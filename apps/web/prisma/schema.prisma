@@ -1,0 +1,572 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/whink/nextjs_space/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+// ── Auth.js tables ──────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          String    @default("user")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  profile       UserProfile?
+  preferences   UserPreference?
+  conversations Conversation[]
+  projects      ProjectMember[]
+  ownedProjects Project[]
+  personaState  PersonaState?
+  actions       Action[]
+  permissions   Permission[]
+  delegations   Delegation[]
+  evaluationRuns EvaluationRun[]
+
+  @@map("users")
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ── User Profile & Preferences ──────────────────────────────────
+
+model UserProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  displayName         String?
+  timezone            String   @default("UTC")
+  workingHoursStart   String   @default("09:00")
+  workingHoursEnd     String   @default("17:00")
+  interruptionBudget  String   @default("BALANCED")
+  autonomyLevel       Int      @default(1)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model UserPreference {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  verbosity        String   @default("STANDARD")
+  mambaPreference  String   @default("ON_REQUEST")
+  defaultFunctionalMode String? 
+  executionProfile String   @default("BALANCED")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+// ── Persona ─────────────────────────────────────────────────────
+
+model PersonaState {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  activePersona    String   @default("WHINK")
+  mambaMode        String?  
+  functionalMode   String?
+  activationSource String   @default("system")
+  activatedAt      DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("persona_states")
+}
+
+// ── Conversations & Messages ────────────────────────────────────
+
+model Conversation {
+  id          String    @id @default(cuid())
+  userId      String
+  title       String    @default("New Conversation")
+  projectId   String?
+  isArchived  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project  Project?  @relation(fields: [projectId], references: [id])
+  messages Message[]
+
+  @@index([userId, updatedAt])
+  @@map("conversations")
+}
+
+model Message {
+  id              String   @id @default(cuid())
+  conversationId  String
+  role            String   // user | assistant | system
+  content         String
+  persona         String?  // WHINK | MAMBA
+  mambaMode       String?  // WHITE | GREY
+  functionalMode  String?
+  toolCalls       String?  // JSON string of tool calls
+  metadata        String?  // JSON string
+  createdAt       DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// ── Projects ────────────────────────────────────────────────────
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  goal        String?
+  description String?
+  status      String   @default("ACTIVE")
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner         User              @relation(fields: [ownerId], references: [id])
+  members       ProjectMember[]
+  tasks         ProjectTask[]
+  milestones    ProjectMilestone[]
+  decisions     ProjectDecision[]
+  risks         ProjectRisk[]
+  openQuestions ProjectOpenQuestion[]
+  conversations Conversation[]
+  memoryEpisodes MemoryEpisode[]
+  memorySemantic MemorySemantic[]
+  entityEdges   EntityEdge[]
+  hypotheses    Hypothesis[]
+
+  @@index([ownerId])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      String   @default("member")
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+model ProjectTask {
+  id           String    @id @default(cuid())
+  projectId    String
+  title        String
+  description  String?
+  status       String    @default("TODO")
+  priority     String    @default("MEDIUM")
+  assignee     String?
+  dueDate      DateTime?
+  dependencies String?   // JSON array of task IDs
+  source       String?   // how the task was created
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@map("project_tasks")
+}
+
+model ProjectMilestone {
+  id          String    @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  status      String    @default("PENDING")
+  targetDate  DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_milestones")
+}
+
+model ProjectDecision {
+  id          String   @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  rationale   String?
+  decidedBy   String?
+  decidedAt   DateTime @default(now())
+  status      String   @default("DECIDED")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_decisions")
+}
+
+model ProjectRisk {
+  id          String   @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  severity    String   @default("MEDIUM")
+  likelihood  String   @default("MEDIUM")
+  mitigation  String?
+  status      String   @default("OPEN")
+  createdAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_risks")
+}
+
+model ProjectOpenQuestion {
+  id          String    @id @default(cuid())
+  projectId   String
+  question    String
+  context     String?
+  assignedTo  String?
+  status      String    @default("OPEN")
+  answer      String?
+  answeredAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_open_questions")
+}
+
+// ── Memory Engine ───────────────────────────────────────────────
+
+model MemoryEpisode {
+  id            String   @id @default(cuid())
+  userId        String
+  projectId     String?
+  eventType     String   // decision_made, meeting_completed, correction, mamba_insight, etc.
+  entities      String?  // JSON array of entity references
+  summary       String
+  source        String   // conversation, tool, integration
+  confidence    Float    @default(0.8)
+  importance    Float    @default(0.5)
+  privacyClass  String   @default("PERSONAL")
+  supersededBy  String?  // ID of newer episode
+  createdAt     DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([projectId])
+  @@map("memory_episodes")
+}
+
+model MemorySemantic {
+  id              String   @id @default(cuid())
+  userId          String
+  projectId       String?
+  statement       String
+  sourceType      String   // user, conversation, integration, mamba
+  sourceId        String?  // reference to source conversation/message
+  confidence      Float    @default(0.8)
+  epistemicStatus String   // KNOWN, INFERRED, HYPOTHESIS, UNVERIFIED
+  supersededBy    String?  // ID of newer semantic memory
+  retrievedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([projectId])
+  @@map("memory_semantic")
+}
+
+model MemoryProcedural {
+  id          String   @id @default(cuid())
+  userId      String
+  category    String   // email_tone, report_structure, model_preference, etc.
+  description String
+  details     String?  // JSON string of procedural details
+  confidence  Float    @default(0.9)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, category])
+  @@map("memory_procedural")
+}
+
+// ── Hypotheses (MAMBA Memory Firewall) ──────────────────────────
+
+model Hypothesis {
+  id              String   @id @default(cuid())
+  userId          String
+  projectId       String?
+  statement       String
+  epistemicStatus String   // MUST be 'hypothesis' — enforced by DB CHECK
+  confidence      Float    @default(0.3) // MAX 0.4 — enforced by DB CHECK
+  source          String   @default("MAMBA")
+  mambaMode       String?  // WHITE | GREY
+  rationale       String?
+  supersededBy    String?
+  createdAt       DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("hypotheses")
+}
+
+// ── Entity / Knowledge Graph ────────────────────────────────────
+
+model EntityNode {
+  id             String   @id @default(cuid())
+  userId         String
+  type           String   // PERSON, ORGANIZATION, PROJECT, DOCUMENT, LOCATION, EVENT
+  canonicalName  String
+  confidence     Float    @default(0.8)
+  metadata       String?  // JSON for additional properties
+  mergedInto     String?  // ID of entity this was merged into
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  aliases    EntityAlias[]
+  edgesFrom  EntityEdge[]  @relation("EdgeFrom")
+  edgesTo    EntityEdge[]  @relation("EdgeTo")
+
+  @@index([userId, type])
+  @@map("entity_nodes")
+}
+
+model EntityAlias {
+  id       String @id @default(cuid())
+  entityId String
+  alias    String
+
+  entity EntityNode @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@index([alias])
+  @@map("entity_aliases")
+}
+
+model EntityEdge {
+  id               String   @id @default(cuid())
+  fromId           String
+  toId             String
+  relationshipType String
+  context          String?
+  confidence       Float    @default(0.8)
+  projectId        String?
+  supersededBy     String?
+  createdAt        DateTime @default(now())
+
+  from    EntityNode @relation("EdgeFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to      EntityNode @relation("EdgeTo", fields: [toId], references: [id], onDelete: Cascade)
+  project Project?   @relation(fields: [projectId], references: [id])
+
+  @@index([fromId])
+  @@index([toId])
+  @@index([projectId])
+  @@map("entity_edges")
+}
+
+// ── Tool Registry ───────────────────────────────────────────────
+
+model Tool {
+  id                  String   @id @default(cuid())
+  name                String   @unique
+  description         String
+  capabilities        String   // JSON array
+  inputSchema         String?  // JSON schema
+  outputSchema        String?  // JSON schema
+  riskClass           String   @default("A") // A, B, C
+  requiredPermissions String?  // JSON array
+  isActive            Boolean  @default(true)
+  version             String   @default("1.0.0")
+  createdAt           DateTime @default(now())
+
+  @@map("tools")
+}
+
+// ── Execution Plans ─────────────────────────────────────────────
+
+model ExecutionPlan {
+  id          String   @id @default(cuid())
+  userId      String
+  objective   String
+  persona     String   @default("WHINK")
+  riskLevel   String   @default("LOW")
+  status      String   @default("PENDING") // PENDING, RUNNING, COMPLETE, FAILED, CANCELLED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  steps PlanStep[]
+
+  @@index([userId])
+  @@map("execution_plans")
+}
+
+model PlanStep {
+  id               String   @id @default(cuid())
+  planId           String
+  stepOrder        Int
+  capability       String
+  description      String?
+  dependencies     String?  // JSON array of step IDs
+  status           String   @default("PENDING")
+  approvalRequired Boolean  @default(false)
+  result           String?  // JSON
+  error            String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime @default(now())
+
+  plan ExecutionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, stepOrder])
+  @@map("plan_steps")
+}
+
+// ── Action Ledger (append-only) ─────────────────────────────────
+
+model Action {
+  id                 String   @id @default(cuid())
+  userId             String
+  initiator          String   // user | system | automation
+  persona            String?  // WHINK | MAMBA
+  mambaMode          String?
+  planId             String?
+  tool               String?
+  action             String
+  permissionClass    String   @default("A")
+  confirmationMethod String?  // auto | user_confirmed | delegated
+  inputSummary       String?
+  outputSummary      String?
+  validationResult   String?  // JSON
+  status             String   @default("SUBMITTED") // SUBMITTED, VALIDATED, FAILED, UNVERIFIED
+  correlationId      String?
+  latencyMs          Int?
+  createdAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([correlationId])
+  @@map("actions")
+}
+
+// ── Permissions & Delegations ───────────────────────────────────
+
+model Permission {
+  id         String   @id @default(cuid())
+  userId     String
+  capability String
+  class      String   @default("A") // A, B, C
+  granted    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, capability])
+  @@map("permissions")
+}
+
+model Delegation {
+  id         String    @id @default(cuid())
+  userId     String
+  capability String
+  conditions String?   // JSON conditions
+  permission String    @default("automatic")
+  expiresAt  DateTime?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, capability])
+  @@map("delegations")
+}
+
+// ── Evaluation Harness ──────────────────────────────────────────
+
+model EvaluationScenario {
+  id               String   @id @default(cuid())
+  category         String   // memory_accuracy, persona_switching, permission_enforcement, context_retrieval
+  title            String
+  input            String
+  expectedBehavior String
+  acceptanceCriteria String?
+  createdAt        DateTime @default(now())
+
+  runs EvaluationRun[]
+
+  @@map("evaluation_scenarios")
+}
+
+model EvaluationRun {
+  id          String   @id @default(cuid())
+  scenarioId  String
+  userId      String
+  result      String   // PASS, FAIL, PARTIAL
+  score       Float?
+  details     String?  // JSON
+  executedAt  DateTime @default(now())
+
+  scenario EvaluationScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  user     User               @relation(fields: [userId], references: [id])
+
+  @@index([scenarioId])
+  @@map("evaluation_runs")
+}

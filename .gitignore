@@ -1,0 +1,27 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+.yarn/install-state.gz
+.yarn/cache/
+
+# python services
+__pycache__/
+.venv/
+venv/
+
+# os and editor
+.DS_Store
+.vscode/
+.idea/
+
+# local data
+*.log
+backups/

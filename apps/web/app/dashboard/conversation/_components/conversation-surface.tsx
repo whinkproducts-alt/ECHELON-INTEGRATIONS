@@ -1,0 +1,361 @@
+'use client';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Send, Plus, MessageSquare, Zap, ChevronDown,
+  FolderKanban, Trash2
+} from 'lucide-react';
+
+interface Message {
+  id: string;
+  role: string;
+  content: string;
+  persona: string | null;
+  mambaMode: string | null;
+  functionalMode: string | null;
+  createdAt: string;
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  projectId: string | null;
+  updatedAt: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+}
+
+export function ConversationSurface() {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [streaming, setStreaming] = useState(false);
+  const [streamText, setStreamText] = useState('');
+  const [streamPersona, setStreamPersona] = useState('WHINK');
+  const [streamMambaMode, setStreamMambaMode] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [showProjects, setShowProjects] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load conversations and projects
+  useEffect(() => {
+    fetch('/api/conversations').then(r => r.json()).then(d => setConversations(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch('/api/projects').then(r => r.json()).then(d => setProjects(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+
+  // Load messages when conversation changes
+  useEffect(() => {
+    if (!activeConvId) { setMessages([]); return; }
+    fetch(`/api/conversations/${activeConvId}/messages`)
+      .then(r => r.json())
+      .then(d => setMessages(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, [activeConvId]);
+
+  // Scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, streamText]);
+
+  const createConversation = async () => {
+    const res = await fetch('/api/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'New Conversation', projectId: selectedProject }),
+    });
+    const conv = await res.json();
+    setConversations(prev => [conv, ...(prev ?? [])]);
+    setActiveConvId(conv.id);
+    setMessages([]);
+  };
+
+  const sendMessage = useCallback(async () => {
+    if (!input.trim() || streaming) return;
+
+    let convId = activeConvId;
+    if (!convId) {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: input.substring(0, 60), projectId: selectedProject }),
+      });
+      const conv = await res.json();
+      convId = conv.id;
+      setActiveConvId(conv.id);
+      setConversations(prev => [conv, ...(prev ?? [])]);
+    }
+
+    const userMsg: Message = {
+      id: `temp-${Date.now()}`,
+      role: 'user',
+      content: input,
+      persona: null,
+      mambaMode: null,
+      functionalMode: null,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages(prev => [...(prev ?? []), userMsg]);
+    const messageText = input;
+    setInput('');
+    setStreaming(true);
+    setStreamText('');
+
+    try {
+      const res = await fetch(`/api/conversations/${convId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: messageText, projectId: selectedProject }),
+      });
+
+      const reader = res.body?.getReader();
+      if (!reader) return;
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullText = '';
+      let persona = 'WHINK';
+      let mambaMode: string | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'text') {
+                fullText += data.content ?? '';
+                setStreamText(fullText);
+                persona = data.persona ?? 'WHINK';
+                mambaMode = data.mambaMode ?? null;
+                setStreamPersona(persona);
+                setStreamMambaMode(mambaMode);
+              } else if (data.type === 'done') {
+                persona = data.persona ?? persona;
+                mambaMode = data.mambaMode ?? mambaMode;
+              }
+            } catch {}
+          }
+        }
+      }
+
+      // Add completed message
+      const assistantMsg: Message = {
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        content: fullText,
+        persona,
+        mambaMode,
+        functionalMode: null,
+        createdAt: new Date().toISOString(),
+      };
+      setMessages(prev => [...(prev ?? []), assistantMsg]);
+      setStreamText('');
+    } catch (error) {
+      console.error('Stream error:', error);
+    } finally {
+      setStreaming(false);
+    }
+  }, [input, streaming, activeConvId, selectedProject]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  return (
+    <div className="flex h-full">
+      {/* Conversation List */}
+      <div className="w-64 border-r border-border flex flex-col bg-card/50">
+        <div className="p-3 border-b border-border">
+          <button
+            onClick={createConversation}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+          >
+            <Plus className="h-4 w-4" /> New
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto py-1">
+          {(conversations ?? []).map((conv: Conversation) => (
+            <button
+              key={conv.id}
+              onClick={() => setActiveConvId(conv.id)}
+              className={`w-full text-left px-3 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+                activeConvId === conv.id
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+              }`}
+            >
+              <MessageSquare className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">{conv.title}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Project Selector */}
+        <div className="px-4 py-2 border-b border-border flex items-center gap-3">
+          <div className="relative">
+            <button
+              onClick={() => setShowProjects(!showProjects)}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <FolderKanban className="h-3 w-3" />
+              {selectedProject ? (projects ?? []).find((p: Project) => p.id === selectedProject)?.name ?? 'Project' : 'No Project'}
+              <ChevronDown className="h-3 w-3" />
+            </button>
+            {showProjects && (
+              <div className="absolute top-full left-0 mt-1 w-48 bg-card border border-border rounded-md shadow-lg z-10 py-1">
+                <button
+                  onClick={() => { setSelectedProject(null); setShowProjects(false); }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent transition-colors"
+                >
+                  No Project
+                </button>
+                {(projects ?? []).map((p: Project) => (
+                  <button
+                    key={p.id}
+                    onClick={() => { setSelectedProject(p.id); setShowProjects(false); }}
+                    className="w-full text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent transition-colors"
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-auto px-4 py-4 space-y-4">
+          {(messages ?? []).length === 0 && !streamText && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <Zap className="h-10 w-10 text-primary/30 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground font-mono">WHINK online.</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">Type a command or start a conversation.</p>
+              </div>
+            </div>
+          )}
+
+          {(messages ?? []).map((msg: Message) => (
+            <MessageBubble key={msg.id} message={msg} />
+          ))}
+
+          {/* Streaming message */}
+          {streamText && (
+            <div className={`flex gap-3 ${
+              streamPersona === 'MAMBA' ? 'mamba-glow' : ''
+            }`}>
+              <div className={`flex-shrink-0 h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                streamPersona === 'MAMBA'
+                  ? 'bg-amber-400/10 text-amber-400'
+                  : 'bg-primary/10 text-primary'
+              }`}>
+                {streamPersona === 'MAMBA' ? 'M' : 'W'}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-xs font-mono font-medium ${
+                    streamPersona === 'MAMBA' ? 'text-amber-400' : 'text-primary'
+                  }`}>
+                    {streamPersona}{streamMambaMode ? ` • ${streamMambaMode}` : ''}
+                  </span>
+                </div>
+                <div className="text-sm text-foreground whitespace-pre-wrap">
+                  {streamText}
+                  <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="border-t border-border p-4">
+          <div className="flex gap-3 max-w-3xl mx-auto">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a command or message..."
+              rows={1}
+              className="flex-1 px-4 py-3 bg-secondary rounded-lg border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary text-sm resize-none min-h-[44px] max-h-[120px]"
+              style={{ height: 'auto' }}
+              disabled={streaming}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={!input.trim() || streaming}
+              className="px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-30"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex items-center gap-3 mt-2 max-w-3xl mx-auto">
+            <span className="text-xs text-muted-foreground/50 font-mono">
+              /mamba • /whink • /brief • /deep • /plan • /status
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({ message }: { message: Message }) {
+  const isUser = message.role === 'user';
+  const isMamba = message.persona === 'MAMBA';
+
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[70%] px-4 py-2.5 bg-primary/10 text-foreground rounded-lg text-sm">
+          <p className="whitespace-pre-wrap">{message.content}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex gap-3 ${isMamba ? 'mamba-glow' : ''}`}>
+      <div className={`flex-shrink-0 h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold ${
+        isMamba ? 'bg-amber-400/10 text-amber-400' : 'bg-primary/10 text-primary'
+      }`}>
+        {isMamba ? 'M' : 'W'}
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-1">
+          <span className={`text-xs font-mono font-medium ${
+            isMamba ? 'text-amber-400' : 'text-primary'
+          }`}>
+            {message.persona ?? 'WHINK'}{message.mambaMode ? ` • ${message.mambaMode}` : ''}
+          </span>
+          {message.functionalMode && (
+            <span className="text-xs font-mono text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+              {message.functionalMode}
+            </span>
+          )}
+        </div>
+        <div className="text-sm text-foreground whitespace-pre-wrap">{message.content}</div>
+      </div>
+    </div>
+  );
+}
