@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /** @type {import('next').NextConfig} */
 const path = require('path');
 
@@ -11,6 +12,8 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: { unoptimized: true },
+  // Transpile the org-kit workspace package (TypeScript source, no build step)
+  transpilePackages: ['@whink/org-kit'],
   // Next 16 BLOCKS unlisted origins on /_next/* and /__nextjs* in dev — including the /_next/hmr
   // WEBSOCKET upgrade, and Turbopack gates client module wiring on that socket, so a blocked origin
   // means the page renders but never hydrates, with no console error (the block writes a raw
@@ -21,7 +24,7 @@ const nextConfig = {
   // the platform's browser checks on the pod browse via 127.0.0.1. Enumerated hosts, never a
   // wildcard: every conversation previews under the same parent domain and serves content its own
   // author controls, so `**.<domain>` would let any UNRELATED app's preview reach this dev server.
-  allowedDevOrigins: ['127.0.0.1', 'fece2504.na113.preview.abacusai.app'],
+  allowedDevOrigins: ['127.0.0.1'],
 };
 
 const fs = require('fs');

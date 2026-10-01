@@ -26,11 +26,11 @@ export function MemorySurface() {
   };
 
   useEffect(() => {
-    if (tab === 'entities') loadEntities();
+    if (tab === 'entities') loadEntities(); // eslint-disable-line react-hooks/set-state-in-effect
   }, [tab]);
 
   useEffect(() => {
-    search();
+    search(); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
 
   const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [

@@ -7,10 +7,10 @@ async function main() {
   // Hidden test account
   const testHash = await bcrypt.hash('ZnlCX#2Ppw', 12);
   const testUser = await prisma.user.upsert({
-    where: { email: 'abacus-7a0f30d3@example.com' },
+    where: { email: 'victor@whink.ai' },
     update: { passwordHash: testHash },
     create: {
-      email: 'abacus-7a0f30d3@example.com',
+      email: 'victor@whink.ai',
       name: 'WHINK Admin',
       passwordHash: testHash,
       role: 'admin',

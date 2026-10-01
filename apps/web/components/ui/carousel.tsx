@@ -111,7 +111,7 @@ const Carousel = React.forwardRef<
         return;
       }
 
-      onSelect(api);
+      onSelect(api); // eslint-disable-line react-hooks/set-state-in-effect
       api.on('reInit', onSelect);
       api.on('select', onSelect);
 

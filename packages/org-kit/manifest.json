@@ -1,0 +1,22 @@
+{
+  "name": "WHINK Group Portable AI Organization Kit",
+  "version": "2.0.0",
+  "portable": true,
+  "native_universal_plugin": false,
+  "supported_targets": [
+    "ChatGPT/OpenAI",
+    "Anthropic Claude",
+    "xAI Grok",
+    "Google Gemini",
+    "Local/Self-hosted LLMs"
+  ],
+  "entrypoint_for_chat_attachment": "WHINK_PORTABLE_CHAT_BOOTSTRAP.md",
+  "canonical_org_file": "organization/whink_group_leadership.json",
+  "canonical_governance_file": "governance/core_governance.yaml",
+  "team_count": 163,
+  "agent_count": 326,
+  "skill_count": 570,
+  "routing_engine": "workflows/router_reference.py",
+  "approval_gate": true,
+  "reuse_before_creation": true
+}

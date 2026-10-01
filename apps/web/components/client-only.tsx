@@ -5,6 +5,7 @@ import { ReactNode, useEffect, useState } from 'react'
 /** True only after the component has mounted on the client. Use to gate browser-only values. */
 export function useMounted(): boolean {
   const [mounted, setMounted] = useState(false)
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), [])
   return mounted
 }

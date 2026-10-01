@@ -1,0 +1,59 @@
+version: '2.0'
+entry_personas:
+  primary: WHINK
+  adversarial_review: MAMBA
+principles:
+- route_to_smallest_competent_team
+- reuse_existing_agents_before_any_creation
+- all_agents_dormant_by_default
+- human_approval_before_execution
+- least_privilege
+- provider_neutral_core
+routing_stages:
+- classify_task_domain
+- identify_directorate
+- identify_department
+- scan_existing_agents_company_wide
+- score_agents_by_skill_overlap_and_scope
+- select_smallest_competent_team
+- estimate_schedule
+- estimate_budget_using_provider_adapter_rates
+- prepare_execution_authorization_request
+- wait_for_human_approval
+- activate_approved_agents_only
+- execute_and_review
+- consolidate_to_whink
+- return_to_human
+- store_validated_lessons_only
+agent_scoring:
+  required_skill_overlap: 0.5
+  weights:
+    required_skill_match: 0.45
+    department_match: 0.2
+    directorate_match: 0.1
+    dormant_availability: 0.1
+    cost_efficiency: 0.1
+    review_coverage: 0.05
+  penalties:
+    scope_conflict: -0.3
+    permission_gap: -0.5
+    active_overload: -0.2
+approval_gate:
+  required_before_execution: true
+  required_fields:
+  - objective
+  - lead_agent
+  - supporting_agents
+  - team_size
+  - schedule
+  - milestones
+  - estimated_budget
+  - assumptions
+  - risks
+new_agent_policy:
+  creation_allowed_only_after:
+  - company_wide_registry_scan
+  - reuse_evaluation
+  - retraining_evaluation
+  - temporary_worker_evaluation
+  - human_approval

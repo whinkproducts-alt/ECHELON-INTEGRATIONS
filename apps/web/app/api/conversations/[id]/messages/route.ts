@@ -2,8 +2,11 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { streamChat } from '@/lib/model-router';
 import { processInput } from '@/lib/orchestrator';
 import { logger, generateCorrelationId } from '@/lib/logger';
+import { runTaskGate } from '@/lib/task-gate';
+import { handleApproval } from '@/lib/approval-handler';
 
 export async function GET(
   req: NextRequest,
@@ -94,30 +97,114 @@ export async function POST(
       });
     }
 
-    // Stream from LLM API
-    const llmResponse = await fetch('https://apps.abacus.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.ABACUSAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-5.4-mini',
-        messages,
-        stream: true,
-        max_tokens: 4000,
-        temperature: 0.7,
-      }),
-    });
+    // ── Approval Handler ─────────────────────────────────────────────────────
+    // Catches "Approved" / "Go ahead" replies and dispatches the pending EAR.
+    const approvalOutcome = await handleApproval(session.user.id, userMessage, orchResult.newPersona ?? 'WHINK');
+    if (approvalOutcome.dispatched) {
+      const dispatchContent = approvalOutcome.dispatchMessage;
 
-    if (!llmResponse.ok) {
-      const errText = await llmResponse.text().catch(() => 'Unknown error');
-      logger.error('LLM API error', { correlationId, error: errText });
-      return NextResponse.json({ error: 'LLM API failed' }, { status: 502 });
+      await prisma.message.create({
+        data: {
+          conversationId,
+          role: 'assistant',
+          content: dispatchContent,
+          persona: orchResult.newPersona ?? 'WHINK',
+        },
+      });
+
+      const approvalEncoder = new TextEncoder();
+      const approvalStream = new ReadableStream({
+        start(ctrl) {
+          ctrl.enqueue(approvalEncoder.encode(`data: ${JSON.stringify({ type: 'text', content: dispatchContent, persona: orchResult.newPersona ?? 'WHINK', agentDispatched: true })}
+
+`));
+          ctrl.enqueue(approvalEncoder.encode(`data: ${JSON.stringify({ type: 'done', persona: orchResult.newPersona ?? 'WHINK' })}
+
+`));
+          ctrl.close();
+        },
+      });
+
+      return new Response(approvalStream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
     }
+    // ── End Approval Handler ──────────────────────────────────────────────────
 
+        // ── Org-Kit Task Gate ────────────────────────────────────────────────────
+    // If this message is a task directive, build an Execution Authorization
+    // Request and return it immediately. Execution is blocked until Victor
+    // approves.
+    const gateOutcome = runTaskGate(userMessage, orchResult.newPersona ?? 'WHINK');
+    if (gateOutcome.intercepted) {
+      const earContent = gateOutcome.formattedResponse;
+
+      // Persist the EAR as an assistant message
+      await prisma.message.create({
+        data: {
+          conversationId,
+          role: 'assistant',
+          content: earContent,
+          persona: orchResult.newPersona ?? 'WHINK',
+        },
+      });
+
+      // Log the authorization request
+      await prisma.action.create({
+        data: {
+          userId: session.user.id,
+          initiator: 'user',
+          persona: orchResult.newPersona ?? 'WHINK',
+          action: 'execution_authorization_request',
+          permissionClass: 'S',
+          confirmationMethod: 'human_required',
+          status: 'AWAITING_APPROVAL',
+          validationResult: JSON.stringify(gateOutcome.ear),
+          inputSummary: userMessage.substring(0, 500),
+          outputSummary: earContent.substring(0, 500),
+          correlationId,
+        },
+      });
+
+      // Stream the EAR back
+      const earEncoder = new TextEncoder();
+      const earStream = new ReadableStream({
+        start(ctrl) {
+          ctrl.enqueue(earEncoder.encode(`data: ${JSON.stringify({ type: 'text', content: earContent, persona: orchResult.newPersona ?? 'WHINK', earIntercepted: true })}
+
+`));
+          ctrl.enqueue(earEncoder.encode(`data: ${JSON.stringify({ type: 'done', persona: orchResult.newPersona ?? 'WHINK' })}
+
+`));
+          ctrl.close();
+        },
+      });
+
+      return new Response(earStream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
+    }
+    // ── End Task Gate ────────────────────────────────────────────────────────
+
+        // Stream from model router
     const activePersona = orchResult.newPersona ?? 'WHINK';
     const activeMambaMode = orchResult.newMambaMode ?? null;
+
+    let routerStream: ReadableStream<Uint8Array>;
+    try {
+      routerStream = await streamChat({ messages });
+    } catch (err: any) {
+      logger.error('Model router error', { correlationId, error: err?.message });
+      return NextResponse.json({ error: 'LLM API failed' }, { status: 502 });
+    }
 
     // Create streaming response
     const encoder = new TextEncoder();
@@ -132,11 +219,7 @@ export async function POST(
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', content: switchAnnouncement + '\n\n', persona: activePersona, mambaMode: activeMambaMode })}\n\n`));
           }
 
-          const reader = llmResponse.body?.getReader();
-          if (!reader) {
-            controller.close();
-            return;
-          }
+          const reader = routerStream.getReader();
 
           let partialRead = '';
           while (true) {
@@ -147,22 +230,20 @@ export async function POST(
             partialRead = lines.pop() ?? '';
 
             for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6);
-                if (data === '[DONE]') {
+              if (!line.startsWith('data: ')) continue;
+              const data = line.slice(6).trim();
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.type === 'done') {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done', persona: activePersona, mambaMode: activeMambaMode })}\n\n`));
-                  continue;
+                } else if (parsed.type === 'text' && parsed.content) {
+                  fullContent += parsed.content;
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', content: parsed.content, persona: activePersona, mambaMode: activeMambaMode })}\n\n`));
+                } else if (parsed.type === 'error') {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: parsed.error ?? 'LLM error' })}\n\n`));
                 }
-                try {
-                  const parsed = JSON.parse(data);
-                  const content = parsed?.choices?.[0]?.delta?.content ?? '';
-                  if (content) {
-                    fullContent += content;
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', content, persona: activePersona, mambaMode: activeMambaMode })}\n\n`));
-                  }
-                } catch {
-                  // skip invalid JSON
-                }
+              } catch {
+                // skip unparseable lines
               }
             }
           }

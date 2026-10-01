@@ -49,8 +49,8 @@ export async function assembleContext(
 
   // 2. Project context
   if (projectId) {
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId },
       include: {
         tasks: { where: { status: { not: 'DONE' } }, take: 10, orderBy: { updatedAt: 'desc' } },
         decisions: { take: 5, orderBy: { decidedAt: 'desc' } },

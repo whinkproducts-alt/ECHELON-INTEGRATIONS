@@ -1,0 +1,190 @@
+group: WHINK GROUP
+founder:
+  name: Victor Igboekwe
+  preferred_name: Kaycee
+  pronunciation: K-C
+executive_personas:
+- name: WHINK
+  role: CEO
+  level: peer executive persona
+  primary_interface: true
+- name: MAMBA
+  role: Consigliere
+  level: peer executive persona
+  primary_interface: false
+product:
+  name: W.H.I.N.K ULTIMATE
+  created_by: WHINK APPS
+  parent_company: WHINK GROUP
+directorates:
+- name: Executive Office & Corporate Strategy
+  director: Dr. Tinaye Muzenyi-Igboekwe
+  departments:
+    Office of the CEO & Executive Operations: Whitney Brown
+    Corporate Strategy & Strategic Planning: Chux Onwusah
+    Corporate Development & Strategic Investments: Tosin (Suki) Suara
+    Enterprise Transformation & Strategic Programs: Nimat Omobolanle
+    Enterprise Business Intelligence & Performance: Jideofor Nnaji
+    Strategic Portfolio & PMO: Pat Johnson
+- name: WHINK Group Marketing Intelligence
+  director: Tai Tamminga
+  departments:
+    Brand, Media & Audience Intelligence: Sonia Bantu
+    Commercial & Growth Marketing Intelligence: David Eniolade
+- name: Sales & Revenue
+  director: Juliet Uchechukwu Igboekwe (JP)
+  departments:
+    Enterprise Sales: Ijie Alpha
+    SMB & Mid-Market Sales: Muyiwa Agoro
+    Sales Development & Pipeline Generation: Mosope Talabi
+    Solutions & Technical Sales: Matthew Okonunfua
+    Channel & Partner Sales: Oluwaseun Lambo
+    Account Management & Expansion: Sam Patel
+    Revenue Operations & Sales Intelligence: Sylvester Anyanwu
+- name: Product
+  director: Atika Emmanuel
+  departments:
+    Product Strategy & Portfolio: Dee Jay Khaled
+    Product Management: Kamsiyochukwu Igboekwe
+    Product Operations: Kiki Palmer
+    Product Research & Customer Discovery: Denzel Washington
+    Product Analytics & Intelligence: Kaisochukwu Nnaji
+    User Experience & Service Design: Inaas Abdul
+    Release & Product Lifecycle Management: Abiodun Iseniyi
+- name: Engineering & Technology
+  director: Luke Mellors
+  departments:
+    Software Engineering: Sofoluwe Coker
+    Mobile & Client Platforms: Ernest Abhulimehn
+    Platform Engineering & Core Infrastructure: Tinashe Muzenyi
+    Architecture & Technical Strategy: Sophia Mercurri
+    API, Integrations & Developer Ecosystem: Omolara Suara
+    DevOps, SRE & Cloud Engineering: Raven May Mei
+    Quality Engineering & Test Automation: Terhemba Ahile
+    Release Engineering & Configuration Management: Rebecca Johnson
+    Engineering Productivity & Developer Experience: Étienne Moreau
+    Technical Documentation & Engineering Knowledge: Leila Haddad
+- name: Data & Artificial Intelligence
+  director: Dr. Amara Okafor
+  departments:
+    AI Engineering & Applied Intelligence: Lukas Schneider
+    Agent Architecture & AI Workforce Systems: Hanae Nakamura
+    Skill Engineering & Tool Orchestration: Mateo Fernández
+    Machine Learning & Model Development: Dr. Priyanka Rao
+    Model Evaluation, Reliability & Intelligence Quality: Elias Haddad
+    Model Routing & AI Infrastructure: Ingrid Bergström
+    Data Engineering & Data Platforms: Kwesi Boateng
+    Data Science & Decision Intelligence: Dr. Sofia Petrovic
+    Knowledge Systems & Enterprise Memory: Leila Ben Youssef
+    AI Governance Technology & Responsible AI Systems: Amina El-Sayed
+    AI FinOps & Usage Intelligence: Gabriel Costa
+    AI Platform Operations & Observability: Min-jun Park
+- name: Research & Development
+  director: Dr. Elena Varga
+  departments:
+    Applied Research: Dr. Tendai Muchengeti
+    Emerging Technologies & Future Systems: Kenji Mori
+    Experimental Engineering & Prototyping: Andrés Valdés
+    AI & Autonomous Systems Research: Dr. Samira Qureshi
+    Human–Computer Interaction & Future Interfaces: Freja Lindholm
+    Advanced Computing & Systems Research: Dr. Kwame Asante
+    Research Partnerships & Academic Collaboration: Claire Dubois
+    Innovation Incubation & Technology Transfer: Rafael Mendes
+    Intellectual Property Discovery & Invention Management: Noura Al-Mansouri
+    Research Intelligence & Scientific Foresight: Dr. Ji-won Seo
+- name: Information Technology
+  director: Alejandro Ruiz
+  departments:
+    Enterprise Applications & Business Systems: Grace Kimani
+    End-User Computing & Workplace Technology: Yuki Tanaka
+    IT Service Management & Service Desk: Michael O'Connor
+    Cloud & Infrastructure Operations: Ananya Deshmukh
+    Network & Connectivity Services: Chinedu Eze
+    Identity & Access Administration: Katarina Novak
+    Collaboration & Productivity Platforms: Farah Rahman
+    IT Asset & Configuration Management: João Ferreira
+    Enterprise Systems Administration: Thabo Mokoena
+    IT Architecture & Technology Standards: Dr. Elise van der Meer
+- name: Cybersecurity & Resilience
+  director: Anthony C Igboekwe
+  departments:
+    Security Operations & Incident Response: Marcus Lund
+    Threat Intelligence & Threat Hunting: Olumide Adekunle
+    Identity Security & Privileged Access: Camille Tremblay
+    Security Engineering: Arjun Mehra
+    Cloud & Infrastructure Security: Sofia Dimitrova
+    Application & Product Security: Diego Morales
+    Security Architecture: Dr. Miriam Kessler
+    Vulnerability & Exposure Management: Bongani Dlamini
+    Data Security & Information Protection: Noor Al-Khatib
+    Third-Party & Supply Chain Security: Haruka Watanabe
+    Cyber Risk & Security Governance: Gabriela Torres
+    Business Continuity, Disaster Recovery & Cyber Resilience: Henrik Sørensen
+- name: Finance & Accounting
+  director: Charles Soludo
+  departments:
+    Accounting & Close: Helena Costa
+    Financial Reporting & Consolidation: Kwabena Mensah
+    FP&A, Budgeting & Forecasting: Priya Raman
+    Treasury & Capital Management: Mikhail Petrov
+    Tax: Aisha Bello
+    Billing, Accounts Receivable & Accounts Payable: Camila Ferreira
+    Payroll Finance: Thandiwe Ncube
+    Financial Controls & Management Accounting: Giulia Romano
+- name: Legal, Risk & Governance
+  director: Genevieve Igboekwe
+  departments:
+    Corporate & Commercial Legal: Marcus Feldman
+    Contracts & Transactions: Zainab Bakare
+    Intellectual Property & Technology Legal: Dr. Lucía Herrera
+    Employment Legal: Daniel Cho
+    Privacy & Data Protection: Amélie Laurent
+    Enterprise Risk Management: Sipho Dlamini
+    Governance & Board Affairs: Ingrid Madsen
+    Regulatory Compliance & Ethics: Farida El-Masri
+    Records & Information Governance: Tomasz Kowalski
+- name: People & Culture
+  director: Victoria Ngozi Igboekwe
+  departments:
+    HR Business Partnering & People Operations: Nneka Eze
+    Talent Acquisition: Sofia Lindström
+    Onboarding & Employee Experience: Javier Morales
+    Employee Relations: Amina Yusuf
+    Total Rewards, Compensation & Benefits: Claire Beaumont
+    Performance & Talent Management: Kofi Agyeman
+    Learning & Development: Hana Suzuki
+    Organizational Design & Workforce Planning: Rajiv Menon
+    People Analytics: Elena Popescu
+    AI Workforce & Organizational Intelligence: Dr. Maya Kilonzo
+- name: Operations & Procurement
+  director: Bruno Fernades
+  departments:
+    Corporate Operations: Nadia Petrescu
+    Business Process & Continuous Improvement: Samuel Adekunle
+    Procurement & Strategic Sourcing: Linh Nguyen
+    Vendor & Supplier Management: Matteo Ricci
+    Facilities & Workplace: Chloe Martin
+    Real Estate & Physical Infrastructure: Ahmed Al-Hassan
+    Quality Management: Dr. Eva Horváth
+    Operational Performance & Service Excellence: Bongiwe Khumalo
+- name: Customer Organization
+  director: Zaleena BeeHarry
+  departments:
+    Customer Success: Sofia Mendes
+    Customer Onboarding & Implementation: Caleb Nwosu
+    Professional Services: Aiko Fujimoto
+    Technical Account Management: Lars Petersen
+    Customer Support & Service Desk: Naomi Chen
+    Customer Education & Adoption: Fatima Zahra
+    Renewals & Expansion: Diego Fernandes
+    Customer Health & Escalation Management: Grace Owusu
+- name: Internal Audit & Assurance
+  director: Francis Lampard
+  departments:
+    Financial Audit & Assurance: Helena Novak
+    Technology Audit: Dr. Marcus Chen
+    Cybersecurity Assurance: Leila Haddad-Sayegh
+    Operational Audit: Tawanda Moyo
+    Compliance & Governance Audit: Ingrid Solberg
+    Controls Assurance: Priya Kapoor
+    AI Systems & Agent Governance Audit: Dr. Kojo Mensima

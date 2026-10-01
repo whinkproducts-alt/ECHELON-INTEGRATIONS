@@ -2,6 +2,10 @@
 
 Newest first. Each entry: date, decision, alternatives, reason.
 
+## 2026-09-27  No blinking
+The avatars do not blink. Animation is limited to audio driven mouth shapes, a subtle breathing motion, and state changes in the interface.
+Reason: a convincing blink needs a hand drawn eyes closed frame per character; not worth the cost.
+
 ## 2026-09-27  Build team as Claude Code subagents
 Twelve project level agents in .claude/agents: five builders, five assurance agents, two guardians. Assurance agents never write the code they check.
 Alternatives: installing all 37 contains-studio agents globally.

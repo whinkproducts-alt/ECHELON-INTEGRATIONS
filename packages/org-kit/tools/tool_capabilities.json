@@ -1,0 +1,59 @@
+{
+  "web.search": {
+    "type": "research",
+    "provider_adapter_required": true
+  },
+  "files.search": {
+    "type": "knowledge",
+    "provider_adapter_required": true
+  },
+  "files.read": {
+    "type": "knowledge",
+    "provider_adapter_required": true
+  },
+  "email.read": {
+    "type": "communication",
+    "provider_adapter_required": true,
+    "approval": "task_scope"
+  },
+  "email.send": {
+    "type": "communication",
+    "provider_adapter_required": true,
+    "approval": "human_before_send"
+  },
+  "calendar.read": {
+    "type": "productivity",
+    "provider_adapter_required": true
+  },
+  "calendar.create": {
+    "type": "productivity",
+    "provider_adapter_required": true,
+    "approval": "human_before_create_unless_delegated"
+  },
+  "crm.read": {
+    "type": "revenue",
+    "provider_adapter_required": true
+  },
+  "crm.write": {
+    "type": "revenue",
+    "provider_adapter_required": true,
+    "approval": "human_or_explicit_delegation"
+  },
+  "finance.read": {
+    "type": "finance",
+    "provider_adapter_required": true
+  },
+  "finance.commit": {
+    "type": "finance",
+    "provider_adapter_required": true,
+    "approval": "explicit_human"
+  },
+  "code.execute": {
+    "type": "engineering",
+    "provider_adapter_required": true
+  },
+  "document.create": {
+    "type": "artifact",
+    "provider_adapter_required": true
+  }
+}

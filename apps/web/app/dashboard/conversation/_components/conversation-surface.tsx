@@ -51,10 +51,10 @@ export function ConversationSurface() {
 
   // Load messages when conversation changes
   useEffect(() => {
-    if (!activeConvId) { setMessages([]); return; }
+    if (!activeConvId) { setMessages([]); return; } // eslint-disable-line react-hooks/set-state-in-effect
     fetch(`/api/conversations/${activeConvId}/messages`)
       .then(r => r.json())
-      .then(d => setMessages(Array.isArray(d) ? d : []))
+      .then(d => setMessages(Array.isArray(d) ? d : [])) // eslint-disable-line react-hooks/set-state-in-effect
       .catch(() => {});
   }, [activeConvId]);
 

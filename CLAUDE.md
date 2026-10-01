@@ -113,3 +113,17 @@ Base #070B12, surface #0E1520, WHINK accent #38B6FF (cyan #4FF3EE under review),
 
 ## Credits
 The agent roster was informed by the structure of contains-studio/agents. The agent files here are written for this project.
+
+---
+## Cowork sync
+
+This repo is paired with the **W.H.I.N.K ULTIMATE** Cowork project on claude.ai (Projects → W.H.I.N.K ULTIMATE).
+
+At the start of every Claude Code session:
+- Read `docs/daily-syncs/` — the most recent file is the current project state
+- Read `docs/decisions.md` — the dated decision log
+- Read `/areas/whink-ai-assistant.md` from memory — long-term stated facts about this build
+
+The end-of-day-memory-sync scheduled task keeps all three in sync automatically.
+Account-level memory (`/areas/whink-ai-assistant.md`) is writable from Claude Code sessions
+— update it whenever Victor states a new fact or makes a decision during a build session.
