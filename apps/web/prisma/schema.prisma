@@ -624,3 +624,23 @@ model Note {
   @@index([userId, createdAt])
   @@map("notes")
 }
+
+// ── Compound Agent Intelligence ─────────────────────────────────
+
+model AgentKnowledge {
+  id        String   @id @default(cuid())
+  agentId   String   // e.g. "backend-engineer", "frontend-engineer"
+  domain    String   // e.g. "tool-loop", "prisma", "auth", "ui"
+  taskType  String   // e.g. "migration", "api-route", "component", "debug"
+  lesson    String   // The actual lesson — what worked, what failed, why
+  outcome   String   // "success" | "failure" | "partial"
+  tags      String?  // JSON array of keyword tags for retrieval
+  accountId String?  // M1: tenant isolation. null = global/curated lesson
+  createdAt DateTime @default(now())
+
+  @@index([agentId])
+  @@index([domain])
+  @@index([taskType])
+  @@index([accountId])
+  @@map("agent_knowledge")
+}

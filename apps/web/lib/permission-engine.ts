@@ -46,12 +46,9 @@ export async function checkPermission(
     return { allowed: false, method: 'requires_confirmation', reason: 'Class B action requires autonomy level 2+ or delegation' };
   }
 
-  // Class C: requires explicit confirmation unless autonomy 4 with delegation
+  // Class C: always requires explicit human approval — no autonomy bypass
   if (permissionClass === 'C') {
-    if (autonomyLevel >= 4) {
-      return { allowed: true, method: 'auto' };
-    }
-    return { allowed: false, method: 'requires_confirmation', reason: 'Class C action requires explicit approval' };
+    return { allowed: false, reason: 'Class C action requires explicit approval. An EAR has been queued.', method: 'requires_confirmation' };
   }
 
   return { allowed: false, method: 'requires_confirmation' };

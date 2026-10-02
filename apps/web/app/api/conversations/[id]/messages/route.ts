@@ -45,18 +45,7 @@ export async function POST(
     });
     if (!conv) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
 
-    // Save user message
-    const personaState = await prisma.personaState.findUnique({ where: { userId: session.user.id } });
-    await prisma.message.create({
-      data: {
-        conversationId,
-        role: 'user',
-        content: userMessage,
-        persona: personaState?.activePersona ?? 'WHINK',
-      },
-    });
-
-    // Process through orchestrator
+    // Process through orchestrator FIRST — before saving the user message
     const orchResult = await processInput({
       userId: session.user.id,
       conversationId,
@@ -64,12 +53,9 @@ export async function POST(
       projectId: projectId ?? conv.projectId,
     });
 
-    // Block injection attempts — do not forward to model
+    // Block injection attempts — do not save user message, do not forward to model
     if (orchResult.injectionDetected) {
       const blocked = 'Message blocked: injection pattern detected. External content must be submitted through a trusted tool, not pasted directly into chat.';
-      await prisma.message.create({
-        data: { conversationId, role: 'assistant', content: blocked, persona: orchResult.newPersona ?? 'WHINK' },
-      });
       const enc = new TextEncoder();
       return new Response(
         new ReadableStream({
@@ -83,23 +69,45 @@ export async function POST(
       );
     }
 
+    // Block meta-authorization attempts — do not save user message
+    if (orchResult.metaAuthViolation) {
+      const blocked = 'Message blocked: this looks like an attempt to modify WHINK\'s authorization rules. That is not permitted.';
+      const enc = new TextEncoder();
+      return new Response(
+        new ReadableStream({
+          start(ctrl) {
+            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'text', content: blocked, persona: orchResult.newPersona ?? 'WHINK' })}\n\n`));
+            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+            ctrl.close();
+          },
+        }),
+        { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } }
+      );
+    }
+
+    // Save user message (only after passing all block checks)
+    const personaState = await prisma.personaState.findUnique({ where: { userId: session.user.id } });
+    await prisma.message.create({
+      data: {
+        conversationId,
+        role: 'user',
+        content: userMessage,
+        persona: personaState?.activePersona ?? 'WHINK',
+      },
+    });
+
     // Handle persona switch announcement
     let switchAnnouncement = '';
     if (orchResult.personaSwitched) {
       switchAnnouncement = orchResult.newPersona === 'MAMBA' ? 'MAMBA active.' : 'WHINK active.';
     }
 
-    // Handle meta-authorization violation
-    if (orchResult.metaAuthViolation) {
-      switchAnnouncement = 'Permission changes require the Settings interface. Conversational authorization is not accepted.';
-    }
-
-    // Get conversation history for context
-    const history = await prisma.message.findMany({
+    // Get conversation history for context — most recent 50, in chronological order
+    const history = (await prisma.message.findMany({
       where: { conversationId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
       take: 50,
-    });
+    })).reverse();
 
     const messages = [
       { role: 'system', content: orchResult.systemPrompt },

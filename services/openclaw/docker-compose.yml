@@ -1,0 +1,25 @@
+# OpenClaw — external action gateway for W.H.I.N.K. Ultimate
+#
+# ghcr.io/opencoatl/openclaw does not exist as a published image.
+# When the real image is available, replace the build section below with:
+#   image: ghcr.io/opencoatl/openclaw:latest
+#
+# Until then this compose file builds a minimal pass-through stub so the
+# rest of the stack can wire up against a live HTTP endpoint.
+# Replace the Dockerfile in this directory once the upstream image ships.
+
+services:
+  openclaw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./config:/app/config:ro
+    environment:
+      - PORT=3100
+      - CONFIG_PATH=/app/config/tools.json
+    # Never expose OpenClaw to the public internet.
+    # It must only be reachable from the apps/web container or localhost.

@@ -3,7 +3,8 @@ import { generateCorrelationId } from '@/lib/logger';
 import { assembleContext, formatContextForPrompt } from '@/lib/context-engine';
 import { buildSystemPrompt } from '@/prompts/build-prompt';
 import { checkMetaAuthorization, logSecurityEvent } from '@/lib/permission-engine';
-import { scanForInjectionPatterns } from '@/lib/content-isolation';
+import { scanUserInput } from '@/lib/content-isolation';
+import { readContext } from '@/lib/agent-memory';
 
 const PERSONA_SWITCH_PATTERNS: Array<{ regex: RegExp; persona: string; mode?: string }> = [
   { regex: /^\/?mamba\b/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
@@ -58,8 +59,8 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
     await logSecurityEvent(userId, 'META_AUTH_ATTEMPT', `User attempted meta-authorization: "${message.substring(0, 200)}"`, correlationId);
   }
 
-  // 2. Check for injection patterns — block if suspicious
-  const injectionScan = scanForInjectionPatterns(message);
+  // 2. Check for injection patterns in user input (tighter regexes, caller decides to block)
+  const injectionScan = scanUserInput(message);
   if (injectionScan.suspicious) {
     await logSecurityEvent(
       userId,
@@ -127,16 +128,31 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
   const context = await assembleContext(userId, conversationId, projectId, correlationId);
   const contextStr = formatContextForPrompt(context);
 
+  // 6b. Read agent lessons (CAI) — scoped by accountId for tenant isolation
+  const agentId = activePersona === 'MAMBA' ? 'mamba' : 'whink';
+  const taskTypeDomain = activeFunctionalMode?.toLowerCase() ?? 'general';
+  // TODO: when User model has an accountId field, use it here. For now, userId is the accountId.
+  const userForAccount = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  const accountId = userForAccount?.id ?? userId;
+  const agentLessons = await readContext(agentId, 'conversation', taskTypeDomain, 10, accountId);
+
   // 7. Get user profile
   const profile = await prisma.userProfile.findUnique({ where: { userId } });
 
   // 8. Build system prompt
+  const agentContextStr = agentLessons.length > 0
+    ? agentLessons
+        .map((l, i) => `${i + 1}. [${l.outcome}] ${l.lesson}`)
+        .join('\n')
+    : undefined;
+
   const systemPrompt = buildSystemPrompt({
     persona: activePersona,
     mambaMode: activeMambaMode,
     functionalMode: activeFunctionalMode,
     retrievedContext: contextStr || undefined,
     userProfile: profile ? { displayName: profile.displayName, timezone: profile.timezone } : undefined,
+    agentContext: agentContextStr,
   });
 
   return {

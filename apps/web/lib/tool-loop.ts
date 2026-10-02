@@ -13,6 +13,10 @@
  */
 
 import { executeTool } from '@/lib/tool-registry';
+import { wrapUntrustedContent, stripFakeUntrustedTags, scanForInjectionPatterns } from '@/lib/content-isolation';
+
+const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search']);
+const isExternal = (name: string) => EXTERNAL_TOOLS.has(name) || name.startsWith('openclaw__');
 
 export interface ToolDefinition {
   name: string;
@@ -126,10 +130,24 @@ async function runAnthropicToolLoop(
               data: result.data ?? result.error,
             });
 
+            // Wrap external tool results to prevent prompt injection
+            let toolContent: string;
+            if (isExternal(block.name) && result.success) {
+              const rawStr = JSON.stringify(result.data);
+              const safe = stripFakeUntrustedTags(rawStr);
+              const injection = scanForInjectionPatterns(safe);
+              if (injection.suspicious) {
+                console.warn(`[tool-loop] injection patterns in ${block.name} result: ${injection.patterns.join(', ')}`);
+              }
+              toolContent = wrapUntrustedContent(safe, block.name, result.source ?? block.name);
+            } else {
+              toolContent = JSON.stringify(result.success ? result.data : { error: result.error });
+            }
+
             toolResults.push({
               type: 'tool_result',
               tool_use_id: block.id,
-              content: JSON.stringify(result.success ? result.data : { error: result.error }),
+              content: toolContent,
             });
           }
 
