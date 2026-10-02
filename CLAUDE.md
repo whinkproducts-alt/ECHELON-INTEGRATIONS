@@ -92,10 +92,10 @@ Acceptance:
 - `yarn build` and `yarn lint` pass.
 
 Victor's checklist:
-- [ ] I followed the README on my Mac and the app started.
-- [ ] I had a conversation with WHINK on Claude.
-- [ ] I switched to Ollama and had the same conversation offline.
-- [ ] I switched to MAMBA and he sounded like MAMBA.
+- [x] I followed the README on my Mac and the app started.
+- [x] I had a conversation with WHINK on Claude.
+- [x] I switched to Ollama and had the same conversation offline.
+- [x] I switched to MAMBA and he sounded like MAMBA.
 
 ## Known issues in the inherited code
 - Tool registry exists but is never passed to the model or called from chat. (Phase 2)
