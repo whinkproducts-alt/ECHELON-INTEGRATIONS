@@ -11,7 +11,7 @@ Install with Homebrew on Apple Silicon:
 
 ```sh
 brew install --cask orbstack        # OrbStack (Docker runtime)
-brew install node pnpm              # Node 20+ and pnpm
+brew install node                   # Node 20+
 brew install ollama                 # Ollama (local models)
 ```
 
@@ -24,7 +24,7 @@ OrbStack must be running before you start Postgres.
 ```sh
 git clone <repo-url> whink-ultimate
 cd whink-ultimate/apps/web
-yarn install
+npm install
 ```
 
 ---
@@ -42,7 +42,7 @@ DATABASE_URL=postgresql://whink:whink_local@localhost:5432/whink
 ANTHROPIC_API_KEY=sk-ant-...
 NEXTAUTH_SECRET=<any random string, e.g. openssl rand -hex 32>
 AUTH_SECRET=<same or different random string>
-DEFAULT_MODEL=claude-3-5-sonnet-20241022
+DEFAULT_MODEL=claude-sonnet-4-6
 ```
 
 ---
@@ -77,7 +77,7 @@ npx prisma migrate dev
 ## Start the app
 
 ```sh
-yarn dev
+npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
