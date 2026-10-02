@@ -250,7 +250,7 @@ describe('Ollama round-trip (integration)', () => {
 
       let ollamaUp = false;
       try {
-        const res = await fetch(`${baseUrl}/models`, { signal: AbortSignal.timeout(1500) });
+        const res = await fetch(`${baseUrl}/models`, { signal: AbortSignal.timeout(500) });
         ollamaUp = res.ok;
       } catch {
         ollamaUp = false;
@@ -280,6 +280,6 @@ describe('Ollama round-trip (integration)', () => {
 
       expect(lines[lines.length - 1].type).toBe('done');
     },
-    10_000, // 10 s timeout for the integration test
+    5_000, // 5 s timeout for the integration test
   );
 });
