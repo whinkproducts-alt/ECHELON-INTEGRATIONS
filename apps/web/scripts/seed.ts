@@ -10,6 +10,7 @@ async function main() {
     where: { email: 'victor@whink.ai' },
     update: { passwordHash: testHash },
     create: {
+      id: 'whink-admin-victor-igboekwe',
       email: 'victor@whink.ai',
       name: 'WHINK Admin',
       passwordHash: testHash,
