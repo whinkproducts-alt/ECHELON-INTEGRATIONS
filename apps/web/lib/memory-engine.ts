@@ -172,36 +172,44 @@ export async function searchMemory(
 
   if (queryVec) {
     const vecLiteral = `[${queryVec.join(',')}]`;
-    const projectFilter = projectId ? `AND "projectId" = '${projectId}'` : '';
 
     // Cosine distance (<=>). Lower = more similar. Scoped by userId (tenant isolation).
-    const semanticRows = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT *, (embedding <=> $1::vector) AS distance
-       FROM memory_semantic
-       WHERE "userId" = $2
-         AND "supersededBy" IS NULL
-         AND embedding IS NOT NULL
-         ${projectFilter}
-       ORDER BY distance
-       LIMIT $3`,
-      vecLiteral,
-      userId,
-      limit
-    );
+    // Two separate parameterized queries to avoid string interpolation of projectId.
+    const semanticRows = projectId
+      ? await prisma.$queryRawUnsafe<any[]>(
+          `SELECT *, (embedding <=> $1::vector) AS distance
+           FROM memory_semantic
+           WHERE "userId" = $2 AND "projectId" = $3
+             AND "supersededBy" IS NULL AND embedding IS NOT NULL
+           ORDER BY distance LIMIT $4`,
+          vecLiteral, userId, projectId, limit
+        )
+      : await prisma.$queryRawUnsafe<any[]>(
+          `SELECT *, (embedding <=> $1::vector) AS distance
+           FROM memory_semantic
+           WHERE "userId" = $2
+             AND "supersededBy" IS NULL AND embedding IS NOT NULL
+           ORDER BY distance LIMIT $3`,
+          vecLiteral, userId, limit
+        );
 
-    const episodeRows = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT *, (embedding <=> $1::vector) AS distance
-       FROM memory_episodes
-       WHERE "userId" = $2
-         AND "supersededBy" IS NULL
-         AND embedding IS NOT NULL
-         ${projectFilter}
-       ORDER BY distance
-       LIMIT $3`,
-      vecLiteral,
-      userId,
-      limit
-    );
+    const episodeRows = projectId
+      ? await prisma.$queryRawUnsafe<any[]>(
+          `SELECT *, (embedding <=> $1::vector) AS distance
+           FROM memory_episodes
+           WHERE "userId" = $2 AND "projectId" = $3
+             AND "supersededBy" IS NULL AND embedding IS NOT NULL
+           ORDER BY distance LIMIT $4`,
+          vecLiteral, userId, projectId, limit
+        )
+      : await prisma.$queryRawUnsafe<any[]>(
+          `SELECT *, (embedding <=> $1::vector) AS distance
+           FROM memory_episodes
+           WHERE "userId" = $2
+             AND "supersededBy" IS NULL AND embedding IS NOT NULL
+           ORDER BY distance LIMIT $3`,
+          vecLiteral, userId, limit
+        );
 
     // If no embedded rows exist yet, fall back to LIKE
     if (semanticRows.length === 0 && episodeRows.length === 0) {
