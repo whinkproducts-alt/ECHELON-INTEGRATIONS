@@ -540,6 +540,23 @@ model Delegation {
   @@map("delegations")
 }
 
+// ── Tenant Config (white label) ─────────────────────────────────
+
+model TenantConfig {
+  id          String   @id @default(cuid())
+  tenantId    String   @unique  // matches userId for single-tenant; org ID for multi
+  productName String   @default("WHINK")
+  logoUrl     String?
+  accentColor String   @default("#38B6FF")
+  supportUrl  String?
+  privacyUrl  String?
+  termsUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tenant_config")
+}
+
 // ── Evaluation Harness ──────────────────────────────────────────
 
 model EvaluationScenario {

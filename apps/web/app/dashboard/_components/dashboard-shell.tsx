@@ -8,6 +8,7 @@ import {
   Zap, MessageSquare, FolderKanban, Brain, CheckSquare,
   Settings, LogOut, Command, ChevronLeft, ChevronRight,
 } from 'lucide-react';
+import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 
 interface NavItem {
   label: string;
@@ -32,6 +33,7 @@ interface PersonaState {
 
 export function DashboardShell({ children, user }: { children: React.ReactNode; user: any }) {
   const pathname = usePathname();
+  const tenantConfig = useTenantConfig();
   const [collapsed, setCollapsed] = useState(false);
   const [personaState, setPersonaState] = useState<PersonaState>({
     activePersona: 'WHINK',
@@ -49,9 +51,13 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
   }, [pathname]);
 
   const isWhink = personaState.activePersona === 'WHINK';
+  const accentColor = tenantConfig.accentColor;
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div
+      className="flex h-screen bg-background overflow-hidden"
+      style={{ '--accent-color': accentColor } as React.CSSProperties}
+    >
       {/* Sidebar */}
       <aside
         className={`flex flex-col border-r border-border bg-card transition-all duration-200 ${
@@ -62,7 +68,7 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
         <div className="flex items-center gap-2 px-4 h-14 border-b border-border">
           <Zap className={`h-5 w-5 flex-shrink-0 ${isWhink ? 'text-primary' : 'text-amber-400'}`} />
           {!collapsed && (
-            <span className="font-display font-bold text-foreground tracking-tight">WHINK</span>
+            <span className="font-display font-bold text-foreground tracking-tight">{tenantConfig.productName}</span>
           )}
         </div>
 
@@ -117,7 +123,7 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
               <span className={`h-2 w-2 rounded-full ${
                 isWhink ? 'bg-primary animate-pulse-subtle' : 'bg-amber-400 animate-pulse-subtle'
               }`} />
-              {isWhink ? 'WHINK' : `MAMBA • ${personaState.mambaMode ?? 'WHITE'}`}
+              {isWhink ? tenantConfig.productName : `MAMBA • ${personaState.mambaMode ?? 'WHITE'}`}
             </div>
             {personaState.functionalMode && (
               <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-1 rounded">
