@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Send, Plus, MessageSquare, Zap, ChevronDown,
-  FolderKanban
+  FolderKanban, Mic, MicOff, Volume2, VolumeX
 } from 'lucide-react';
+import { useVoice } from '@/lib/hooks/useVoice';
 
 interface Message {
   id: string;
@@ -40,8 +41,15 @@ export function ConversationSurface() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [showProjects, setShowProjects] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('whink-voice-mode') === 'true';
+    }
+    return false;
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { startListening, stopListening, speak, isListening, isSpeaking, supported } = useVoice();
 
   // Load conversations and projects
   useEffect(() => {
@@ -161,12 +169,17 @@ export function ConversationSurface() {
       };
       setMessages(prev => [...(prev ?? []), assistantMsg]);
       setStreamText('');
+
+      // Read response aloud if voice mode is on
+      if (voiceMode && fullText) {
+        speak(fullText).catch(() => {});
+      }
     } catch (error) {
       console.error('Stream error:', error);
     } finally {
       setStreaming(false);
     }
-  }, [input, streaming, activeConvId, selectedProject]);
+  }, [input, streaming, activeConvId, selectedProject, voiceMode, speak]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -207,8 +220,25 @@ export function ConversationSurface() {
 
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
-        {/* Project Selector */}
+        {/* Header: Project Selector + Voice Toggle */}
         <div className="px-4 py-2 border-b border-border flex items-center gap-3">
+          {/* Voice mode toggle */}
+          {(supported.stt || supported.tts) && (
+            <button
+              onClick={() => {
+                const next = !voiceMode;
+                setVoiceMode(next);
+                if (typeof window !== 'undefined') localStorage.setItem('whink-voice-mode', String(next));
+              }}
+              title={voiceMode ? 'Voice mode on — click to disable' : 'Enable voice mode'}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                voiceMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'
+              } ${isSpeaking ? 'animate-pulse' : ''}`}
+            >
+              {voiceMode ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+              <span className="font-mono">Voice</span>
+            </button>
+          )}
           <div className="relative">
             <button
               onClick={() => setShowProjects(!showProjects)}
@@ -301,6 +331,31 @@ export function ConversationSurface() {
               style={{ height: 'auto' }}
               disabled={streaming}
             />
+            {supported.stt && (
+              <button
+                onMouseDown={() => {
+                  startListening();
+                }}
+                onMouseUp={async () => {
+                  const t = await stopListening();
+                  if (t.trim()) setInput(t.trim());
+                }}
+                onTouchStart={() => startListening()}
+                onTouchEnd={async () => {
+                  const t = await stopListening();
+                  if (t.trim()) setInput(t.trim());
+                }}
+                title={isListening ? 'Listening… release to stop' : 'Hold to speak'}
+                disabled={streaming}
+                className={`px-4 py-3 rounded-lg border transition-colors disabled:opacity-30 ${
+                  isListening
+                    ? 'bg-red-500/20 border-red-500 text-red-400 animate-pulse'
+                    : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </button>
+            )}
             <button
               onClick={sendMessage}
               disabled={!input.trim() || streaming}

@@ -2,6 +2,12 @@
 
 Newest first. Each entry: date, decision, alternatives, reason.
 
+## 2026-10-02  Phase 4 Voice architecture
+Browser Web Speech API as primary STT/TTS in development (zero dependencies).
+Server routes /api/voice/stt and /api/voice/tts bridge to Whisper + Kokoro for production/offline.
+ADA V2 maps to the TTS_URL/STT_URL env vars — swap the URL to point at ADA when it is running.
+Spoken approvals: client-side EAR reading + speech recognition for "approved"/"denied".
+
 ## 2026-09-27  No blinking
 The avatars do not blink. Animation is limited to audio driven mouth shapes, a subtle breathing motion, and state changes in the interface.
 Reason: a convincing blink needs a hand drawn eyes closed frame per character; not worth the cost.
