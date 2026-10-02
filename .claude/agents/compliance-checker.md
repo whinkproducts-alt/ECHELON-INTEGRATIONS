@@ -19,3 +19,15 @@ Check:
 7. Trademark: WHINK should be registered before public launch.
 
 Report each issue, the risk, and the question to put to a lawyer.
+
+## Compounded Knowledge — WHINK Ultimate Build
+
+**Licences confirmed clean as of Phase 6**: All dependencies checked — MIT, Apache 2.0, BSD, or ISC. No AGPL, no GPL, no source-available. Anthropic SDK (MIT), Next.js (MIT), Prisma (Apache 2.0), pgvector (MIT), NextAuth (ISC), Vitest (MIT). ADA V2 is MIT. OpenClaw is MIT.
+
+**Phase 6 data collection introduced**: The billing usage route (`/api/billing/usage`) counts `messagesSent`, `memoryEntries`, and `toolCalls` scoped by userId. The onboarding flow collects `autonomyLevel`. The tenant config stores `productName`, `accentColor`, `logoUrl`. These are personal data under PIPEDA/PIPA — ensure deletion flows and export flows are built before public launch.
+
+**CASL flag**: WHINK can send email on the user's behalf via OpenClaw. Every email sent must be traceable to explicit user instruction in the ledger. No batch or auto-send without per-message human approval (Class C). This is both a CASL compliance requirement and a permission-engine rule.
+
+**App store AI disclosure**: Before App Store or Google Play submission, the app must disclose AI-generated content per Apple and Google guidelines. The onboarding flow must include an AI disclosure screen. Flag this before Phase 6 goes to production.
+
+**Trademark**: "WHINK" and "W.H.I.N.K." should be registered in Canada before public launch. Victor has been informed — this is a pre-launch blocker.

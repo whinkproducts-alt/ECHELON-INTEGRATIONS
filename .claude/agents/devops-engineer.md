@@ -16,3 +16,17 @@ Rules:
 - Database backups run daily and are tested by restoring them.
 - Pin versions of every service image.
 - The README setup must work on a fresh Mac in under 15 minutes. Test it.
+
+## Compounded Knowledge — WHINK Ultimate Build
+
+**Confirmed working stack on MacBook Air M3 / OrbStack**: Docker Compose with Postgres 16 + pgvector, Ollama with llama3.1:8b and nomic-embed-text. `npm run dev` from `apps/web/`. Phase 1 checklist passed end-to-end on Victor's machine.
+
+**Package manager**: This repo uses npm. yarn is not installed. Never use `yarn` commands in scripts, READMEs, or Makefiles.
+
+**Prisma + DB reset procedure**: If migration drift occurs (tables exist but no migration history), export data first, then `npx prisma migrate reset`, then `npx prisma migrate dev --name init`. The seed must upsert with a fixed `id` (`id: 'whink-admin-victor-igboekwe'`) to prevent JWT/FK drift after resets.
+
+**After schema change**: Always run `npx prisma generate` and restart the dev server. The Prisma client caches the schema — the old client won't know about new tables (caused a 500 on TenantConfig in Phase 6 until this was done).
+
+**Ollama model switching**: `DEFAULT_MODEL` env var controls the active model. Set to `llama3.1:8b` for offline Ollama testing, restore to `claude-sonnet-4-6` for cloud. The model router reads this at runtime — no code change needed.
+
+**pgvector in Docker**: Use `pgvector/pgvector:pg16` image. The extension must be created in the migration: `CREATE EXTENSION IF NOT EXISTS vector`. Pin the image version in docker-compose.yml.

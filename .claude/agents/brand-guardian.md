@@ -18,3 +18,15 @@ Check:
 - Colour never carries meaning without a label or shape.
 
 Report each issue with the file, line, and the token that should be used.
+
+## Compounded Knowledge — WHINK Ultimate Build
+
+**CSS custom properties confirmed in globals.css**: `--whink-accent: #38B6FF`, `--mamba-blood: #C41E1E`, `--ember: #FF4A1C`, `--pending-amber: #F5A623`, `--denial: #E5484D`, `--base: #070B12`, `--surface: #0E1520`. All components must reference these variables, never raw hex.
+
+**Obsidian overlay spec** (Phase 5, confirmed): blood-red border at 40% opacity, radial gradient 4% opacity from center, OBSIDIAN label in ember (#FF4A1C) at 10px IBM Plex Mono, 0.4s fade-in. This is a security signal (persona switch) — it must be visually unambiguous and never suppressed.
+
+**Tenant config accent injection** (Phase 6): `accentColor` from tenant config is injected as `--tenant-accent` on `:root` via the `useTenantConfig` hook. Components that want white-label theming use `var(--tenant-accent)`, falling back to `var(--whink-accent)`. The WHINK brand accent and the tenant accent are separate tokens.
+
+**White label hard rule**: The string "WHINK", "MAMBA", or any product name must never appear in JSX/TSX markup except in dev fixtures and agent definition files. `productName` from `useTenantConfig()` is the only source of the product name in the UI.
+
+**Typography confirmed**: Jost loaded via Google Fonts for display headings. IBM Plex Sans for body. IBM Plex Mono for all numbers, IDs, timestamps, system events, and the Neural Link feed.
