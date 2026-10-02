@@ -2,8 +2,8 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { streamChat } from '@/lib/model-router';
 import { processInput } from '@/lib/orchestrator';
+import { runToolLoop, STANDARD_TOOLS } from '@/lib/tool-loop';
 import { logger, generateCorrelationId } from '@/lib/logger';
 import { runTaskGate } from '@/lib/task-gate';
 import { handleApproval } from '@/lib/approval-handler';
@@ -61,6 +61,25 @@ export async function POST(
       message: userMessage,
       projectId: projectId ?? conv.projectId,
     });
+
+    // Block injection attempts — do not forward to model
+    if (orchResult.injectionDetected) {
+      const blocked = 'Message blocked: injection pattern detected. External content must be submitted through a trusted tool, not pasted directly into chat.';
+      await prisma.message.create({
+        data: { conversationId, role: 'assistant', content: blocked, persona: orchResult.newPersona ?? 'WHINK' },
+      });
+      const enc = new TextEncoder();
+      return new Response(
+        new ReadableStream({
+          start(ctrl) {
+            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'text', content: blocked, persona: orchResult.newPersona ?? 'WHINK' })}\n\n`));
+            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+            ctrl.close();
+          },
+        }),
+        { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } }
+      );
+    }
 
     // Handle persona switch announcement
     let switchAnnouncement = '';
@@ -194,13 +213,20 @@ export async function POST(
     }
     // ── End Task Gate ────────────────────────────────────────────────────────
 
-        // Stream from model router
+        // Stream from tool loop (falls back to plain streamChat for non-Anthropic)
     const activePersona = orchResult.newPersona ?? 'WHINK';
     const activeMambaMode = orchResult.newMambaMode ?? null;
 
     let routerStream: ReadableStream<Uint8Array>;
     try {
-      routerStream = await streamChat({ messages });
+      routerStream = await runToolLoop({
+        messages,
+        tools: STANDARD_TOOLS,
+        userId: session.user.id,
+        persona: activePersona,
+        mambaMode: activeMambaMode,
+        correlationId,
+      });
     } catch (err: any) {
       logger.error('Model router error', { correlationId, error: err?.message });
       return NextResponse.json({ error: 'LLM API failed' }, { status: 502 });
@@ -239,6 +265,10 @@ export async function POST(
                 } else if (parsed.type === 'text' && parsed.content) {
                   fullContent += parsed.content;
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', content: parsed.content, persona: activePersona, mambaMode: activeMambaMode })}\n\n`));
+                } else if (parsed.type === 'tool_call') {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'tool_call', tool: parsed.tool, input: parsed.input, persona: activePersona })}\n\n`));
+                } else if (parsed.type === 'tool_result') {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'tool_result', tool: parsed.tool, success: parsed.success, persona: activePersona })}\n\n`));
                 } else if (parsed.type === 'error') {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: parsed.error ?? 'LLM error' })}\n\n`));
                 }

@@ -6,16 +6,14 @@ import { checkMetaAuthorization, logSecurityEvent } from '@/lib/permission-engin
 import { scanForInjectionPatterns } from '@/lib/content-isolation';
 
 const PERSONA_SWITCH_PATTERNS: Array<{ regex: RegExp; persona: string; mode?: string }> = [
-  { regex: /^\/?mamba\b/i, persona: 'MAMBA', mode: 'WHITE' },
-  { regex: /mamba mode/i, persona: 'MAMBA', mode: 'WHITE' },
-  { regex: /activate mamba/i, persona: 'MAMBA', mode: 'WHITE' },
-  { regex: /switch to mamba/i, persona: 'MAMBA', mode: 'WHITE' },
-  { regex: /bring mamba in/i, persona: 'MAMBA', mode: 'WHITE' },
-  { regex: /let mamba look/i, persona: 'MAMBA', mode: 'WHITE' },
-  { regex: /give me mamba/i, persona: 'MAMBA', mode: 'WHITE' },
-  { regex: /mamba,?\s*white\s*mode/i, persona: 'MAMBA', mode: 'WHITE' },
-  { regex: /mamba,?\s*grey\s*mode/i, persona: 'MAMBA', mode: 'GREY' },
-  { regex: /mamba,?\s*gray\s*mode/i, persona: 'MAMBA', mode: 'GREY' },
+  { regex: /^\/?mamba\b/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
+  { regex: /mamba mode/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
+  { regex: /activate mamba/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
+  { regex: /switch to mamba/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
+  { regex: /bring mamba in/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
+  { regex: /let mamba look/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
+  { regex: /give me mamba/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
+  { regex: /mamba,?\s*obsidian\s*mode/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
   { regex: /stand down mamba/i, persona: 'WHINK' },
   { regex: /whink mode/i, persona: 'WHINK' },
   { regex: /switch (back )?to whink/i, persona: 'WHINK' },
@@ -60,8 +58,16 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
     await logSecurityEvent(userId, 'META_AUTH_ATTEMPT', `User attempted meta-authorization: "${message.substring(0, 200)}"`, correlationId);
   }
 
-  // 2. Check for injection patterns
+  // 2. Check for injection patterns — block if suspicious
   const injectionScan = scanForInjectionPatterns(message);
+  if (injectionScan.suspicious) {
+    await logSecurityEvent(
+      userId,
+      'INJECTION_ATTEMPT',
+      `Injection patterns detected (${injectionScan.patterns.join(', ')}): "${message.substring(0, 200)}"`,
+      correlationId
+    );
+  }
 
   // 3. Detect persona switch
   let personaSwitched = false;
