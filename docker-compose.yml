@@ -23,5 +23,26 @@ services:
       timeout: 5s
       retries: 10
 
+  # Speech-to-text: faster-whisper (OpenAI-compatible /v1/audio/transcriptions)
+  # Needs ~2 GB RAM. Set WHISPER_MODEL to 'base' to reduce memory use.
+  whisper:
+    image: fedirz/faster-whisper-server:latest-cpu
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8765:8000"
+    environment:
+      WHISPER__MODEL: ${WHISPER_MODEL:-base}
+    volumes:
+      - whink_whisper_cache:/root/.cache/huggingface
+
+  # Text-to-speech: kokoro-fastapi (OpenAI-compatible /v1/audio/speech)
+  # Lightweight — runs on CPU with ~500 MB RAM.
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.2.2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8766:8880"
+
 volumes:
   whink_pgdata:
+  whink_whisper_cache:

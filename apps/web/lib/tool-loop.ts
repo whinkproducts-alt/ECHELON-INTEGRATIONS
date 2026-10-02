@@ -229,4 +229,66 @@ export const STANDARD_TOOLS: ToolDefinition[] = [
       required: ['projectId', 'title'],
     },
   },
+  {
+    name: 'web_search',
+    description: 'Search the web for current information, news, or facts.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query' },
+        count: { type: 'number', description: 'Number of results (max 10, default 5)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'web_fetch',
+    description: 'Fetch the content of a URL and return its text or JSON. Use after web_search to read a specific page.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Full URL starting with http or https' },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'calendar_list',
+    description: "List Victor's upcoming calendar events.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        days: { type: 'number', description: 'How many days ahead to look (default 7, max 30)' },
+      },
+    },
+  },
+  {
+    name: 'calendar_create',
+    description: "Create a calendar event for Victor.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        startAt: { type: 'string', description: 'ISO 8601 datetime' },
+        endAt: { type: 'string', description: 'ISO 8601 datetime' },
+        description: { type: 'string' },
+        location: { type: 'string' },
+        allDay: { type: 'boolean' },
+      },
+      required: ['title', 'startAt'],
+    },
+  },
+  {
+    name: 'note_write',
+    description: "Save a note or capture an idea for Victor.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        content: { type: 'string' },
+        tags: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['content'],
+    },
+  },
 ];

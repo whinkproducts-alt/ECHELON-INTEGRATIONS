@@ -95,6 +95,93 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
     return { success: false, error: 'No operation specified', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
+  web_search: async (_userId: string, params: any) => {
+    const query = String(params.query ?? '').trim();
+    if (!query) return { success: false, error: 'query required', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    const braveKey = process.env.BRAVE_SEARCH_API_KEY?.trim();
+    if (braveKey) {
+      const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${params.count ?? 5}`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json', 'X-Subscription-Token': braveKey } });
+      if (!res.ok) return { success: false, error: `Brave Search ${res.status}`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+      const json: any = await res.json();
+      const results = (json.web?.results ?? []).map((r: any) => ({ title: r.title, url: r.url, snippet: r.description }));
+      return { success: true, data: results, source: 'brave_search', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    // DuckDuckGo instant-answer fallback (no key required)
+    const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+    const res = await fetch(ddgUrl, { headers: { 'User-Agent': 'WHINK/1.0' } });
+    if (!res.ok) return { success: false, error: `DDG ${res.status}`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    const json: any = await res.json();
+    const results: any[] = [];
+    if (json.AbstractText) results.push({ title: json.Heading, url: json.AbstractURL, snippet: json.AbstractText });
+    (json.RelatedTopics ?? []).slice(0, 4).forEach((t: any) => {
+      if (t.Text && t.FirstURL) results.push({ title: t.Text.split(' - ')[0], url: t.FirstURL, snippet: t.Text });
+    });
+    return { success: true, data: results, source: 'duckduckgo', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
+  web_fetch: async (_userId: string, params: any) => {
+    const url = String(params.url ?? '').trim();
+    if (!url.startsWith('http')) return { success: false, error: 'url must start with http', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    const res = await fetch(url, { headers: { 'User-Agent': 'WHINK/1.0' }, signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return { success: false, error: `HTTP ${res.status}`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    const contentType = res.headers.get('content-type') ?? '';
+    if (contentType.includes('json')) {
+      const json = await res.json();
+      return { success: true, data: json, source: url, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+    const text = await res.text();
+    // Strip HTML tags for readability
+    const plain = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .substring(0, 8000);
+    return { success: true, data: plain, source: url, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
+  calendar_list: async (userId: string, params: any) => {
+    const days = Math.min(params.days ?? 7, 30);
+    const now = new Date();
+    const end = new Date(now.getTime() + days * 86_400_000);
+    const events = await prisma.calendarEvent.findMany({
+      where: { userId, startAt: { gte: now, lte: end } },
+      orderBy: { startAt: 'asc' },
+      take: 20,
+    });
+    return { success: true, data: events, source: 'calendar', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
+  calendar_create: async (userId: string, params: any) => {
+    const event = await prisma.calendarEvent.create({
+      data: {
+        userId,
+        title: params.title,
+        description: params.description,
+        startAt: new Date(params.startAt),
+        endAt: new Date(params.endAt ?? params.startAt),
+        location: params.location,
+        allDay: params.allDay ?? false,
+      },
+    });
+    return { success: true, data: event, source: 'calendar', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
+  note_write: async (userId: string, params: any) => {
+    const note = await prisma.note.create({
+      data: {
+        userId,
+        title: params.title ?? 'Untitled',
+        content: params.content,
+        tags: params.tags ? JSON.stringify(params.tags) : null,
+      },
+    });
+    return { success: true, data: note, source: 'notes', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
   task_create: async (userId: string, params: any) => {
     const task = await prisma.projectTask.create({
       data: {
@@ -118,6 +205,11 @@ const TOOL_RISK_MAP: Record<string, PermissionClass> = {
   entity_create: 'A',
   entity_update: 'B',
   task_create: 'B',
+  web_search: 'A',
+  web_fetch: 'A',
+  calendar_list: 'A',
+  calendar_create: 'B',
+  note_write: 'A',
 };
 
 export async function executeTool(
