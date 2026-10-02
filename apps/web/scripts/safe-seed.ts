@@ -20,7 +20,7 @@ try {
     process.exit(1);
   }
 
-} catch (err: any) {
+} catch {
 }
 
 execSync("tsx --require dotenv/config scripts/seed.ts", { stdio: "inherit" });

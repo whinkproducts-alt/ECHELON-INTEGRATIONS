@@ -33,7 +33,7 @@ export async function PUT(
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { id } = await params;
   const body = await req.json();
-  const project = await prisma.project.updateMany({
+  await prisma.project.updateMany({
     where: { id, ownerId: session.user.id },
     data: {
       name: body.name,

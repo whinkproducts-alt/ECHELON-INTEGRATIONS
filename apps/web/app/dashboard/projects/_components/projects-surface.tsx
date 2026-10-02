@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FolderKanban, Plus, ArrowRight, Target, AlertTriangle } from 'lucide-react';
-import { SafeDate } from '@/components/safe-format';
+import { FolderKanban, Plus, ArrowRight } from 'lucide-react';
+
 
 interface Project {
   id: string;

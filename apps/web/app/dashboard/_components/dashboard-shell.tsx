@@ -7,7 +7,6 @@ import { signOut } from 'next-auth/react';
 import {
   Zap, MessageSquare, FolderKanban, Brain, CheckSquare,
   Settings, LogOut, Command, ChevronLeft, ChevronRight,
-  Shield, Activity
 } from 'lucide-react';
 
 interface NavItem {

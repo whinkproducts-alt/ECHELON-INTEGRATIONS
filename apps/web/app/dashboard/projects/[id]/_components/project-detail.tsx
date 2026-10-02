@@ -6,7 +6,7 @@ import {
   ArrowLeft, Target, CheckSquare, AlertTriangle, HelpCircle,
   Milestone, Plus
 } from 'lucide-react';
-import { SafeDate } from '@/components/safe-format';
+
 
 export function ProjectDetail({ projectId }: { projectId: string }) {
   const router = useRouter();

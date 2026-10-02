@@ -11,7 +11,7 @@ export function MemorySurface() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any>(null);
   const [entities, setEntities] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const search = async () => {
     setLoading(true);
@@ -30,7 +30,10 @@ export function MemorySurface() {
   }, [tab]);
 
   useEffect(() => {
-    search(); // eslint-disable-line react-hooks/set-state-in-effect
+    fetch(`/api/memory/search?q=`)
+      .then(r => r.json())
+      .catch(() => ({}))
+      .then(res => { setResults(res); setLoading(false); });
   }, []);
 
   const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [

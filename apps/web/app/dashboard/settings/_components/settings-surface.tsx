@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, Save, User, Shield, Bell, Gauge } from 'lucide-react';
+import { Save, User, Shield, Bell, Gauge } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function SettingsSurface() {

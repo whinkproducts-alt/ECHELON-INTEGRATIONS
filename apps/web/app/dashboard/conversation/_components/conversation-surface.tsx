@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Send, Plus, MessageSquare, Zap, ChevronDown,
-  FolderKanban, Trash2
+  FolderKanban
 } from 'lucide-react';
 
 interface Message {
@@ -54,7 +54,7 @@ export function ConversationSurface() {
     if (!activeConvId) { setMessages([]); return; } // eslint-disable-line react-hooks/set-state-in-effect
     fetch(`/api/conversations/${activeConvId}/messages`)
       .then(r => r.json())
-      .then(d => setMessages(Array.isArray(d) ? d : [])) // eslint-disable-line react-hooks/set-state-in-effect
+      .then(d => setMessages(Array.isArray(d) ? d : []))  
       .catch(() => {});
   }, [activeConvId]);
 

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { workingMemory } from '@/lib/working-memory';
-import { logger } from '@/lib/logger';
+
 
 const MAX_CONTEXT_TOKENS = 80000;
 const AVG_CHARS_PER_TOKEN = 4;
@@ -20,7 +20,7 @@ export async function assembleContext(
   userId: string,
   conversationId: string,
   projectId?: string | null,
-  correlationId?: string
+  _correlationId?: string
 ): Promise<RetrievedContext> {
   const result: RetrievedContext = {
     workingMemory: [],

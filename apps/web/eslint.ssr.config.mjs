@@ -108,7 +108,7 @@ const ssrPlugin = {
   },
 }
 
-export default [
+const config = [
   {
     ignores: ['node_modules/**', '.next/**', '.build/**', '.deploy/**', 'out/**', 'dist/**', 'build/**', 'prisma/**', 'scripts/**', '**/*.d.ts', 'next.config.js', 'postcss.config.js', 'tailwind.config.ts'],
   },
@@ -137,4 +137,6 @@ export default [
       'ssr/no-bare-locale-format': 'error',
     },
   },
-]
+];
+
+export default config;

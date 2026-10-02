@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { logger, generateCorrelationId } from '@/lib/logger';
+import { generateCorrelationId } from '@/lib/logger';
 import { assembleContext, formatContextForPrompt } from '@/lib/context-engine';
 import { buildSystemPrompt } from '@/prompts/build-prompt';
 import { checkMetaAuthorization, logSecurityEvent } from '@/lib/permission-engine';

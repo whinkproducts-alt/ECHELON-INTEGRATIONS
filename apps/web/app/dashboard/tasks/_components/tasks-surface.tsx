@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CheckSquare, Circle, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { CheckSquare, Circle, CheckCircle2, Clock } from 'lucide-react';
 import { SafeDate } from '@/components/safe-format';
 
 interface Task {

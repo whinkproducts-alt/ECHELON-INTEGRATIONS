@@ -13,7 +13,7 @@ export async function checkPermission(
   userId: string,
   capability: string,
   permissionClass: PermissionClass,
-  correlationId?: string
+  _correlationId?: string
 ): Promise<PermissionCheckResult> {
   // Get user's autonomy level
   const profile = await prisma.userProfile.findUnique({ where: { userId } });
@@ -77,7 +77,7 @@ export async function logSecurityEvent(
   details: string,
   correlationId?: string
 ) {
-  logger.security(event, { userId, details, correlationId });
+  logger.security(event, { userId, details });
   await prisma.action.create({
     data: {
       userId,

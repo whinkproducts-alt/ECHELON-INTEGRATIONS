@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { logger, generateCorrelationId } from '@/lib/logger';
+import { generateCorrelationId } from '@/lib/logger';
 import { checkPermission, type PermissionClass } from '@/lib/permission-engine';
 import { writeMemory, correctMemory, searchMemory } from '@/lib/memory-engine';
 
