@@ -7,6 +7,8 @@ import { runToolLoop, STANDARD_TOOLS } from '@/lib/tool-loop';
 import { logger, generateCorrelationId } from '@/lib/logger';
 import { runTaskGate } from '@/lib/task-gate';
 import { handleApproval } from '@/lib/approval-handler';
+import { writeMemory } from '@/lib/memory-engine';
+import { chatOnce } from '@/lib/model-router';
 
 export async function GET(
   req: NextRequest,
@@ -236,6 +238,7 @@ export async function POST(
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     let fullContent = switchAnnouncement ? switchAnnouncement + '\n\n' : '';
+    let memoryWriteCalledInLoop = false;
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -268,6 +271,7 @@ export async function POST(
                 } else if (parsed.type === 'tool_call') {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'tool_call', tool: parsed.tool, input: parsed.input, persona: activePersona })}\n\n`));
                 } else if (parsed.type === 'tool_result') {
+                  if (parsed.tool === 'memory_write') memoryWriteCalledInLoop = true;
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'tool_result', tool: parsed.tool, success: parsed.success, persona: activePersona })}\n\n`));
                 } else if (parsed.type === 'error') {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: parsed.error ?? 'LLM error' })}\n\n`));
@@ -289,6 +293,44 @@ export async function POST(
               functionalMode: orchResult.functionalMode,
             },
           });
+
+          // Auto memory extraction (detached — does not block the response)
+          if (!memoryWriteCalledInLoop && fullContent.length > 100) {
+            const autoMemoryUserId = session.user.id;
+            const autoMemoryConvId = conversationId;
+            const autoMemoryContent = fullContent;
+            const autoMemoryUserMsg = userMessage;
+            void (async () => {
+              try {
+                const extractModel = 'claude-haiku-4-5-20251001';
+                const extractPrompt = `You are a memory extraction assistant. Given the exchange below, extract 0–3 concise factual statements worth remembering about the user. Return ONLY a JSON array of strings, e.g. ["fact1","fact2"]. Return [] if nothing is worth storing. Never include conversational filler.\n\nUser: ${autoMemoryUserMsg}\n\nAssistant: ${autoMemoryContent}`;
+                const result = await chatOnce({
+                  messages: [{ role: 'user', content: extractPrompt }],
+                  model: extractModel,
+                  maxTokens: 256,
+                  temperature: 0,
+                });
+                let facts: string[] = [];
+                try {
+                  const trimmed = result.trim().replace(/^```json|```$/g, '').trim();
+                  facts = JSON.parse(trimmed);
+                } catch { /* ignore parse error */ }
+                if (!Array.isArray(facts)) return;
+                for (const fact of facts.slice(0, 3)) {
+                  if (typeof fact !== 'string' || fact.length < 5) continue;
+                  await writeMemory({
+                    userId: autoMemoryUserId,
+                    type: 'semantic',
+                    statement: fact,
+                    source: 'conversation',
+                    sourceId: autoMemoryConvId,
+                    confidence: 0.75,
+                    epistemicStatus: 'INFERRED',
+                  });
+                }
+              } catch { /* non-blocking — never surface */ }
+            })();
+          }
 
           // Update conversation timestamp
           await prisma.conversation.update({

@@ -302,6 +302,7 @@ model MemoryEpisode {
   importance    Float    @default(0.5)
   privacyClass  String   @default("PERSONAL")
   supersededBy  String?  // ID of newer episode
+  embedding     Unsupported("vector(1536)")?
   createdAt     DateTime @default(now())
 
   project Project? @relation(fields: [projectId], references: [id])
@@ -322,6 +323,7 @@ model MemorySemantic {
   epistemicStatus String   // KNOWN, INFERRED, HYPOTHESIS, UNVERIFIED
   supersededBy    String?  // ID of newer semantic memory
   retrievedAt     DateTime?
+  embedding       Unsupported("vector(1536)")?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

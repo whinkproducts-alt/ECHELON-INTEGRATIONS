@@ -40,6 +40,98 @@ export async function streamChat(opts: StreamChatOptions): Promise<ReadableStrea
   return streamOpenAICompatible(opts.messages, model, maxTokens, temperature);
 }
 
+/**
+ * Non-streaming single completion. Returns the text response.
+ * Used for background tasks like auto memory extraction.
+ * Throws on error.
+ */
+export async function chatOnce(opts: StreamChatOptions): Promise<string> {
+  const model = opts.model ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+  const maxTokens = opts.maxTokens ?? 512;
+  const temperature = opts.temperature ?? 0.0;
+
+  if (model.startsWith('claude')) {
+    return chatOnceAnthropic(opts.messages, model, maxTokens, temperature);
+  }
+  if (model.startsWith('gemini')) {
+    return chatOnceGemini(opts.messages, model, maxTokens, temperature);
+  }
+  return chatOnceOpenAICompatible(opts.messages, model, maxTokens, temperature);
+}
+
+async function chatOnceAnthropic(
+  messages: ChatMessage[],
+  model: string,
+  maxTokens: number,
+  temperature: number,
+): Promise<string> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new Error('ANTHROPIC_API_KEY not set');
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey: key });
+  const systemMsg = messages.find((m) => m.role === 'system');
+  const chatMessages = messages
+    .filter((m) => m.role !== 'system')
+    .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+  const res = await client.messages.create({
+    model,
+    max_tokens: maxTokens,
+    temperature,
+    system: systemMsg?.content,
+    messages: chatMessages,
+  });
+  return res.content.map((b: any) => (b.type === 'text' ? b.text : '')).join('');
+}
+
+async function chatOnceGemini(
+  messages: ChatMessage[],
+  model: string,
+  maxTokens: number,
+  temperature: number,
+): Promise<string> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error('GEMINI_API_KEY not set');
+  const { GoogleGenerativeAI } = await import('@google/generative-ai');
+  const genai = new GoogleGenerativeAI(key);
+  const systemMsg = messages.find((m) => m.role === 'system');
+  const chatMessages = messages.filter((m) => m.role !== 'system');
+  const history = chatMessages.slice(0, -1).map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+  const lastMessage = chatMessages[chatMessages.length - 1];
+  const genModel = genai.getGenerativeModel({
+    model,
+    systemInstruction: systemMsg?.content,
+    generationConfig: { maxOutputTokens: maxTokens, temperature },
+  });
+  const chat = genModel.startChat({ history });
+  const result = await chat.sendMessage(lastMessage?.content ?? '');
+  return result.response.text();
+}
+
+async function chatOnceOpenAICompatible(
+  messages: ChatMessage[],
+  model: string,
+  maxTokens: number,
+  temperature: number,
+): Promise<string> {
+  const baseUrl =
+    (process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
+  const apiKey = process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama';
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ model, messages, stream: false, max_tokens: maxTokens, temperature }),
+  });
+  if (!response.ok) {
+    const errText = await response.text().catch(() => 'Unknown error');
+    throw new Error(`OpenAI-compatible endpoint error ${response.status}: ${errText}`);
+  }
+  const json = await response.json();
+  return json?.choices?.[0]?.message?.content ?? '';
+}
+
 // ── Anthropic ────────────────────────────────────────────────────────────────
 
 async function streamAnthropic(

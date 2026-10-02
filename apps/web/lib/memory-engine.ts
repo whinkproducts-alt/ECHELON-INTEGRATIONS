@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { generateEmbedding } from '@/lib/embedding-service';
 
 
 export interface MemoryWriteInput {
@@ -25,8 +26,8 @@ export async function writeMemory(input: MemoryWriteInput) {
   } = input;
 
   switch (type) {
-    case 'episodic':
-      return prisma.memoryEpisode.create({
+    case 'episodic': {
+      const episodeRow = await prisma.memoryEpisode.create({
         data: {
           userId,
           projectId: projectId ?? null,
@@ -38,9 +39,20 @@ export async function writeMemory(input: MemoryWriteInput) {
           entities: entities ? JSON.stringify(entities) : null,
         },
       });
+      // Fire-and-forget embedding update
+      generateEmbedding(statement).then(async (vec) => {
+        if (!vec) return;
+        await prisma.$executeRawUnsafe(
+          `UPDATE memory_episodes SET embedding = $1::vector WHERE id = $2`,
+          `[${vec.join(',')}]`,
+          episodeRow.id
+        );
+      }).catch(() => {/* non-blocking */});
+      return episodeRow;
+    }
 
-    case 'semantic':
-      return prisma.memorySemantic.create({
+    case 'semantic': {
+      const semanticRow = await prisma.memorySemantic.create({
         data: {
           userId,
           projectId: projectId ?? null,
@@ -51,6 +63,17 @@ export async function writeMemory(input: MemoryWriteInput) {
           epistemicStatus: epistemicStatus ?? 'KNOWN',
         },
       });
+      // Fire-and-forget embedding update
+      generateEmbedding(statement).then(async (vec) => {
+        if (!vec) return;
+        await prisma.$executeRawUnsafe(
+          `UPDATE memory_semantic SET embedding = $1::vector WHERE id = $2`,
+          `[${vec.join(',')}]`,
+          semanticRow.id
+        );
+      }).catch(() => {/* non-blocking */});
+      return semanticRow;
+    }
 
     case 'procedural':
       return prisma.memoryProcedural.create({
@@ -141,28 +164,85 @@ export async function searchMemory(
   projectId?: string | null,
   limit: number = 10
 ) {
-  // Text-based search (pgvector similarity search is a Phase 2 enhancement)
-  const semantics = await prisma.memorySemantic.findMany({
-    where: {
-      userId,
-      supersededBy: null,
-      statement: { contains: query },
-      ...(projectId ? { projectId } : {}),
-    },
-    orderBy: { createdAt: 'desc' },
-    take: limit,
-  });
+  // Attempt vector search first; fall back to SQL LIKE
+  const queryVec = await generateEmbedding(query);
 
-  const episodes = await prisma.memoryEpisode.findMany({
-    where: {
+  let semantics: any[];
+  let episodes: any[];
+
+  if (queryVec) {
+    const vecLiteral = `[${queryVec.join(',')}]`;
+    const projectFilter = projectId ? `AND "projectId" = '${projectId}'` : '';
+
+    // Cosine distance (<=>). Lower = more similar. Scoped by userId (tenant isolation).
+    const semanticRows = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT *, (embedding <=> $1::vector) AS distance
+       FROM memory_semantic
+       WHERE "userId" = $2
+         AND "supersededBy" IS NULL
+         AND embedding IS NOT NULL
+         ${projectFilter}
+       ORDER BY distance
+       LIMIT $3`,
+      vecLiteral,
       userId,
-      supersededBy: null,
-      summary: { contains: query },
-      ...(projectId ? { projectId } : {}),
-    },
-    orderBy: { createdAt: 'desc' },
-    take: limit,
-  });
+      limit
+    );
+
+    const episodeRows = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT *, (embedding <=> $1::vector) AS distance
+       FROM memory_episodes
+       WHERE "userId" = $2
+         AND "supersededBy" IS NULL
+         AND embedding IS NOT NULL
+         ${projectFilter}
+       ORDER BY distance
+       LIMIT $3`,
+      vecLiteral,
+      userId,
+      limit
+    );
+
+    // If no embedded rows exist yet, fall back to LIKE
+    if (semanticRows.length === 0 && episodeRows.length === 0) {
+      semantics = await prisma.memorySemantic.findMany({
+        where: { userId, supersededBy: null, statement: { contains: query }, ...(projectId ? { projectId } : {}) },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
+      episodes = await prisma.memoryEpisode.findMany({
+        where: { userId, supersededBy: null, summary: { contains: query }, ...(projectId ? { projectId } : {}) },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
+    } else {
+      semantics = semanticRows;
+      episodes = episodeRows;
+    }
+  } else {
+    // Embedding unavailable — use SQL LIKE
+    semantics = await prisma.memorySemantic.findMany({
+      where: {
+        userId,
+        supersededBy: null,
+        statement: { contains: query },
+        ...(projectId ? { projectId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+
+    episodes = await prisma.memoryEpisode.findMany({
+      where: {
+        userId,
+        supersededBy: null,
+        summary: { contains: query },
+        ...(projectId ? { projectId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
 
   const hypotheses = await prisma.hypothesis.findMany({
     where: {
