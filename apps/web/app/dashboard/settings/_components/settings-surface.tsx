@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, User, Shield, Bell, Gauge, CreditCard, Palette } from 'lucide-react';
+import { Save, User, Shield, Bell, Gauge, CreditCard, Palette, Key, Eye, EyeOff, Trash2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { BillingSurface } from '../billing/_components/billing-surface';
 
-type Tab = 'profile' | 'billing' | 'whitelabel';
+type Tab = 'profile' | 'billing' | 'apikeys' | 'whitelabel';
 
 export function SettingsSurface() {
   const [activeTab, setActiveTab] = useState<Tab>('profile');
@@ -98,6 +98,7 @@ export function SettingsSurface() {
         {([
           { id: 'profile', label: 'Profile', icon: <User className="h-3.5 w-3.5" /> },
           { id: 'billing', label: 'Billing', icon: <CreditCard className="h-3.5 w-3.5" /> },
+          { id: 'apikeys', label: 'API Keys', icon: <Key className="h-3.5 w-3.5" /> },
           ...(isAdmin ? [{ id: 'whitelabel', label: 'White Label', icon: <Palette className="h-3.5 w-3.5" /> }] : []),
         ] as { id: Tab; label: string; icon: React.ReactNode }[]).map((tab) => (
           <button
@@ -115,6 +116,7 @@ export function SettingsSurface() {
       </div>
 
       {activeTab === 'billing' && <BillingSurface />}
+      {activeTab === 'apikeys' && <ApiKeysSurface />}
 
       {activeTab === 'whitelabel' && isAdmin && (
         <div className="bg-card border border-border rounded-lg p-5 space-y-4">
@@ -258,6 +260,163 @@ export function SettingsSurface() {
           ring: 1px solid hsl(var(--primary));
         }
       `}</style>
+    </div>
+  );
+}
+
+function ApiKeysSurface() {
+  const [keys, setKeys] = useState<{ provider: string; keyHint: string; createdAt: string }[]>([]);
+  const [anthropicInput, setAnthropicInput] = useState('');
+  const [openaiInput, setOpenaiInput] = useState('');
+  const [showAnthropic, setShowAnthropic] = useState(false);
+  const [showOpenai, setShowOpenai] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/settings/api-keys').then(r => r.json()).then(d => {
+      if (Array.isArray(d)) setKeys(d);
+    }).catch(() => {});
+  }, []);
+
+  const storedKey = (provider: string) => keys.find(k => k.provider === provider);
+
+  const save = async (provider: string, value: string) => {
+    if (!value.trim()) return;
+    setSaving(provider);
+    try {
+      const r = await fetch('/api/settings/api-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, key: value.trim() }),
+      });
+      const d = await r.json();
+      if (!r.ok) { toast.error(d.error ?? 'Failed to save key'); return; }
+      setKeys(prev => {
+        const without = prev.filter(k => k.provider !== provider);
+        return [...without, { provider, keyHint: d.keyHint, createdAt: new Date().toISOString() }];
+      });
+      if (provider === 'anthropic') setAnthropicInput('');
+      if (provider === 'openai') setOpenaiInput('');
+      toast.success(`${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} key saved`);
+    } catch {
+      toast.error('Failed to save key');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const remove = async (provider: string) => {
+    try {
+      await fetch(`/api/settings/api-keys/${provider}`, { method: 'DELETE' });
+      setKeys(prev => prev.filter(k => k.provider !== provider));
+      toast.success('Key removed');
+    } catch {
+      toast.error('Failed to remove key');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Section title="Your API Keys (BYOK)" icon={<Key className="h-4 w-4" />}>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Connect your own provider keys. WHINK will use them instead of the server keys for your sessions.
+          Keys are encrypted at rest with AES-256-GCM. Your billing stays under your own provider dashboard.
+        </p>
+
+        {/* Anthropic */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-muted-foreground">Anthropic (Claude)</label>
+            {storedKey('anthropic') && (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1 text-xs text-green-500 font-mono">
+                  <CheckCircle className="h-3 w-3" />
+                  ····{storedKey('anthropic')!.keyHint}
+                </span>
+                <button
+                  onClick={() => remove('anthropic')}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                  title="Remove key"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type={showAnthropic ? 'text' : 'password'}
+                value={anthropicInput}
+                onChange={e => setAnthropicInput(e.target.value)}
+                placeholder="sk-ant-api03-..."
+                className="input-field pr-9"
+              />
+              <button
+                type="button"
+                onClick={() => setShowAnthropic(v => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showAnthropic ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+            <button
+              onClick={() => save('anthropic', anthropicInput)}
+              disabled={!anthropicInput.trim() || saving === 'anthropic'}
+              className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:opacity-90 disabled:opacity-40 whitespace-nowrap"
+            >
+              {saving === 'anthropic' ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+
+        {/* OpenAI */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-muted-foreground">OpenAI (GPT / o-series)</label>
+            {storedKey('openai') && (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1 text-xs text-green-500 font-mono">
+                  <CheckCircle className="h-3 w-3" />
+                  ····{storedKey('openai')!.keyHint}
+                </span>
+                <button
+                  onClick={() => remove('openai')}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                  title="Remove key"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type={showOpenai ? 'text' : 'password'}
+                value={openaiInput}
+                onChange={e => setOpenaiInput(e.target.value)}
+                placeholder="sk-..."
+                className="input-field pr-9"
+              />
+              <button
+                type="button"
+                onClick={() => setShowOpenai(v => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showOpenai ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+            <button
+              onClick={() => save('openai', openaiInput)}
+              disabled={!openaiInput.trim() || saving === 'openai'}
+              className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:opacity-90 disabled:opacity-40 whitespace-nowrap"
+            >
+              {saving === 'openai' ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </Section>
     </div>
   );
 }

@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Send, Plus, MessageSquare, Zap, ChevronDown,
-  FolderKanban, Mic, MicOff, Volume2, VolumeX
+  FolderKanban, Mic, MicOff, Volume2, VolumeX, Cpu
 } from 'lucide-react';
 import { useVoice } from '@/lib/hooks/useVoice';
 import { AvatarRenderer } from './avatar-renderer';
 import { ObsidianOverlay } from './obsidian-overlay';
 import { NeuralLink, NeuralEvent } from '@/app/dashboard/_components/neural-link';
+import { ToolTrace } from './tool-trace';
 
 interface Message {
   id: string;
@@ -18,6 +19,14 @@ interface Message {
   mambaMode: string | null;
   functionalMode: string | null;
   createdAt: string;
+}
+
+interface TraceEntry {
+  id: string;
+  tool: string;
+  input?: unknown;
+  result?: { success: boolean; data?: unknown };
+  persona: string;
 }
 
 interface Conversation {
@@ -52,8 +61,16 @@ export function ConversationSurface() {
     }
     return false;
   });
+  const [selectedModel, setSelectedModel] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('whink-preferred-model') ?? '';
+    }
+    return '';
+  });
+  const [showModelPicker, setShowModelPicker] = useState(false);
   const [neuralOpen, setNeuralOpen] = useState(false);
   const [neuralEvents, setNeuralEvents] = useState<NeuralEvent[]>([]);
+  const [traceEntries, setTraceEntries] = useState<TraceEntry[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { startListening, stopListening, speak, isListening, isSpeaking, supported } = useVoice();
@@ -65,10 +82,16 @@ export function ConversationSurface() {
     ]);
   }, []);
 
-  // Load conversations and projects
+  // Load conversations, projects, and saved model preference
   useEffect(() => {
     fetch('/api/conversations').then(r => r.json()).then(d => setConversations(Array.isArray(d) ? d : [])).catch(() => {});
     fetch('/api/projects').then(r => r.json()).then(d => setProjects(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch('/api/settings').then(r => r.json()).then(d => {
+      const saved = d?.preferences?.preferredModel;
+      if (saved && !localStorage.getItem('whink-preferred-model')) {
+        setSelectedModel(saved);
+      }
+    }).catch(() => {});
   }, []);
 
   // Load messages when conversation changes
@@ -76,6 +99,7 @@ export function ConversationSurface() {
     if (!activeConvId) {
       setMessages([]); // eslint-disable-line react-hooks/set-state-in-effect
       setNeuralEvents([]); // eslint-disable-line react-hooks/set-state-in-effect
+      setTraceEntries([]); // eslint-disable-line react-hooks/set-state-in-effect
       return;
     }
     fetch(`/api/conversations/${activeConvId}/messages`)
@@ -129,6 +153,7 @@ export function ConversationSurface() {
       createdAt: new Date().toISOString(),
     };
     setMessages(prev => [...(prev ?? []), userMsg]);
+    setTraceEntries([]);
     const messageText = input;
     setInput('');
     setStreaming(true);
@@ -138,7 +163,11 @@ export function ConversationSurface() {
       const res = await fetch(`/api/conversations/${convId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: messageText, projectId: selectedProject }),
+        body: JSON.stringify({
+          message: messageText,
+          projectId: selectedProject,
+          ...(selectedModel ? { model: selectedModel } : {}),
+        }),
       });
 
       const reader = res.body?.getReader();
@@ -170,8 +199,27 @@ export function ConversationSurface() {
                 setStreamMambaMode(mambaMode);
               } else if (data.type === 'tool_call') {
                 pushNeuralEvent('tool_call', data.name ?? 'tool');
+                const traceId = data.id ?? `trace-${Date.now()}-${Math.random()}`;
+                setTraceEntries(prev => [
+                  ...prev,
+                  { id: traceId, tool: data.name ?? data.tool ?? 'tool', input: data.input, persona },
+                ]);
               } else if (data.type === 'tool_result') {
                 pushNeuralEvent('tool_result', data.content ?? 'result');
+                const traceId = data.id ?? null;
+                setTraceEntries(prev => {
+                  // Match by id if available, otherwise update the last running entry for this tool
+                  const idx = traceId
+                    ? prev.findLastIndex(e => e.id === traceId)
+                    : prev.findLastIndex(e => e.result === undefined);
+                  if (idx === -1) return prev;
+                  const updated = [...prev];
+                  updated[idx] = {
+                    ...updated[idx],
+                    result: { success: data.success ?? true, data: data.data ?? data.content },
+                  };
+                  return updated;
+                });
               } else if (data.type === 'error') {
                 pushNeuralEvent('error', data.message ?? 'error');
               } else if (data.type === 'done') {
@@ -333,6 +381,24 @@ export function ConversationSurface() {
               Neural Link
             </button>
 
+            {/* Model picker */}
+            <ModelPicker
+              selected={selectedModel}
+              onChange={(m) => {
+                setSelectedModel(m);
+                try { localStorage.setItem('whink-preferred-model', m); } catch {}
+                // Persist to user preferences
+                fetch('/api/settings', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ preferences: { preferredModel: m || null } }),
+                }).catch(() => {});
+                setShowModelPicker(false);
+              }}
+              open={showModelPicker}
+              onToggle={() => setShowModelPicker(o => !o)}
+            />
+
             {/* Project selector */}
             <div className="relative">
               <button
@@ -382,6 +448,21 @@ export function ConversationSurface() {
               {(messages ?? []).map((msg: Message) => (
                 <MessageBubble key={msg.id} message={msg} />
               ))}
+
+              {/* Inline tool traces — rendered between messages and the streaming reply */}
+              {traceEntries.length > 0 && (
+                <div className="space-y-0.5 pl-10">
+                  {traceEntries.map(entry => (
+                    <ToolTrace
+                      key={entry.id}
+                      tool={entry.tool}
+                      input={entry.input}
+                      result={entry.result}
+                      persona={entry.persona}
+                    />
+                  ))}
+                </div>
+              )}
 
               {/* Streaming message */}
               {streamText && (
@@ -477,6 +558,60 @@ export function ConversationSurface() {
           </div>
         </div>
       </ObsidianOverlay>
+    </div>
+  );
+}
+
+const MODEL_OPTIONS = [
+  { value: '', label: 'Default', hint: 'env DEFAULT_MODEL' },
+  { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku', hint: 'Fast' },
+  { value: 'claude-sonnet-4-5', label: 'Claude Sonnet', hint: 'Balanced' },
+  { value: 'claude-opus-5-5', label: 'Claude Opus', hint: 'Advanced' },
+  { value: 'gpt-4o', label: 'GPT-4o', hint: 'OpenAI' },
+  { value: 'llama3.1:8b', label: 'Llama 3.1 8B', hint: 'Local' },
+];
+
+function ModelPicker({
+  selected,
+  onChange,
+  open,
+  onToggle,
+}: {
+  selected: string;
+  onChange: (m: string) => void;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const current = MODEL_OPTIONS.find(o => o.value === selected) ?? MODEL_OPTIONS[0];
+  return (
+    <div className="relative">
+      <button
+        onClick={onToggle}
+        title="Select model"
+        className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors text-muted-foreground hover:text-foreground bg-secondary"
+      >
+        <Cpu className="h-3 w-3" />
+        <span className="font-mono">{current.label}</span>
+        <ChevronDown className="h-3 w-3" />
+      </button>
+      {open && (
+        <div className="absolute top-full right-0 mt-1 w-52 bg-card border border-border rounded-md shadow-lg z-20 py-1">
+          {MODEL_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => onChange(opt.value)}
+              className={`w-full text-left px-3 py-2 text-xs transition-colors flex items-center justify-between ${
+                selected === opt.value
+                  ? 'text-primary bg-primary/10'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              }`}
+            >
+              <span className="font-mono">{opt.label}</span>
+              <span className="text-muted-foreground/60">{opt.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

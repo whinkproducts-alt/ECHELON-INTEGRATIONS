@@ -10,6 +10,7 @@ import { scanForInjectionPatterns } from '@/lib/content-isolation';
 import { handleApproval } from '@/lib/approval-handler';
 import { writeMemory } from '@/lib/memory-engine';
 import { chatOnce } from '@/lib/model-router';
+import { decryptKey } from '@/lib/key-encryption';
 
 export async function GET(
   req: NextRequest,
@@ -39,6 +40,7 @@ export async function POST(
     const body = await req.json();
     const userMessage = body?.message ?? '';
     const projectId = body?.projectId ?? null;
+    const requestedModel = body?.model as string | undefined;
 
     // Verify conversation ownership
     const conv = await prisma.conversation.findFirst({
@@ -228,6 +230,24 @@ export async function POST(
     const activePersona = orchResult.newPersona ?? 'WHINK';
     const activeMambaMode = orchResult.newMambaMode ?? null;
 
+    // Resolve model: request body > user preference > env default
+    const userPrefs = await prisma.userPreference.findUnique({ where: { userId: session.user.id } });
+    const resolvedModel = requestedModel ?? userPrefs?.preferredModel ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+
+    // Load BYOK key for the resolved provider, if one is stored
+    let byokApiKey: string | undefined;
+    try {
+      const provider = resolvedModel.startsWith('claude') ? 'anthropic'
+        : resolvedModel.startsWith('gpt') || resolvedModel.startsWith('o1') || resolvedModel.startsWith('o3') ? 'openai'
+        : null;
+      if (provider) {
+        const storedKey = await prisma.userApiKey.findUnique({
+          where: { userId_provider: { userId: session.user.id, provider } },
+        });
+        if (storedKey) byokApiKey = decryptKey(storedKey.encryptedKey);
+      }
+    } catch { /* non-blocking — fall back to server key */ }
+
     let routerStream: ReadableStream<Uint8Array>;
     try {
       routerStream = await runToolLoop({
@@ -236,6 +256,8 @@ export async function POST(
         userId: session.user.id,
         persona: activePersona,
         mambaMode: activeMambaMode,
+        model: resolvedModel,
+        apiKey: byokApiKey,
         correlationId,
       });
     } catch (err: any) {

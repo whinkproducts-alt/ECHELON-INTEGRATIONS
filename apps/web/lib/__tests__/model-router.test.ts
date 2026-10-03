@@ -237,7 +237,104 @@ describe('SSE output format', () => {
   });
 });
 
-// ── 4. Ollama round-trip (conditional integration) ────────────────────────────
+// ── 4. BYOK — user-supplied apiKey overrides server env key ──────────────────
+
+describe('BYOK apiKey override', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    delete process.env.ANTHROPIC_API_KEY;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('streamChat uses user-supplied apiKey for Anthropic when env key is absent', async () => {
+    let capturedKey: string | undefined;
+
+    vi.doMock('@anthropic-ai/sdk', () => {
+      const mockStream = (async function* () {
+        yield { type: 'content_block_delta', delta: { type: 'text_delta', text: 'ok' } };
+      })();
+      const streamFn = vi.fn().mockResolvedValue(mockStream);
+      function MockAnthropic(this: any, opts: any) {
+        capturedKey = opts?.apiKey;
+        this.messages = { stream: streamFn };
+      }
+      return { default: MockAnthropic };
+    });
+
+    const { streamChat } = await import('../model-router');
+    const stream = await streamChat({
+      messages: [{ role: 'user', content: 'hi' }],
+      model: 'claude-sonnet-4-5',
+      apiKey: 'sk-ant-user-supplied-key',
+    });
+    await drainStream(stream);
+    expect(capturedKey).toBe('sk-ant-user-supplied-key');
+  });
+
+  it('streamChat user apiKey takes precedence over server ANTHROPIC_API_KEY', async () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-server-key';
+    let capturedKey: string | undefined;
+
+    vi.doMock('@anthropic-ai/sdk', () => {
+      const mockStream = (async function* () {
+        yield { type: 'content_block_delta', delta: { type: 'text_delta', text: 'ok' } };
+      })();
+      const streamFn = vi.fn().mockResolvedValue(mockStream);
+      function MockAnthropic(this: any, opts: any) {
+        capturedKey = opts?.apiKey;
+        this.messages = { stream: streamFn };
+      }
+      return { default: MockAnthropic };
+    });
+
+    const { streamChat } = await import('../model-router');
+    await streamChat({
+      messages: [{ role: 'user', content: 'hi' }],
+      model: 'claude-haiku-4-5-20251001',
+      apiKey: 'sk-ant-user-key-wins',
+    });
+    expect(capturedKey).toBe('sk-ant-user-key-wins');
+    delete process.env.ANTHROPIC_API_KEY;
+  });
+
+  it('streamChat still throws when no key available at all for Anthropic', async () => {
+    const { streamChat } = await import('../model-router');
+    await expect(
+      streamChat({ messages: [{ role: 'user', content: 'hi' }], model: 'claude-sonnet-4-5' }),
+    ).rejects.toThrow('ANTHROPIC_API_KEY');
+  });
+
+  it('streamChat passes user apiKey as Authorization header for OpenAI-compatible endpoint', async () => {
+    let capturedHeaders: Record<string, string> | undefined;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      capturedHeaders = init?.headers as Record<string, string>;
+      const encoder = new TextEncoder();
+      return {
+        ok: true,
+        body: new ReadableStream({
+          start(ctrl) {
+            ctrl.enqueue(encoder.encode('data: [DONE]\n\n'));
+            ctrl.close();
+          },
+        }),
+      } as any;
+    });
+
+    const { streamChat } = await import('../model-router');
+    await streamChat({
+      messages: [{ role: 'user', content: 'hi' }],
+      model: 'gpt-4o',
+      apiKey: 'sk-user-openai-key',
+    });
+
+    expect(capturedHeaders?.Authorization).toBe('Bearer sk-user-openai-key');
+    vi.restoreAllMocks();
+  });
+});
 
 describe('Ollama round-trip (integration)', () => {
   it(

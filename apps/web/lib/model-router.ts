@@ -14,6 +14,8 @@ export interface StreamChatOptions {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  /** Per-user BYOK API key, decrypted. If provided, overrides the server env key. */
+  apiKey?: string;
 }
 
 /**
@@ -32,12 +34,12 @@ export async function streamChat(opts: StreamChatOptions): Promise<ReadableStrea
   const temperature = opts.temperature ?? 0.7;
 
   if (model.startsWith('claude')) {
-    return streamAnthropic(opts.messages, model, maxTokens, temperature);
+    return streamAnthropic(opts.messages, model, maxTokens, temperature, opts.apiKey);
   }
   if (model.startsWith('gemini')) {
     return streamGemini(opts.messages, model, maxTokens, temperature);
   }
-  return streamOpenAICompatible(opts.messages, model, maxTokens, temperature);
+  return streamOpenAICompatible(opts.messages, model, maxTokens, temperature, opts.apiKey);
 }
 
 /**
@@ -51,12 +53,12 @@ export async function chatOnce(opts: StreamChatOptions): Promise<string> {
   const temperature = opts.temperature ?? 0.0;
 
   if (model.startsWith('claude')) {
-    return chatOnceAnthropic(opts.messages, model, maxTokens, temperature);
+    return chatOnceAnthropic(opts.messages, model, maxTokens, temperature, opts.apiKey);
   }
   if (model.startsWith('gemini')) {
     return chatOnceGemini(opts.messages, model, maxTokens, temperature);
   }
-  return chatOnceOpenAICompatible(opts.messages, model, maxTokens, temperature);
+  return chatOnceOpenAICompatible(opts.messages, model, maxTokens, temperature, opts.apiKey);
 }
 
 async function chatOnceAnthropic(
@@ -64,8 +66,9 @@ async function chatOnceAnthropic(
   model: string,
   maxTokens: number,
   temperature: number,
+  userApiKey?: string,
 ): Promise<string> {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = userApiKey ?? process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error('ANTHROPIC_API_KEY not set');
   const { default: Anthropic } = await import('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey: key });
@@ -115,10 +118,11 @@ async function chatOnceOpenAICompatible(
   model: string,
   maxTokens: number,
   temperature: number,
+  userApiKey?: string,
 ): Promise<string> {
   const baseUrl =
     (process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
-  const apiKey = process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama';
+  const apiKey = userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama';
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
@@ -139,8 +143,9 @@ async function streamAnthropic(
   model: string,
   maxTokens: number,
   temperature: number,
+  userApiKey?: string,
 ): Promise<ReadableStream<Uint8Array>> {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = userApiKey ?? process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error('ANTHROPIC_API_KEY not set');
 
   // Lazy import so the SDK is never loaded in non-Anthropic paths
@@ -256,10 +261,11 @@ async function streamOpenAICompatible(
   model: string,
   maxTokens: number,
   temperature: number,
+  userApiKey?: string,
 ): Promise<ReadableStream<Uint8Array>> {
   const baseUrl =
     (process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
-  const apiKey = process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama';
+  const apiKey = userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama';
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',

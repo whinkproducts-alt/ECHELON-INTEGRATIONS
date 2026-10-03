@@ -34,6 +34,8 @@ export interface ToolLoopOptions {
   model?: string;
   maxTokens?: number;
   correlationId?: string;
+  /** Decrypted BYOK API key. Passed to the model router to override the server env key. */
+  apiKey?: string;
 }
 
 const MAX_TOOL_ITERATIONS = 5;
@@ -44,7 +46,7 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
   // Non-Anthropic providers: fall back to plain streaming (no tool use yet)
   if (!model.startsWith('claude')) {
     const { streamChat } = await import('@/lib/model-router');
-    return streamChat({ messages: opts.messages, model, maxTokens: opts.maxTokens });
+    return streamChat({ messages: opts.messages, model, maxTokens: opts.maxTokens, apiKey: opts.apiKey });
   }
 
   return runAnthropicToolLoop(opts, model);
@@ -54,7 +56,7 @@ async function runAnthropicToolLoop(
   opts: ToolLoopOptions,
   model: string,
 ): Promise<ReadableStream<Uint8Array>> {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = opts.apiKey ?? process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error('ANTHROPIC_API_KEY not set');
 
   const { default: Anthropic } = await import('@anthropic-ai/sdk');

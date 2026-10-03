@@ -157,3 +157,99 @@ describe('runToolLoop — Anthropic tool call round-trip', () => {
     expect(create).toHaveBeenCalledTimes(2);
   });
 });
+
+// ── BYOK: apiKey threaded through to Anthropic client ────────────────────────
+
+describe('runToolLoop — BYOK apiKey', () => {
+  beforeEach(() => vi.resetModules());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.ANTHROPIC_API_KEY;
+  });
+
+  it('passes user apiKey to Anthropic constructor when provided', async () => {
+    let capturedKey: string | undefined;
+
+    vi.doMock('@anthropic-ai/sdk', () => {
+      const create = vi.fn().mockResolvedValue({
+        content: [{ type: 'text', text: 'byok response' }],
+        stop_reason: 'end_turn',
+      });
+      function MockAnthropic(this: any, opts: any) {
+        capturedKey = opts?.apiKey;
+        this.messages = { create };
+      }
+      return { default: MockAnthropic };
+    });
+    vi.doMock('@/lib/tool-registry', () => ({ executeTool: vi.fn() }));
+
+    const { runToolLoop } = await import('../tool-loop');
+    const stream = await runToolLoop({
+      messages: [{ role: 'user', content: 'test' }],
+      tools: TEST_TOOLS,
+      userId: 'u1',
+      model: 'claude-sonnet-4-5',
+      apiKey: 'sk-ant-user-byok-key',
+    });
+    await drainStream(stream);
+
+    expect(capturedKey).toBe('sk-ant-user-byok-key');
+  });
+
+  it('user apiKey takes precedence over ANTHROPIC_API_KEY env', async () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-env-key';
+    let capturedKey: string | undefined;
+
+    vi.doMock('@anthropic-ai/sdk', () => {
+      const create = vi.fn().mockResolvedValue({
+        content: [{ type: 'text', text: 'ok' }],
+        stop_reason: 'end_turn',
+      });
+      function MockAnthropic(this: any, opts: any) {
+        capturedKey = opts?.apiKey;
+        this.messages = { create };
+      }
+      return { default: MockAnthropic };
+    });
+    vi.doMock('@/lib/tool-registry', () => ({ executeTool: vi.fn() }));
+
+    const { runToolLoop } = await import('../tool-loop');
+    await drainStream(await runToolLoop({
+      messages: [{ role: 'user', content: 'test' }],
+      tools: TEST_TOOLS,
+      userId: 'u1',
+      model: 'claude-haiku-4-5-20251001',
+      apiKey: 'sk-ant-user-wins',
+    }));
+
+    expect(capturedKey).toBe('sk-ant-user-wins');
+  });
+
+  it('non-Anthropic model: passes apiKey as Authorization header via fetch', async () => {
+    let capturedAuth: string | undefined;
+    const encoder = new TextEncoder();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      capturedAuth = (init?.headers as any)?.Authorization;
+      return {
+        ok: true,
+        body: new ReadableStream({
+          start(c) {
+            c.enqueue(encoder.encode('data: [DONE]\n\n'));
+            c.close();
+          },
+        }),
+      } as any;
+    });
+
+    const { runToolLoop } = await import('../tool-loop');
+    await drainStream(await runToolLoop({
+      messages: [{ role: 'user', content: 'test' }],
+      tools: TEST_TOOLS,
+      userId: 'u1',
+      model: 'gpt-4o',
+      apiKey: 'sk-user-openai-byok',
+    }));
+
+    expect(capturedAuth).toBe('Bearer sk-user-openai-byok');
+  });
+});
