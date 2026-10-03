@@ -4,9 +4,36 @@
  * environment variable that holds the value (supplied by compose / .env).
  */
 
+import { posix } from 'node:path';
+import { isIP } from 'node:net';
+
 export const PLATFORM_RE = /^[a-z0-9]{1,16}$/;
-const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+export const ENV_NAME_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
 const HEADER_NAME_RE = /^[A-Za-z0-9-]{1,64}$/;
+const PREFIX_RE = /^(Bearer |Basic |Token )?$/;
+const TOOL_NAME_RE = /^[A-Za-z0-9_.-]{1,128}$/;
+
+/** Env names that can never be forwarded to an upstream or used for a header. */
+const DENIED_ENV_NAMES = new Set(['OPENCLAW_TOKEN', 'PORT', 'HOST', 'CONFIG_PATH', 'NODE_OPTIONS', 'PATH']);
+const DENIED_ENV_PREFIXES = ['LD_', 'OPENCLAW_', 'GATEWAY_'];
+
+/** Known credential shapes. Matched anywhere in a string. */
+const TOKEN_PATTERNS: RegExp[] = [
+  /ghp_/, /github_pat_/, /gho_/, /ghs_/, /ghu_/, /ghr_/,
+  /sk-/, /sk-ant-/, /xox[abpr]-/,
+  /AKIA[0-9A-Z]{16}/,
+  /AIza[0-9A-Za-z_-]{35}/,
+];
+/** Long unbroken runs of token characters look like real secrets. */
+const HIGH_ENTROPY_RE = /[A-Za-z0-9_-]{32,}/;
+
+function hasKnownToken(v: string): boolean {
+  // Anchored to a non-token character before, so "task-x" or "disk-1" do not trip "sk-".
+  return TOKEN_PATTERNS.some((r) => new RegExp(`(?<![A-Za-z0-9])(?:${r.source})`).test(v));
+}
+function looksLikeSecret(v: string): boolean {
+  return hasKnownToken(v) || HIGH_ENTROPY_RE.test(v);
+}
 
 export interface HeaderSource {
   env: string;
@@ -20,6 +47,8 @@ export interface StdioServerConfig {
   args: string[];
   /** Names of env vars (read from the gateway process env) to pass to the child. */
   envNames: string[];
+  /** Optional allow-list of ORIGINAL upstream tool names. When set, only these are exposed. */
+  tools?: string[];
 }
 
 export interface HttpServerConfig {
@@ -28,6 +57,7 @@ export interface HttpServerConfig {
   url: string;
   /** Header name -> env var that supplies the value. */
   headers: Record<string, HeaderSource>;
+  tools?: string[];
 }
 
 export type ServerConfig = StdioServerConfig | HttpServerConfig;
@@ -36,6 +66,83 @@ export class ConfigError extends Error {}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/** Env var names are checked WITHOUT echoing them: a pasted secret must never reach a log. */
+function checkEnvName(name: unknown, platform: string, where: string): string {
+  const prefix = `${platform.toUpperCase()}_`;
+  if (
+    typeof name !== 'string' ||
+    !ENV_NAME_RE.test(name) ||
+    hasKnownToken(name) ||
+    DENIED_ENV_NAMES.has(name) ||
+    DENIED_ENV_PREFIXES.some((p) => name.startsWith(p))
+  ) {
+    throw new ConfigError(`${where}: invalid env name (must be an UPPER_SNAKE variable NAME, not a value, and not reserved)`);
+  }
+  if (!name.startsWith(prefix)) {
+    throw new ConfigError(`${where}: env name must start with the platform prefix ${prefix}`);
+  }
+  return name;
+}
+
+const STDIO_ALLOWED_ROOTS = ['/app/node_modules/', '/app/upstreams/'];
+
+function underRoot(p: string, roots: string[]): boolean {
+  if (!p.startsWith('/')) return false;
+  const n = posix.normalize(p);
+  return n === p && !p.split('/').includes('..') && roots.some((r) => n.startsWith(r) && n.length > r.length);
+}
+
+/** stdio is only for servers baked into the image. No npx, uvx, shells or runtime downloads. */
+function checkStdioCommand(command: string, args: string[], where: string): void {
+  if (command === 'node') {
+    if (args.length === 0 || !underRoot(args[0], STDIO_ALLOWED_ROOTS)) {
+      throw new ConfigError(`${where}: stdio "node" needs args[0] to be a script under /app/node_modules/ or /app/upstreams/`);
+    }
+    return;
+  }
+  if (underRoot(command, ['/app/'])) return;
+  throw new ConfigError(`${where}: stdio command must be "node" or an absolute path under /app/ (baked into the image). Run other servers as separate compose services over http`);
+}
+
+function ipv4Parts(h: string): number[] | null {
+  if (isIP(h) !== 4) return null;
+  return h.split('.').map(Number);
+}
+
+/** Always-rejected destinations: link-local and cloud metadata addresses. */
+function isForbiddenHost(host: string): boolean {
+  const h = host.replace(/^\[|\]$/g, '').toLowerCase();
+  const v4 = ipv4Parts(h);
+  if (v4) return (v4[0] === 169 && v4[1] === 254) || h === '100.100.100.200';
+  if (isIP(h) === 6) {
+    if (h.startsWith('fd')) return true; // fd00::/8 (includes fd00:ec2::254)
+    if (/^fe[89ab]/.test(h)) return true; // fe80::/10 link-local
+    if (h.includes('a9fe')) return true; // IPv4-mapped 169.254.x.x
+    return false;
+  }
+  return h === 'metadata.google.internal' || h === 'instance-data';
+}
+
+function isLoopbackHost(host: string): boolean {
+  const h = host.replace(/^\[|\]$/g, '').toLowerCase();
+  const v4 = ipv4Parts(h);
+  if (v4) return v4[0] === 127;
+  return h === 'localhost' || h === '::1';
+}
+
+/** A bare compose service name such as "github-mcp": no dots, not an IP. */
+function isSingleLabelHost(host: string): boolean {
+  return !host.includes('.') && !host.includes(':') && !host.startsWith('[') && /^[a-z0-9-]+$/i.test(host);
+}
+
+function parseTools(v: unknown, where: string): string[] | undefined {
+  if (v === undefined) return undefined;
+  if (!Array.isArray(v) || !v.every((t) => typeof t === 'string' && TOOL_NAME_RE.test(t))) {
+    throw new ConfigError(`${where}.tools must be an array of tool names`);
+  }
+  return v as string[];
 }
 
 function parseOne(raw: unknown, index: number): ServerConfig {
@@ -54,11 +161,14 @@ function parseOne(raw: unknown, index: number): ServerConfig {
     if (!Array.isArray(args) || !args.every((a) => typeof a === 'string')) {
       throw new ConfigError(`${where}.args must be an array of strings`);
     }
-    const env = raw.env ?? [];
-    if (!Array.isArray(env) || !env.every((e) => typeof e === 'string' && ENV_NAME_RE.test(e))) {
-      throw new ConfigError(`${where}.env must be an array of environment variable NAMES, not values`);
+    if (args.some((a) => looksLikeSecret(a))) {
+      throw new ConfigError(`${where}.args must not contain secrets; pass credentials through env var NAMES`);
     }
-    return { platform, transport: 'stdio', command: raw.command, args: args as string[], envNames: env as string[] };
+    checkStdioCommand(raw.command, args as string[], where);
+    const env = raw.env ?? [];
+    if (!Array.isArray(env)) throw new ConfigError(`${where}.env must be an array of environment variable NAMES`);
+    const envNames = env.map((e) => checkEnvName(e, platform, `${where}.env`));
+    return { platform, transport: 'stdio', command: raw.command, args: args as string[], envNames, tools: parseTools(raw.tools, where) };
   }
 
   if (raw.transport === 'http') {
@@ -75,25 +185,40 @@ function parseOne(raw: unknown, index: number): ServerConfig {
     if (parsed.username || parsed.password || parsed.search) {
       throw new ConfigError(`${where}.url must not embed credentials or query strings; use headers`);
     }
+    if (hasKnownToken(raw.url) || /[A-Za-z0-9_-]{32,}/.test(parsed.pathname.replace(/\//g, ' '))) {
+      throw new ConfigError(`${where}.url must not contain secrets`);
+    }
+    if (isForbiddenHost(parsed.hostname)) {
+      throw new ConfigError(`${where}.url points at a link-local or metadata address`);
+    }
     const headersRaw = raw.headers ?? {};
     if (!isRecord(headersRaw)) throw new ConfigError(`${where}.headers must be an object`);
     const headers: Record<string, HeaderSource> = {};
     for (const [name, value] of Object.entries(headersRaw)) {
-      if (!HEADER_NAME_RE.test(name)) throw new ConfigError(`${where}.headers has an invalid header name`);
+      if (!HEADER_NAME_RE.test(name) || looksLikeSecret(name)) throw new ConfigError(`${where}.headers has an invalid header name`);
       let source: HeaderSource;
       if (typeof value === 'string') {
         source = { env: value, prefix: '' };
       } else if (isRecord(value) && typeof value.env === 'string') {
-        source = { env: value.env, prefix: typeof value.prefix === 'string' ? value.prefix : '' };
+        const prefix = value.prefix === undefined ? '' : value.prefix;
+        if (typeof prefix !== 'string' || !PREFIX_RE.test(prefix)) {
+          throw new ConfigError(`${where}.headers prefix must be "Bearer ", "Basic ", "Token " or empty`);
+        }
+        source = { env: value.env, prefix };
       } else {
-        throw new ConfigError(`${where}.headers.${name} must be an env var name or {env, prefix}`);
+        throw new ConfigError(`${where}.headers must map a header name to an env var name or {env, prefix}`);
       }
-      if (!ENV_NAME_RE.test(source.env)) {
-        throw new ConfigError(`${where}.headers.${name} must reference an environment variable NAME, not a value`);
-      }
+      checkEnvName(source.env, platform, `${where}.headers`);
       headers[name] = source;
     }
-    return { platform, transport: 'http', url: raw.url, headers };
+    if (Object.keys(headers).length > 0) {
+      const host = parsed.hostname;
+      const safeHost = isLoopbackHost(host) || isSingleLabelHost(host);
+      if (parsed.protocol !== 'https:' && !safeHost) {
+        throw new ConfigError(`${where}.url must be https when credentials are sent (http only for loopback or a compose service name)`);
+      }
+    }
+    return { platform, transport: 'http', url: raw.url, headers, tools: parseTools(raw.tools, where) };
   }
 
   throw new ConfigError(`${where}.transport must be "stdio" or "http"`);

@@ -1,11 +1,12 @@
 {
-  "_comment": "Example only. Copy the entry into servers.json 'servers'. Official GitHub MCP server (github/github-mcp-server, MIT) over HTTP. Needs GITHUB_PERSONAL_ACCESS_TOKEN in compose env.",
+  "_comment": "Example only. Copy the entry into config/local/servers.json (untracked). Official GitHub MCP server (github/github-mcp-server, MIT) runs as its OWN compose service (see the commented github-mcp service in docker-compose.yml) in HTTP mode. The gateway sends the token as a header. Needs GITHUB_PERSONAL_ACCESS_TOKEN in compose env. Verify the server's HTTP path for the pinned version; adjust 'url' to match.",
   "servers": [
     {
       "platform": "github",
       "transport": "http",
-      "url": "https://api.githubcopilot.com/mcp/",
-      "headers": { "Authorization": { "env": "GITHUB_PERSONAL_ACCESS_TOKEN", "prefix": "Bearer " } }
+      "url": "http://github-mcp:8082/",
+      "headers": { "Authorization": { "env": "GITHUB_PERSONAL_ACCESS_TOKEN", "prefix": "Bearer " } },
+      "tools": ["get_me", "list_issues", "get_issue"]
     }
   ]
 }

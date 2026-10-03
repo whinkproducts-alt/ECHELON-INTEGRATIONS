@@ -11,7 +11,9 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        EXTRA_APK: ""   # e.g. "uv" to run Python MCP servers with uvx
+        EXTRA_APK: ""   # OS packages for baked stdio servers only. Third-party servers belong in their own service.
+        # Local dev: "true" bundles the reference server so `ref` tools work. Product images: "false".
+        INCLUDE_REF_SERVER: "true"
     restart: unless-stopped
     # Hardening: unprivileged user, read-only root, no capabilities, no privilege escalation.
     user: "1000:1000"
@@ -36,8 +38,12 @@ services:
       PORT: "3100"
       HOST: "0.0.0.0"   # inside the container only; the publish rule above limits the host side
       CONFIG_PATH: /app/config/servers.json
+      # If config/local/servers.json exists (untracked) it replaces config/servers.json.
+      # Host header allow-list (DNS-rebinding defence). Add names only if clients reach the gateway by them.
+      GATEWAY_ALLOWED_HOSTS: ${GATEWAY_ALLOWED_HOSTS:-localhost,127.0.0.1,[::1],openclaw}
       OPENCLAW_TOKEN: ${OPENCLAW_TOKEN:?set OPENCLAW_TOKEN in services/openclaw/.env (openssl rand -hex 32)}
       # Upstream credentials: list the variable NAME here and in config/servers.json.
+      # Names must start with the platform prefix, e.g. GITHUB_ for platform "github".
       # GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PERSONAL_ACCESS_TOKEN:-}
 
     healthcheck:
@@ -46,3 +52,17 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+
+  # Third-party MCP servers run as SEPARATE services and are reached over http (see README).
+  # They share neither a uid nor a /proc with the gateway, so they cannot read OPENCLAW_TOKEN.
+  # github-mcp:
+  #   image: ghcr.io/github/github-mcp-server   # MIT. Pin a version tag or digest.
+  #   command: ["http"]                          # streamable HTTP, default port 8082
+  #   restart: unless-stopped
+  #   read_only: true
+  #   user: "1000:1000"
+  #   cap_drop: [ALL]
+  #   security_opt: ["no-new-privileges:true"]
+  #   mem_limit: 256m
+  #   expose: ["8082"]                           # internal network only, never `ports:`
+  #   # No token here: the gateway forwards GITHUB_PERSONAL_ACCESS_TOKEN as an Authorization header.

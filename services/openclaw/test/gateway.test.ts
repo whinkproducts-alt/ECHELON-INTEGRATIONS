@@ -35,7 +35,7 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((s) => new Promise((r) => s.close(() => r(null)))));
 });
 
-async function start(agg: Aggregator, token?: string): Promise<string> {
+async function start(agg: Aggregator, token = 'secret'): Promise<string> {
   const s = createGateway(agg, token);
   servers.push(s);
   await new Promise<void>((r) => s.listen(0, '127.0.0.1', () => r()));
@@ -104,6 +104,83 @@ describe('capContent', () => {
     expect(big.endsWith('[truncated]')).toBe(true);
     expect(capContent([{ type: 'image', data: 'AAAA' }])).toBe('[image content omitted]');
     expect(capContent('garbage')).toBe('');
+  });
+});
+
+describe('tools allow-list, snapshots, timeouts', () => {
+  const twoTools = () =>
+    fakeClient({
+      listTools: vi.fn().mockResolvedValue({
+        tools: ['echo', 'get-sum', 'get-env'].map((name) => ({ name, inputSchema: { type: 'object' } })),
+      }),
+    });
+
+  it('exposes only allow-listed tools', async () => {
+    const c: ServerConfig[] = [{ ...(cfg[0] as ServerConfig), tools: ['echo', 'get-sum'] } as ServerConfig];
+    const tools = await new Aggregator(c, async () => twoTools(), {}).listTools();
+    expect(tools.map((t) => t.name)).toEqual(['ref__echo', 'ref__get_sum']);
+  });
+
+  it('serves the last good snapshot when an upstream later fails, and never logs the error message', async () => {
+    const err = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const client = twoTools();
+    const agg = new Aggregator(cfg, async () => client, {});
+    expect((await agg.listTools()).length).toBe(3);
+    (client.listTools as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('LEAKY-BODY-ghp_x'));
+    await agg.refresh();
+    const logged = err.mock.calls.map((c) => String(c[0])).join('');
+    err.mockRestore();
+    expect((await agg.listTools()).length).toBe(3);
+    expect(logged).toContain('Error');
+    expect(logged).not.toContain('LEAKY-BODY');
+  });
+
+  it('times out a hung listTools without blocking other upstreams', async () => {
+    vi.useFakeTimers();
+    try {
+      const two: ServerConfig[] = [...cfg, { platform: 'slow', transport: 'stdio', command: 'y', args: [], envNames: [] }];
+      const connector: Connector = async (c) =>
+        c.platform === 'slow' ? fakeClient({ listTools: () => new Promise(() => undefined) }) : fakeClient();
+      const agg = new Aggregator(two, connector, {});
+      const p = agg.refresh();
+      await vi.advanceTimersByTimeAsync(5_100);
+      await p;
+      expect((await agg.listTools()).map((t) => t.name)).toEqual(['ref__echo']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('L8 gateway request gating', () => {
+  const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+  const headers = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: 'Bearer secret' };
+
+  it('refuses to be created without a token', () => {
+    expect(() => createGateway(new Aggregator(cfg, async () => fakeClient(), {}), '')).toThrow();
+  });
+  it('rejects any Origin header with 403, even with a valid token', async () => {
+    const base = await start(new Aggregator(cfg, async () => fakeClient(), {}));
+    const r = await fetch(`${base}/mcp`, { method: 'POST', headers: { ...headers, Origin: 'http://evil.example' }, body });
+    expect(r.status).toBe(403);
+  });
+  it('rejects unknown Host values (DNS rebinding) with 403', async () => {
+    const base = await start(new Aggregator(cfg, async () => fakeClient(), {}));
+    const { request } = await import('node:http');
+    const status = await new Promise<number>((resolve, reject) => {
+      const u = new URL(base);
+      const rq = request({ host: u.hostname, port: u.port, path: '/mcp', method: 'POST', headers: { ...headers, Host: 'evil.example' } }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      rq.on('error', reject);
+      rq.end(body);
+    });
+    expect(status).toBe(403);
+  });
+  it('still serves a valid request (token, allowed host, no origin)', async () => {
+    const base = await start(new Aggregator(cfg, async () => fakeClient(), {}));
+    expect((await fetch(`${base}/mcp`, { method: 'POST', headers, body })).status).toBe(200);
   });
 });
 

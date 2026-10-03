@@ -11,6 +11,7 @@ export const MAX_RESPONSE_CHARS = 64 * 1024;
 const REFRESH_MS = 30_000;
 const CONNECT_TIMEOUT_MS = 15_000;
 const CALL_TIMEOUT_MS = 30_000;
+const LIST_TIMEOUT_MS = 5_000;
 
 /** What the gateway publishes for a tool. Deliberately no annotations or class hints. */
 export interface PublishedTool {
@@ -64,6 +65,21 @@ export const sdkConnector: Connector = async (cfg, env) => {
   return client as unknown as UpstreamClient;
 };
 
+interface Snapshot {
+  tools: PublishedTool[];
+  routes: Map<string, Route>;
+}
+
+function withTimeout<T>(ms: number, fn: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    fn().then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e: unknown) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
+
 interface Route {
   platform: string;
   original: string;
@@ -76,6 +92,7 @@ function isObjectSchema(s: unknown): s is { type: 'object'; [k: string]: unknown
 export class Aggregator {
   private clients = new Map<string, UpstreamClient>();
   private routes = new Map<string, Route>();
+  private snapshots = new Map<string, Snapshot>();
   private published: PublishedTool[] = [];
   private refreshedAt = 0;
   private refreshing: Promise<void> | null = null;
@@ -100,50 +117,76 @@ export class Aggregator {
     return this.refreshing;
   }
 
+  /** Refresh every upstream in parallel. A failing upstream keeps its last good snapshot. */
   private async doRefresh(): Promise<void> {
-    const published: PublishedTool[] = [];
-    const routes = new Map<string, Route>();
-    for (const cfg of this.configs) {
-      try {
-        let client = this.clients.get(cfg.platform);
-        if (!client) {
-          client = await this.connector(cfg, this.env);
-          this.clients.set(cfg.platform, client);
-        }
-        const tools: UpstreamTool[] = [];
-        let cursor: string | undefined;
-        for (let page = 0; page < 20; page++) {
-          const res = await client.listTools(cursor ? { cursor } : undefined);
-          tools.push(...res.tools);
-          cursor = res.nextCursor;
-          if (!cursor) break;
-        }
-        const valid = tools.filter((t) => {
-          const ok = typeof t?.name === 'string' && isObjectSchema(t.inputSchema);
-          if (!ok) log.warn('rejected upstream tool: missing name or object inputSchema', { platform: cfg.platform });
-          return ok;
+    const results = await Promise.allSettled(this.configs.map((cfg) => this.refreshOne(cfg)));
+    results.forEach((r, i) => {
+      const cfg = this.configs[i];
+      if (r.status === 'fulfilled') {
+        this.snapshots.set(cfg.platform, r.value);
+        log.info('upstream ready', { platform: cfg.platform, tools: r.value.tools.length });
+      } else {
+        const stale = this.snapshots.get(cfg.platform);
+        log.warn('upstream unavailable', {
+          platform: cfg.platform,
+          kind: errName(r.reason),
+          serving: stale ? 'last good snapshot' : 'nothing',
         });
-        const { accepted, rejected } = assignNames(cfg.platform, valid);
-        for (const r of rejected) log.warn('rejected upstream tool name', { platform: cfg.platform, tool: r.tool, reason: r.reason });
-        for (const a of accepted) {
-          routes.set(a.exposed, { platform: cfg.platform, original: a.original });
-          published.push({
-            name: a.exposed,
-            description: String(a.tool.description ?? '').slice(0, MAX_DESCRIPTION_LEN),
-            inputSchema: a.tool.inputSchema as PublishedTool['inputSchema'],
-          });
-        }
-        log.info('upstream ready', { platform: cfg.platform, tools: accepted.length });
-      } catch (err) {
-        log.warn('upstream unavailable', { platform: cfg.platform, error: errMsg(err) });
         const dead = this.clients.get(cfg.platform);
         this.clients.delete(cfg.platform);
         if (dead) dead.close().catch(() => undefined);
       }
+    });
+    const published: PublishedTool[] = [];
+    const routes = new Map<string, Route>();
+    for (const cfg of this.configs) {
+      const snap = this.snapshots.get(cfg.platform);
+      if (!snap) continue;
+      published.push(...snap.tools);
+      for (const [k, v] of snap.routes) routes.set(k, v);
     }
     this.published = published;
     this.routes = routes;
     this.refreshedAt = Date.now();
+  }
+
+  private async refreshOne(cfg: ServerConfig): Promise<Snapshot> {
+    let client = this.clients.get(cfg.platform);
+    if (!client) {
+      client = await this.connector(cfg, this.env);
+      this.clients.set(cfg.platform, client);
+    }
+    const c = client;
+    const tools = await withTimeout(LIST_TIMEOUT_MS, async () => {
+      const all: UpstreamTool[] = [];
+      let cursor: string | undefined;
+      for (let page = 0; page < 20; page++) {
+        const res = await c.listTools(cursor ? { cursor } : undefined);
+        all.push(...res.tools);
+        cursor = res.nextCursor;
+        if (!cursor) break;
+      }
+      return all;
+    });
+    const allow = cfg.tools ? new Set(cfg.tools) : null;
+    const valid = tools.filter((t) => {
+      if (allow && !(typeof t?.name === 'string' && allow.has(t.name))) return false;
+      const ok = typeof t?.name === 'string' && isObjectSchema(t.inputSchema);
+      if (!ok) log.warn('rejected upstream tool: missing name or object inputSchema', { platform: cfg.platform });
+      return ok;
+    });
+    const { accepted, rejected } = assignNames(cfg.platform, valid);
+    for (const r of rejected) log.warn('rejected upstream tool name', { platform: cfg.platform, tool: r.tool, reason: r.reason });
+    const snap: Snapshot = { tools: [], routes: new Map() };
+    for (const a of accepted) {
+      snap.routes.set(a.exposed, { platform: cfg.platform, original: a.original });
+      snap.tools.push({
+        name: a.exposed,
+        description: String(a.tool.description ?? '').slice(0, MAX_DESCRIPTION_LEN),
+        inputSchema: a.tool.inputSchema as PublishedTool['inputSchema'],
+      });
+    }
+    return snap;
   }
 
   /** Forward one call. Arguments and results are never logged. */
@@ -172,8 +215,9 @@ export class Aggregator {
   }
 }
 
-function errMsg(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+/** Only the error class name is ever logged: messages and bodies can echo secrets or arguments. */
+function errName(e: unknown): string {
+  return e instanceof Error ? e.name : 'unknown';
 }
 
 function errorResult(text: string): { content: { type: 'text'; text: string }[]; isError: boolean } {

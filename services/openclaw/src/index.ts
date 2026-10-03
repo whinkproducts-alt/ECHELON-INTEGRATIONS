@@ -1,10 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { parseConfig } from './config.js';
+import { readFileSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { parseConfig, ConfigError } from './config.js';
 import { Aggregator } from './aggregator.js';
-import { createGateway } from './server.js';
+import { createGateway, parseAllowedHosts } from './server.js';
 import { log } from './log.js';
-
-const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1']);
 
 function main(): void {
   const port = Number.parseInt(process.env.PORT ?? '3100', 10);
@@ -12,15 +11,25 @@ function main(): void {
   const token = process.env.OPENCLAW_TOKEN?.trim() || undefined;
   const configPath = process.env.CONFIG_PATH ?? '/app/config/servers.json';
 
-  if (!token && !LOOPBACK.has(host)) {
-    log.error('refusing to bind a non-loopback address without OPENCLAW_TOKEN');
+  if (!token) {
+    log.error('refusing to start without OPENCLAW_TOKEN');
     process.exit(1);
   }
-  if (!token) log.warn('OPENCLAW_TOKEN is not set: requests are unauthenticated (loopback only)');
 
-  const configs = parseConfig(readFileSync(configPath, 'utf8'));
+  // Optional untracked override: <config dir>/local/servers.json replaces the tracked file.
+  const localPath = join(dirname(configPath), 'local', 'servers.json');
+  const useLocal = existsSync(localPath);
+  let configs;
+  try {
+    configs = parseConfig(readFileSync(useLocal ? localPath : configPath, 'utf8'));
+  } catch (err) {
+    // ConfigError messages are fixed strings that never contain config values.
+    log.error('invalid config', { source: useLocal ? 'local override' : 'default', reason: err instanceof ConfigError ? err.message : 'unreadable' });
+    process.exit(1);
+  }
+  log.info('config loaded', { source: useLocal ? 'config/local/servers.json' : 'config/servers.json' });
   const agg = new Aggregator(configs);
-  const server = createGateway(agg, token);
+  const server = createGateway(agg, token, parseAllowedHosts(process.env.GATEWAY_ALLOWED_HOSTS));
   server.listen(port, host, () => {
     log.info('gateway listening', { host, port, upstreams: configs.map((c) => c.platform) });
     void agg.refresh();
