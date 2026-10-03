@@ -28,7 +28,12 @@ export function generateNonce(): string {
   return btoa(bin);
 }
 
-export function buildCsp(opts: { nonce: string; isDev: boolean }): string {
+/** True only when the configured public URL is https, so plain-http deployments (local prod builds) still work. */
+export function isHttpsDeployment(configuredUrl: string | undefined | null): boolean {
+  return typeof configuredUrl === 'string' && configuredUrl.trim().toLowerCase().startsWith('https://');
+}
+
+export function buildCsp(opts: { nonce: string; isDev: boolean; upgradeInsecure?: boolean }): string {
   const { nonce, isDev } = opts;
   const directives: string[] = [
     "default-src 'self'",
@@ -45,6 +50,6 @@ export function buildCsp(opts: { nonce: string; isDev: boolean }): string {
     "form-action 'self'",
     "frame-ancestors 'none'",
   ];
-  if (!isDev) directives.push('upgrade-insecure-requests');
+  if (!isDev && opts.upgradeInsecure) directives.push('upgrade-insecure-requests');
   return directives.join('; ');
 }

@@ -7,13 +7,21 @@
  *   OPENCLAW_URL=http://127.0.0.1:3100 OPENCLAW_TOKEN=... npx tsx --tsconfig tsconfig.json scripts/tool-def-hash.ts
  */
 import { listOpenClawTools } from '../lib/openclaw-client';
-import { defHash } from '../lib/tool-definition';
+import { defHash, sanitiseToolDefinition } from '../lib/tool-definition';
 
 async function main(): Promise<void> {
   const tools = await listOpenClawTools();
   for (const t of tools) {
-    const hash = defHash({ description: t.description, inputSchema: t.inputSchema });
-    console.log(`${`openclaw__${t.name.toLowerCase()}`}\t${hash}`);
+    const clean = sanitiseToolDefinition({ description: t.description, inputSchema: t.inputSchema });
+    const name = `openclaw__${t.name.toLowerCase()}`;
+    if (!clean.ok) {
+      console.log(`${name}\tREJECTED (${clean.reason}); cannot be reviewed`);
+      continue;
+    }
+    const { description, inputSchema } = clean.definition;
+    console.log(`${name}\t${defHash(clean.definition)}`);
+    console.log(`  description: ${description}`);
+    console.log(`  inputSchema:\n${JSON.stringify(inputSchema, null, 2).replace(/^/gm, '    ')}\n`);
   }
 }
 

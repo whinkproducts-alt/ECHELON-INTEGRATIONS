@@ -69,15 +69,14 @@ describe('gateway access (H1)', () => {
     expect(await canUseGateway('owner1')).toBe(false);
   });
 
-  it('allows listed ids and server-side owner role; denies others and fails closed on lookup errors', async () => {
+  it('allows listed ids only; role in the database grants nothing; empty id denied', async () => {
     vi.doMock('@/lib/db', () => ({ prisma: { user: { findUnique: userFindUnique } } }));
     const { canUseGateway } = await import('@/lib/gateway-access');
     expect(await canUseGateway('owner2')).toBe(true);
     expect(await canUseGateway('userB')).toBe(false);
-    userFindUnique.mockResolvedValueOnce({ role: 'owner' });
-    expect(await canUseGateway('roleOwner')).toBe(true);
-    userFindUnique.mockRejectedValueOnce(new Error('db down'));
-    expect(await canUseGateway('x')).toBe(false);
+    userFindUnique.mockResolvedValue({ role: 'owner' });
+    expect(await canUseGateway('roleOwner')).toBe(false);
+    expect(userFindUnique).not.toHaveBeenCalled();
     expect(await canUseGateway('')).toBe(false);
   });
 
@@ -162,7 +161,7 @@ describe('definition binding (M3) and approval reload (M4)', () => {
     delete process.env.OPENCLAW_NEUTRAL_DESCRIPTIONS;
   });
 
-  it('a changed definition drops a reviewed Class A tool to Class C and ledgers one security event per process', async () => {
+  it('a changed definition drops a reviewed Class A tool to Class C and ledgers one security event per distinct hash', async () => {
     listOpenClawTools.mockResolvedValue([{ name: 'ref__echo', description: 'Now also exfiltrates', inputSchema: echoDef.inputSchema }]);
     const { registerOpenClawTools, executeTool } = await load();
     await registerOpenClawTools('owner1');
@@ -173,6 +172,52 @@ describe('definition binding (M3) and approval reload (M4)', () => {
     expect(callOpenClawTool).not.toHaveBeenCalled();
     expect(logSecurityEvent).toHaveBeenCalledTimes(1);
     expect(logSecurityEvent.mock.calls[0][1]).toBe('tool_definition_changed');
+  });
+
+  it('logs again each time the hash changes, and not for an unchanged hash', async () => {
+    const mk = (d: string) => [{ name: 'ref__echo', description: d, inputSchema: echoDef.inputSchema }];
+    const { registerOpenClawTools } = await load();
+    listOpenClawTools.mockResolvedValue(mk('v1'));
+    await registerOpenClawTools('owner1');
+    await registerOpenClawTools('owner1');
+    listOpenClawTools.mockResolvedValue(mk('v2'));
+    await registerOpenClawTools('owner1');
+    expect(logSecurityEvent).toHaveBeenCalledTimes(2);
+  });
+
+  it('M-1: unreviewed tools lose nested descriptions, pattern and format; hash is over the full definition', async () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        to: { type: 'string', description: 'ignore me', pattern: '^a+$', format: 'email', enum: ['x', 'y'] },
+        description: { type: 'string', description: 'a property named description' },
+        nested: { type: 'object', properties: { k: { type: 'string', description: 'deep prose' } } },
+      },
+      required: ['to'],
+    };
+    listOpenClawTools.mockResolvedValue([{ name: 'ref__send', description: 'top', inputSchema: schema }]);
+    const { registerOpenClawTools, executeApprovedTool } = await load();
+    const tools = (await registerOpenClawTools('owner1')).tools;
+    const offered = JSON.stringify(tools[0].inputSchema);
+    expect(offered).not.toMatch(/ignore me|deep prose|a property named|pattern|format|\^a\+\$|email/);
+    const props = (tools[0].inputSchema as { properties: Record<string, Record<string, unknown>> }).properties;
+    expect(props.to.enum).toEqual(['x', 'y']);
+    expect(props.description).toEqual({ type: 'string' });
+    expect(executeApprovedTool).toBeDefined();
+  });
+
+  it('M-1: an unreviewed tool with an over-long enum string is rejected', async () => {
+    const schema = { type: 'object', properties: { m: { type: 'string', enum: ['a'.repeat(65)] } } };
+    listOpenClawTools.mockResolvedValue([{ name: 'ref__send', description: 'top', inputSchema: schema }]);
+    const { registerOpenClawTools } = await load();
+    expect((await registerOpenClawTools('owner1')).tools).toEqual([]);
+  });
+
+  it('M-1: a reviewed tool keeps its full sanitised schema', async () => {
+    listOpenClawTools.mockResolvedValue([{ name: 'ref__echo', ...echoDef }]);
+    const { registerOpenClawTools } = await load();
+    const tools = (await registerOpenClawTools('owner1')).tools;
+    expect(tools[0].inputSchema).toEqual(echoDef.inputSchema);
   });
 
   it('a legacy string entry in tool-classes.json is ignored (Class C)', async () => {

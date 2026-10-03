@@ -2,11 +2,15 @@ import { auth } from '@/auth';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { checkCsrf } from '@/lib/csrf';
-import { buildCsp, generateNonce } from '@/lib/csp';
+import { buildCsp, generateNonce, isHttpsDeployment } from '@/lib/csp';
 
 export default auth(async function middleware(req: NextRequest & { auth: any }) {
   const nonce = generateNonce();
-  const csp = buildCsp({ nonce, isDev: process.env.NODE_ENV === 'development' });
+  const csp = buildCsp({
+    nonce,
+    isDev: process.env.NODE_ENV === 'development',
+    upgradeInsecure: isHttpsDeployment(process.env.AUTH_URL ?? process.env.NEXTAUTH_URL),
+  });
   const res = await handle(req, nonce, csp);
   res.headers.set('Content-Security-Policy', csp);
   return res;
@@ -65,7 +69,10 @@ async function handle(req: NextRequest & { auth: any }, nonce: string, csp: stri
 }
 
 export const config = {
+  // The static-extension exclusion applies outside /api only: /api/* always runs CSRF + CSP,
+  // even for a path that ends in .png or similar.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/api/:path*',
+    '/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

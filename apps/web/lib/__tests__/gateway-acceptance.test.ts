@@ -157,6 +157,31 @@ describe('CSP through the real middleware', () => {
     expect(redir.headers.get('content-security-policy')).toMatch(/nonce-/);
   });
 
+  it('upgrade-insecure-requests follows AUTH_URL scheme, not NODE_ENV', async () => {
+    vi.stubEnv('AUTH_URL', 'https://app.example.com');
+    let m = await loadMw(null);
+    expect((await m.mw(new m.NextRequest('http://localhost:3000/login'))).headers.get('content-security-policy')).toContain('upgrade-insecure-requests');
+    vi.resetModules();
+    vi.stubEnv('AUTH_URL', 'http://localhost:3000');
+    m = await loadMw(null);
+    expect((await m.mw(new m.NextRequest('http://localhost:3000/login'))).headers.get('content-security-policy')).not.toContain('upgrade-insecure-requests');
+    vi.unstubAllEnvs();
+  });
+
+  it('L-6: the matcher never excludes /api paths by extension, and CSRF + CSP run on /api/x.png', async () => {
+    const { mw, NextRequest } = await loadMw({ user: { id: 'u1' } });
+    const mod = await import('@/middleware');
+    const patterns = mod.config.matcher;
+    expect(patterns).toContain('/api/:path*');
+    const catchAll = new RegExp(`^${patterns.find((p: string) => p.startsWith('/(('))!}$`);
+    expect(catchAll.test('/api/files/logo.png')).toBe(false); // covered by the /api/:path* entry instead
+    expect(catchAll.test('/logo.png')).toBe(false);
+    expect(catchAll.test('/dashboard')).toBe(true);
+    const res = await mw(new NextRequest('http://localhost:3000/api/settings/x.png', { method: 'POST', headers: { 'sec-fetch-site': 'cross-site', origin: 'https://evil.example' } }));
+    expect(res.status).toBe(403);
+    expect(res.headers.get('content-security-policy')).toMatch(/nonce-/);
+  });
+
   it('uses a different nonce per request', async () => {
     const { mw, NextRequest } = await loadMw(null);
     const a = (await mw(new NextRequest('http://localhost:3000/login'))).headers.get('content-security-policy');

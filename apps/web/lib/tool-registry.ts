@@ -7,7 +7,7 @@ import { stripFakeUntrustedTags, scanForInjectionPatterns, filterToolResult } fr
 import { writeMemory, correctMemory, searchMemory } from '@/lib/memory-engine';
 import { listOpenClawTools, callOpenClawTool, isGatewayConfigured } from '@/lib/openclaw-client';
 import { canUseGateway, isGatewayTool } from '@/lib/gateway-access';
-import { defHash, neutralDescription } from '@/lib/tool-definition';
+import { defHash, neutralDescription, redactSchemaForUnreviewed } from '@/lib/tool-definition';
 import toolClassesConfig from '@/config/tool-classes.json';
 import type { ToolDefinition } from '@/lib/tool-loop';
 import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
@@ -421,8 +421,8 @@ const GATEWAY_CLASS_ALLOWLIST = loadToolClassAllowList();
 const GATEWAY_TOOLS = new Map<string, ToolDefinition>();
 /** Hash of the sanitised definition as last advertised by the gateway, by full name. */
 const GATEWAY_DEF_HASH = new Map<string, string>();
-/** Tools already reported as changed in this process: one security event per tool. */
-const REPORTED_DEF_CHANGES = new Set<string>();
+/** Last hash reported as differing from the reviewed one, per tool: one event per distinct hash. */
+const REPORTED_DEF_HASH = new Map<string, string>();
 
 function neutralDescriptionsEnabled(): boolean {
   return process.env.OPENCLAW_NEUTRAL_DESCRIPTIONS?.trim().toLowerCase() !== 'false';
@@ -483,42 +483,61 @@ export async function registerOpenClawTools(userId: string): Promise<GatewayRegi
     accepted.set(full, { tool: c.tool, original: c.original });
   }
 
-  // Drop gateway tools that are no longer advertised.
+  // Phase 1: compute class, hash and the model-facing definition for every tool. No awaits, no shared state touched.
+  interface Plan { full: string; original: string; hash: string; cls: PermissionClass; def: ToolDefinition; unreviewedChange: boolean }
+  const plans: Plan[] = [];
+  for (const [full, { tool, original }] of accepted) {
+    // Class C unless WHINK's own allow-list says otherwise AND the definition is the one that was reviewed.
+    // Nothing from the gateway is consulted for the class. The hash covers the full sanitised definition.
+    const hash = defHash({ description: tool.description, inputSchema: tool.inputSchema as Record<string, unknown> });
+    const entry = GATEWAY_CLASS_ALLOWLIST[full];
+    const reviewed = Boolean(entry) && entry.defHash === hash;
+    let def: ToolDefinition = { name: full, description: tool.description, inputSchema: tool.inputSchema };
+    if (!reviewed && neutralDescriptionsEnabled()) {
+      // Unreviewed: neutral top-level description, and nested descriptions, pattern and format
+      // are stripped from the schema so no upstream prose reaches the model.
+      const redacted = redactSchemaForUnreviewed(tool.inputSchema as Record<string, unknown>);
+      if (!redacted.ok) {
+        console.warn(`[openclaw] rejecting unreviewed tool ${full}: ${redacted.reason}`);
+        continue;
+      }
+      def = { name: full, description: neutralDescription(original), inputSchema: redacted.inputSchema };
+    }
+    plans.push({ full, original, hash, cls: reviewed ? entry.class : 'C', def, unreviewedChange: Boolean(entry) && !reviewed });
+  }
+
+  // Phase 2: update the shared maps synchronously, with no await between the drop and the sets.
+  const planned = new Set(plans.map((p) => p.full));
   for (const old of [...GATEWAY_TOOLS.keys()]) {
-    if (!accepted.has(old)) {
+    if (!planned.has(old)) {
       delete TOOL_HANDLERS[old];
       delete TOOL_RISK_MAP[old];
       GATEWAY_TOOLS.delete(old);
       GATEWAY_DEF_HASH.delete(old);
     }
   }
-
   const registered: ToolDefinition[] = [];
-  for (const [full, { tool, original }] of accepted) {
-    TOOL_HANDLERS[full] = async (_uid: string, params: any): Promise<ToolExecutionResult> => {
+  for (const p of plans) {
+    const original = p.original;
+    TOOL_HANDLERS[p.full] = async (_uid: string, params: any): Promise<ToolExecutionResult> => {
       const data = await callOpenClawTool(original, params);
       return { success: true, data, source: 'openclaw', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
     };
-    // Class C unless WHINK's own allow-list says otherwise AND the definition is the one that was reviewed.
-    // Nothing from the gateway is consulted for the class.
-    const hash = defHash({ description: tool.description, inputSchema: tool.inputSchema as Record<string, unknown> });
-    const entry = GATEWAY_CLASS_ALLOWLIST[full];
-    const reviewed = Boolean(entry) && entry.defHash === hash;
-    if (entry && !reviewed && !REPORTED_DEF_CHANGES.has(full)) {
-      REPORTED_DEF_CHANGES.add(full);
-      try {
-        await logSecurityEvent(userId, 'tool_definition_changed', `Gateway tool ${full} no longer matches its reviewed definition hash; treated as Class C`);
-      } catch (e) {
-        logger.error('security event write failed', { userId, tool: full, error: (e as Error)?.message });
-      }
+    TOOL_RISK_MAP[p.full] = p.cls;
+    GATEWAY_DEF_HASH.set(p.full, p.hash);
+    GATEWAY_TOOLS.set(p.full, p.def);
+    registered.push(p.def);
+  }
+
+  // Phase 3: security events, after the maps are consistent.
+  for (const p of plans) {
+    if (!p.unreviewedChange || REPORTED_DEF_HASH.get(p.full) === p.hash) continue;
+    REPORTED_DEF_HASH.set(p.full, p.hash);
+    try {
+      await logSecurityEvent(userId, 'tool_definition_changed', `Gateway tool ${p.full} no longer matches its reviewed definition hash (now ${p.hash.slice(0, 12)}); treated as Class C`);
+    } catch (e) {
+      logger.error('security event write failed', { userId, tool: p.full, error: (e as Error)?.message });
     }
-    TOOL_RISK_MAP[full] = reviewed ? entry.class : 'C';
-    GATEWAY_DEF_HASH.set(full, hash);
-    // Unreviewed tools get a neutral description so upstream prose never reaches the model.
-    const description = reviewed || !neutralDescriptionsEnabled() ? tool.description : neutralDescription(original);
-    const def: ToolDefinition = { name: full, description, inputSchema: tool.inputSchema };
-    GATEWAY_TOOLS.set(full, def);
-    registered.push(def);
   }
 
   console.log(`[openclaw] registered ${registered.length} tool(s) for user ${userId}`);

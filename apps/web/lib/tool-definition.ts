@@ -141,6 +141,49 @@ export function defHash(def: SanitisedDefinition): string {
   return createHash('sha256').update(canonicalJson({ description: def.description, inputSchema: def.inputSchema })).digest('hex');
 }
 
+export const MAX_UNREVIEWED_ENUM_LEN = 64;
+
+export type RedactResult =
+  | { ok: true; inputSchema: Record<string, unknown> }
+  | { ok: false; reason: string };
+
+function redactNode(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(redactNode);
+  if (!isPlainObject(node)) return node;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (key === 'description' && typeof value === 'string') continue;
+    if (key === 'pattern' || key === 'format') continue;
+    if (key === 'enum' && Array.isArray(value)) {
+      for (const v of value) {
+        if (typeof v !== 'string') continue;
+        if (v.length > MAX_UNREVIEWED_ENUM_LEN || scanForInjectionPatterns(normaliseText(v)).suspicious) throw new Reject('enum value not acceptable for an unreviewed tool');
+      }
+      out[key] = [...value];
+      continue;
+    }
+    // A property literally named "description" holds a sub-schema under `properties`; recurse, do not drop it.
+    out[key] = key === 'properties' && isPlainObject(value)
+      ? Object.fromEntries(Object.entries(value).map(([n, sub]) => [n, redactNode(sub)]))
+      : redactNode(value);
+  }
+  return out;
+}
+
+/**
+ * Schema offered to the model for a tool WHINK has not reviewed: every nested
+ * `description` removed, `pattern` and `format` dropped, enum strings kept only
+ * if short and clean (otherwise the whole tool is rejected). Takes a SANITISED
+ * schema. defHash must be computed over the sanitised definition BEFORE this runs.
+ */
+export function redactSchemaForUnreviewed(inputSchema: Record<string, unknown>): RedactResult {
+  try {
+    return { ok: true, inputSchema: redactNode(inputSchema) as Record<string, unknown> };
+  } catch (err) {
+    return { ok: false, reason: err instanceof Reject ? err.message : 'unreadable schema' };
+  }
+}
+
 /** Description shown to the model for a gateway tool WHINK has not reviewed. */
 export function neutralDescription(gatewayName: string): string {
   const platform = gatewayName.split('__')[0] || 'unknown';
