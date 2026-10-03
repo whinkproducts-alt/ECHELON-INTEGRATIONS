@@ -5,7 +5,7 @@ import { X, Zap } from 'lucide-react';
 
 export type NeuralEvent = {
   id: string;
-  type: 'tool_call' | 'tool_result' | 'security_event' | 'memory_write' | 'text_chunk' | 'error';
+  type: 'tool_call' | 'tool_result' | 'security_event' | 'memory_write' | 'text_chunk' | 'error' | 'approval';
   text: string;
   ts: number;
 };
@@ -22,6 +22,7 @@ const EVENT_META: Record<NeuralEvent['type'], { icon: string; label: string; col
   security_event: { icon: '⚠', label: 'security',      colorVar: 'hsl(var(--denial))' },
   memory_write:   { icon: '◈', label: 'memory',        colorVar: 'hsl(var(--whink-accent))' },
   text_chunk:     { icon: '▸', label: 'stream',        colorVar: 'hsl(var(--muted-foreground))' },
+  approval:       { icon: '⏳', label: 'approval pending', colorVar: 'hsl(var(--pending-amber))' },
   error:          { icon: '✕', label: 'error',         colorVar: 'hsl(var(--denial))' },
 };
 

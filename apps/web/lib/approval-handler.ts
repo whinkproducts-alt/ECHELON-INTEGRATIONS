@@ -1,12 +1,11 @@
 /**
  * WHINK Org-Kit Approval Handler
  *
- * Detects "Approved" replies and dispatches the authorized team.
- * Execution only begins after Victor (Kaycee) explicitly approves an EAR.
+ * A chat message can never approve anything. Approvals go through the approval card or a
+ * spoken approval that names the request id (lib/approvals.ts). This module only detects
+ * bare approval phrases (to refuse them) and formats the dispatch message.
  */
 
-import { prisma } from "@/lib/db";
-import { recordAction, updateActionStatus } from "@/lib/ledger";
 import type { ExecutionAuthorizationRequest } from "@whink/org-kit";
 
 // ── Approval detection ────────────────────────────────────────────────────────
@@ -23,83 +22,15 @@ const APPROVAL_PATTERNS: RegExp[] = [
   /^(yes|yep|yeah),?\s*go\.?$/i,
 ];
 
+/** Detection only. A match approves nothing. */
 export function isApprovalMessage(message: string): boolean {
   return APPROVAL_PATTERNS.some((re) => re.test(message.trim()));
 }
 
-// ── Pending EAR lookup ────────────────────────────────────────────────────────
+export const BARE_APPROVAL_REPLY =
+  "Approvals go through the approval card (or say approve while I read it out) \u2014 nothing was approved from chat.";
 
-export async function findPendingEAR(
-  userId: string
-): Promise<{ actionId: string; ear: ExecutionAuthorizationRequest } | null> {
-  const action = await prisma.action.findFirst({
-    where: {
-      userId,
-      action: "execution_authorization_request",
-      status: "AWAITING_APPROVAL",
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (!action?.validationResult) return null;
-
-  try {
-    const ear = JSON.parse(action.validationResult) as ExecutionAuthorizationRequest;
-    return { actionId: action.id, ear };
-  } catch {
-    return null;
-  }
-}
-
-// ── Dispatch ──────────────────────────────────────────────────────────────────
-
-export interface DispatchResult {
-  dispatched: true;
-  actionId: string;
-  ear: ExecutionAuthorizationRequest;
-  dispatchMessage: string;
-}
-
-export interface DispatchSkipped {
-  dispatched: false;
-  reason: "no_pending_ear" | "not_approval";
-}
-
-export type ApprovalOutcome = DispatchResult | DispatchSkipped;
-
-export async function handleApproval(
-  userId: string,
-  message: string,
-  persona: string = "WHINK"
-): Promise<ApprovalOutcome> {
-  if (!isApprovalMessage(message)) return { dispatched: false, reason: "not_approval" };
-
-  const pending = await findPendingEAR(userId);
-  if (!pending) return { dispatched: false, reason: "no_pending_ear" };
-
-  const { actionId, ear } = pending;
-
-  // Mark the EAR as approved
-  const updated = await updateActionStatus(userId, actionId, {
-    status: "VALIDATED",
-    confirmationMethod: "user_confirmed",
-  });
-  if (!updated) return { dispatched: false, reason: "no_pending_ear" };
-
-  // Log the dispatch action
-  await recordAction({
-    userId,
-    initiator: "user",
-    persona,
-    action: "agent_dispatch",
-    permissionClass: "S",
-    confirmationMethod: "user_confirmed",
-    status: "VALIDATED",
-    inputSummary: `Approval received for: ${ear.objective?.substring(0, 200)}`,
-    outputSummary: `Dispatched: ${ear.lead_agent ?? "No lead"} + ${ear.team_size - 1} supporting`,
-    validationResult: JSON.stringify({ approved_ear_id: actionId, ear }),
-  });
-
+export function buildDispatchMessage(ear: ExecutionAuthorizationRequest, persona: string = "WHINK"): string {
   const header =
     persona === "MAMBA"
       ? "🐍 **MAMBA — TEAM DISPATCHED**"
@@ -126,5 +57,5 @@ export async function handleApproval(
 
 Team is active. I'll report milestones, surface blockers, and request your input before any irreversible action. You can say **"Stand down"** at any point to pause execution.`;
 
-  return { dispatched: true, actionId, ear, dispatchMessage };
+  return dispatchMessage;
 }

@@ -1,12 +1,13 @@
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { recordAction, type LedgerStatus } from '@/lib/ledger';
+import { approvalContentHash } from '@/lib/canonical-json';
 
 export type PermissionClass = 'A' | 'B' | 'C';
 
 interface PermissionCheckResult {
   allowed: boolean;
-  method: 'auto' | 'delegated' | 'requires_confirmation';
+  method: 'auto' | 'delegated' | 'requires_confirmation' | 'human_approved';
   reason?: string;
 }
 
@@ -53,6 +54,37 @@ export async function checkPermission(
   }
 
   return { allowed: false, method: 'requires_confirmation' };
+}
+
+/**
+ * Approval-aware path for Class C. The only way a Class C action may run.
+ * Allowed only when the approval row (scoped by userId) was moved to EXECUTING by the
+ * winning atomic decision, names this capability, the stored content still hashes to
+ * the hash the human saw, and the decision was made before expiry. Autonomy level and
+ * delegations are never consulted: they cannot substitute for a human decision.
+ */
+export async function checkApprovedAction(
+  userId: string,
+  approvalId: string,
+  capability: string,
+  contentHash: string
+): Promise<PermissionCheckResult> {
+  const deny = (reason: string): PermissionCheckResult => ({ allowed: false, method: 'requires_confirmation', reason });
+  if (!userId || !approvalId) return deny('Approval required');
+  const row = await prisma.approvalRequest.findFirst({ where: { id: approvalId, userId } });
+  if (!row) return deny('Approval not found');
+  if (row.status !== 'EXECUTING') return deny(`Approval is ${row.status}, not approved for execution`);
+  if (row.executedAt) return deny('Approval already consumed');
+  if ((row.tool ?? row.kind) !== capability) return deny('Approval does not match this action');
+  if (!row.decidedAt || row.decidedAt.getTime() > row.expiresAt.getTime()) return deny('Approval was not decided before expiry');
+  let recomputed: string;
+  try {
+    recomputed = approvalContentHash({ kind: row.kind, tool: row.tool, params: row.params });
+  } catch {
+    return deny('Approved content hash mismatch');
+  }
+  if (recomputed !== row.contentHash || contentHash !== row.contentHash) return deny('Approved content hash mismatch');
+  return { allowed: true, method: 'human_approved' };
 }
 
 // Log persona authority bypass attempts

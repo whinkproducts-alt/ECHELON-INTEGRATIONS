@@ -25,7 +25,7 @@ const AUTONOMY_LABELS: Record<number, string> = {
   1: 'Ask before everything',
   2: 'Run Class A automatically (recommended)',
   3: 'Run Class A + B automatically',
-  4: 'Full autonomy — Class C included',
+  4: 'Maximum autonomy — Class A + B, broader delegation',
 };
 
 export function OnboardingStep({ step }: { step: number }) {
@@ -39,7 +39,7 @@ export function OnboardingStep({ step }: { step: number }) {
   const [roleTitle, setRoleTitle] = useState('');
 
   // Step 2 fields
-  const [autonomyLevel, setAutonomyLevel] = useState(2);
+  const [autonomyLevel, setAutonomyLevel] = useState(1);
   const [classCConfirmed, setClassCConfirmed] = useState(false);
 
   const saveStep1 = async () => {
@@ -72,6 +72,10 @@ export function OnboardingStep({ step }: { step: number }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profile: { autonomyLevel } }),
       });
+      if (r.status === 409) {
+        toast.error('Raising autonomy above your current level needs approval. You can change it later in Settings.');
+        return;
+      }
       if (!r.ok) throw new Error();
       router.push('/onboarding/step/3');
     } catch {
@@ -194,7 +198,7 @@ export function OnboardingStep({ step }: { step: number }) {
                       <p className="text-xs text-muted-foreground mt-1">Most actions run automatically, including delegated tasks. Only irreversible or high-stakes actions wait.</p>
                     )}
                     {autonomyLevel === 4 && (
-                      <p className="text-xs text-muted-foreground mt-1">All actions run automatically. Use only if you fully trust the system and your tool integrations.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Class A and B actions run automatically. Class C actions (irreversible, high-stakes) always wait for your approval at every level.</p>
                     )}
                   </div>
                 </div>
@@ -208,7 +212,7 @@ export function OnboardingStep({ step }: { step: number }) {
                       className="mt-0.5 accent-primary"
                     />
                     <span className="text-xs text-muted-foreground">
-                      I understand that full autonomy means Class C actions (irreversible, high-stakes) will run without my approval. I accept responsibility for all outcomes.
+                      I understand that maximum autonomy lets Class A and B actions run without asking. Class C actions still always wait for my approval.
                     </span>
                   </label>
                 )}

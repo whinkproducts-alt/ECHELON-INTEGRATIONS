@@ -1,9 +1,25 @@
 import { auth } from '@/auth';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { checkCsrf } from '@/lib/csrf';
 
 export default auth(async function middleware(req: NextRequest & { auth: any }) {
   const { pathname } = req.nextUrl;
+
+  // M1: CSRF guard for state-changing /api calls, before any other work.
+  const csrf = checkCsrf({
+    method: req.method,
+    pathname,
+    secFetchSite: req.headers.get('sec-fetch-site'),
+    origin: req.headers.get('origin'),
+    host: req.headers.get('x-forwarded-host') ?? req.headers.get('host'),
+    proto: req.headers.get('x-forwarded-proto'),
+    requestOrigin: req.nextUrl.origin,
+    configuredUrl: process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? null,
+  });
+  if (!csrf.ok) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   // Public paths — no redirect
   const publicPaths = ['/login', '/signup', '/api/auth'];

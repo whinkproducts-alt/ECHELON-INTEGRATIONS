@@ -1,9 +1,13 @@
 import { prisma } from '@/lib/db';
 import { generateCorrelationId, logger } from '@/lib/logger';
 import { recordAction, recordActionSafe, updateActionStatus } from '@/lib/ledger';
-import { checkPermission, type PermissionClass } from '@/lib/permission-engine';
+import { checkPermission, checkApprovedAction, type PermissionClass } from '@/lib/permission-engine';
+import { createApproval, type ApprovalView } from '@/lib/approvals';
+import { stripFakeUntrustedTags, scanForInjectionPatterns, filterToolResult } from '@/lib/content-isolation';
 import { writeMemory, correctMemory, searchMemory } from '@/lib/memory-engine';
 import { listOpenClawTools, callOpenClawTool } from '@/lib/openclaw-client';
+import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
+import { validateTaskInput } from '@/lib/task-input';
 import dns from 'dns';
 import net from 'net';
 
@@ -84,6 +88,8 @@ export interface ToolExecutionResult {
   data?: any;
   error?: string;
   source?: string;
+  /** Set when a Class C call was queued as an approval request instead of running. */
+  approvalRequired?: ApprovalView;
   timestamp: string;
   toolVersion: string;
 }
@@ -91,11 +97,16 @@ export interface ToolExecutionResult {
 // Use null-prototype objects to prevent __proto__ injection
 const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<ToolExecutionResult>> = Object.assign(Object.create(null), {
   memory_write: async (userId: string, params: any) => {
+    let projectId: string | null = null;
+    if (hasProjectId(params.projectId)) {
+      projectId = await assertOwnedProject(userId, params.projectId);
+      if (!projectId) return { success: false, error: 'Project not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
     const result = await writeMemory({
       userId,
       type: params.type ?? 'semantic',
       statement: params.statement,
-      projectId: params.projectId,
+      projectId,
       source: params.source ?? 'conversation',
       confidence: params.confidence,
       epistemicStatus: params.epistemicStatus ?? 'KNOWN',
@@ -110,7 +121,12 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
   },
 
   memory_correct: async (userId: string, params: any) => {
-    const result = await correctMemory(userId, params.oldStatement, params.newStatement, params.projectId);
+    let projectId: string | null = null;
+    if (hasProjectId(params.projectId)) {
+      projectId = await assertOwnedProject(userId, params.projectId);
+      if (!projectId) return { success: false, error: 'Project not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+    const result = await correctMemory(userId, params.oldStatement, params.newStatement, projectId);
     return { success: true, data: result, source: 'memory_engine', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
@@ -140,6 +156,12 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
       const to = await prisma.entityNode.findFirst({ where: { id: params.relationship.toId, userId } });
       if (!to) return { success: false, error: 'Entity not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
 
+      let edgeProjectId: string | null = null;
+      if (hasProjectId(params.projectId)) {
+        edgeProjectId = await assertOwnedProject(userId, params.projectId);
+        if (!edgeProjectId) return { success: false, error: 'Project not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+      }
+
       // Supersede old relationship if exists
       if (params.supersede) {
         const old = await prisma.entityEdge.findFirst({
@@ -158,7 +180,7 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
               relationshipType: params.relationship.type,
               context: params.relationship.context,
               confidence: params.relationship.confidence ?? 0.8,
-              projectId: params.projectId,
+              projectId: edgeProjectId,
             },
           });
           await prisma.entityEdge.update({ where: { id: old.id }, data: { supersededBy: newEdge.id } });
@@ -171,7 +193,7 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
           toId: params.relationship.toId,
           relationshipType: params.relationship.type,
           context: params.relationship.context,
-          projectId: params.projectId,
+          projectId: edgeProjectId,
         },
       });
       return { success: true, data: edge, source: 'knowledge_graph', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
@@ -319,17 +341,23 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
   },
 
   task_create: async (userId: string, params: any) => {
+    if (typeof params?.projectId !== 'string' || params.projectId.length === 0) {
+      return { success: false, error: 'projectId required', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
     // Cross-tenant ownership check: verify project belongs to caller
-    const project = await prisma.project.findFirst({ where: { id: params.projectId, ownerId: userId } });
-    if (!project) return { success: false, error: 'Project not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    const projectId = await assertOwnedProject(userId, params.projectId);
+    if (!projectId) return { success: false, error: 'Project not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    // assignee and status are not declared in the tool schema, so they are ignored on this path.
+    const parsed = validateTaskInput(params, { allowAssignee: false, allowStatus: false });
+    if ('error' in parsed) return { success: false, error: parsed.error, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    const v = parsed.value;
     const task = await prisma.projectTask.create({
       data: {
-        projectId: params.projectId,
-        title: params.title,
-        description: params.description,
-        priority: params.priority ?? 'MEDIUM',
-        assignee: params.assignee,
-        dueDate: params.dueDate ? new Date(params.dueDate) : null,
+        projectId,
+        title: v.title,
+        description: v.description,
+        priority: v.priority,
+        dueDate: v.dueDate,
         source: 'whink',
       },
     });
@@ -425,7 +453,7 @@ function safeJson(v: unknown): string {
 async function finaliseRow(
   userId: string,
   id: string,
-  patch: { status: 'VALIDATED' | 'FAILED'; outputSummary: string; latencyMs: number },
+  patch: { status: 'VALIDATED' | 'FAILED' | 'DENIED'; outputSummary: string; latencyMs: number },
 ): Promise<void> {
   try {
     await updateActionStatus(userId, id, patch);
@@ -440,7 +468,8 @@ export async function executeTool(
   params: any,
   persona?: string,
   mambaMode?: string,
-  correlationId?: string
+  correlationId?: string,
+  opts: { approvalAlreadyPending?: boolean } = {}
 ): Promise<ToolExecutionResult> {
   const cid = correlationId ?? generateCorrelationId();
   const startTime = Date.now();
@@ -470,16 +499,56 @@ export async function executeTool(
   const permCheck = await checkPermission(userId, toolName, riskClass, cid);
 
   if (!permCheck.allowed) {
-    // Log to action ledger — Class C gets AWAITING_APPROVAL, others get FAILED
+    // Class C: queue a full-fidelity approval request (the ledger row is written by createApproval).
+    if (riskClass === 'C' && opts.approvalAlreadyPending) {
+      // L7: one approval per tool-loop run. Further Class C calls in the same run are denied, not queued.
+      await recordActionSafe({
+        userId,
+        initiator: 'system',
+        persona,
+        mambaMode,
+        tool: toolName,
+        action: 'approval_already_pending_this_turn',
+        permissionClass: 'C',
+        status: 'DENIED',
+        inputSummary: safeJson(params),
+        outputSummary: 'An approval is already pending this turn; call not queued',
+        correlationId: cid,
+        latencyMs: Date.now() - startTime,
+      });
+      return { success: false, error: 'An approval is already pending this turn; call not queued', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+    if (riskClass === 'C') {
+      try {
+        const approval = await createApproval({
+          userId,
+          kind: 'tool_call',
+          tool: toolName,
+          params,
+          persona,
+          correlationId: cid,
+        });
+        return {
+          success: false,
+          error: 'Awaiting human approval',
+          approvalRequired: approval,
+          timestamp: new Date().toISOString(),
+          toolVersion: '1.0.0',
+        };
+      } catch (e) {
+        logger.error('approval creation failed; tool not run', { userId, tool: toolName, error: (e as Error)?.message });
+        return { success: false, error: 'Could not queue approval; tool not run', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+      }
+    }
     await recordActionSafe({
       userId,
       initiator: 'system',
       persona,
       mambaMode,
       tool: toolName,
-      action: riskClass === 'C' ? 'pending_class_c_approval' : 'tool_execution_denied',
+      action: 'tool_execution_denied',
       permissionClass: riskClass,
-      status: riskClass === 'C' ? 'AWAITING_APPROVAL' : 'FAILED',
+      status: 'FAILED',
       inputSummary: safeJson(params),
       outputSummary: permCheck.reason,
       correlationId: cid,
@@ -557,5 +626,98 @@ export async function executeTool(
       latencyMs: Date.now() - startTime,
     });
     return { success: false, error: error?.message ?? 'Tool execution failed', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  }
+}
+
+const EXTERNAL_RESULT_TOOLS = new Set(['web_fetch', 'web_search', 'document_search']);
+
+/** Sanitise a tool result before it is stored or shown. External results are stripped, filtered and scanned. */
+function sanitiseApprovedResult(toolName: string, result: ToolExecutionResult): ToolExecutionResult {
+  if (!(EXTERNAL_RESULT_TOOLS.has(toolName) || toolName.startsWith('openclaw__'))) return result;
+  if (!result.success) {
+    return { ...result, error: filterToolResult(stripFakeUntrustedTags(result.error ?? 'error')) };
+  }
+  const filtered = filterToolResult(stripFakeUntrustedTags(JSON.stringify(result.data) ?? ''));
+  const scan = scanForInjectionPatterns(filtered);
+  return { ...result, data: scan.suspicious ? `[content withheld: injection patterns detected in tool "${toolName}"]` : filtered };
+}
+
+export interface ApprovedToolCall {
+  id: string;
+  tool: string;
+  /** Params as stored on the approval row. Never from a request body. */
+  params: unknown;
+  contentHash: string;
+  correlationId: string;
+  persona?: string;
+}
+
+/**
+ * Run a human-approved Class C call. The permission engine must allow it
+ * (checkApprovedAction) or nothing runs. Same write-ahead ledger row as executeTool.
+ */
+export async function executeApprovedTool(userId: string, approval: ApprovedToolCall): Promise<ToolExecutionResult> {
+  const startTime = Date.now();
+  const stamp = () => new Date().toISOString();
+  const handler = TOOL_HANDLERS[approval.tool];
+  const riskClass = TOOL_RISK_MAP[approval.tool] ?? 'C';
+  const base = {
+    userId,
+    initiator: 'user' as const,
+    persona: approval.persona,
+    tool: approval.tool,
+    permissionClass: riskClass,
+    correlationId: approval.correlationId,
+  };
+
+  if (!handler) {
+    await recordActionSafe({ ...base, action: 'tool_execution_denied', status: 'DENIED', outputSummary: 'Unknown tool', validationResult: JSON.stringify({ approvalId: approval.id }), latencyMs: 0 });
+    return { success: false, error: `Unknown tool: ${approval.tool}`, timestamp: stamp(), toolVersion: '1.0.0' };
+  }
+
+  const perm = await checkApprovedAction(userId, approval.id, approval.tool, approval.contentHash);
+  if (!perm.allowed) {
+    await recordActionSafe({ ...base, action: 'tool_execution_denied', status: 'DENIED', outputSummary: perm.reason, validationResult: JSON.stringify({ approvalId: approval.id }), latencyMs: 0 });
+    return { success: false, error: perm.reason ?? 'Permission denied', timestamp: stamp(), toolVersion: '1.0.0' };
+  }
+
+  let actionRow: { id: string };
+  try {
+    actionRow = await recordAction({
+      ...base,
+      action: `tool_executed: ${approval.tool}`,
+      confirmationMethod: 'user_confirmed',
+      status: 'SUBMITTED',
+      inputSummary: safeJson(approval.params),
+      validationResult: JSON.stringify({ approvalId: approval.id }),
+      latencyMs: 0,
+    });
+  } catch (e) {
+    logger.error('ledger pre-write failed; approved tool not run', { userId, tool: approval.tool, error: (e as Error)?.message });
+    return { success: false, error: 'Action ledger unavailable; tool not run', timestamp: stamp(), toolVersion: '1.0.0' };
+  }
+
+  // M2: consume the approval. Exactly one caller may move executedAt from null; only then does the handler run.
+  const claim = await prisma.approvalRequest.updateMany({
+    where: { id: approval.id, userId, status: 'EXECUTING', executedAt: null },
+    data: { executedAt: new Date() },
+  });
+  if (claim.count !== 1) {
+    await finaliseRow(userId, actionRow.id, { status: 'DENIED', outputSummary: 'Approval already consumed; tool not run', latencyMs: Date.now() - startTime });
+    return { success: false, error: 'Approval already consumed; tool not run', timestamp: stamp(), toolVersion: '1.0.0' };
+  }
+
+  try {
+    const raw = await handler(userId, approval.params ?? {});
+    const result = sanitiseApprovedResult(approval.tool, raw);
+    await finaliseRow(userId, actionRow.id, {
+      status: result.success ? 'VALIDATED' : 'FAILED',
+      outputSummary: safeJson(result.data ?? result.error),
+      latencyMs: Date.now() - startTime,
+    });
+    return result;
+  } catch (error: unknown) {
+    await finaliseRow(userId, actionRow.id, { status: 'FAILED', outputSummary: (error as Error)?.message ?? 'Unknown error', latencyMs: Date.now() - startTime });
+    return { success: false, error: 'Tool execution failed', timestamp: stamp(), toolVersion: '1.0.0' };
   }
 }

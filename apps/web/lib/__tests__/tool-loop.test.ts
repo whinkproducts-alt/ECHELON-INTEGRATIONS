@@ -245,3 +245,45 @@ describe('runToolLoop — BYOK apiKey', () => {
     expect(capturedAuth).toBe('Bearer sk-user-openai-byok');
   });
 });
+
+describe('runToolLoop — approvals (L3, L7)', () => {
+  beforeEach(() => vi.resetModules());
+  afterEach(() => vi.restoreAllMocks());
+
+  const jsonRes = (body: unknown) => ({ ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) }) as any;
+  const mailCall = (id: string) => ({ id, type: 'function', function: { name: 'openclaw__send_mail', arguments: '{}' } });
+  const TOOLS: ToolDefinition[] = [
+    { name: 'openclaw__send_mail', description: 'Mail', inputSchema: { type: 'object', properties: {} } },
+  ];
+
+  it('keeps the approval id out of model context, ends the turn after the first approval, and denies later Class C calls', async () => {
+    const executeTool = vi.fn()
+      .mockResolvedValueOnce({ success: false, error: 'Awaiting human approval', approvalRequired: { id: 'SECRET-APPROVAL-ID' }, timestamp: 't', toolVersion: '1' })
+      .mockResolvedValueOnce({ success: false, error: 'An approval is already pending this turn; call not queued', timestamp: 't', toolVersion: '1' });
+    vi.doMock('@/lib/tool-registry', () => ({ executeTool }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonRes({ choices: [{ finish_reason: 'tool_calls', message: { content: null, tool_calls: [mailCall('c1'), mailCall('c2')] } }] }))
+      .mockResolvedValueOnce(jsonRes({ choices: [{ finish_reason: 'stop', message: { content: 'should never be requested' } }] }));
+
+    const { runToolLoop } = await import('../tool-loop');
+    const raw = await drainStream(await runToolLoop({
+      messages: [{ role: 'user', content: 'mail twice' }], tools: TOOLS, userId: 'u1', model: 'llama3.1:8b', correlationId: 'cid',
+    }));
+    const events = parseSSE(raw);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1); // no further model call after an approval
+    expect(executeTool).toHaveBeenCalledTimes(2);
+    expect(executeTool.mock.calls[0][6]).toEqual({ approvalAlreadyPending: false });
+    expect(executeTool.mock.calls[1][6]).toEqual({ approvalAlreadyPending: true });
+    expect(events.filter((e) => e.type === 'approval_required')).toHaveLength(1);
+    expect(events.at(-1)?.type).toBe('done');
+    expect(raw).not.toContain('should never be requested');
+  });
+
+  it('source never interpolates the approval id into model-visible content', async () => {
+    const fs = await import('fs');
+    const src = fs.readFileSync(new URL('../tool-loop.ts', import.meta.url), 'utf8');
+    expect(src).not.toMatch(/content:\s*`[^`]*approvalRequired/);
+    expect(src).toContain("'Awaiting human approval. Do not retry; the user will decide.'");
+  });
+});

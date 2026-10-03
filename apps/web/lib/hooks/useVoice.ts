@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import { beginSpeech, endSpeech } from '@/lib/hooks/speech-activity';
 
 declare global {
   interface Window {
@@ -111,7 +112,7 @@ export function useVoice(): UseVoiceReturn {
     // ── MediaRecorder → server STT path ──────────────────────────────────
     if (typeof MediaRecorder === 'undefined') return;
 
-    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then((stream) => {
       audioChunksRef.current = [];
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
@@ -171,8 +172,7 @@ export function useVoice(): UseVoiceReturn {
   }, []);
 
   // ── TTS: server first, browser fallback ──────────────────────────────────
-  const speak = useCallback(async (text: string): Promise<void> => {
-    if (!text.trim()) return;
+  const speakInner = useCallback(async (text: string): Promise<void> => {
 
     try {
       const res = await fetch('/api/voice/tts', {
@@ -215,6 +215,16 @@ export function useVoice(): UseVoiceReturn {
     });
     setIsSpeaking(false);
   }, []);
+
+  const speak = useCallback(async (text: string): Promise<void> => {
+    if (!text.trim()) return;
+    beginSpeech();
+    try {
+      await speakInner(text);
+    } finally {
+      endSpeech();
+    }
+  }, [speakInner]);
 
   return { startListening, stopListening, speak, isListening, isSpeaking, transcript, supported };
 }

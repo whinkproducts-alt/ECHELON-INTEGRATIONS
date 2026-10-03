@@ -40,7 +40,7 @@ describe('tool loop on OpenAI-compatible endpoints', () => {
       persona: 'WHINK', model: 'llama3.1:8b', correlationId: 'cid',
     }));
 
-    expect(executeTool).toHaveBeenCalledWith('u1', 'memory_read', { query: 'Victor' }, 'WHINK', undefined, 'cid');
+    expect(executeTool).toHaveBeenCalledWith('u1', 'memory_read', { query: 'Victor' }, 'WHINK', undefined, 'cid', { approvalAlreadyPending: false });
     expect(events.map((e) => e.type)).toEqual(['tool_call', 'tool_result', 'text', 'done']);
 
     const first = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
@@ -145,7 +145,7 @@ describe('tool loop on Gemini', () => {
       tools: TOOLS, userId: 'u1', persona: 'MAMBA', mambaMode: 'OBSIDIAN', model: 'gemini-2.0-flash',
     }));
 
-    expect(executeTool).toHaveBeenCalledWith('u1', 'memory_read', { query: 'Victor' }, 'MAMBA', 'OBSIDIAN', undefined);
+    expect(executeTool).toHaveBeenCalledWith('u1', 'memory_read', { query: 'Victor' }, 'MAMBA', 'OBSIDIAN', undefined, { approvalAlreadyPending: false });
     expect(events.map((e) => e.type)).toEqual(['tool_call', 'tool_result', 'text', 'done']);
 
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
