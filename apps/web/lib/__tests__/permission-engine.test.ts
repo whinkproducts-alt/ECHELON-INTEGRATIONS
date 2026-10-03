@@ -119,17 +119,36 @@ describe('checkPermission', () => {
     expect(result.method).toBe('requires_confirmation');
   });
 
-  it('allows Class C at autonomy 4', async () => {
+  it('always denies Class C regardless of autonomy level (security invariant)', async () => {
+    for (const autonomyLevel of [4, 5]) {
+      vi.doMock('@/lib/db', () => ({
+        prisma: {
+          userProfile: { findUnique: vi.fn().mockResolvedValue({ autonomyLevel }) },
+          delegation: { findFirst: vi.fn().mockResolvedValue(null) },
+        },
+      }));
+      vi.resetModules();
+      const { checkPermission } = await import('../permission-engine');
+      const result = await checkPermission('user-1', 'delete_account', 'C');
+      expect(result.allowed).toBe(false);
+      expect(result.method).toBe('requires_confirmation');
+    }
+  });
+
+  it('denies Class C even with an active delegation (security invariant)', async () => {
     vi.doMock('@/lib/db', () => ({
       prisma: {
-        userProfile: { findUnique: vi.fn().mockResolvedValue({ autonomyLevel: 4 }) },
-        delegation: { findFirst: vi.fn().mockResolvedValue(null) },
+        userProfile: { findUnique: vi.fn().mockResolvedValue({ autonomyLevel: 5 }) },
+        delegation: {
+          findFirst: vi.fn().mockResolvedValue({ id: 'd1', capability: 'delete_account', isActive: true }),
+        },
       },
     }));
+    vi.resetModules();
     const { checkPermission } = await import('../permission-engine');
     const result = await checkPermission('user-1', 'delete_account', 'C');
-    expect(result.allowed).toBe(true);
-    expect(result.method).toBe('auto');
+    expect(result.allowed).toBe(false);
+    expect(result.method).toBe('requires_confirmation');
   });
 
   it('falls back to autonomy 1 when profile is missing', async () => {
