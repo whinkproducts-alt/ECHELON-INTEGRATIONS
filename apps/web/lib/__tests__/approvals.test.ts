@@ -34,6 +34,7 @@ describe('approvals', () => {
 
   async function setup(opts: { permissionEngine?: 'real' | 'refuse' } = {}) {
     vi.resetModules();
+    process.env.OPENCLAW_ALLOWED_USER_IDS = 'u1';
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(T0);
     rows = []; ledgerRows = []; failLedger = new Set(); seq = 0; autonomy = 1; delegation = false;
@@ -104,12 +105,12 @@ describe('approvals', () => {
     const { registry } = await setup();
     const big = { text: 'x'.repeat(2000), b: 1, a: { z: 1, y: 2 } };
     const a = await queue(registry, big);
-    expect(a.params).toEqual(big);
+    expect(a.params).toEqual({ args: big, defHash: expect.stringMatching(/^[0-9a-f]{64}$/) });
     expect(a.tool).toBe(TOOL);
     expect(a.kind).toBe('tool_call');
     expect(a.permissionClass).toBe('C');
     expect(new Date(a.expiresAt).getTime() - new Date(a.createdAt).getTime()).toBe(30_000);
-    expect(a.contentHash).toBe(approvalContentHash({ kind: 'tool_call', tool: TOOL, params: big }));
+    expect(a.contentHash).toBe(approvalContentHash({ kind: 'tool_call', tool: TOOL, params: a.params }));
     expect(a.contentHash).toMatch(/^[0-9a-f]{64}$/);
     expect(canonicalJson({ b: 1, a: [2, { d: 1, c: 2 }] })).toBe('{"a":[2,{"c":2,"d":1}],"b":1}');
     const created = rowsFor('approval_created');

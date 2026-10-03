@@ -3,11 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const loadGatewayTools = vi.fn();
 const recordActionSafe = vi.fn();
+const canUseGateway = vi.fn();
 const std = [{ name: 'memory_read', description: 'r', inputSchema: { type: 'object' } }];
 const gw = { name: 'openclaw__ref__echo', description: 'e', inputSchema: { type: 'object' } };
 
 async function load() {
   vi.doMock('@/lib/tool-registry', () => ({ loadGatewayTools }));
+  vi.doMock('@/lib/gateway-access', () => ({ canUseGateway }));
   vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
   return import('@/lib/gateway-chat');
 }
@@ -17,6 +19,16 @@ describe('resolveChatTools', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    canUseGateway.mockResolvedValue(true);
+  });
+
+  it('H1: a user who may not use the gateway gets standard tools and no gateway load', async () => {
+    canUseGateway.mockResolvedValue(false);
+    const { resolveChatTools } = await load();
+    expect(await resolveChatTools({ ...opts, userId: 'userB' })).toEqual(std);
+    expect(canUseGateway).toHaveBeenCalledWith('userB');
+    expect(loadGatewayTools).not.toHaveBeenCalled();
+    expect(recordActionSafe).not.toHaveBeenCalled();
   });
 
   it('offers standard tools plus gateway tools', async () => {

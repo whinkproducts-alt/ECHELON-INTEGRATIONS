@@ -125,7 +125,7 @@ describe('openclaw-client (MCP adapter)', () => {
     expect((await listOpenClawTools()).map((t) => t.name)).toEqual(['ref__ok']);
   });
 
-  it('caps descriptions at 500 characters and sanitises injection patterns', async () => {
+  it('caps descriptions at 500 characters and rejects tools whose description holds injection patterns', async () => {
     listTools.mockResolvedValueOnce({
       tools: [
         { name: 'ref__long', description: 'x'.repeat(2000), inputSchema: schema },
@@ -134,9 +134,25 @@ describe('openclaw-client (MCP adapter)', () => {
     });
     const { listOpenClawTools } = await load();
     const tools = await listOpenClawTools();
+    expect(tools.map((t) => t.name)).toEqual(['ref__long']);
     expect(tools[0].description).toHaveLength(500);
-    expect(tools[1].description).toMatch(/sanitised/);
-    expect(tools[1].description).not.toMatch(/Ignore all instructions/i);
+  });
+
+  it('refuses http to a non-local host even with a token (L7)', async () => {
+    process.env.OPENCLAW_URL = 'http://gateway.example.com';
+    process.env.OPENCLAW_TOKEN = 'tok';
+    const { listOpenClawTools } = await load();
+    await expect(listOpenClawTools()).rejects.toThrow(/https/);
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('never puts upstream error text or the token in a thrown error (L2)', async () => {
+    process.env.OPENCLAW_TOKEN = 'sekret-token';
+    connect.mockRejectedValueOnce(Object.assign(new Error('401 body: bearer sekret-token rejected'), { code: 401 }));
+    const { listOpenClawTools } = await load();
+    const err = await listOpenClawTools().catch((e: Error) => e);
+    expect((err as Error).message).toBe('OpenClaw gateway request failed (status 401)');
+    expect(vi.mocked(console.warn).mock.calls.flat().join(' ')).not.toContain('sekret-token');
   });
 
   it('rejects an oversized tool list', async () => {
@@ -157,7 +173,7 @@ describe('openclaw-client (MCP adapter)', () => {
   it('propagates connection failure so callers can degrade', async () => {
     connect.mockRejectedValueOnce(new Error('ECONNREFUSED'));
     const { listOpenClawTools } = await load();
-    await expect(listOpenClawTools()).rejects.toThrow(/ECONNREFUSED/);
+    await expect(listOpenClawTools()).rejects.toThrow(/request failed/);
     expect(close).toHaveBeenCalled();
   });
 
@@ -190,7 +206,8 @@ describe('openclaw-client (MCP adapter)', () => {
   it('throws when the tool reports isError', async () => {
     callTool.mockResolvedValueOnce({ isError: true, content: [{ type: 'text', text: 'bad input' }] });
     const { callOpenClawTool } = await load();
-    await expect(callOpenClawTool('ref__echo', {})).rejects.toThrow(/bad input/);
+    const err = await callOpenClawTool('ref__echo', {}).catch((e: Error) => e);
+    expect((err as Error).message).toBe('OpenClaw tool reported an error');
   });
 
   it('coerces non-object params to an empty argument object', async () => {

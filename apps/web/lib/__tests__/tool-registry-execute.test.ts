@@ -11,6 +11,7 @@ describe('executeTool registry gating', () => {
 
   beforeEach(() => {
     vi.resetModules();
+    process.env.OPENCLAW_ALLOWED_USER_IDS = 'u1';
     recordActionSafe.mockReset().mockResolvedValue({ id: 'row1' });
     recordAction.mockReset().mockResolvedValue({ id: 'row1' });
     updateActionStatus.mockReset().mockResolvedValue(true);
@@ -68,7 +69,7 @@ describe('executeTool registry gating', () => {
     expect(checkPermission).toHaveBeenCalledTimes(1);
     expect(checkPermission.mock.calls[0][2]).toBe('C');
     expect(openclaw.callOpenClawTool).not.toHaveBeenCalled();
-    expect(createApproval).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', kind: 'tool_call', tool: 'openclaw__ref__send_thing', params: {} }));
+    expect(createApproval).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', kind: 'tool_call', tool: 'openclaw__ref__send_thing', params: { args: {}, defHash: expect.stringMatching(/^[0-9a-f]{64}$/) } }));
     expect(res.approvalRequired).toMatchObject({ id: 'ap1' });
   });
 

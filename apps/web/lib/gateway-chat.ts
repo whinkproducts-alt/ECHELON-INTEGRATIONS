@@ -9,6 +9,7 @@
  */
 
 import { loadGatewayTools } from '@/lib/tool-registry';
+import { canUseGateway } from '@/lib/gateway-access';
 import { recordActionSafe } from '@/lib/ledger';
 import type { ToolDefinition } from '@/lib/tool-loop';
 
@@ -18,6 +19,9 @@ export async function resolveChatTools(opts: {
   persona: string;
   correlationId: string;
 }): Promise<ToolDefinition[]> {
+  // H1: gateway tools are owner-only. Anyone else gets standard tools and no gateway load.
+  if (!(await canUseGateway(opts.userId))) return opts.standardTools;
+
   let gateway: { available: boolean; disabled?: boolean; tools: ToolDefinition[] };
   try {
     gateway = await loadGatewayTools(opts.userId);

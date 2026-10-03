@@ -1,4 +1,7 @@
 {
-  "_comment": "WHINK-side permission classes for gateway tools, keyed by full WHINK tool name. Any gateway tool not listed here is Class C (always needs a human). Only edit this file after reviewing the tool. A class or annotation sent by the gateway is ignored.",
-  "openclaw__ref__echo": "A"
+  "_comment": "WHINK-side permission classes for gateway tools, keyed by full WHINK tool name. Any gateway tool not listed here, or whose sanitised definition no longer matches defHash, is Class C (always needs a human). Compute defHash with scripts/tool-def-hash.ts after reviewing the tool. A class or annotation sent by the gateway is ignored.",
+  "openclaw__ref__echo": {
+    "class": "A",
+    "defHash": "e35aa3e0379809f1c80652111d7beae5c4ecc52be5668e63a18db2d5c6e3667b"
+  }
 }

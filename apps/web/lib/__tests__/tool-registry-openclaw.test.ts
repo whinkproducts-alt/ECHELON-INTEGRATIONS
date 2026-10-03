@@ -8,9 +8,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const listOpenClawTools = vi.fn();
 const callOpenClawTool = vi.fn();
 
+import { defHash } from '@/lib/tool-definition';
+
 const def = (name: string, extra: Record<string, unknown> = {}) => ({ name, description: 'd', inputSchema: { type: 'object' }, ...extra });
 
 async function load(autonomyLevel = 3) {
+  process.env.OPENCLAW_ALLOWED_USER_IDS = 'u1';
+  vi.doMock('@/config/tool-classes.json', () => ({
+    default: { openclaw__ref__echo: { class: 'A', defHash: defHash({ description: 'd', inputSchema: { type: 'object' } }) } },
+  }));
   vi.doMock('@/lib/openclaw-client', () => ({ isGatewayConfigured: () => true, listOpenClawTools, callOpenClawTool }));
   vi.doMock('@/lib/db', () => ({
     prisma: {

@@ -10,6 +10,7 @@
  */
 
 import { prisma } from '@/lib/db';
+import { canUseGateway, isGatewayTool } from '@/lib/gateway-access';
 import { logger } from '@/lib/logger';
 import { recordAction, recordActionSafe, type LedgerStatus } from '@/lib/ledger';
 import { checkApprovedAction, logSecurityEvent } from '@/lib/permission-engine';
@@ -138,6 +139,8 @@ export async function createApproval(input: CreateApprovalInput): Promise<Approv
   if (!userId) throw new Error('approvals: userId is required');
   const tool = kind === 'tool_call' ? (input.tool ?? null) : null;
   if (kind === 'tool_call' && !tool) throw new Error('approvals: tool is required for tool_call');
+  // H1: no approval is ever created for a gateway call by a user who may not use the gateway.
+  if (tool && isGatewayTool(tool) && !(await canUseGateway(userId))) throw new Error('approvals: gateway_not_permitted');
 
   if (input.conversationId) {
     const conv = await prisma.conversation.findFirst({ where: { id: input.conversationId, userId }, select: { id: true } });

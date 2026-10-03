@@ -9,6 +9,7 @@
  * If Postgres is unreachable every test skips, so CI without a database stays green.
  * Credentials are never printed.
  */
+import { defHash } from '@/lib/tool-definition';
 import { describe, it, expect, vi, beforeAll, afterAll, type TestContext } from 'vitest';
 
 const TOOL_NAME = 'itest__counter';
@@ -45,7 +46,8 @@ async function makeApproval(params: Record<string, unknown> = { n: 1 }, at?: Dat
     userId: userA,
     kind: 'tool_call',
     tool: TOOL,
-    params,
+    // Gateway approvals carry the definition hash the way executeTool stores them.
+    params: { args: params, defHash: defHash({ description: 'counting probe', inputSchema: { type: 'object', properties: {} } }) },
     correlationId: `itest-${stamp}-${Math.random().toString(36).slice(2, 8)}`,
     now: at ? () => at : undefined,
   });
@@ -80,6 +82,7 @@ beforeAll(async () => {
   const b = await prisma.user.create({ data: { email: `approvals-itest-b-${stamp}@example.test`, name: 'itest B' } });
   userA = a.id;
   userB = b.id;
+  process.env.OPENCLAW_ALLOWED_USER_IDS = userA;
   await registerOpenClawTools(userA);
 }, 15000);
 

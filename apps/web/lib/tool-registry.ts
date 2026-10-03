@@ -1,11 +1,13 @@
 import { prisma } from '@/lib/db';
 import { generateCorrelationId, logger } from '@/lib/logger';
 import { recordAction, recordActionSafe, updateActionStatus } from '@/lib/ledger';
-import { checkPermission, checkApprovedAction, type PermissionClass } from '@/lib/permission-engine';
+import { checkPermission, checkApprovedAction, logSecurityEvent, type PermissionClass } from '@/lib/permission-engine';
 import { createApproval, type ApprovalView } from '@/lib/approvals';
 import { stripFakeUntrustedTags, scanForInjectionPatterns, filterToolResult } from '@/lib/content-isolation';
 import { writeMemory, correctMemory, searchMemory } from '@/lib/memory-engine';
 import { listOpenClawTools, callOpenClawTool, isGatewayConfigured } from '@/lib/openclaw-client';
+import { canUseGateway, isGatewayTool } from '@/lib/gateway-access';
+import { defHash, neutralDescription } from '@/lib/tool-definition';
 import toolClassesConfig from '@/config/tool-classes.json';
 import type { ToolDefinition } from '@/lib/tool-loop';
 import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
@@ -393,13 +395,23 @@ const GATEWAY_FULL_NAME_RE = /^[a-z0-9_]{1,64}$/;
 /** `<platform>__<action>`: platform is 1-16 chars of [a-z0-9] with no underscore. */
 const GATEWAY_SHAPE_RE = /^[a-z0-9]{1,16}__[a-z0-9_]+$/;
 
-/** WHINK-owned allow-list (data, not code). Anything absent is Class C. */
-function loadToolClassAllowList(): Record<string, PermissionClass> {
-  const out: Record<string, PermissionClass> = Object.create(null);
-  for (const [name, cls] of Object.entries(toolClassesConfig as Record<string, unknown>)) {
+interface AllowListEntry {
+  class: PermissionClass;
+  /** sha256 of the sanitised definition that was reviewed. A different definition is Class C. */
+  defHash: string;
+}
+
+/** WHINK-owned allow-list (data, not code). Anything absent, malformed or legacy-shaped is Class C. */
+function loadToolClassAllowList(): Record<string, AllowListEntry> {
+  const out: Record<string, AllowListEntry> = Object.create(null);
+  for (const [name, entry] of Object.entries(toolClassesConfig as Record<string, unknown>)) {
     if (!name.startsWith(GATEWAY_PREFIX)) continue;
-    if (cls === 'A' || cls === 'B' || cls === 'C') out[name] = cls;
-    else console.warn(`[openclaw] ignoring invalid class for ${name} in tool-classes.json`);
+    const e = entry as { class?: unknown; defHash?: unknown } | null;
+    if (e && typeof e === 'object' && (e.class === 'A' || e.class === 'B' || e.class === 'C') && typeof e.defHash === 'string' && /^[0-9a-f]{64}$/.test(e.defHash)) {
+      out[name] = { class: e.class, defHash: e.defHash };
+    } else {
+      console.warn(`[openclaw] ignoring invalid entry for ${name} in tool-classes.json (needs class and defHash)`);
+    }
   }
   return out;
 }
@@ -407,6 +419,14 @@ const GATEWAY_CLASS_ALLOWLIST = loadToolClassAllowList();
 
 /** Tools this module registered from the gateway, by full name. Built-ins are never in here. */
 const GATEWAY_TOOLS = new Map<string, ToolDefinition>();
+/** Hash of the sanitised definition as last advertised by the gateway, by full name. */
+const GATEWAY_DEF_HASH = new Map<string, string>();
+/** Tools already reported as changed in this process: one security event per tool. */
+const REPORTED_DEF_CHANGES = new Set<string>();
+
+function neutralDescriptionsEnabled(): boolean {
+  return process.env.OPENCLAW_NEUTRAL_DESCRIPTIONS?.trim().toLowerCase() !== 'false';
+}
 
 export interface GatewayRegistration {
   /** False when the gateway could not be reached, or is disabled. */
@@ -469,6 +489,7 @@ export async function registerOpenClawTools(userId: string): Promise<GatewayRegi
       delete TOOL_HANDLERS[old];
       delete TOOL_RISK_MAP[old];
       GATEWAY_TOOLS.delete(old);
+      GATEWAY_DEF_HASH.delete(old);
     }
   }
 
@@ -478,9 +499,24 @@ export async function registerOpenClawTools(userId: string): Promise<GatewayRegi
       const data = await callOpenClawTool(original, params);
       return { success: true, data, source: 'openclaw', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
     };
-    // Class C unless WHINK's own allow-list says otherwise. Nothing from the gateway is consulted.
-    TOOL_RISK_MAP[full] = GATEWAY_CLASS_ALLOWLIST[full] ?? 'C';
-    const def: ToolDefinition = { name: full, description: tool.description, inputSchema: tool.inputSchema };
+    // Class C unless WHINK's own allow-list says otherwise AND the definition is the one that was reviewed.
+    // Nothing from the gateway is consulted for the class.
+    const hash = defHash({ description: tool.description, inputSchema: tool.inputSchema as Record<string, unknown> });
+    const entry = GATEWAY_CLASS_ALLOWLIST[full];
+    const reviewed = Boolean(entry) && entry.defHash === hash;
+    if (entry && !reviewed && !REPORTED_DEF_CHANGES.has(full)) {
+      REPORTED_DEF_CHANGES.add(full);
+      try {
+        await logSecurityEvent(userId, 'tool_definition_changed', `Gateway tool ${full} no longer matches its reviewed definition hash; treated as Class C`);
+      } catch (e) {
+        logger.error('security event write failed', { userId, tool: full, error: (e as Error)?.message });
+      }
+    }
+    TOOL_RISK_MAP[full] = reviewed ? entry.class : 'C';
+    GATEWAY_DEF_HASH.set(full, hash);
+    // Unreviewed tools get a neutral description so upstream prose never reaches the model.
+    const description = reviewed || !neutralDescriptionsEnabled() ? tool.description : neutralDescription(original);
+    const def: ToolDefinition = { name: full, description, inputSchema: tool.inputSchema };
     GATEWAY_TOOLS.set(full, def);
     registered.push(def);
   }
@@ -499,9 +535,11 @@ let gatewayInflight: Promise<GatewayRegistration> | null = null;
  * reused for 60 s, failures for 15 s so a dead gateway does not add a timeout
  * to every message. Concurrent callers share one request.
  */
-export async function loadGatewayTools(userId: string): Promise<GatewayRegistration> {
+export async function loadGatewayTools(userId: string, opts: { fresh?: boolean } = {}): Promise<GatewayRegistration> {
   if (!isGatewayConfigured()) return { available: false, disabled: true, tools: [] };
-  if (gatewayCache) {
+  // H1: non-owners never trigger a load and never see the cached tool list.
+  if (!(await canUseGateway(userId))) return { available: false, disabled: true, tools: [] };
+  if (gatewayCache && !opts.fresh) {
     const ttl = gatewayCache.value.available ? GATEWAY_TTL_OK_MS : GATEWAY_TTL_FAIL_MS;
     if (Date.now() - gatewayCache.at < ttl) return gatewayCache.value;
   }
@@ -545,6 +583,25 @@ export async function executeTool(
 ): Promise<ToolExecutionResult> {
   const cid = correlationId ?? generateCorrelationId();
   const startTime = Date.now();
+
+  // H1: gateway tools are owner-only. Denied before lookup, permission check or approval.
+  if (isGatewayTool(toolName) && !(await canUseGateway(userId))) {
+    await recordActionSafe({
+      userId,
+      initiator: 'system',
+      persona,
+      mambaMode,
+      tool: toolName,
+      action: 'gateway_not_permitted',
+      permissionClass: 'C',
+      status: 'DENIED',
+      inputSummary: safeJson(params),
+      outputSummary: 'gateway_not_permitted',
+      correlationId: cid,
+      latencyMs: Date.now() - startTime,
+    });
+    return { success: false, error: 'Gateway tools are not available to this account', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  }
 
   // Unknown tools are denied outright — never default an unregistered tool to a runnable class.
   const handler = TOOL_HANDLERS[toolName];
@@ -596,7 +653,8 @@ export async function executeTool(
           userId,
           kind: 'tool_call',
           tool: toolName,
-          params,
+          // Gateway approvals bind the definition that was on screen: the hash lock then covers it too.
+          params: isGatewayTool(toolName) ? { args: params ?? {}, defHash: GATEWAY_DEF_HASH.get(toolName) ?? null } : params,
           persona,
           correlationId: cid,
         });
@@ -731,6 +789,39 @@ export interface ApprovedToolCall {
 export async function executeApprovedTool(userId: string, approval: ApprovedToolCall): Promise<ToolExecutionResult> {
   const startTime = Date.now();
   const stamp = () => new Date().toISOString();
+  const gateway = isGatewayTool(approval.tool);
+  let callParams: unknown = approval.params;
+  let storedDefHash: string | null = null;
+  const baseEarly = {
+    userId,
+    initiator: 'user' as const,
+    persona: approval.persona,
+    tool: approval.tool,
+    permissionClass: 'C',
+    correlationId: approval.correlationId,
+  };
+
+  if (gateway) {
+    // H1: checked before anything else, including on approvals created before this rule existed.
+    if (!(await canUseGateway(userId))) {
+      await recordActionSafe({ ...baseEarly, action: 'gateway_not_permitted', status: 'DENIED', outputSummary: 'gateway_not_permitted', validationResult: JSON.stringify({ approvalId: approval.id }), latencyMs: 0 });
+      return { success: false, error: 'Gateway tools are not available to this account', timestamp: stamp(), toolVersion: '1.0.0' };
+    }
+    const p = approval.params as { args?: unknown; defHash?: unknown } | null;
+    if (!p || typeof p !== 'object' || typeof p.defHash !== 'string' || !('args' in p)) {
+      await recordActionSafe({ ...baseEarly, action: 'tool_execution_denied', status: 'FAILED', outputSummary: 'Approval lacks a definition hash; not run', validationResult: JSON.stringify({ approvalId: approval.id }), latencyMs: 0 });
+      return { success: false, error: 'Approval lacks a definition hash; not run', timestamp: stamp(), toolVersion: '1.0.0' };
+    }
+    storedDefHash = p.defHash;
+    callParams = p.args;
+    // M4 + definition check: always read the live definition (bypassing the cache) before running.
+    const live = await loadGatewayTools(userId, { fresh: true }).catch(() => null);
+    if (!live || !live.available) {
+      await recordActionSafe({ ...baseEarly, action: 'tool_execution_denied', status: 'FAILED', outputSummary: 'Gateway unavailable; not run', validationResult: JSON.stringify({ approvalId: approval.id }), latencyMs: 0 });
+      return { success: false, error: 'Gateway unavailable; not run', timestamp: stamp(), toolVersion: '1.0.0' };
+    }
+  }
+
   const handler = TOOL_HANDLERS[approval.tool];
   const riskClass = TOOL_RISK_MAP[approval.tool] ?? 'C';
   const base = {
@@ -753,6 +844,16 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
     return { success: false, error: perm.reason ?? 'Permission denied', timestamp: stamp(), toolVersion: '1.0.0' };
   }
 
+  if (gateway && GATEWAY_DEF_HASH.get(approval.tool) !== storedDefHash) {
+    try {
+      await logSecurityEvent(userId, 'tool_definition_changed', `Gateway tool ${approval.tool} changed between approval ${approval.id} request and decision; not run`, approval.correlationId, 'FAILED');
+    } catch (e) {
+      logger.error('security event write failed', { userId, tool: approval.tool, error: (e as Error)?.message });
+    }
+    await recordActionSafe({ ...base, action: 'tool_execution_denied', status: 'FAILED', outputSummary: 'Tool definition changed since approval was requested; not run', validationResult: JSON.stringify({ approvalId: approval.id }), latencyMs: 0 });
+    return { success: false, error: 'Tool definition changed since approval was requested; not run', timestamp: stamp(), toolVersion: '1.0.0' };
+  }
+
   let actionRow: { id: string };
   try {
     actionRow = await recordAction({
@@ -760,7 +861,7 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
       action: `tool_executed: ${approval.tool}`,
       confirmationMethod: 'user_confirmed',
       status: 'SUBMITTED',
-      inputSummary: safeJson(approval.params),
+      inputSummary: safeJson(callParams),
       validationResult: JSON.stringify({ approvalId: approval.id }),
       latencyMs: 0,
     });
@@ -780,7 +881,7 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
   }
 
   try {
-    const raw = await handler(userId, approval.params ?? {});
+    const raw = await handler(userId, callParams ?? {});
     const result = sanitiseApprovedResult(approval.tool, raw);
     await finaliseRow(userId, actionRow.id, {
       status: result.success ? 'VALIDATED' : 'FAILED',
