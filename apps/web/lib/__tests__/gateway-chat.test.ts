@@ -40,6 +40,13 @@ describe('resolveChatTools', () => {
     expect(recordActionSafe).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', action: 'gateway_unavailable', correlationId: 'c1', status: 'FAILED' }));
   });
 
+  it('gateway disabled (OPENCLAW_URL unset): standard tools only and no ledger row', async () => {
+    loadGatewayTools.mockResolvedValueOnce({ available: false, disabled: true, tools: [] });
+    const { resolveChatTools } = await load();
+    expect(await resolveChatTools(opts)).toEqual(std);
+    expect(recordActionSafe).not.toHaveBeenCalled();
+  });
+
   it('does not crash if the loader itself throws', async () => {
     loadGatewayTools.mockRejectedValueOnce(new Error('boom'));
     const { resolveChatTools } = await load();

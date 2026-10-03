@@ -18,12 +18,15 @@ export async function resolveChatTools(opts: {
   persona: string;
   correlationId: string;
 }): Promise<ToolDefinition[]> {
-  let gateway: { available: boolean; tools: ToolDefinition[] };
+  let gateway: { available: boolean; disabled?: boolean; tools: ToolDefinition[] };
   try {
     gateway = await loadGatewayTools(opts.userId);
   } catch {
     gateway = { available: false, tools: [] };
   }
+
+  // Gateway not configured: not an outage, so no network call and no ledger row.
+  if (gateway.disabled) return opts.standardTools;
 
   if (!gateway.available) {
     await recordActionSafe({

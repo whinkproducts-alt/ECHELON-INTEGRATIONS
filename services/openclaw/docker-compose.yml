@@ -1,7 +1,8 @@
 # WHINK MCP gateway. Add or swap MCP servers by editing this file and
 # config/servers.json only. See README.md.
 #
-# Required env (shell or `--env-file .env`): OPENCLAW_TOKEN.
+# Required: OPENCLAW_TOKEN, read automatically from services/openclaw/.env (git-ignored).
+#   openssl rand -hex 32   -> same value in services/openclaw/.env and apps/web/.env
 # The port is published on 127.0.0.1 only. Never expose it to the internet.
 
 services:
@@ -12,6 +13,21 @@ services:
       args:
         EXTRA_APK: ""   # e.g. "uv" to run Python MCP servers with uvx
     restart: unless-stopped
+    # Hardening: unprivileged user, read-only root, no capabilities, no privilege escalation.
+    user: "1000:1000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      # Only place the container can write. Gone on restart. npx/uvx caches land under /home/node.
+      - /tmp:size=64m,mode=1777,uid=1000,gid=1000
+      - /home/node:size=256m,mode=0755,uid=1000,gid=1000
+    pids_limit: 256
+    # Budget for a 16 GB Mac: idle gateway plus the reference server is ~100 MB.
+    mem_limit: 512m
+    cpus: 1.0
     ports:
       - "127.0.0.1:3100:3100"
     volumes:
@@ -20,6 +36,13 @@ services:
       PORT: "3100"
       HOST: "0.0.0.0"   # inside the container only; the publish rule above limits the host side
       CONFIG_PATH: /app/config/servers.json
-      OPENCLAW_TOKEN: ${OPENCLAW_TOKEN:?set OPENCLAW_TOKEN (openssl rand -hex 32)}
+      OPENCLAW_TOKEN: ${OPENCLAW_TOKEN:?set OPENCLAW_TOKEN in services/openclaw/.env (openssl rand -hex 32)}
       # Upstream credentials: list the variable NAME here and in config/servers.json.
       # GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PERSONAL_ACCESS_TOKEN:-}
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s

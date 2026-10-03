@@ -5,7 +5,7 @@ import { checkPermission, checkApprovedAction, type PermissionClass } from '@/li
 import { createApproval, type ApprovalView } from '@/lib/approvals';
 import { stripFakeUntrustedTags, scanForInjectionPatterns, filterToolResult } from '@/lib/content-isolation';
 import { writeMemory, correctMemory, searchMemory } from '@/lib/memory-engine';
-import { listOpenClawTools, callOpenClawTool } from '@/lib/openclaw-client';
+import { listOpenClawTools, callOpenClawTool, isGatewayConfigured } from '@/lib/openclaw-client';
 import toolClassesConfig from '@/config/tool-classes.json';
 import type { ToolDefinition } from '@/lib/tool-loop';
 import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
@@ -409,8 +409,10 @@ const GATEWAY_CLASS_ALLOWLIST = loadToolClassAllowList();
 const GATEWAY_TOOLS = new Map<string, ToolDefinition>();
 
 export interface GatewayRegistration {
-  /** False when the gateway could not be reached. */
+  /** False when the gateway could not be reached, or is disabled. */
   available: boolean;
+  /** True when the gateway is not configured: not an outage, so nothing is ledgered. */
+  disabled?: boolean;
   /** Full WHINK names registered this run. */
   tools: ToolDefinition[];
 }
@@ -427,6 +429,7 @@ export interface GatewayRegistration {
  * Handlers return the raw payload; callers must wrap it as untrusted.
  */
 export async function registerOpenClawTools(userId: string): Promise<GatewayRegistration> {
+  if (!isGatewayConfigured()) return { available: false, disabled: true, tools: [] };
   let listed: ToolDefinition[];
   try {
     listed = await listOpenClawTools();
@@ -497,6 +500,7 @@ let gatewayInflight: Promise<GatewayRegistration> | null = null;
  * to every message. Concurrent callers share one request.
  */
 export async function loadGatewayTools(userId: string): Promise<GatewayRegistration> {
+  if (!isGatewayConfigured()) return { available: false, disabled: true, tools: [] };
   if (gatewayCache) {
     const ttl = gatewayCache.value.available ? GATEWAY_TTL_OK_MS : GATEWAY_TTL_FAIL_MS;
     if (Date.now() - gatewayCache.at < ttl) return gatewayCache.value;

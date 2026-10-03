@@ -13,7 +13,6 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { ToolDefinition } from '@/lib/tool-loop';
 import { scanForInjectionPatterns } from '@/lib/content-isolation';
 
-const DEFAULT_URL = 'http://localhost:3100';
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
 /** Gateway-side name shape. The full WHINK name (openclaw__ + this) is checked in tool-registry. */
@@ -25,8 +24,18 @@ const MAX_LIST_PAGES = 10;
 const LIST_TIMEOUT_MS = 10_000;
 const CALL_TIMEOUT_MS = 30_000;
 
+/**
+ * The gateway is opt-in. With OPENCLAW_URL unset or empty it is disabled: no
+ * network call is made, and callers offer standard tools only.
+ */
+export function isGatewayConfigured(): boolean {
+  return Boolean(process.env.OPENCLAW_URL?.trim());
+}
+
 function endpoint(): URL {
-  const base = (process.env.OPENCLAW_URL?.trim() || DEFAULT_URL).replace(/\/+$/, '');
+  const configured = process.env.OPENCLAW_URL?.trim();
+  if (!configured) throw new Error('OpenClaw gateway is disabled (OPENCLAW_URL is not set)');
+  const base = configured.replace(/\/+$/, '');
   return new URL(base.endsWith('/mcp') ? base : `${base}/mcp`);
 }
 

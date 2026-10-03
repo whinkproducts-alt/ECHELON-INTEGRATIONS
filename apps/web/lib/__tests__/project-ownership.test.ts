@@ -24,7 +24,7 @@ describe('project ownership scoping: task_create', () => {
     vi.doMock('@/lib/ledger', () => ({ recordAction, recordActionSafe, updateActionStatus }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission }));
     vi.doMock('@/lib/memory-engine', () => ({ writeMemory: vi.fn(), correctMemory: vi.fn(), searchMemory: vi.fn() }));
-    vi.doMock('@/lib/openclaw-client', () => ({ listOpenClawTools: vi.fn(), callOpenClawTool: vi.fn() }));
+    vi.doMock('@/lib/openclaw-client', () => ({ isGatewayConfigured: () => true, listOpenClawTools: vi.fn(), callOpenClawTool: vi.fn() }));
   });
 
   it("another user's project: scoped by ownerId, returns 'Project not found', never creates a task", async () => {

@@ -2,9 +2,25 @@ import { auth } from '@/auth';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { checkCsrf } from '@/lib/csrf';
+import { buildCsp, generateNonce } from '@/lib/csp';
 
 export default auth(async function middleware(req: NextRequest & { auth: any }) {
+  const nonce = generateNonce();
+  const csp = buildCsp({ nonce, isDev: process.env.NODE_ENV === 'development' });
+  const res = await handle(req, nonce, csp);
+  res.headers.set('Content-Security-Policy', csp);
+  return res;
+});
+
+async function handle(req: NextRequest & { auth: any }, nonce: string, csp: string): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
+  // Next reads the nonce from the request's CSP header and stamps it on its own scripts.
+  const passThrough = () => {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set('x-nonce', nonce);
+    requestHeaders.set('Content-Security-Policy', csp);
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  };
 
   // M1: CSRF guard for state-changing /api calls, before any other work.
   const csrf = checkCsrf({
@@ -24,7 +40,7 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
   // Public paths — no redirect
   const publicPaths = ['/login', '/signup', '/api/auth'];
   if (publicPaths.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
+    return passThrough();
   }
 
   const session = req.auth;
@@ -45,8 +61,8 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
     }
   }
 
-  return NextResponse.next();
-});
+  return passThrough();
+}
 
 export const config = {
   matcher: [

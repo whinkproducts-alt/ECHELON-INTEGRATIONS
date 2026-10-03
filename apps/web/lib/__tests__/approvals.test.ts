@@ -70,6 +70,7 @@ describe('approvals', () => {
       updateActionStatus: async () => true,
     }));
     vi.doMock('@/lib/openclaw-client', () => ({
+      isGatewayConfigured: () => true,
       listOpenClawTools: async () => [{ name: 'x__post', description: 'd', inputSchema: {} }],
       callOpenClawTool: handler,
     }));

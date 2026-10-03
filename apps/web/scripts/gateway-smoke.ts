@@ -1,7 +1,7 @@
 /**
  * Manual smoke test: list gateway tools through the adapter and show the names
  * WHINK would register. Usage (token comes from the environment, never printed):
- *   OPENCLAW_TOKEN=... npx tsx --tsconfig tsconfig.json scripts/gateway-smoke.ts [toolName jsonArgs]
+ *   OPENCLAW_URL=http://localhost:3100 OPENCLAW_TOKEN=... npx tsx --tsconfig tsconfig.json scripts/gateway-smoke.ts [toolName jsonArgs]
  */
 import { listOpenClawTools, callOpenClawTool } from '../lib/openclaw-client';
 

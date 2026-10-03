@@ -38,11 +38,29 @@ describe('openclaw-client (MCP adapter)', () => {
     transportArgs.length = 0;
     connect.mockResolvedValue(undefined);
     close.mockResolvedValue(undefined);
-    delete process.env.OPENCLAW_URL;
+    process.env.OPENCLAW_URL = 'http://localhost:3100';
     delete process.env.OPENCLAW_TOKEN;
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it('is disabled when OPENCLAW_URL is unset or blank: no client is created, calls throw', async () => {
+    const { isGatewayConfigured, listOpenClawTools, callOpenClawTool } = await load();
+    for (const v of [undefined, '', '   ']) {
+      if (v === undefined) delete process.env.OPENCLAW_URL;
+      else process.env.OPENCLAW_URL = v;
+      expect(isGatewayConfigured()).toBe(false);
+      await expect(listOpenClawTools()).rejects.toThrow(/disabled/);
+      await expect(callOpenClawTool('ref__echo', {})).rejects.toThrow(/disabled/);
+    }
+    expect(connect).not.toHaveBeenCalled();
+    expect(transportArgs).toHaveLength(0);
+  });
+
+  it('is configured when OPENCLAW_URL is set', async () => {
+    const { isGatewayConfigured } = await load();
+    expect(isGatewayConfigured()).toBe(true);
+  });
 
   it('lists tools as typed ToolDefinitions and drops annotations and class hints', async () => {
     listTools.mockResolvedValueOnce({

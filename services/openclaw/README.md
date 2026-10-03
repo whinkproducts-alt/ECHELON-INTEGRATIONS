@@ -6,15 +6,27 @@ Only `apps/web/lib/openclaw-client.ts` knows this transport.
 
 ## Run
 
+1. Make one shared secret and put it in BOTH git-ignored files (`.env` is ignored everywhere, including `services/openclaw/.env`):
+
 ```
 cd services/openclaw
-export OPENCLAW_TOKEN=$(openssl rand -hex 32)      # same value goes in apps/web/.env
+cp .env.example .env
+openssl rand -hex 32          # copy the output
+# paste it as OPENCLAW_TOKEN=<value> in services/openclaw/.env
+# and as OPENCLAW_TOKEN=<value> in apps/web/.env
+```
+
+2. Start the gateway. Compose reads `services/openclaw/.env` by itself, and refuses to start if `OPENCLAW_TOKEN` is empty:
+
+```
 docker compose up -d --build
 ```
 
-Or keep it in a git-ignored env file: copy `.env.example` to `.env`, fill it in, and run `docker compose --env-file .env up -d --build`.
+3. In `apps/web/.env` set `OPENCLAW_URL=http://localhost:3100`, then restart `npm run dev`/`pnpm dev`. Within about 60 seconds WHINK offers `openclaw__ref__echo` and the other reference tools.
 
-In `apps/web/.env` set `OPENCLAW_URL=http://localhost:3100` and `OPENCLAW_TOKEN` to the same value. Within about 60 seconds WHINK offers `openclaw__ref__echo` and the other reference tools.
+Leave `OPENCLAW_URL` empty to run without the gateway: WHINK makes no gateway call, writes no ledger row, and offers standard tools only. If it is set but the gateway is down, chat still works and the ledger records one `gateway_unavailable` row per request.
+
+Hardening (see `docker-compose.yml`): non-root user (uid 1000), read-only root filesystem, only tmpfs writable (`/tmp` 64 MB noexec, `/home/node` 512 MB), all capabilities dropped, `no-new-privileges`, 512 MB memory and 1 CPU limit, 256 pids, healthcheck, `restart: unless-stopped`, base image pinned by exact version and digest. Measured: about 50 MB with the reference server on Apple Silicon.
 
 Security properties:
 - Published on `127.0.0.1:3100` only. It listens on `0.0.0.0` inside the container, and refuses to start on a non-loopback address without `OPENCLAW_TOKEN`.
@@ -67,6 +79,12 @@ Example: the official GitHub MCP server (`github/github-mcp-server`, MIT). A cop
 ```
 
 Check each server's licence (MIT, Apache 2.0, BSD or ISC only) before adding it.
+
+## Swap test record (C2), 2026-10-03
+
+Added the official `mcp-server-time` 2026.8.18 (`modelcontextprotocol/servers`, MIT, read-only) by editing only `config/servers.json` (a `uvx` entry) and `docker-compose.yml` (`EXTRA_APK: "uv"`, three `UV_*` cache variables, `exec` on the `/home/node` tmpfs). After `docker compose up -d --build` the gateway listed `openclaw__time__get_current_time` and `openclaw__time__convert_time`, a call returned the time, and `git diff --stat` showed only those two files. No change to `apps/web`.
+
+Result: the swap works. The entry was REVERTED because the server's Python dependency tree includes `certifi` (MPL-2.0) and `typing_extensions` (PSF-2.0), which are outside the MIT, Apache 2.0, BSD, ISC policy, and it needs the network at every start and raised memory to about 320 MB. Needs Victor's approval before it is used. Notes for any Python MCP server: the `/home/node` tmpfs needs `exec` (uvx unpacks a Python runtime and native wheels), and the `UV_*` variables must be listed in the entry's `"env"`.
 
 ## Reference server and licences
 

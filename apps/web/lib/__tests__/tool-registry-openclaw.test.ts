@@ -11,7 +11,7 @@ const callOpenClawTool = vi.fn();
 const def = (name: string, extra: Record<string, unknown> = {}) => ({ name, description: 'd', inputSchema: { type: 'object' }, ...extra });
 
 async function load(autonomyLevel = 3) {
-  vi.doMock('@/lib/openclaw-client', () => ({ listOpenClawTools, callOpenClawTool }));
+  vi.doMock('@/lib/openclaw-client', () => ({ isGatewayConfigured: () => true, listOpenClawTools, callOpenClawTool }));
   vi.doMock('@/lib/db', () => ({
     prisma: {
       action: { create: vi.fn().mockResolvedValue({ id: 'act-1' }) },
@@ -179,5 +179,16 @@ describe('loadGatewayTools cache', () => {
     vi.advanceTimersByTime(16_000);
     await loadGatewayTools('u1');
     expect(listOpenClawTools).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('gateway disabled', () => {
+  it('loadGatewayTools makes no gateway call when OPENCLAW_URL is not configured', async () => {
+    vi.resetModules();
+    const list = vi.fn();
+    vi.doMock('@/lib/openclaw-client', () => ({ isGatewayConfigured: () => false, listOpenClawTools: list, callOpenClawTool: vi.fn() }));
+    const { loadGatewayTools } = await import('../tool-registry');
+    expect(await loadGatewayTools('u1')).toEqual({ available: false, disabled: true, tools: [] });
+    expect(list).not.toHaveBeenCalled();
   });
 });

@@ -23,7 +23,7 @@ describe('executeTool registry gating', () => {
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission, checkApprovedAction: vi.fn() }));
     vi.doMock('@/lib/approvals', () => ({ createApproval }));
     vi.doMock('@/lib/memory-engine', () => ({ writeMemory, correctMemory: vi.fn(), searchMemory }));
-    vi.doMock('@/lib/openclaw-client', () => ({ listOpenClawTools: vi.fn(), callOpenClawTool: vi.fn() }));
+    vi.doMock('@/lib/openclaw-client', () => ({ isGatewayConfigured: () => true, listOpenClawTools: vi.fn(), callOpenClawTool: vi.fn() }));
   });
 
   it('denies an unregistered tool, records DENIED, never checks permission or runs a handler', async () => {
@@ -54,6 +54,7 @@ describe('executeTool registry gating', () => {
 
   it('treats a registered tool with no risk map entry as Class C and does not run it', async () => {
     const openclaw = {
+      isGatewayConfigured: () => true,
       listOpenClawTools: vi.fn().mockResolvedValue([{ name: 'ref__send_thing', description: 'd', inputSchema: {} }]),
       callOpenClawTool: vi.fn(),
     };

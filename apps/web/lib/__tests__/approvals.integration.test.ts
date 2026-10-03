@@ -16,6 +16,7 @@ const TOOL = `openclaw__${TOOL_NAME}`;
 let handlerCalls = 0;
 
 vi.mock('@/lib/openclaw-client', () => ({
+  isGatewayConfigured: () => true,
   listOpenClawTools: vi.fn(async () => [
     { name: TOOL_NAME, description: 'counting probe', inputSchema: { type: 'object', properties: {} } },
   ]),
