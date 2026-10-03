@@ -1,7 +1,11 @@
 // Content isolation envelope for prompt injection defense
 
 export function wrapUntrustedContent(content: string, sourceType: string, origin: string): string {
-  return `[UNTRUSTED_EXTERNAL_CONTENT source="${sourceType}" from="${origin}"]\n${content}\n[/UNTRUSTED_EXTERNAL_CONTENT]`;
+  const safeType = sourceType.replace(/["\[\]\u0000-\u001F\u007F\u2028\u2029]/g, '');
+  const safeOrigin = origin.replace(/["\[\]\u0000-\u001F\u007F\u2028\u2029]/g, '');
+  let safeUrl = safeOrigin;
+  try { safeUrl = new URL(safeOrigin).href.replace(/["[\]\n\r]/g, ''); } catch { /* not a URL — use safeOrigin */ }
+  return `[UNTRUSTED_EXTERNAL_CONTENT source="${safeType}" from="${safeUrl}"]\n${content}\n[/UNTRUSTED_EXTERNAL_CONTENT]`;
 }
 
 /**
@@ -40,4 +44,22 @@ export function scanForInjectionPatterns(content: string): { suspicious: boolean
  */
 export function scanUserInput(content: string): { suspicious: boolean; patterns: string[] } {
   return scanForInjectionPatterns(content);
+}
+
+/**
+ * Normalise and sanitise external tool result content.
+ * Collapses Unicode lookalikes, strips zero-width chars, escapes bracket chars,
+ * and truncates. Does NOT try to judge content — injection detection is handled
+ * separately by scanForInjectionPatterns in the tool loop.
+ */
+export function filterToolResult(content: string): string {
+  // Step 1: Unicode normalisation — collapse lookalikes
+  let text = content.normalize('NFKC');
+  // Step 2: Strip Unicode tag block (U+E0000–U+E007F) and all Unicode format characters (Cf)
+  text = text.replace(/[\u{E0000}-\u{E007F}]/gu, '').replace(/\p{Cf}/gu, '');
+  // Step 3: Escape all [ and ] to prevent fake wrapper tags
+  text = text.replace(/\[/g, '⟦').replace(/\]/g, '⟧');
+  // Step 4: Truncate to 4000 chars
+  if (text.length > 4000) text = text.substring(0, 4000) + '[...truncated]';
+  return text;
 }
