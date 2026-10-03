@@ -13,8 +13,55 @@ export interface ValidTaskInput {
   assignee: string | null;
 }
 
-/** Validate untrusted task fields. Returns an error string or the cleaned values. Unknown fields are ignored. */
+export type TaskPatch = Partial<ValidTaskInput>;
+
+/**
+ * Validate untrusted task fields. Returns an error string or the cleaned values. Unknown fields are ignored.
+ * With `partial: true` only supplied fields are validated and returned (title may be omitted).
+ */
 export function validateTaskInput(
+  raw: Record<string, unknown>,
+  opts: { allowAssignee: boolean; allowStatus: boolean; partial: true }
+): { error: string } | { value: TaskPatch };
+export function validateTaskInput(
+  raw: Record<string, unknown>,
+  opts: { allowAssignee: boolean; allowStatus: boolean; partial?: false }
+): { error: string } | { value: ValidTaskInput };
+export function validateTaskInput(
+  raw: Record<string, unknown>,
+  opts: { allowAssignee: boolean; allowStatus: boolean; partial?: boolean }
+): { error: string } | { value: ValidTaskInput | TaskPatch } {
+  if (opts.partial) return validatePartial(raw, opts);
+  return validateFull(raw, opts);
+}
+
+function validatePartial(
+  raw: Record<string, unknown>,
+  opts: { allowAssignee: boolean; allowStatus: boolean }
+): { error: string } | { value: TaskPatch } {
+  const has = (k: string) => raw[k] !== undefined;
+  // null is not a legal value for title, priority or status in a patch.
+  for (const k of ['title', 'priority', 'status']) {
+    if (raw[k] === null) return { error: `${k} cannot be null` };
+  }
+  const probe = validateFull(
+    { ...raw, title: has('title') ? raw.title : 'x', status: opts.allowStatus ? raw.status : undefined },
+    opts
+  );
+  if ('error' in probe) return probe;
+  const v = probe.value;
+  const out: TaskPatch = {};
+  if (has('title')) out.title = v.title;
+  if (has('description')) out.description = v.description;
+  if (has('priority')) out.priority = v.priority;
+  if (has('dueDate')) out.dueDate = v.dueDate;
+  if (opts.allowStatus && has('status')) out.status = v.status;
+  if (opts.allowAssignee && has('assignee')) out.assignee = v.assignee;
+  if (Object.keys(out).length === 0) return { error: 'no valid fields to update' };
+  return { value: out };
+}
+
+function validateFull(
   raw: Record<string, unknown>,
   opts: { allowAssignee: boolean; allowStatus: boolean }
 ): { error: string } | { value: ValidTaskInput } {
