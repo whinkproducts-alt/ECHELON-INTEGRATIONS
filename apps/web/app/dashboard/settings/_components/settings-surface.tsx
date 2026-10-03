@@ -27,6 +27,9 @@ export function SettingsSurface() {
     interruptionBudget: 'BALANCED',
     autonomyLevel: 1,
   });
+  const [savedAutonomy, setSavedAutonomy] = useState(1);
+  const [autonomyNotice, setAutonomyNotice] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [preferences, setPreferences] = useState({
     verbosity: 'STANDARD',
     mambaPreference: 'ON_REQUEST',
@@ -40,6 +43,7 @@ export function SettingsSurface() {
     ])
       .then(([d, tc]) => {
         if (d?.profile) setProfile(p => ({ ...p, ...(d.profile ?? {}) }));
+        if (typeof d?.profile?.autonomyLevel === 'number') setSavedAutonomy(d.profile.autonomyLevel);
         if (d?.preferences) setPreferences(p => ({ ...p, ...(d.preferences ?? {}) }));
         if (d?.role === 'admin') setIsAdmin(true);
         if (tc?.productName) setWlProductName(tc.productName);
@@ -52,14 +56,50 @@ export function SettingsSurface() {
 
   const save = async () => {
     setSaving(true);
+    setAutonomyNotice(null);
+    setSaveError(null);
     try {
-      await fetch('/api/settings', {
+      const raising = profile.autonomyLevel > savedAutonomy;
+      const changed = profile.autonomyLevel !== savedAutonomy;
+      // Raising is never sent with other fields; those go with the saved level.
+      const sendLevel = changed && !raising;
+      const { autonomyLevel: _level, ...rest } = profile;
+      void _level;
+      const r = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, preferences, name: profile.displayName }),
+        body: JSON.stringify({
+          profile: sendLevel ? { ...rest, autonomyLevel: profile.autonomyLevel } : rest,
+          preferences,
+          name: profile.displayName,
+        }),
       });
-      toast.success('Settings saved');
+      if (!r.ok) {
+        let msg = 'Failed to save';
+        let requiresApproval = false;
+        try {
+          const d: { error?: string; requiresApproval?: boolean } = await r.json();
+          if (d.error) msg = d.error;
+          requiresApproval = r.status === 409 && d.requiresApproval === true;
+        } catch { /* keep default message */ }
+        if (requiresApproval) {
+          setProfile(p => ({ ...p, autonomyLevel: savedAutonomy }));
+          setAutonomyNotice('Raising autonomy needs approval \u2014 nothing was saved.');
+        } else {
+          setSaveError(msg);
+          toast.error(msg);
+        }
+        return;
+      }
+      if (sendLevel) setSavedAutonomy(profile.autonomyLevel);
+      if (raising) {
+        setProfile(p => ({ ...p, autonomyLevel: savedAutonomy }));
+        setAutonomyNotice('Other settings saved. Raising autonomy needs approval \u2014 the level was not changed.');
+      } else {
+        toast.success('Settings saved');
+      }
     } catch {
+      setSaveError('Failed to save');
       toast.error('Failed to save');
     } finally {
       setSaving(false);
@@ -189,10 +229,18 @@ export function SettingsSurface() {
           {/* Autonomy & Permissions */}
           <Section title="Autonomy & Permissions" icon={<Shield className="h-4 w-4" />}>
             <Field label={`Autonomy Level: ${profile.autonomyLevel}`} description="0=Adviser, 1=Assistant, 2=Operator, 3=Delegate, 4=High Autonomy">
-              <input type="range" min={0} max={4} value={profile.autonomyLevel} onChange={e => setProfile(p => ({ ...p, autonomyLevel: parseInt(e.target.value) }))} className="w-full accent-primary" />
+              <input type="range" min={0} max={4} value={profile.autonomyLevel} onChange={e => { setAutonomyNotice(null); setProfile(p => ({ ...p, autonomyLevel: parseInt(e.target.value) })); }} className="w-full accent-primary" aria-describedby="autonomy-notice" />
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
                 <span>Adviser</span><span>Assistant</span><span>Operator</span><span>Delegate</span><span>High</span>
               </div>
+              {profile.autonomyLevel > savedAutonomy && !autonomyNotice && (
+                <p className="mt-2 text-xs text-[hsl(var(--pending-amber))]">Limit: raising autonomy needs approval and will not be saved.</p>
+              )}
+              {autonomyNotice && (
+                <p id="autonomy-notice" role="status" className="mt-2 text-xs text-[hsl(var(--pending-amber))] border border-[hsl(var(--pending-amber)/0.2)] bg-[hsl(var(--pending-amber)/0.1)] rounded-md px-3 py-2">
+                  Limit: {autonomyNotice}
+                </p>
+              )}
             </Field>
           </Section>
 
@@ -239,6 +287,9 @@ export function SettingsSurface() {
             </Field>
           </Section>
 
+          {saveError && (
+            <p role="alert" className="text-sm text-destructive border border-destructive/30 bg-destructive/10 rounded-md px-3 py-2">Error: {saveError}</p>
+          )}
           <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50">
             <Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Settings'}
           </button>
