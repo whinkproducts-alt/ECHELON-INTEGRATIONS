@@ -93,6 +93,24 @@ describe('M2 stdio isolation', () => {
       { command: 'node', args: ['relative.js'] },
       { command: '/app/../bin/sh', args: [] },
       { command: 'node', args: [] },
+      { command: '/app/config/local/run.sh', args: [] },
+      { command: '/app/config/run.sh', args: [] },
+      { command: '/app/run.sh', args: [] },
+      { command: '/app/node_modules/.bin/x', args: [] },
+      { command: '/app//config/local/run.sh', args: [] },
+      { command: '/app/upstreams/../config/local/run.sh', args: [] },
+      { command: '/app/upstreams//x', args: [] },
+      { command: '/app/upstreams/./x', args: [] },
+      { command: '/app/upstreams/x/', args: [] },
+      { command: '/app/upstreams/x.', args: [] },
+      { command: '/app/upstreams/', args: [] },
+      { command: '/app/upstreams/x\\..\\y', args: [] },
+      { command: '/app/config', args: [] },
+      { command: 'node', args: ['/app/config/local/x.js'] },
+      { command: 'node', args: ['/app/config/../upstreams/x.js'] },
+      { command: 'node', args: ['/app/upstreams//x.js'] },
+      { command: 'node', args: ['/app/upstreams/x.js.'] },
+      { command: 'node', args: ['/app/upstreams/./x.js'] },
     ]) {
       expect(() => parseConfig(withStdio(o))).toThrow(ConfigError);
     }
@@ -120,7 +138,7 @@ describe('L4 http upstream destinations', () => {
   it('always rejects link-local and metadata hosts', () => {
     for (const url of [
       'http://169.254.169.254/', 'https://169.254.0.1/', 'http://100.100.100.200/',
-      'http://[fd00:ec2::254]/', 'http://[fe80::1]/', 'http://metadata.google.internal/',
+      'http://[fd00:ec2::254]/', 'http://[fc00::1]/', 'http://[fcff::1]/', 'http://[FC00::1]/', 'http://[fe80::1]/', 'http://metadata.google.internal/',
       'http://[::ffff:169.254.169.254]/', 'http://2852039166/',
     ]) {
       expect(() => parseConfig(http({ url }))).toThrow(ConfigError);

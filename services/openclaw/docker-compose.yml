@@ -33,6 +33,9 @@ services:
     ports:
       - "127.0.0.1:3100:3100"
     volumes:
+      # read-only is NOT noexec. Compose long-syntax bind mounts have no noexec option (and Docker Desktop
+      # on macOS ignores mount flags on file shares), so execution from here is blocked by config.ts instead:
+      # stdio commands and node scripts under /app/config/ are rejected at parse time (security finding M-2).
       - ./config:/app/config:ro
     environment:
       PORT: "3100"

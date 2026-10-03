@@ -86,24 +86,32 @@ function checkEnvName(name: unknown, platform: string, where: string): string {
   return name;
 }
 
-const STDIO_ALLOWED_ROOTS = ['/app/node_modules/', '/app/upstreams/'];
+/** Roots that are baked into the image. /app/config is a host bind mount and is NEVER executable. */
+const STDIO_SCRIPT_ROOTS = ['/app/node_modules/', '/app/upstreams/'];
+const STDIO_COMMAND_ROOTS = ['/app/upstreams/'];
+const FORBIDDEN_ROOTS = ['/app/config/', '/app/config'];
 
 function underRoot(p: string, roots: string[]): boolean {
-  if (!p.startsWith('/')) return false;
+  if (!p.startsWith('/') || p.includes('\0') || p.includes('\\')) return false;
+  const segs = p.split('/').slice(1);
+  // No empty segments ("//", trailing slash), no dot segments, no trailing dots/spaces.
+  if (segs.some((s) => s === '' || s === '.' || s === '..' || /[. ]$/.test(s))) return false;
   const n = posix.normalize(p);
-  return n === p && !p.split('/').includes('..') && roots.some((r) => n.startsWith(r) && n.length > r.length);
+  if (n !== p) return false;
+  if (FORBIDDEN_ROOTS.some((f) => n === f || n.startsWith(f.endsWith('/') ? f : `${f}/`))) return false;
+  return roots.some((r) => n.startsWith(r) && n.length > r.length);
 }
 
 /** stdio is only for servers baked into the image. No npx, uvx, shells or runtime downloads. */
 function checkStdioCommand(command: string, args: string[], where: string): void {
   if (command === 'node') {
-    if (args.length === 0 || !underRoot(args[0], STDIO_ALLOWED_ROOTS)) {
-      throw new ConfigError(`${where}: stdio "node" needs args[0] to be a script under /app/node_modules/ or /app/upstreams/`);
+    if (args.length === 0 || !underRoot(args[0], STDIO_SCRIPT_ROOTS)) {
+      throw new ConfigError(`${where}: stdio "node" needs args[0] to be a clean script path under /app/node_modules/ or /app/upstreams/ (never /app/config/)`);
     }
     return;
   }
-  if (underRoot(command, ['/app/'])) return;
-  throw new ConfigError(`${where}: stdio command must be "node" or an absolute path under /app/ (baked into the image). Run other servers as separate compose services over http`);
+  if (underRoot(command, STDIO_COMMAND_ROOTS)) return;
+  throw new ConfigError(`${where}: stdio command must be "node" or a clean absolute path under /app/upstreams/ (baked into the image, never /app/config/). Run other servers as separate compose services over http`);
 }
 
 function ipv4Parts(h: string): number[] | null {
@@ -117,7 +125,7 @@ function isForbiddenHost(host: string): boolean {
   const v4 = ipv4Parts(h);
   if (v4) return (v4[0] === 169 && v4[1] === 254) || h === '100.100.100.200';
   if (isIP(h) === 6) {
-    if (h.startsWith('fd')) return true; // fd00::/8 (includes fd00:ec2::254)
+    if (/^f[cd]/.test(h)) return true; // fc00::/7 unique-local (includes fd00:ec2::254)
     if (/^fe[89ab]/.test(h)) return true; // fe80::/10 link-local
     if (h.includes('a9fe')) return true; // IPv4-mapped 169.254.x.x
     return false;

@@ -59,7 +59,12 @@ export const sdkConnector: Connector = async (cfg, env) => {
   } else {
     const { headers, missing } = resolveHeaders(cfg.headers, env);
     if (missing.length > 0) log.warn('upstream header env var not set', { platform: cfg.platform, names: missing });
-    const transport = new StreamableHTTPClientTransport(new URL(cfg.url), { requestInit: { headers } });
+    const transport = new StreamableHTTPClientTransport(new URL(cfg.url), {
+      requestInit: { headers },
+      // Never follow redirects: a hostile upstream must not bounce credentials to another host (L-3).
+      fetch: (input, init) => fetch(input, { ...init, redirect: 'error' }),
+      redirectPolicy: 'same-origin',
+    });
     await client.connect(transport, { timeout: CONNECT_TIMEOUT_MS });
   }
   return client as unknown as UpstreamClient;
