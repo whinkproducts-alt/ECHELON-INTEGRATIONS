@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { recordAction, updateActionStatus } from "@/lib/ledger";
 import type { ExecutionAuthorizationRequest } from "@whink/org-kit";
 
 // ── Approval detection ────────────────────────────────────────────────────────
@@ -79,28 +80,24 @@ export async function handleApproval(
   const { actionId, ear } = pending;
 
   // Mark the EAR as approved
-  await prisma.action.update({
-    where: { id: actionId },
-    data: {
-      status: "VALIDATED",
-      confirmationMethod: "user_confirmed",
-    },
+  const updated = await updateActionStatus(userId, actionId, {
+    status: "VALIDATED",
+    confirmationMethod: "user_confirmed",
   });
+  if (!updated) return { dispatched: false, reason: "no_pending_ear" };
 
   // Log the dispatch action
-  await prisma.action.create({
-    data: {
-      userId,
-      initiator: "user",
-      persona,
-      action: "agent_dispatch",
-      permissionClass: "S",
-      confirmationMethod: "user_confirmed",
-      status: "VALIDATED",
-      inputSummary: `Approval received for: ${ear.objective?.substring(0, 200)}`,
-      outputSummary: `Dispatched: ${ear.lead_agent ?? "No lead"} + ${ear.team_size - 1} supporting`,
-      validationResult: JSON.stringify({ approved_ear_id: actionId, ear }),
-    },
+  await recordAction({
+    userId,
+    initiator: "user",
+    persona,
+    action: "agent_dispatch",
+    permissionClass: "S",
+    confirmationMethod: "user_confirmed",
+    status: "VALIDATED",
+    inputSummary: `Approval received for: ${ear.objective?.substring(0, 200)}`,
+    outputSummary: `Dispatched: ${ear.lead_agent ?? "No lead"} + ${ear.team_size - 1} supporting`,
+    validationResult: JSON.stringify({ approved_ear_id: actionId, ear }),
   });
 
   const header =

@@ -19,7 +19,7 @@ interface NeuralLinkProps {
 const EVENT_META: Record<NeuralEvent['type'], { icon: string; label: string; colorVar: string }> = {
   tool_call:      { icon: '⚙', label: 'tool call',     colorVar: 'var(--whink-accent-hex, hsl(var(--whink-accent)))' },
   tool_result:    { icon: '✓', label: 'tool result',   colorVar: 'hsl(160 84% 50%)' },
-  security_event: { icon: '⚠', label: 'security',      colorVar: 'hsl(var(--pending-amber))' },
+  security_event: { icon: '⚠', label: 'security',      colorVar: 'hsl(var(--denial))' },
   memory_write:   { icon: '◈', label: 'memory',        colorVar: 'hsl(var(--whink-accent))' },
   text_chunk:     { icon: '▸', label: 'stream',        colorVar: 'hsl(var(--muted-foreground))' },
   error:          { icon: '✕', label: 'error',         colorVar: 'hsl(var(--denial))' },

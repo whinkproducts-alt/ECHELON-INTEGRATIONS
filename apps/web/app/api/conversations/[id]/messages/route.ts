@@ -11,6 +11,8 @@ import { handleApproval } from '@/lib/approval-handler';
 import { writeMemory } from '@/lib/memory-engine';
 import { chatOnce } from '@/lib/model-router';
 import { decryptKey } from '@/lib/key-encryption';
+import { recordActionSafe } from '@/lib/ledger';
+import { normaliseMambaMode } from '@/lib/types';
 
 export async function GET(
   req: NextRequest,
@@ -56,15 +58,19 @@ export async function POST(
       projectId: projectId ?? conv.projectId,
     });
 
-    // Block injection attempts — do not save user message, do not forward to model
-    if (orchResult.injectionDetected) {
-      const blocked = 'Message blocked: injection pattern detected. External content must be submitted through a trusted tool, not pasted directly into chat.';
+    // Block injection attempts — do not save user message, do not forward to model.
+    // The orchestrator already wrote the DENIED ledger row.
+    if (orchResult.injectionBlocked) {
+      const patterns = orchResult.injectionPatterns;
+      const refusal = `I didn't act on that message \u2014 it contains instruction patterns I treat as an injection attempt: ${patterns.join(', ')}.`;
       const enc = new TextEncoder();
+      const blockedPersona = orchResult.newPersona ?? 'WHINK';
       return new Response(
         new ReadableStream({
           start(ctrl) {
-            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'text', content: blocked, persona: orchResult.newPersona ?? 'WHINK' })}\n\n`));
-            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'text', content: refusal, persona: blockedPersona })}\n\n`));
+            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'security', event: 'injection_blocked', patterns })}\n\n`));
+            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'done', persona: blockedPersona })}\n\n`));
             ctrl.close();
           },
         }),
@@ -73,14 +79,15 @@ export async function POST(
     }
 
     // Block meta-authorization attempts — do not save user message
-    if (orchResult.metaAuthViolation) {
-      const blocked = 'Message blocked: this looks like an attempt to modify WHINK\'s authorization rules. That is not permitted.';
+    if (orchResult.metaAuthBlocked || orchResult.metaAuthViolation) {
+      const blocked = 'I won\'t treat a message as authorisation \u2014 approvals only come through the approval flow.';
       const enc = new TextEncoder();
       return new Response(
         new ReadableStream({
           start(ctrl) {
             ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'text', content: blocked, persona: orchResult.newPersona ?? 'WHINK' })}\n\n`));
-            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'security', event: 'meta_auth_blocked' })}\n\n`));
+            ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'done', persona: orchResult.newPersona ?? 'WHINK' })}\n\n`));
             ctrl.close();
           },
         }),
@@ -186,20 +193,18 @@ export async function POST(
       });
 
       // Log the authorization request
-      await prisma.action.create({
-        data: {
-          userId: session.user.id,
-          initiator: 'user',
-          persona: orchResult.newPersona ?? 'WHINK',
-          action: 'execution_authorization_request',
-          permissionClass: 'S',
-          confirmationMethod: 'human_required',
-          status: 'AWAITING_APPROVAL',
-          validationResult: JSON.stringify(gateOutcome.ear),
-          inputSummary: userMessage.substring(0, 500),
-          outputSummary: earContent.substring(0, 500),
-          correlationId,
-        },
+      await recordActionSafe({
+        userId: session.user.id,
+        initiator: 'user',
+        persona: orchResult.newPersona ?? 'WHINK',
+        action: 'execution_authorization_request',
+        permissionClass: 'S',
+        confirmationMethod: 'human_required',
+        status: 'AWAITING_APPROVAL',
+        validationResult: JSON.stringify(gateOutcome.ear),
+        inputSummary: userMessage,
+        outputSummary: earContent,
+        correlationId,
       });
 
       // Stream the EAR back
@@ -228,7 +233,7 @@ export async function POST(
 
         // Stream from tool loop (falls back to plain streamChat for non-Anthropic)
     const activePersona = orchResult.newPersona ?? 'WHINK';
-    const activeMambaMode = orchResult.newMambaMode ?? null;
+    const activeMambaMode = normaliseMambaMode(orchResult.newMambaMode, activePersona);
 
     // Resolve model: request body > user preference > env default
     const userPrefs = await prisma.userPreference.findUnique({ where: { userId: session.user.id } });
@@ -274,6 +279,8 @@ export async function POST(
 
     const stream = new ReadableStream({
       async start(controller) {
+        let closed = false;
+        const close = () => { if (!closed) { closed = true; controller.close(); } };
         try {
           // Send switch announcement first if present
           if (switchAnnouncement) {
@@ -306,6 +313,8 @@ export async function POST(
                   if (parsed.tool === 'memory_write') memoryWriteCalledInLoop = true;
                   toolRanThisTurn = true;
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'tool_result', tool: parsed.tool, success: parsed.success, persona: activePersona })}\n\n`));
+                } else if (parsed.type === 'security') {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'security', event: parsed.event, tool: parsed.tool, patterns: parsed.patterns })}\n\n`));
                 } else if (parsed.type === 'error') {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: parsed.error ?? 'LLM error' })}\n\n`));
                 }
@@ -409,27 +418,25 @@ Assistant: ${autoMemoryContent}`;
           });
 
           // Log action
-          await prisma.action.create({
-            data: {
-              userId: session.user.id,
-              initiator: 'user',
-              persona: activePersona,
-              mambaMode: activeMambaMode,
-              action: 'conversation_response',
-              permissionClass: 'A',
-              confirmationMethod: 'auto',
-              status: 'VALIDATED',
-              inputSummary: userMessage.substring(0, 500),
-              outputSummary: fullContent.substring(0, 500),
-              correlationId,
-            },
+          await recordActionSafe({
+            userId: session.user.id,
+            initiator: 'user',
+            persona: activePersona,
+            mambaMode: activeMambaMode,
+            action: 'conversation_response',
+            permissionClass: 'A',
+            confirmationMethod: 'auto',
+            status: 'VALIDATED',
+            inputSummary: userMessage,
+            outputSummary: fullContent,
+            correlationId,
           });
 
         } catch (error: any) {
           logger.error('Stream error', { correlationId, error: error?.message });
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: 'Stream failed' })}\n\n`));
         } finally {
-          controller.close();
+          close();
         }
       },
     });

@@ -28,18 +28,15 @@ const TEST_TOOLS: ToolDefinition[] = [
   },
 ];
 
-describe('runToolLoop — non-Anthropic fallback', () => {
+describe('runToolLoop — OpenAI-compatible text-only turn', () => {
   beforeEach(() => vi.resetModules());
   afterEach(() => vi.restoreAllMocks());
 
-  it('falls back to streamChat for non-claude models', async () => {
-    const sseBody = 'data: {"choices":[{"delta":{"content":"pong"}}]}\n\ndata: [DONE]\n\n';
-    const encoder = new TextEncoder();
+  it('uses the generic loop for non-claude models and emits text + done', async () => {
+    vi.doMock('@/lib/tool-registry', () => ({ executeTool: vi.fn() }));
     const mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
-      body: new ReadableStream({
-        start(c) { c.enqueue(encoder.encode(sseBody)); c.close(); },
-      }),
+      json: async () => ({ choices: [{ message: { content: 'pong' }, finish_reason: 'stop' }] }),
     } as any);
 
     const { runToolLoop } = await import('../tool-loop');
@@ -50,9 +47,9 @@ describe('runToolLoop — non-Anthropic fallback', () => {
       model: 'llama3.1:8b',
     });
 
-    const raw = await drainStream(stream);
-    const lines = parseSSE(raw);
+    const lines = parseSSE(await drainStream(stream));
     expect(mockFetch).toHaveBeenCalledOnce();
+    expect(lines.filter((l) => l.type === 'text').map((l) => l.content).join('')).toBe('pong');
     expect(lines.find((l) => l.type === 'done')).toBeDefined();
   });
 });
@@ -227,17 +224,12 @@ describe('runToolLoop — BYOK apiKey', () => {
 
   it('non-Anthropic model: passes apiKey as Authorization header via fetch', async () => {
     let capturedAuth: string | undefined;
-    const encoder = new TextEncoder();
+    vi.doMock('@/lib/tool-registry', () => ({ executeTool: vi.fn() }));
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
       capturedAuth = (init?.headers as any)?.Authorization;
       return {
         ok: true,
-        body: new ReadableStream({
-          start(c) {
-            c.enqueue(encoder.encode('data: [DONE]\n\n'));
-            c.close();
-          },
-        }),
+        json: async () => ({ choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] }),
       } as any;
     });
 
