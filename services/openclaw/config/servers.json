@@ -1,0 +1,13 @@
+{
+  "servers": [
+    {
+      "platform": "ref",
+      "description": "Dev-only MCP reference server (server-everything). Present only when the image is built with INCLUDE_REF_SERVER=true. Product configs use an empty servers list.",
+      "transport": "stdio",
+      "command": "node",
+      "args": ["/app/upstreams/ref/node_modules/@modelcontextprotocol/server-everything/dist/index.js", "stdio"],
+      "env": [],
+      "tools": ["echo", "get-sum"]
+    }
+  ]
+}

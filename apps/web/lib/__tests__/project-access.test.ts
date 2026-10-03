@@ -137,7 +137,7 @@ describe('tool handlers verify project ownership', () => {
     }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn().mockResolvedValue({ allowed: true, method: 'delegated' }) }));
     vi.doMock('@/lib/memory-engine', () => ({ writeMemory, correctMemory, searchMemory: vi.fn() }));
-    vi.doMock('@/lib/openclaw-client', () => ({ listOpenClawTools: vi.fn(), callOpenClawTool: vi.fn() }));
+    vi.doMock('@/lib/openclaw-client', () => ({ isGatewayConfigured: () => true, listOpenClawTools: vi.fn(), callOpenClawTool: vi.fn() }));
   });
 
   it('memory_write: unowned project fails, owned passes verified id, no project passes null', async () => {

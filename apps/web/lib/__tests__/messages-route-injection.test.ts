@@ -44,6 +44,7 @@ describe('messages route injection block', () => {
     vi.doMock('@/lib/memory-engine', () => ({ writeMemory: vi.fn() }));
     vi.doMock('@/lib/key-encryption', () => ({ decryptKey: vi.fn() }));
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe: vi.fn() }));
+    vi.doMock('@/lib/gateway-chat', () => ({ resolveChatTools: vi.fn(async (o: { standardTools: unknown[] }) => o.standardTools) }));
   });
 
   it('streams text, security(injection_blocked), done in order and never reaches the model', async () => {

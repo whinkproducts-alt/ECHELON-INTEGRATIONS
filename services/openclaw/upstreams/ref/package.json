@@ -1,0 +1,9 @@
+{
+  "name": "whink-openclaw-ref-upstream",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dev-only reference MCP server, installed into the image only when INCLUDE_REF_SERVER=true.",
+  "dependencies": {
+    "@modelcontextprotocol/server-everything": "2026.8.31"
+  }
+}

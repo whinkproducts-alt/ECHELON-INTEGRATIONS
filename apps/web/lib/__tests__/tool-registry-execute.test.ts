@@ -11,6 +11,7 @@ describe('executeTool registry gating', () => {
 
   beforeEach(() => {
     vi.resetModules();
+    process.env.OPENCLAW_ALLOWED_USER_IDS = 'u1';
     recordActionSafe.mockReset().mockResolvedValue({ id: 'row1' });
     recordAction.mockReset().mockResolvedValue({ id: 'row1' });
     updateActionStatus.mockReset().mockResolvedValue(true);
@@ -23,7 +24,7 @@ describe('executeTool registry gating', () => {
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission, checkApprovedAction: vi.fn() }));
     vi.doMock('@/lib/approvals', () => ({ createApproval }));
     vi.doMock('@/lib/memory-engine', () => ({ writeMemory, correctMemory: vi.fn(), searchMemory }));
-    vi.doMock('@/lib/openclaw-client', () => ({ listOpenClawTools: vi.fn(), callOpenClawTool: vi.fn() }));
+    vi.doMock('@/lib/openclaw-client', () => ({ isGatewayConfigured: () => true, listOpenClawTools: vi.fn(), callOpenClawTool: vi.fn() }));
   });
 
   it('denies an unregistered tool, records DENIED, never checks permission or runs a handler', async () => {
@@ -54,7 +55,8 @@ describe('executeTool registry gating', () => {
 
   it('treats a registered tool with no risk map entry as Class C and does not run it', async () => {
     const openclaw = {
-      listOpenClawTools: vi.fn().mockResolvedValue([{ name: 'send_thing', description: 'd', inputSchema: {} }]),
+      isGatewayConfigured: () => true,
+      listOpenClawTools: vi.fn().mockResolvedValue([{ name: 'ref__send_thing', description: 'd', inputSchema: {} }]),
       callOpenClawTool: vi.fn(),
     };
     vi.doMock('@/lib/openclaw-client', () => openclaw);
@@ -62,12 +64,12 @@ describe('executeTool registry gating', () => {
     const { executeTool, registerOpenClawTools } = await import('../tool-registry');
     await registerOpenClawTools('u1');
 
-    const res = await executeTool('u1', 'openclaw__send_thing', {});
+    const res = await executeTool('u1', 'openclaw__ref__send_thing', {});
     expect(res.success).toBe(false);
     expect(checkPermission).toHaveBeenCalledTimes(1);
     expect(checkPermission.mock.calls[0][2]).toBe('C');
     expect(openclaw.callOpenClawTool).not.toHaveBeenCalled();
-    expect(createApproval).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', kind: 'tool_call', tool: 'openclaw__send_thing', params: {} }));
+    expect(createApproval).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', kind: 'tool_call', tool: 'openclaw__ref__send_thing', params: { args: {}, defHash: expect.stringMatching(/^[0-9a-f]{64}$/) } }));
     expect(res.approvalRequired).toMatchObject({ id: 'ap1' });
   });
 

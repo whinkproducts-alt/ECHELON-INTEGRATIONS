@@ -13,6 +13,7 @@ import { writeMemory } from '@/lib/memory-engine';
 import { chatOnce } from '@/lib/model-router';
 import { decryptKey } from '@/lib/key-encryption';
 import { recordActionSafe } from '@/lib/ledger';
+import { resolveChatTools } from '@/lib/gateway-chat';
 import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
 import { normaliseMambaMode } from '@/lib/types';
 
@@ -266,11 +267,19 @@ export async function POST(
       }
     } catch { /* non-blocking — fall back to server key */ }
 
+    // Standard tools plus any gateway tools (cached). Gateway down means standard tools only.
+    const chatTools = await resolveChatTools({
+      userId: session.user.id,
+      standardTools: STANDARD_TOOLS,
+      persona: activePersona,
+      correlationId,
+    });
+
     let routerStream: ReadableStream<Uint8Array>;
     try {
       routerStream = await runToolLoop({
         messages,
-        tools: STANDARD_TOOLS,
+        tools: chatTools,
         userId: session.user.id,
         persona: activePersona,
         mambaMode: activeMambaMode,

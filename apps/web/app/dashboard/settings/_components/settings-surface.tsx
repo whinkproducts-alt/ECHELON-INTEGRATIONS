@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react';
 import { Save, User, Shield, Bell, Gauge, CreditCard, Palette, Key, Eye, EyeOff, Trash2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { BillingSurface } from '../billing/_components/billing-surface';
+import { AutonomyApprovalPanel } from './autonomy-approval-panel';
+import {
+  interpretPatchResponse, pickPendingAutonomy, resolveDecision, type AutonomyApproval,
+} from '@/lib/autonomy-approval';
+import type { DecisionStatus } from '@/lib/hooks/approval-state';
 
 type Tab = 'profile' | 'billing' | 'apikeys' | 'whitelabel';
 
@@ -28,7 +33,10 @@ export function SettingsSurface() {
     autonomyLevel: 1,
   });
   const [savedAutonomy, setSavedAutonomy] = useState(1);
-  const [autonomyNotice, setAutonomyNotice] = useState<string | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<AutonomyApproval | null>(null);
+  const [resolution, setResolution] = useState<{ tone: 'success' | 'neutral' | 'error'; message: string } | null>(null);
+  const [otherNotice, setOtherNotice] = useState<string | null>(null);
+  const [savedOthers, setSavedOthers] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [preferences, setPreferences] = useState({
     verbosity: 'STANDARD',
@@ -40,8 +48,14 @@ export function SettingsSurface() {
     Promise.all([
       fetch('/api/settings').then(r => r.json()),
       fetch('/api/tenant/config').then(r => r.json()),
+      fetch('/api/approvals?status=pending').then(r => (r.ok ? r.json() : null)).catch(() => null),
     ])
-      .then(([d, tc]) => {
+      .then(([d, tc, pend]) => {
+        const restored = pickPendingAutonomy(pend);
+        if (restored) setPendingApproval(restored);
+        const { autonomyLevel: _l, ...restProfile } = { ...d?.profile };
+        void _l;
+        setSavedOthers(JSON.stringify([restProfile, d?.preferences ?? null]));
         if (d?.profile) setProfile(p => ({ ...p, ...(d.profile ?? {}) }));
         if (typeof d?.profile?.autonomyLevel === 'number') setSavedAutonomy(d.profile.autonomyLevel);
         if (d?.preferences) setPreferences(p => ({ ...p, ...(d.preferences ?? {}) }));
@@ -54,50 +68,61 @@ export function SettingsSurface() {
       .catch(() => setLoading(false));
   }, []);
 
+  const othersKey = () => {
+    const { autonomyLevel: _l, ...rest } = profile;
+    void _l;
+    return JSON.stringify([rest, preferences]);
+  };
+
+  const onApprovalResolved = (status: DecisionStatus, detail: string | null) => {
+    const to = pendingApproval?.to ?? savedAutonomy;
+    const from = pendingApproval?.from ?? savedAutonomy;
+    const res = resolveDecision(status, savedAutonomy, from, to, detail);
+    setSavedAutonomy(res.savedLevel);
+    setProfile(p => ({ ...p, autonomyLevel: res.sliderLevel }));
+    setResolution({ tone: res.tone, message: res.message });
+  };
+
   const save = async () => {
     setSaving(true);
-    setAutonomyNotice(null);
     setSaveError(null);
+    if (resolution) setPendingApproval(null);
+    setResolution(null);
+    setOtherNotice(null);
     try {
-      const raising = profile.autonomyLevel > savedAutonomy;
       const changed = profile.autonomyLevel !== savedAutonomy;
-      // Raising is never sent with other fields; those go with the saved level.
-      const sendLevel = changed && !raising;
+      const othersChanged = othersKey() !== savedOthers;
       const { autonomyLevel: _level, ...rest } = profile;
       void _level;
       const r = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profile: sendLevel ? { ...rest, autonomyLevel: profile.autonomyLevel } : rest,
+          profile: changed ? { ...rest, autonomyLevel: profile.autonomyLevel } : rest,
           preferences,
           name: profile.displayName,
         }),
       });
-      if (!r.ok) {
-        let msg = 'Failed to save';
-        let requiresApproval = false;
-        try {
-          const d: { error?: string; requiresApproval?: boolean } = await r.json();
-          if (d.error) msg = d.error;
-          requiresApproval = r.status === 409 && d.requiresApproval === true;
-        } catch { /* keep default message */ }
-        if (requiresApproval) {
-          setProfile(p => ({ ...p, autonomyLevel: savedAutonomy }));
-          setAutonomyNotice('Raising autonomy needs approval \u2014 nothing was saved.');
-        } else {
-          setSaveError(msg);
-          toast.error(msg);
+      let body: unknown = null;
+      try { body = await r.json(); } catch { /* no body */ }
+      const outcome = interpretPatchResponse(r.status, body);
+      if (outcome.kind === 'error') {
+        setSaveError(outcome.message);
+        toast.error(outcome.message);
+        return;
+      }
+      if (outcome.kind === 'approval') {
+        setPendingApproval(outcome.approval);
+        setProfile(p => ({ ...p, autonomyLevel: outcome.approval.to }));
+        if (outcome.othersApplied) {
+          setSavedOthers(othersKey());
+          if (othersChanged) setOtherNotice('Other settings saved');
         }
         return;
       }
-      if (sendLevel) setSavedAutonomy(profile.autonomyLevel);
-      if (raising) {
-        setProfile(p => ({ ...p, autonomyLevel: savedAutonomy }));
-        setAutonomyNotice('Other settings saved. Raising autonomy needs approval \u2014 the level was not changed.');
-      } else {
-        toast.success('Settings saved');
-      }
+      setSavedOthers(othersKey());
+      if (changed) setSavedAutonomy(profile.autonomyLevel);
+      toast.success('Settings saved');
     } catch {
       setSaveError('Failed to save');
       toast.error('Failed to save');
@@ -229,17 +254,30 @@ export function SettingsSurface() {
           {/* Autonomy & Permissions */}
           <Section title="Autonomy & Permissions" icon={<Shield className="h-4 w-4" />}>
             <Field label={`Autonomy Level: ${profile.autonomyLevel}`} description="0=Adviser, 1=Assistant, 2=Operator, 3=Delegate, 4=High Autonomy">
-              <input type="range" min={0} max={4} value={profile.autonomyLevel} onChange={e => { setAutonomyNotice(null); setProfile(p => ({ ...p, autonomyLevel: parseInt(e.target.value) })); }} className="w-full accent-primary" aria-describedby="autonomy-notice" />
+              <input type="range" min={0} max={4} value={profile.autonomyLevel} disabled={pendingApproval !== null && !resolution} onChange={e => { setResolution(null); setPendingApproval(null); setProfile(p => ({ ...p, autonomyLevel: parseInt(e.target.value) })); }} className="w-full accent-primary" aria-describedby="autonomy-notice" />
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
                 <span>Adviser</span><span>Assistant</span><span>Operator</span><span>Delegate</span><span>High</span>
               </div>
-              {profile.autonomyLevel > savedAutonomy && !autonomyNotice && (
-                <p className="mt-2 text-xs text-[hsl(var(--pending-amber))]">Limit: raising autonomy needs approval and will not be saved.</p>
+              {profile.autonomyLevel > savedAutonomy && !pendingApproval && (
+                <p className="mt-2 text-xs text-[hsl(var(--pending-amber))]">Limit: raising autonomy is a Class C action. Saving will ask for your approval.</p>
               )}
-              {autonomyNotice && (
-                <p id="autonomy-notice" role="status" className="mt-2 text-xs text-[hsl(var(--pending-amber))] border border-[hsl(var(--pending-amber)/0.2)] bg-[hsl(var(--pending-amber)/0.1)] rounded-md px-3 py-2">
-                  Limit: {autonomyNotice}
+              <p className="mt-2 text-xs font-mono text-muted-foreground">Saved level: {savedAutonomy}</p>
+              {otherNotice && (
+                <p role="status" className="mt-2 text-xs text-muted-foreground">{otherNotice}</p>
+              )}
+              {resolution && (
+                <p
+                  id="autonomy-notice"
+                  role={resolution.tone === 'error' ? 'alert' : 'status'}
+                  className={`mt-2 text-xs font-mono ${resolution.tone === 'error' ? 'text-[hsl(var(--denial))]' : 'text-foreground'}`}
+                >
+                  {resolution.tone === 'error' ? 'Error: ' : ''}{resolution.message}
                 </p>
+              )}
+              {pendingApproval && (
+                <div className="mt-3">
+                  <AutonomyApprovalPanel key={pendingApproval.view.id} approval={pendingApproval} onResolved={onApprovalResolved} />
+                </div>
               )}
             </Field>
           </Section>

@@ -22,6 +22,21 @@ const nextConfig = {
   // wildcard: every conversation previews under the same parent domain and serves content its own
   // author controls, so `**.<domain>` would let any UNRELATED app's preview reach this dev server.
   allowedDevOrigins: ['127.0.0.1'],
+  // Static security headers. The Content-Security-Policy itself is per-request (nonce) and is
+  // set in middleware.ts via lib/csp.ts.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Permissions-Policy', value: 'microphone=(self), camera=(), geolocation=(), payment=(), usb=()' },
+        ],
+      },
+    ];
+  },
 };
 
 const fs = require('fs');

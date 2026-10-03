@@ -109,17 +109,7 @@ describe('PATCH /api/settings', () => {
     expect(userUpdate).not.toHaveBeenCalled();
   });
 
-  it('refuses raising autonomy with 409, writes nothing, ledgers DENIED', async () => {
-    const { PATCH } = await import('../../app/api/settings/route');
-    const res = await PATCH(req({ profile: { autonomyLevel: 4, timezone: 'UTC' } }));
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: 'Raising autonomy requires approval', requiresApproval: true });
-    expect(profileUpsert).not.toHaveBeenCalled();
-    expect(recordAction).toHaveBeenCalledWith(expect.objectContaining({
-      userId: 'u1', action: 'autonomy_level_change', status: 'DENIED',
-      inputSummary: JSON.stringify({ from: 2, to: 4 }),
-    }));
-  });
+  // Raising autonomy (202 + approval, never written here) is covered in autonomy-approval.test.ts.
 
   it('applies a lowered autonomy and ledgers VALIDATED', async () => {
     const { PATCH } = await import('../../app/api/settings/route');
