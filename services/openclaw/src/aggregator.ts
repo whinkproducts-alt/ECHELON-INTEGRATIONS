@@ -7,6 +7,24 @@ import { assignNames } from './namespace.js';
 import { log } from './log.js';
 
 export const MAX_DESCRIPTION_LEN = 500;
+export const CREDENTIAL_META_KEY = 'dev.whink/credential';
+const MAX_CREDENTIAL_CHARS = 8192;
+
+/**
+ * Build the upstream _meta for ONE call from the incoming one. Only the credential (a string) and the
+ * MCP-standard progressToken pass; every other key is dropped. The result is never logged or stored.
+ */
+export function forwardMeta(incoming: unknown): Record<string, unknown> | undefined {
+  if (!incoming || typeof incoming !== 'object') return undefined;
+  const m = incoming as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  const cred = m[CREDENTIAL_META_KEY];
+  if (typeof cred === 'string' && cred.length > 0 && cred.length <= MAX_CREDENTIAL_CHARS) out[CREDENTIAL_META_KEY] = cred;
+  const pt = m.progressToken;
+  if (typeof pt === 'string' || typeof pt === 'number') out.progressToken = pt;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export const MAX_RESPONSE_CHARS = 64 * 1024;
 const REFRESH_MS = 30_000;
 const CONNECT_TIMEOUT_MS = 15_000;
@@ -31,7 +49,7 @@ export interface UpstreamTool {
 export interface UpstreamClient {
   listTools(params?: { cursor?: string }): Promise<{ tools: UpstreamTool[]; nextCursor?: string }>;
   callTool(
-    params: { name: string; arguments?: Record<string, unknown> },
+    params: { name: string; arguments?: Record<string, unknown>; _meta?: Record<string, unknown> },
     schema?: undefined,
     options?: { timeout?: number },
   ): Promise<{ content?: unknown; isError?: boolean }>;
@@ -198,6 +216,7 @@ export class Aggregator {
   async callTool(
     exposed: string,
     args: Record<string, unknown> | undefined,
+    meta?: unknown,
   ): Promise<{ content: { type: 'text'; text: string }[]; isError: boolean }> {
     if (this.routes.size === 0 || !this.routes.has(exposed)) await this.refresh();
     const route = this.routes.get(exposed);
@@ -205,7 +224,12 @@ export class Aggregator {
     const client = this.clients.get(route.platform);
     if (!client) return errorResult('upstream unavailable');
     try {
-      const res = await client.callTool({ name: route.original, arguments: args ?? {} }, undefined, { timeout: CALL_TIMEOUT_MS });
+      const fwd = forwardMeta(meta);
+      const res = await client.callTool(
+        { name: route.original, arguments: args ?? {}, ...(fwd ? { _meta: fwd } : {}) },
+        undefined,
+        { timeout: CALL_TIMEOUT_MS },
+      );
       return { content: [{ type: 'text', text: capContent(res.content) }], isError: res.isError === true };
     } catch (err) {
       // The error message is deliberately not logged: it can echo call arguments.

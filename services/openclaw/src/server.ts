@@ -36,7 +36,7 @@ function buildMcpServer(agg: Aggregator): Server {
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: await agg.listTools() }));
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const args = req.params.arguments as Record<string, unknown> | undefined;
-    return agg.callTool(req.params.name, args);
+    return agg.callTool(req.params.name, args, req.params._meta);
   });
   return server;
 }

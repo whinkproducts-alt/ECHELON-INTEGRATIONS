@@ -5,3 +5,4 @@ upstreams/*/node_modules
 .env
 .env.*
 !.env.example
+upstreams/*/dist

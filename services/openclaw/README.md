@@ -103,3 +103,12 @@ npm install && npm test && npm run typecheck
 ```
 
 To build a product image: `docker build --build-arg INCLUDE_REF_SERVER=false -t whink-openclaw .`
+
+## Social upstream (`upstreams/social`, Phase 2d)
+
+Our own TypeScript MCP stdio server, always built into the image at `/app/upstreams/social/dist`, run once per platform (`--platform x|instagram|tiktok`, config entries `x`, `instagram`, `tiktok`). Official platform APIs only (X API v2); no scraping or browser automation (D9, enforced by a test on the lockfiles).
+
+- The user's token never sits in gateway config or storage. WHINK sends it per call in the tools/call `_meta["dev.whink/credential"]` (JSON `{"access_token","platform_user_id"}`). The gateway forwards only that key (and `progressToken`) to the upstream for that one call, drops every other `_meta` key, and never logs or caches it.
+- No credential: `{"error":"not_connected"}` and no network call. Instagram and TikTok are skeletons: with a credential they return `not_implemented`. TikTok has no DM tools.
+- X errors map to `{"error":"platform_error","status":n}` (status 0 for network failure or the 15 s timeout). Upstream bodies are never returned. Output is capped at 32 KB.
+- Tests: `npm test` (includes `upstreams/social/test`). Social package build: `cd upstreams/social && npm ci && npm run build`.
