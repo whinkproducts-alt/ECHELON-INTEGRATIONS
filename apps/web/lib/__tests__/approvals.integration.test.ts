@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, vi, beforeAll, afterAll, type TestContext } from 'vitest';
 
-const TOOL_NAME = 'itest_counter';
+const TOOL_NAME = 'itest__counter';
 const TOOL = `openclaw__${TOOL_NAME}`;
 let handlerCalls = 0;
 

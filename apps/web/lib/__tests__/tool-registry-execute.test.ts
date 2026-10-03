@@ -54,7 +54,7 @@ describe('executeTool registry gating', () => {
 
   it('treats a registered tool with no risk map entry as Class C and does not run it', async () => {
     const openclaw = {
-      listOpenClawTools: vi.fn().mockResolvedValue([{ name: 'send_thing', description: 'd', inputSchema: {} }]),
+      listOpenClawTools: vi.fn().mockResolvedValue([{ name: 'ref__send_thing', description: 'd', inputSchema: {} }]),
       callOpenClawTool: vi.fn(),
     };
     vi.doMock('@/lib/openclaw-client', () => openclaw);
@@ -62,12 +62,12 @@ describe('executeTool registry gating', () => {
     const { executeTool, registerOpenClawTools } = await import('../tool-registry');
     await registerOpenClawTools('u1');
 
-    const res = await executeTool('u1', 'openclaw__send_thing', {});
+    const res = await executeTool('u1', 'openclaw__ref__send_thing', {});
     expect(res.success).toBe(false);
     expect(checkPermission).toHaveBeenCalledTimes(1);
     expect(checkPermission.mock.calls[0][2]).toBe('C');
     expect(openclaw.callOpenClawTool).not.toHaveBeenCalled();
-    expect(createApproval).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', kind: 'tool_call', tool: 'openclaw__send_thing', params: {} }));
+    expect(createApproval).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', kind: 'tool_call', tool: 'openclaw__ref__send_thing', params: {} }));
     expect(res.approvalRequired).toMatchObject({ id: 'ap1' });
   });
 

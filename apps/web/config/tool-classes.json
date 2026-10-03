@@ -1,0 +1,4 @@
+{
+  "_comment": "WHINK-side permission classes for gateway tools, keyed by full WHINK tool name. Any gateway tool not listed here is Class C (always needs a human). Only edit this file after reviewing the tool. A class or annotation sent by the gateway is ignored.",
+  "openclaw__ref__echo": "A"
+}

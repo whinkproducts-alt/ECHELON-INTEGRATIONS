@@ -1,0 +1,12 @@
+{
+  "servers": [
+    {
+      "platform": "ref",
+      "description": "MCP reference server (server-everything, MIT/Apache-2.0). Demo tools only.",
+      "transport": "stdio",
+      "command": "node",
+      "args": ["/app/node_modules/@modelcontextprotocol/server-everything/dist/index.js", "stdio"],
+      "env": []
+    }
+  ]
+}

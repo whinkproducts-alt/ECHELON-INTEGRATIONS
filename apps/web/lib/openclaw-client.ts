@@ -1,125 +1,128 @@
 /**
- * OpenClaw adapter — the only place in the codebase that talks to the
- * OpenClaw gateway. Keep all other code behind this interface so OpenClaw
- * can be swapped for a different gateway without touching tool-registry.ts.
+ * OpenClaw adapter. The only place in WHINK that knows the gateway transport
+ * (MCP over streamable HTTP). Keep all other code behind listOpenClawTools and
+ * callOpenClawTool so the gateway can be swapped by rewriting this one file.
  *
- * Wire protocol (subset used here):
- *   GET  {OPENCLAW_URL}/tools          → ToolDefinition[]
- *   POST {OPENCLAW_URL}/tools/:name    → any (tool result)
- *
- * All responses are treated as untrusted external content and must be
- * passed through wrapUntrustedContent before entering the model context.
+ * The gateway re-exposes upstream MCP servers as `<platform>__<tool>`.
+ * Everything it returns is untrusted external content. It never decides a
+ * permission class: WHINK assigns classes from config/tool-classes.json.
  */
 
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { ToolDefinition } from '@/lib/tool-loop';
 import { scanForInjectionPatterns } from '@/lib/content-isolation';
 
-const OPENCLAW_URL = (process.env.OPENCLAW_URL ?? 'http://localhost:3100').replace(/\/$/, '');
-const OPENCLAW_NAME_RE = /^[a-z0-9_]{1,64}$/;
+const DEFAULT_URL = 'http://localhost:3100';
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
-const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
+/** Gateway-side name shape. The full WHINK name (openclaw__ + this) is checked in tool-registry. */
+const GATEWAY_NAME_RE = /^[A-Za-z0-9_]{1,54}$/;
+const MAX_LIST_BYTES = 256 * 1024;
+const MAX_DESCRIPTION_LEN = 500;
+const MAX_RESULT_CHARS = 64 * 1024;
+const MAX_LIST_PAGES = 10;
+const LIST_TIMEOUT_MS = 10_000;
+const CALL_TIMEOUT_MS = 30_000;
 
-function assertTokenPresent(): void {
-  const hostname = new URL(OPENCLAW_URL).hostname;
-  const isLocal = LOCAL_HOSTNAMES.has(hostname);
+function endpoint(): URL {
+  const base = (process.env.OPENCLAW_URL?.trim() || DEFAULT_URL).replace(/\/+$/, '');
+  return new URL(base.endsWith('/mcp') ? base : `${base}/mcp`);
+}
+
+function assertTokenPresent(url: URL): void {
+  const isLocal = LOCAL_HOSTNAMES.has(url.hostname);
   if (!isLocal && !process.env.OPENCLAW_TOKEN?.trim()) {
     throw new Error('OPENCLAW_TOKEN must be set for non-local OpenClaw endpoints');
   }
 }
-const MAX_LIST_BYTES = 256 * 1024; // 256 KB
-const MAX_DESCRIPTION_LEN = 500;
 
-function buildHeaders(extra?: Record<string, string>): Record<string, string> {
+async function withClient<T>(timeoutMs: number, fn: (client: Client) => Promise<T>): Promise<T> {
+  const url = endpoint();
+  assertTokenPresent(url);
   const token = process.env.OPENCLAW_TOKEN?.trim();
-  const base: Record<string, string> = { Accept: 'application/json', ...extra };
-  if (token) {
-    base['Authorization'] = `Bearer ${token}`;
+  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  const transport = new StreamableHTTPClientTransport(url, {
+    requestInit: { headers, signal: AbortSignal.timeout(timeoutMs) },
+  });
+  const client = new Client({ name: 'whink', version: '1.0.0' }, { capabilities: {} });
+  try {
+    await client.connect(transport, { timeout: timeoutMs });
+    return await fn(client);
+  } finally {
+    await client.close().catch(() => undefined);
   }
-  return base;
 }
 
 /**
- * Fetch the list of tools that OpenClaw currently has registered.
- * Throws on network error so callers can decide how to handle unavailability.
- * Validates and sanitises each tool definition before returning.
+ * List the tools the gateway currently exposes. Throws on network or protocol
+ * error so callers can decide how to handle unavailability. Each definition is
+ * validated and sanitised. Any annotation or class hint is dropped.
  */
 export async function listOpenClawTools(): Promise<ToolDefinition[]> {
-  assertTokenPresent();
-  const res = await fetch(`${OPENCLAW_URL}/tools`, {
-    headers: buildHeaders(),
-    signal: AbortSignal.timeout(10_000),
+  const rawTools = await withClient(LIST_TIMEOUT_MS, async (client) => {
+    const all: unknown[] = [];
+    let cursor: string | undefined;
+    let bytes = 0;
+    for (let page = 0; page < MAX_LIST_PAGES; page++) {
+      const res = await client.listTools(cursor ? { cursor } : undefined, { timeout: LIST_TIMEOUT_MS });
+      bytes += JSON.stringify(res.tools).length;
+      if (bytes > MAX_LIST_BYTES) throw new Error('OpenClaw tool list exceeds size cap');
+      all.push(...res.tools);
+      cursor = res.nextCursor;
+      if (!cursor) break;
+    }
+    return all;
   });
 
-  if (!res.ok) {
-    throw new Error(`OpenClaw /tools responded with ${res.status}`);
-  }
-
-  // M5: Cap response body at 256 KB before parsing
-  const rawText = await res.text();
-  const capped = rawText.substring(0, MAX_LIST_BYTES);
-
-  let raw: unknown;
-  try {
-    raw = JSON.parse(capped);
-  } catch {
-    throw new Error('OpenClaw /tools returned invalid JSON');
-  }
-
-  if (!Array.isArray(raw)) {
-    throw new Error('OpenClaw /tools returned a non-array payload');
-  }
-
   const result: ToolDefinition[] = [];
-  for (const item of raw as any[]) {
+  for (const item of rawTools as Array<Record<string, unknown> | null>) {
     const name = String(item?.name ?? '');
-
-    // M5: Validate name
-    if (!OPENCLAW_NAME_RE.test(name)) {
-      console.warn(`[openclaw] skipping tool with invalid name: ${JSON.stringify(name)}`);
+    if (!GATEWAY_NAME_RE.test(name)) {
+      console.warn(`[openclaw] skipping tool with invalid name: ${JSON.stringify(name).slice(0, 80)}`);
       continue;
     }
 
-    // M5: Validate inputSchema is a plain object with type:'object'
-    const schema = item?.inputSchema;
+    const schema = item?.inputSchema as Record<string, unknown> | undefined;
     if (!schema || typeof schema !== 'object' || Array.isArray(schema) || schema.type !== 'object') {
-      console.warn(`[openclaw] skipping tool ${name} — inputSchema missing or invalid`);
+      console.warn(`[openclaw] skipping tool ${name}: inputSchema missing or invalid`);
       continue;
     }
 
-    // M5: Cap and sanitise description
     let description = String(item?.description ?? '').substring(0, MAX_DESCRIPTION_LEN);
     const descScan = scanForInjectionPatterns(description);
     if (descScan.suspicious) {
       console.warn(`[openclaw] stripping injection patterns from ${name} description`);
-      description = `[description sanitised — ${descScan.patterns.join(', ')} detected]`;
+      description = `[description sanitised: ${descScan.patterns.join(', ')} detected]`;
     }
 
-    result.push({
-      name,
-      description,
-      inputSchema: schema as Record<string, unknown>,
-    });
+    result.push({ name, description, inputSchema: schema });
   }
-
   return result;
 }
 
 /**
- * Call a single OpenClaw tool by name and return its raw result.
+ * Call one gateway tool by its gateway name and return its text result, capped.
  * The caller must treat the returned value as untrusted external content.
+ * A tool-level error is thrown so the permission and ledger layers see a failure.
  */
 export async function callOpenClawTool(toolName: string, params: unknown): Promise<unknown> {
-  assertTokenPresent();
-  const res = await fetch(`${OPENCLAW_URL}/tools/${encodeURIComponent(toolName)}`, {
-    method: 'POST',
-    headers: buildHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(params ?? {}),
-    signal: AbortSignal.timeout(30_000),
-  });
+  const args = params && typeof params === 'object' && !Array.isArray(params) ? (params as Record<string, unknown>) : {};
+  const res = await withClient(CALL_TIMEOUT_MS, (client) =>
+    client.callTool({ name: toolName, arguments: args }, undefined, { timeout: CALL_TIMEOUT_MS }),
+  );
 
-  if (!res.ok) {
-    throw new Error(`OpenClaw /tools/${toolName} responded with ${res.status}`);
+  const parts: string[] = [];
+  const content: unknown = res.content;
+  if (Array.isArray(content)) {
+    for (const p of content as Array<Record<string, unknown> | null>) {
+      if (p && p.type === 'text' && typeof p.text === 'string') parts.push(p.text);
+      else parts.push(`[${String(p?.type ?? 'unknown').slice(0, 20)} content omitted]`);
+    }
   }
+  const joined = parts.join('\n');
+  const text = joined.length > MAX_RESULT_CHARS ? `${joined.slice(0, MAX_RESULT_CHARS)}\n[truncated]` : joined;
 
-  return res.json();
+  if (res.isError === true) throw new Error(`OpenClaw tool reported an error: ${text.slice(0, 500)}`);
+  return text;
 }

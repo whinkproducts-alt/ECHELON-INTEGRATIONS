@@ -48,6 +48,7 @@
     "@google/generative-ai": "^0.24.1",
     "@headlessui/react": "2.2.10",
     "@hookform/resolvers": "3.9.0",
+    "@modelcontextprotocol/sdk": "1.32.0",
     "@prisma/client": "6.7.0",
     "@radix-ui/react-accordion": "1.2.0",
     "@radix-ui/react-alert-dialog": "1.1.1",

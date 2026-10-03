@@ -1,26 +1,25 @@
-# OpenClaw — external action gateway for W.H.I.N.K. Ultimate
+# WHINK MCP gateway. Add or swap MCP servers by editing this file and
+# config/servers.json only. See README.md.
 #
-# ghcr.io/opencoatl/openclaw does not exist as a published image.
-# When the real image is available, replace the build section below with:
-#   image: ghcr.io/opencoatl/openclaw:latest
-#
-# Until then this compose file builds a minimal pass-through stub so the
-# rest of the stack can wire up against a live HTTP endpoint.
-# Replace the Dockerfile in this directory once the upstream image ships.
+# Required env (shell or `--env-file .env`): OPENCLAW_TOKEN.
+# The port is published on 127.0.0.1 only. Never expose it to the internet.
 
 services:
   openclaw:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        EXTRA_APK: ""   # e.g. "uv" to run Python MCP servers with uvx
     restart: unless-stopped
     ports:
       - "127.0.0.1:3100:3100"
     volumes:
       - ./config:/app/config:ro
     environment:
-      - PORT=3100
-      - CONFIG_PATH=/app/config/tools.json
-      - OPENCLAW_TOKEN=${OPENCLAW_TOKEN:-}
-    # Never expose OpenClaw to the public internet.
-    # It must only be reachable from the apps/web container or localhost.
+      PORT: "3100"
+      HOST: "0.0.0.0"   # inside the container only; the publish rule above limits the host side
+      CONFIG_PATH: /app/config/servers.json
+      OPENCLAW_TOKEN: ${OPENCLAW_TOKEN:?set OPENCLAW_TOKEN (openssl rand -hex 32)}
+      # Upstream credentials: list the variable NAME here and in config/servers.json.
+      # GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PERSONAL_ACCESS_TOKEN:-}
