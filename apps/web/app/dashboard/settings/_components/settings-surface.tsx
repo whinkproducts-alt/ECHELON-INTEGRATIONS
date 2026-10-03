@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, User, Shield, Bell, Gauge, CreditCard, Palette, Key, Eye, EyeOff, Trash2, CheckCircle } from 'lucide-react';
+import { Save, User, Shield, Bell, Gauge, CreditCard, Palette, Key, Eye, EyeOff, Link2, Trash2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import { BillingSurface } from '../billing/_components/billing-surface';
 import { AutonomyApprovalPanel } from './autonomy-approval-panel';
 import {
@@ -178,6 +179,12 @@ export function SettingsSurface() {
             {tab.icon} {tab.label}
           </button>
         ))}
+        <Link
+          href="/dashboard/settings/connected-apps"
+          className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground -mb-px"
+        >
+          <Link2 className="h-3.5 w-3.5" /> Connected apps
+        </Link>
       </div>
 
       {activeTab === 'billing' && <BillingSurface />}
