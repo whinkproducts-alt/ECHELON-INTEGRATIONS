@@ -24,7 +24,12 @@ export async function checkPermission(
     return { allowed: true, method: 'auto' };
   }
 
-  // Check for delegation
+  // Class C: always requires explicit human approval — no autonomy bypass, no delegation bypass
+  if (permissionClass === 'C') {
+    return { allowed: false, reason: 'Class C actions always require explicit human approval. Contact WHINK to queue an approval.', method: 'requires_confirmation' };
+  }
+
+  // Check for delegation (Class B only — Class C is already handled above)
   const delegation = await prisma.delegation.findFirst({
     where: {
       userId,
@@ -44,11 +49,6 @@ export async function checkPermission(
       return { allowed: true, method: 'auto' };
     }
     return { allowed: false, method: 'requires_confirmation', reason: 'Class B action requires autonomy level 2+ or delegation' };
-  }
-
-  // Class C: always requires explicit human approval — no autonomy bypass
-  if (permissionClass === 'C') {
-    return { allowed: false, reason: 'Class C action requires explicit approval. An EAR has been queued.', method: 'requires_confirmation' };
   }
 
   return { allowed: false, method: 'requires_confirmation' };

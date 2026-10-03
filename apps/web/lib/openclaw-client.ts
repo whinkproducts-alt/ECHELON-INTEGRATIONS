@@ -16,6 +16,16 @@ import { scanForInjectionPatterns } from '@/lib/content-isolation';
 
 const OPENCLAW_URL = (process.env.OPENCLAW_URL ?? 'http://localhost:3100').replace(/\/$/, '');
 const OPENCLAW_NAME_RE = /^[a-z0-9_]{1,64}$/;
+
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
+
+function assertTokenPresent(): void {
+  const hostname = new URL(OPENCLAW_URL).hostname;
+  const isLocal = LOCAL_HOSTNAMES.has(hostname);
+  if (!isLocal && !process.env.OPENCLAW_TOKEN?.trim()) {
+    throw new Error('OPENCLAW_TOKEN must be set for non-local OpenClaw endpoints');
+  }
+}
 const MAX_LIST_BYTES = 256 * 1024; // 256 KB
 const MAX_DESCRIPTION_LEN = 500;
 
@@ -34,6 +44,7 @@ function buildHeaders(extra?: Record<string, string>): Record<string, string> {
  * Validates and sanitises each tool definition before returning.
  */
 export async function listOpenClawTools(): Promise<ToolDefinition[]> {
+  assertTokenPresent();
   const res = await fetch(`${OPENCLAW_URL}/tools`, {
     headers: buildHeaders(),
     signal: AbortSignal.timeout(10_000),
@@ -98,6 +109,7 @@ export async function listOpenClawTools(): Promise<ToolDefinition[]> {
  * The caller must treat the returned value as untrusted external content.
  */
 export async function callOpenClawTool(toolName: string, params: unknown): Promise<unknown> {
+  assertTokenPresent();
   const res = await fetch(`${OPENCLAW_URL}/tools/${encodeURIComponent(toolName)}`, {
     method: 'POST',
     headers: buildHeaders({ 'Content-Type': 'application/json' }),

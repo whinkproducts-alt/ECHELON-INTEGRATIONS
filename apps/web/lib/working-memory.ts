@@ -1,48 +1,68 @@
-// In-memory working memory with TTL (Redis not available in this environment)
-// Falls back gracefully — data is ephemeral per server instance
+/**
+ * Working memory — persistent KV store backed by Postgres via Prisma.
+ * Replaces the previous in-process Map (lost on restart).
+ *
+ * All keys are scoped by userId (tenant isolation).
+ */
 
-interface MemoryEntry {
-  value: any;
-  expiresAt: number;
+import { prisma } from '@/lib/db';
+
+const DEFAULT_TTL_SECONDS = 24 * 60 * 60; // 24 hours
+
+export async function setWorkingMemory(
+  userId: string,
+  key: string,
+  value: string,
+  ttlSeconds?: number,
+): Promise<void> {
+  const expiresAt = ttlSeconds != null
+    ? new Date(Date.now() + ttlSeconds * 1000)
+    : new Date(Date.now() + DEFAULT_TTL_SECONDS * 1000);
+
+  await prisma.workingMemory.upsert({
+    where: { userId_key: { userId, key } },
+    update: { value, expiresAt },
+    create: { userId, key, value, expiresAt },
+  });
 }
 
-const store = new Map<string, MemoryEntry>();
+export async function getWorkingMemory(
+  userId: string,
+  key: string,
+): Promise<string | null> {
+  const row = await prisma.workingMemory.findUnique({
+    where: { userId_key: { userId, key } },
+  });
+  if (!row) return null;
+  if (row.expiresAt && row.expiresAt < new Date()) {
+    // Row expired — clean up and return null
+    await prisma.workingMemory.delete({ where: { userId_key: { userId, key } } }).catch(() => {/* already gone */});
+    return null;
+  }
+  return row.value;
+}
 
-const DEFAULT_TTL = 24 * 60 * 60 * 1000; // 24 hours
-
-function cleanup() {
-  const now = Date.now();
-  for (const [key, entry] of store.entries()) {
-    if (entry.expiresAt < now) store.delete(key);
+export async function clearWorkingMemory(userId: string, key?: string): Promise<void> {
+  if (key != null) {
+    await prisma.workingMemory.deleteMany({ where: { userId, key } });
+  } else {
+    await prisma.workingMemory.deleteMany({ where: { userId } });
   }
 }
 
-// Run cleanup every 5 minutes
-if (typeof setInterval !== 'undefined') {
-  setInterval(cleanup, 5 * 60 * 1000);
+/**
+ * List all non-expired working memory entries for a user.
+ * Returns entries in creation order (oldest first).
+ */
+export async function listWorkingMemory(
+  userId: string,
+): Promise<Array<{ key: string; value: string; expiresAt: Date | null }>> {
+  return prisma.workingMemory.findMany({
+    where: {
+      userId,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+    orderBy: { createdAt: 'asc' },
+    select: { key: true, value: true, expiresAt: true },
+  });
 }
-
-export const workingMemory = {
-  async get(key: string): Promise<any> {
-    const entry = store.get(key);
-    if (!entry) return null;
-    if (entry.expiresAt < Date.now()) {
-      store.delete(key);
-      return null;
-    }
-    return entry.value;
-  },
-
-  async set(key: string, value: any, ttlMs: number = DEFAULT_TTL): Promise<void> {
-    store.set(key, { value, expiresAt: Date.now() + ttlMs });
-  },
-
-  async delete(key: string): Promise<void> {
-    store.delete(key);
-  },
-
-  async keys(pattern: string): Promise<string[]> {
-    const regex = new RegExp('^' + pattern.replace('*', '.*') + '$');
-    return Array.from(store.keys()).filter((k: string) => regex.test(k));
-  },
-};

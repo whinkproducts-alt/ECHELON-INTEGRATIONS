@@ -325,6 +325,9 @@ model MemorySemantic {
   epistemicStatus String   // KNOWN, INFERRED, HYPOTHESIS, UNVERIFIED
   supersededBy    String?  // ID of newer semantic memory
   retrievedAt     DateTime?
+  scope           String?  @default("general")
+  validFrom       DateTime @default(now())
+  supersededAt    DateTime?
   embedding       Unsupported("vector(1536)")?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -499,6 +502,8 @@ model Action {
   outputSummary      String?
   validationResult   String?  // JSON
   status             String   @default("SUBMITTED") // SUBMITTED, VALIDATED, FAILED, UNVERIFIED
+  outcome            String?
+  postmortem         String?
   correlationId      String?
   latencyMs          Int?
   createdAt          DateTime @default(now())
@@ -625,6 +630,55 @@ model Note {
   @@map("notes")
 }
 
+// ── Working Memory (persistent KV with TTL) ─────────────────────
+
+model WorkingMemory {
+  id        String    @id @default(cuid())
+  userId    String
+  key       String
+  value     String
+  expiresAt DateTime?
+  updatedAt DateTime  @updatedAt
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("working_memory")
+}
+
+// ── Task Handoffs ────────────────────────────────────────────────
+
+model TaskHandoff {
+  id        String   @id @default(cuid())
+  taskId    String
+  agentId   String
+  userId    String
+  summary   String
+  approach  String
+  blockers  String?
+  nextSteps String?
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+  @@index([agentId])
+  @@index([userId])
+  @@map("task_handoffs")
+}
+
+// ── Document Workspaces (tenant-scoped AnythingLLM mapping) ──────
+
+model DocumentWorkspace {
+  id            String   @id @default(cuid())
+  userId        String
+  workspaceSlug String
+  displayName   String?
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, workspaceSlug])
+  @@index([userId])
+  @@map("document_workspaces")
+}
+
 // ── Compound Agent Intelligence ─────────────────────────────────
 
 model AgentKnowledge {
@@ -635,7 +689,7 @@ model AgentKnowledge {
   lesson    String   // The actual lesson — what worked, what failed, why
   outcome   String   // "success" | "failure" | "partial"
   tags      String?  // JSON array of keyword tags for retrieval
-  accountId String?  // M1: tenant isolation. null = global/curated lesson
+  accountId String?  @map("account_id") // M1: tenant isolation. null = global/curated lesson
   createdAt DateTime @default(now())
 
   @@index([agentId])

@@ -34,7 +34,7 @@ export async function readContext(
 ): Promise<AgentKnowledge[]> {
   const accountFilter = accountId
     ? { OR: [{ accountId }, { accountId: null }] }
-    : {};
+    : { accountId: null };
 
   const exact = await prisma.agentKnowledge.findMany({
     where: { agentId, domain, taskType, ...accountFilter },

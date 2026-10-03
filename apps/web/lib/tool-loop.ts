@@ -13,9 +13,10 @@
  */
 
 import { executeTool } from '@/lib/tool-registry';
-import { wrapUntrustedContent, stripFakeUntrustedTags, scanForInjectionPatterns } from '@/lib/content-isolation';
+import { wrapUntrustedContent, stripFakeUntrustedTags, scanForInjectionPatterns, filterToolResult } from '@/lib/content-isolation';
+import { prisma } from '@/lib/db';
 
-const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search']);
+const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search', 'document_search']);
 const isExternal = (name: string) => EXTERNAL_TOOLS.has(name) || name.startsWith('openclaw__');
 
 export interface ToolDefinition {
@@ -133,15 +134,41 @@ async function runAnthropicToolLoop(
             // Wrap external tool results to prevent prompt injection
             let toolContent: string;
             if (isExternal(block.name) && result.success) {
-              const rawStr = JSON.stringify(result.data);
-              const safe = stripFakeUntrustedTags(rawStr);
-              const injection = scanForInjectionPatterns(safe);
-              if (injection.suspicious) {
-                console.warn(`[tool-loop] injection patterns in ${block.name} result: ${injection.patterns.join(', ')}`);
+              // Correct order: strip fake tags → normalize/filter → scan normalized result → wrap
+              const stripped = stripFakeUntrustedTags(JSON.stringify(result.data));
+              const filtered = filterToolResult(stripped);
+              const scan = scanForInjectionPatterns(filtered);
+              let contentForModel: string;
+              if (scan.suspicious) {
+                void prisma.action.create({
+                  data: {
+                    userId: opts.userId,
+                    initiator: 'system',
+                    action: 'tool_result_injection_withheld',
+                    tool: block.name,
+                    permissionClass: 'A',
+                    status: 'FAILED',
+                    inputSummary: block.name,
+                    outputSummary: scan.patterns.join(', '),
+                    correlationId: opts.correlationId ?? 'unknown',
+                    latencyMs: 0,
+                  },
+                }).catch((e: unknown) => console.error('ledger write failed', { error: (e as Error)?.message }));
+                contentForModel = `[content withheld: injection patterns detected in tool "${block.name}"]`;
+              } else {
+                contentForModel = filtered;
               }
-              toolContent = wrapUntrustedContent(safe, block.name, result.source ?? block.name);
+              toolContent = wrapUntrustedContent(contentForModel, block.name, result.source ?? block.name);
+            } else if (!result.success) {
+              const rawErrorContent = `[Tool error: ${result.error ?? 'unknown'}]`;
+              const errorContent = isExternal(block.name)
+                ? filterToolResult(stripFakeUntrustedTags(rawErrorContent))
+                : rawErrorContent;
+              toolContent = isExternal(block.name)
+                ? wrapUntrustedContent(errorContent, block.name, block.name)
+                : errorContent;
             } else {
-              toolContent = JSON.stringify(result.success ? result.data : { error: result.error });
+              toolContent = JSON.stringify(result.data);
             }
 
             toolResults.push({
@@ -294,6 +321,19 @@ export const STANDARD_TOOLS: ToolDefinition[] = [
         allDay: { type: 'boolean' },
       },
       required: ['title', 'startAt'],
+    },
+  },
+  {
+    name: 'document_search',
+    description: "Search Victor's document library for relevant information, research, or reference material.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'What to search for' },
+        workspace: { type: 'string', description: 'Optional workspace slug to scope the search' },
+        limit: { type: 'number', description: 'Max results (default 5)' },
+      },
+      required: ['query'],
     },
   },
   {

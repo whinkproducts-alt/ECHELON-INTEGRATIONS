@@ -86,9 +86,9 @@ async function main() {
     },
     {
       category: 'persona_switching',
-      title: 'MAMBA White and Grey modes',
-      input: 'User types "Mamba, grey mode"',
-      expectedBehavior: 'Persona state: MAMBA + GREY mode. Response style shifts to grey analysis.',
+      title: 'MAMBA Obsidian mode',
+      input: 'User types "Mamba, obsidian mode"',
+      expectedBehavior: 'Persona state: MAMBA + OBSIDIAN mode. Response maps full adversarial attack surface with countermoves.',
     },
     {
       category: 'permission_enforcement',

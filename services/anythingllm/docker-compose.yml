@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  anythingllm:
+    # Pin to a specific version. Update intentionally when upgrading.
+    image: mintplexlabs/anythingllm:1.7.4
+    container_name: whink-anythingllm
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - ./storage:/app/server/storage
+    environment:
+      - STORAGE_DIR=/app/server/storage
+      - JWT_SECRET=${ANYTHINGLLM_JWT_SECRET:?Set ANYTHINGLLM_JWT_SECRET in services/anythingllm/.env}
+      # AUTH_TOKEN (UI password) is intentionally not set here.
+      # The API key for programmatic access is generated inside AnythingLLM UI
+      # under Settings > API Keys and stored in apps/web/.env as ANYTHINGLLM_API_KEY.
+    restart: unless-stopped
