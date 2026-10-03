@@ -10,11 +10,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const ttsUrl = process.env.TTS_URL?.trim();
-  if (!ttsUrl) {
-    return NextResponse.json({ fallback: 'browser' }, { status: 501 });
-  }
-
   let body: { text?: unknown; voice?: unknown };
   try {
     body = await req.json();
@@ -34,6 +29,57 @@ export async function POST(req: NextRequest) {
     typeof body.voice === 'string' && body.voice.trim()
       ? body.voice.trim()
       : (process.env.TTS_VOICE?.trim() ?? 'alloy');
+
+  const provider = (process.env.TTS_PROVIDER ?? '').toLowerCase().trim();
+
+  // ── OpenAI TTS direct ─────────────────────────────────────────────────────
+  if (provider === 'openai') {
+    const apiKey = process.env.OPENAI_API_KEY?.trim() ?? process.env.OPENAI_COMPATIBLE_API_KEY?.trim();
+    if (!apiKey) {
+      return NextResponse.json({ error: 'OPENAI_API_KEY not set' }, { status: 500 });
+    }
+
+    const ttsModel = process.env.TTS_MODEL ?? 'tts-1';
+
+    let oaiRes: Response;
+    try {
+      oaiRes = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model: ttsModel, input: text, voice }),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'OpenAI TTS unreachable';
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
+
+    if (!oaiRes.ok) {
+      const detail = await oaiRes.text().catch(() => '');
+      return NextResponse.json(
+        { error: `OpenAI TTS error ${oaiRes.status}`, detail },
+        { status: 502 },
+      );
+    }
+
+    const audioBuffer = await oaiRes.arrayBuffer();
+    return new NextResponse(audioBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': String(audioBuffer.byteLength),
+      },
+    });
+  }
+
+  // ── Generic Whisper-compatible TTS (Kokoro, ADA V2, local) ───────────────
+  const ttsUrl = process.env.TTS_URL?.trim();
+  if (!ttsUrl) {
+    // No provider configured — tell client to fall back to browser synthesis
+    return NextResponse.json({ fallback: 'browser' }, { status: 501 });
+  }
 
   let upstreamRes: Response;
   try {
@@ -55,7 +101,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Stream the audio blob back to the client
   const audioBuffer = await upstreamRes.arrayBuffer();
   return new NextResponse(audioBuffer, {
     status: 200,

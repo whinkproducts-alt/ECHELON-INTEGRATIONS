@@ -6,6 +6,7 @@ import {
   FolderKanban, Mic, MicOff, Volume2, VolumeX, Cpu
 } from 'lucide-react';
 import { useVoice } from '@/lib/hooks/useVoice';
+import { speakApprovalRequest } from '@/lib/spoken-approval';
 import { AvatarRenderer } from './avatar-renderer';
 import { ObsidianOverlay } from './obsidian-overlay';
 import { NeuralLink, NeuralEvent } from '@/app/dashboard/_components/neural-link';
@@ -73,7 +74,18 @@ export function ConversationSurface() {
   const [traceEntries, setTraceEntries] = useState<TraceEntry[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const pendingAutoSendRef = useRef(false);
   const { startListening, stopListening, speak, isListening, isSpeaking, supported } = useVoice();
+
+  const sendMessageRef = useRef<(() => void) | null>(null);
+
+  // Auto-send after EAR spoken decision
+  useEffect(() => {
+    if (pendingAutoSendRef.current && input && !streaming) {
+      pendingAutoSendRef.current = false;
+      sendMessageRef.current?.();
+    }
+  }, [input, streaming]);
 
   const pushNeuralEvent = useCallback((type: NeuralEvent['type'], text: string) => {
     setNeuralEvents(prev => [
@@ -225,6 +237,14 @@ export function ConversationSurface() {
               } else if (data.type === 'done') {
                 persona = (data.persona as 'WHINK' | 'MAMBA') ?? persona;
                 mambaMode = data.mambaMode ?? mambaMode;
+                if (data.earIntercepted && data.ear) {
+                  // Speak the EAR and auto-send the spoken decision
+                  const decision = await speakApprovalRequest(data.ear);
+                  if (decision !== 'timeout') {
+                    pendingAutoSendRef.current = true;
+                    setInput(decision === 'approved' ? 'Approved' : 'Denied');
+                  }
+                }
               }
             } catch {}
           }
@@ -259,6 +279,7 @@ export function ConversationSurface() {
       setStreaming(false);
     }
   }, [input, streaming, activeConvId, selectedProject, voiceMode, speak, pushNeuralEvent]);
+  sendMessageRef.current = sendMessage;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

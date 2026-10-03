@@ -11,10 +11,9 @@ const DENY_WORDS = ['denied', 'deny', 'no', 'stop', 'cancel', 'reject'];
 const TIMEOUT_MS = 30_000;
 
 /**
- * Speaks the EAR (Explicit Approval Request) summary and listens for a spoken decision.
+ * Speaks the EAR summary via server TTS (falls back to browser synthesis),
+ * then listens for a spoken decision via server STT (falls back to Web Speech).
  * Returns 'approved', 'denied', or 'timeout'.
- *
- * Must run in the browser. Import dynamically in server components.
  */
 export async function speakApprovalRequest(
   ear: ApprovalRequest,
@@ -25,21 +24,38 @@ export async function speakApprovalRequest(
     `Summary: ${ear.summary}. ` +
     `Say "approved" to allow or "denied" to reject.`;
 
-  // Speak the summary
-  await speakBrowser(text);
-
-  // Listen for the decision
+  await speakServer(text);
   return listenForDecision();
 }
 
-function speakBrowser(text: string): Promise<void> {
-  return new Promise((resolve) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
-      resolve();
+async function speakServer(text: string): Promise<void> {
+  try {
+    const res = await fetch('/api/voice/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      await new Promise<void>((resolve) => {
+        audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+        audio.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+        audio.play().catch(() => resolve());
+      });
       return;
     }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
+    // 501 = no TTS provider, fall through to browser
+    if (res.status !== 501) throw new Error(`TTS ${res.status}`);
+  } catch { /* fall through */ }
+
+  // Browser synthesis fallback
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  await new Promise<void>((resolve) => {
     utterance.onend = () => resolve();
     utterance.onerror = () => resolve();
     window.speechSynthesis.speak(utterance);
@@ -48,19 +64,19 @@ function speakBrowser(text: string): Promise<void> {
 
 function listenForDecision(): Promise<'approved' | 'denied' | 'timeout'> {
   return new Promise((resolve) => {
-    if (typeof window === 'undefined') {
-      resolve('timeout');
-      return;
-    }
+    if (typeof window === 'undefined') { resolve('timeout'); return; }
 
     const SpeechRecognitionCtor =
       (window as Window & typeof globalThis & { webkitSpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition ??
       (window as Window & typeof globalThis & { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
 
-    if (!SpeechRecognitionCtor) {
-      resolve('timeout');
+    // Server STT path (MediaRecorder)
+    if (!SpeechRecognitionCtor && typeof MediaRecorder !== 'undefined') {
+      listenServerStt(TIMEOUT_MS).then(resolve);
       return;
     }
+
+    if (!SpeechRecognitionCtor) { resolve('timeout'); return; }
 
     const recognition = new SpeechRecognitionCtor() as SpeechRecognition;
     recognition.continuous = false;
@@ -83,23 +99,53 @@ function listenForDecision(): Promise<'approved' | 'denied' | 'timeout'> {
       for (let i = 0; i < event.results.length; i++) {
         for (let j = 0; j < event.results[i].length; j++) {
           const heard = event.results[i][j].transcript.toLowerCase().trim();
-          if (APPROVE_WORDS.some((w) => heard.includes(w))) {
-            finish('approved');
-            return;
-          }
-          if (DENY_WORDS.some((w) => heard.includes(w))) {
-            finish('denied');
-            return;
-          }
+          if (APPROVE_WORDS.some((w) => heard.includes(w))) { finish('approved'); return; }
+          if (DENY_WORDS.some((w) => heard.includes(w))) { finish('denied'); return; }
         }
       }
     };
 
     recognition.onerror = () => finish('timeout');
-    recognition.onend = () => {
-      if (!resolved) finish('timeout');
-    };
-
+    recognition.onend = () => { if (!resolved) finish('timeout'); };
     recognition.start();
   });
+}
+
+async function listenServerStt(timeoutMs: number): Promise<'approved' | 'denied' | 'timeout'> {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : 'audio/webm';
+    const recorder = new MediaRecorder(stream, { mimeType });
+    const chunks: Blob[] = [];
+
+    const transcript = await new Promise<string>((resolve) => {
+      const timer = setTimeout(() => {
+        if (recorder.state !== 'inactive') recorder.stop();
+      }, timeoutMs);
+
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = async () => {
+        clearTimeout(timer);
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunks, { type: mimeType });
+        try {
+          const form = new FormData();
+          form.append('audio', blob, 'audio.webm');
+          const res = await fetch('/api/voice/stt', { method: 'POST', body: form });
+          if (res.ok) { const d = await res.json(); resolve(d.text ?? ''); return; }
+        } catch { /* ignore */ }
+        resolve('');
+      };
+      recorder.start();
+    });
+
+    const heard = transcript.toLowerCase().trim();
+    if (APPROVE_WORDS.some((w) => heard.includes(w))) return 'approved';
+    if (DENY_WORDS.some((w) => heard.includes(w))) return 'denied';
+    return 'timeout';
+  } catch {
+    return 'timeout';
+  }
 }
