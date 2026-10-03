@@ -24,7 +24,7 @@ export function parseAutonomyApproval(v: unknown): AutonomyApproval | null {
   if (typeof o.expiresAt !== 'string' || typeof o.createdAt !== 'string') return null;
   const p = typeof o.params === 'object' && o.params !== null && !Array.isArray(o.params)
     ? (o.params as Record<string, unknown>) : null;
-  if (!p || !isLevel(p.from) || !isLevel(p.to)) return null;
+  if (!p || !isLevel(p.from) || !isLevel(p.to) || p.from >= p.to) return null;
   return {
     from: p.from,
     to: p.to,
@@ -50,6 +50,9 @@ export function pickPendingAutonomy(body: unknown): AutonomyApproval | null {
   let best: AutonomyApproval | null = null;
   for (const item of list) {
     const a = parseAutonomyApproval(item);
+    // Expired or unparseable expiry counts as not pending.
+    const exp = a ? new Date(a.view.expiresAt).getTime() : NaN;
+    if (a && !(exp > Date.now())) continue;
     if (a && (best === null || new Date(a.view.createdAt).getTime() >= new Date(best.view.createdAt).getTime())) best = a;
   }
   return best;
