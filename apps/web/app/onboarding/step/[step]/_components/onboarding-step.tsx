@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
+import { AutonomyApprovalPanel } from '@/app/dashboard/settings/_components/autonomy-approval-panel';
+import { interpretPatchResponse, resolveDecision, type AutonomyApproval } from '@/lib/autonomy-approval';
+import type { DecisionStatus } from '@/lib/hooks/approval-state';
 
 const TIMEZONES = [
   'UTC',
@@ -41,6 +44,17 @@ export function OnboardingStep({ step }: { step: number }) {
   // Step 2 fields
   const [autonomyLevel, setAutonomyLevel] = useState(1);
   const [classCConfirmed, setClassCConfirmed] = useState(false);
+  const [savedLevel, setSavedLevel] = useState(1);
+  const [approval, setApproval] = useState<AutonomyApproval | null>(null);
+  const [resolution, setResolution] = useState<{ tone: 'success' | 'neutral' | 'error'; message: string } | null>(null);
+  const [step2Error, setStep2Error] = useState<string | null>(null);
+
+  const onApprovalResolved = (status: DecisionStatus, detail: string | null) => {
+    const res = resolveDecision(status, savedLevel, approval?.from ?? savedLevel, approval?.to ?? savedLevel, detail);
+    setSavedLevel(res.savedLevel);
+    setAutonomyLevel(res.sliderLevel);
+    setResolution({ tone: res.tone, message: res.message });
+  };
 
   const saveStep1 = async () => {
     if (!displayName.trim()) { toast.error('Display name is required'); return; }
@@ -65,21 +79,35 @@ export function OnboardingStep({ step }: { step: number }) {
       toast.error('Please confirm full autonomy before continuing');
       return;
     }
+    // A decision (any outcome) has been made, or no change was requested: move on.
+    if (resolution || autonomyLevel === savedLevel) {
+      router.push('/onboarding/step/3');
+      return;
+    }
     setSaving(true);
+    setStep2Error(null);
     try {
       const r = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profile: { autonomyLevel } }),
       });
-      if (r.status === 409) {
-        toast.error('Raising autonomy above your current level needs approval. You can change it later in Settings.');
+      let body: unknown = null;
+      try { body = await r.json(); } catch { /* no body */ }
+      const outcome = interpretPatchResponse(r.status, body);
+      if (outcome.kind === 'error') {
+        setStep2Error(outcome.message);
         return;
       }
-      if (!r.ok) throw new Error();
+      if (outcome.kind === 'approval') {
+        setApproval(outcome.approval);
+        setAutonomyLevel(outcome.approval.to);
+        return;
+      }
+      setSavedLevel(autonomyLevel);
       router.push('/onboarding/step/3');
     } catch {
-      toast.error('Failed to save. Try again.');
+      setStep2Error('Failed to save. Try again.');
     } finally {
       setSaving(false);
     }
@@ -180,7 +208,10 @@ export function OnboardingStep({ step }: { step: number }) {
                     min={1}
                     max={4}
                     value={autonomyLevel}
+                    disabled={approval !== null && !resolution}
                     onChange={(e) => {
+                      setApproval(null);
+                      setResolution(null);
                       setAutonomyLevel(parseInt(e.target.value));
                       if (parseInt(e.target.value) !== 4) setClassCConfirmed(false);
                     }}
@@ -218,6 +249,37 @@ export function OnboardingStep({ step }: { step: number }) {
                 )}
               </div>
 
+              {autonomyLevel > savedLevel && !approval && (
+                <p className="text-xs text-[hsl(var(--pending-amber))]">
+                  Limit: raising autonomy is a Class C action. Continue will ask for your approval.
+                </p>
+              )}
+              {step2Error && (
+                <p role="alert" className="text-xs font-mono text-[hsl(var(--denial))]">Error: {step2Error}</p>
+              )}
+              {resolution && (
+                <p
+                  role={resolution.tone === 'error' ? 'alert' : 'status'}
+                  className={`text-xs font-mono ${resolution.tone === 'error' ? 'text-[hsl(var(--denial))]' : 'text-foreground'}`}
+                >
+                  {resolution.tone === 'error' ? 'Error: ' : ''}{resolution.message}
+                </p>
+              )}
+              {approval && (
+                <div className="space-y-2">
+                  <AutonomyApprovalPanel key={approval.view.id} approval={approval} onResolved={onApprovalResolved} />
+                  {!resolution && (
+                    <button
+                      type="button"
+                      onClick={() => router.push('/onboarding/step/3')}
+                      className="text-xs text-muted-foreground underline hover:text-foreground"
+                    >
+                      Continue at level {savedLevel} without deciding. You can raise it later in Settings.
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button
                   onClick={() => router.push('/onboarding/step/1')}
@@ -227,7 +289,7 @@ export function OnboardingStep({ step }: { step: number }) {
                 </button>
                 <button
                   onClick={saveStep2}
-                  disabled={saving || (autonomyLevel === 4 && !classCConfirmed)}
+                  disabled={saving || (autonomyLevel === 4 && !classCConfirmed) || (approval !== null && !resolution)}
                   className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Continue'}
