@@ -7,6 +7,7 @@ describe('executeTool registry gating', () => {
   const checkPermission = vi.fn();
   const writeMemory = vi.fn();
   const searchMemory = vi.fn();
+  const createApproval = vi.fn();
 
   beforeEach(() => {
     vi.resetModules();
@@ -14,11 +15,13 @@ describe('executeTool registry gating', () => {
     recordAction.mockReset().mockResolvedValue({ id: 'row1' });
     updateActionStatus.mockReset().mockResolvedValue(true);
     checkPermission.mockReset();
+    createApproval.mockReset().mockResolvedValue({ id: 'ap1', kind: 'tool_call' });
     writeMemory.mockReset();
     searchMemory.mockReset();
     vi.doMock('@/lib/db', () => ({ prisma: {} }));
     vi.doMock('@/lib/ledger', () => ({ recordAction, recordActionSafe, updateActionStatus }));
-    vi.doMock('@/lib/permission-engine', () => ({ checkPermission }));
+    vi.doMock('@/lib/permission-engine', () => ({ checkPermission, checkApprovedAction: vi.fn() }));
+    vi.doMock('@/lib/approvals', () => ({ createApproval }));
     vi.doMock('@/lib/memory-engine', () => ({ writeMemory, correctMemory: vi.fn(), searchMemory }));
     vi.doMock('@/lib/openclaw-client', () => ({ listOpenClawTools: vi.fn(), callOpenClawTool: vi.fn() }));
   });
@@ -64,9 +67,8 @@ describe('executeTool registry gating', () => {
     expect(checkPermission).toHaveBeenCalledTimes(1);
     expect(checkPermission.mock.calls[0][2]).toBe('C');
     expect(openclaw.callOpenClawTool).not.toHaveBeenCalled();
-    const row = recordActionSafe.mock.calls[0][0];
-    expect(row.status).toBe('AWAITING_APPROVAL');
-    expect(row.permissionClass).toBe('C');
+    expect(createApproval).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', kind: 'tool_call', tool: 'openclaw__send_thing', params: {} }));
+    expect(res.approvalRequired).toMatchObject({ id: 'ap1' });
   });
 
   it('known Class A tool is checked as A and runs when allowed', async () => {

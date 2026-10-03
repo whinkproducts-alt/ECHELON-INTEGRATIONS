@@ -7,7 +7,7 @@
  * 3. Append the (wrapped, if external) results and call the model again.
  * 4. Repeat until a text-only response (max MAX_TOOL_ITERATIONS).
  *
- * SSE events: text, tool_call, tool_result, security, done, error.
+ * SSE events: text, tool_call, tool_result, approval_required, security, done, error.
  * If the provider rejects tools (e.g. a small local model), falls back to plain streamChat.
  */
 
@@ -137,6 +137,18 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
               opts.mambaMode ?? undefined,
               opts.correlationId,
             );
+
+            if (result.approvalRequired) {
+              send({ type: 'approval_required', approval: result.approvalRequired });
+              send({ type: 'tool_result', tool: call.name, success: false, data: 'awaiting approval' });
+              history = [...history, {
+                role: 'tool',
+                toolCallId: call.id,
+                name: call.name,
+                content: `Awaiting human approval (id ${result.approvalRequired.id}). Do not retry; the user will decide.`,
+              }];
+              continue;
+            }
 
             send({
               type: 'tool_result',

@@ -7,7 +7,8 @@ import { runToolLoop, STANDARD_TOOLS } from '@/lib/tool-loop';
 import { logger, generateCorrelationId } from '@/lib/logger';
 import { runTaskGate } from '@/lib/task-gate';
 import { scanForInjectionPatterns } from '@/lib/content-isolation';
-import { handleApproval } from '@/lib/approval-handler';
+import { isApprovalMessage, BARE_APPROVAL_REPLY } from '@/lib/approval-handler';
+import { createApproval } from '@/lib/approvals';
 import { writeMemory } from '@/lib/memory-engine';
 import { chatOnce } from '@/lib/model-router';
 import { decryptKey } from '@/lib/key-encryption';
@@ -144,39 +145,23 @@ export async function POST(
     }
 
     // ── Approval Handler ─────────────────────────────────────────────────────
-    // Catches "Approved" / "Go ahead" replies and dispatches the pending EAR.
-    const approvalOutcome = await handleApproval(session.user.id, userMessage, orchResult.newPersona ?? 'WHINK');
-    if (approvalOutcome.dispatched) {
-      const dispatchContent = approvalOutcome.dispatchMessage;
-
+    // A chat message never approves anything. Bare approval phrases get a pointer to the
+    // approval card; approvals are decided by id through /api/approvals/[id]/decision.
+    if (isApprovalMessage(userMessage)) {
+      const approvalPersona = orchResult.newPersona ?? 'WHINK';
       await prisma.message.create({
-        data: {
-          conversationId,
-          role: 'assistant',
-          content: dispatchContent,
-          persona: orchResult.newPersona ?? 'WHINK',
-        },
+        data: { conversationId, role: 'assistant', content: BARE_APPROVAL_REPLY, persona: approvalPersona },
       });
-
       const approvalEncoder = new TextEncoder();
       const approvalStream = new ReadableStream({
         start(ctrl) {
-          ctrl.enqueue(approvalEncoder.encode(`data: ${JSON.stringify({ type: 'text', content: dispatchContent, persona: orchResult.newPersona ?? 'WHINK', agentDispatched: true })}
-
-`));
-          ctrl.enqueue(approvalEncoder.encode(`data: ${JSON.stringify({ type: 'done', persona: orchResult.newPersona ?? 'WHINK' })}
-
-`));
+          ctrl.enqueue(approvalEncoder.encode(`data: ${JSON.stringify({ type: 'text', content: BARE_APPROVAL_REPLY, persona: approvalPersona })}\n\n`));
+          ctrl.enqueue(approvalEncoder.encode(`data: ${JSON.stringify({ type: 'done', persona: approvalPersona })}\n\n`));
           ctrl.close();
         },
       });
-
       return new Response(approvalStream, {
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-        },
+        headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' },
       });
     }
     // ── End Approval Handler ──────────────────────────────────────────────────
@@ -214,6 +199,22 @@ export async function POST(
         correlationId,
       });
 
+      // Store the EAR as an approval request (decided by id, 30 s expiry)
+      let earApproval: Awaited<ReturnType<typeof createApproval>> | null = null;
+      try {
+        earApproval = await createApproval({
+          userId: session.user.id,
+          kind: 'ear',
+          params: gateOutcome.ear,
+          persona: orchResult.newPersona ?? 'WHINK',
+          correlationId,
+          conversationId,
+          permissionClass: 'C',
+        });
+      } catch (e) {
+        logger.error('EAR approval creation failed', { correlationId, error: (e as Error)?.message });
+      }
+
       // Stream the EAR back
       const earEncoder = new TextEncoder();
       const earStream = new ReadableStream({
@@ -221,6 +222,11 @@ export async function POST(
           ctrl.enqueue(earEncoder.encode(`data: ${JSON.stringify({ type: 'text', content: earContent, persona: orchResult.newPersona ?? 'WHINK', earIntercepted: true })}
 
 `));
+          if (earApproval) {
+            ctrl.enqueue(earEncoder.encode(`data: ${JSON.stringify({ type: 'approval_required', approval: earApproval })}
+
+`));
+          }
           ctrl.enqueue(earEncoder.encode(`data: ${JSON.stringify({ type: 'done', persona: orchResult.newPersona ?? 'WHINK' })}
 
 `));
@@ -320,6 +326,8 @@ export async function POST(
                   if (parsed.tool === 'memory_write') memoryWriteCalledInLoop = true;
                   toolRanThisTurn = true;
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'tool_result', tool: parsed.tool, success: parsed.success, persona: activePersona })}\n\n`));
+                } else if (parsed.type === 'approval_required' && parsed.approval) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'approval_required', approval: parsed.approval })}\n\n`));
                 } else if (parsed.type === 'security') {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'security', event: parsed.event, tool: parsed.tool, patterns: parsed.patterns })}\n\n`));
                 } else if (parsed.type === 'error') {

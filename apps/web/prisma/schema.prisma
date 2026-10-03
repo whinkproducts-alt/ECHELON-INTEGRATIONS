@@ -1,11 +1,11 @@
 generator client {
-    provider = "prisma-client-js"
-    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ── Auth.js tables ──────────────────────────────────────────────
@@ -21,21 +21,22 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  profile       UserProfile?
-  preferences   UserPreference?
-  apiKeys       UserApiKey[]
-  conversations Conversation[]
-  projects      ProjectMember[]
-  ownedProjects Project[]
-  personaState  PersonaState?
-  actions       Action[]
-  permissions   Permission[]
-  delegations   Delegation[]
-  evaluationRuns  EvaluationRun[]
-  calendarEvents  CalendarEvent[]
-  notes           Note[]
+  accounts         Account[]
+  sessions         Session[]
+  profile          UserProfile?
+  preferences      UserPreference?
+  apiKeys          UserApiKey[]
+  conversations    Conversation[]
+  projects         ProjectMember[]
+  ownedProjects    Project[]
+  personaState     PersonaState?
+  actions          Action[]
+  permissions      Permission[]
+  delegations      Delegation[]
+  evaluationRuns   EvaluationRun[]
+  calendarEvents   CalendarEvent[]
+  notes            Note[]
+  approvalRequests ApprovalRequest[]
 
   @@map("users")
 }
@@ -80,16 +81,16 @@ model VerificationToken {
 // ── User Profile & Preferences ──────────────────────────────────
 
 model UserProfile {
-  id                  String   @id @default(cuid())
-  userId              String   @unique
-  displayName         String?
-  timezone            String   @default("UTC")
-  workingHoursStart   String   @default("09:00")
-  workingHoursEnd     String   @default("17:00")
-  interruptionBudget  String   @default("BALANCED")
-  autonomyLevel       Int      @default(1)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  displayName        String?
+  timezone           String   @default("UTC")
+  workingHoursStart  String   @default("09:00")
+  workingHoursEnd    String   @default("17:00")
+  interruptionBudget String   @default("BALANCED")
+  autonomyLevel      Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -97,15 +98,15 @@ model UserProfile {
 }
 
 model UserPreference {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  verbosity        String   @default("STANDARD")
-  mambaPreference  String   @default("ON_REQUEST")
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  verbosity             String   @default("STANDARD")
+  mambaPreference       String   @default("ON_REQUEST")
   defaultFunctionalMode String?
-  executionProfile String   @default("BALANCED")
-  preferredModel   String?  // e.g. "claude-sonnet-4-5", "gpt-4o", "llama3.1:8b"
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  executionProfile      String   @default("BALANCED")
+  preferredModel        String? // e.g. "claude-sonnet-4-5", "gpt-4o", "llama3.1:8b"
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -115,9 +116,9 @@ model UserPreference {
 model UserApiKey {
   id           String   @id @default(cuid())
   userId       String
-  provider     String   // "anthropic" | "openai"
-  encryptedKey String   // AES-256-GCM encrypted, hex-encoded
-  keyHint      String   // last 4 chars of the plaintext key
+  provider     String // "anthropic" | "openai"
+  encryptedKey String // AES-256-GCM encrypted, hex-encoded
+  keyHint      String // last 4 chars of the plaintext key
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -134,7 +135,7 @@ model PersonaState {
   id               String   @id @default(cuid())
   userId           String   @unique
   activePersona    String   @default("WHINK")
-  mambaMode        String?  // OBSIDIAN | null
+  mambaMode        String? // OBSIDIAN | null
   functionalMode   String?
   activationSource String   @default("system")
   activatedAt      DateTime @default(now())
@@ -148,13 +149,13 @@ model PersonaState {
 // ── Conversations & Messages ────────────────────────────────────
 
 model Conversation {
-  id          String    @id @default(cuid())
-  userId      String
-  title       String    @default("New Conversation")
-  projectId   String?
-  isArchived  Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id         String   @id @default(cuid())
+  userId     String
+  title      String   @default("New Conversation")
+  projectId  String?
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   project  Project?  @relation(fields: [projectId], references: [id])
@@ -165,16 +166,16 @@ model Conversation {
 }
 
 model Message {
-  id              String   @id @default(cuid())
-  conversationId  String
-  role            String   // user | assistant | system
-  content         String
-  persona         String?  // WHINK | MAMBA
-  mambaMode       String?  // OBSIDIAN | null
-  functionalMode  String?
-  toolCalls       String?  // JSON string of tool calls
-  metadata        String?  // JSON string
-  createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String // user | assistant | system
+  content        String
+  persona        String? // WHINK | MAMBA
+  mambaMode      String? // OBSIDIAN | null
+  functionalMode String?
+  toolCalls      String? // JSON string of tool calls
+  metadata       String? // JSON string
+  createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
@@ -194,18 +195,18 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner         User              @relation(fields: [ownerId], references: [id])
-  members       ProjectMember[]
-  tasks         ProjectTask[]
-  milestones    ProjectMilestone[]
-  decisions     ProjectDecision[]
-  risks         ProjectRisk[]
-  openQuestions ProjectOpenQuestion[]
-  conversations Conversation[]
+  owner          User                  @relation(fields: [ownerId], references: [id])
+  members        ProjectMember[]
+  tasks          ProjectTask[]
+  milestones     ProjectMilestone[]
+  decisions      ProjectDecision[]
+  risks          ProjectRisk[]
+  openQuestions  ProjectOpenQuestion[]
+  conversations  Conversation[]
   memoryEpisodes MemoryEpisode[]
   memorySemantic MemorySemantic[]
-  entityEdges   EntityEdge[]
-  hypotheses    Hypothesis[]
+  entityEdges    EntityEdge[]
+  hypotheses     Hypothesis[]
 
   @@index([ownerId])
   @@map("projects")
@@ -234,8 +235,8 @@ model ProjectTask {
   priority     String    @default("MEDIUM")
   assignee     String?
   dueDate      DateTime?
-  dependencies String?   // JSON array of task IDs
-  source       String?   // how the task was created
+  dependencies String? // JSON array of task IDs
+  source       String? // how the task was created
   notes        String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -293,15 +294,15 @@ model ProjectRisk {
 }
 
 model ProjectOpenQuestion {
-  id          String    @id @default(cuid())
-  projectId   String
-  question    String
-  context     String?
-  assignedTo  String?
-  status      String    @default("OPEN")
-  answer      String?
-  answeredAt  DateTime?
-  createdAt   DateTime  @default(now())
+  id         String    @id @default(cuid())
+  projectId  String
+  question   String
+  context    String?
+  assignedTo String?
+  status     String    @default("OPEN")
+  answer     String?
+  answeredAt DateTime?
+  createdAt  DateTime  @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -311,19 +312,19 @@ model ProjectOpenQuestion {
 // ── Memory Engine ───────────────────────────────────────────────
 
 model MemoryEpisode {
-  id            String   @id @default(cuid())
-  userId        String
-  projectId     String?
-  eventType     String   // decision_made, meeting_completed, correction, mamba_insight, etc.
-  entities      String?  // JSON array of entity references
-  summary       String
-  source        String   // conversation, tool, integration
-  confidence    Float    @default(0.8)
-  importance    Float    @default(0.5)
-  privacyClass  String   @default("PERSONAL")
-  supersededBy  String?  // ID of newer episode
-  embedding     Unsupported("vector(1536)")?
-  createdAt     DateTime @default(now())
+  id           String                       @id @default(cuid())
+  userId       String
+  projectId    String?
+  eventType    String // decision_made, meeting_completed, correction, mamba_insight, etc.
+  entities     String? // JSON array of entity references
+  summary      String
+  source       String // conversation, tool, integration
+  confidence   Float                        @default(0.8)
+  importance   Float                        @default(0.5)
+  privacyClass String                       @default("PERSONAL")
+  supersededBy String? // ID of newer episode
+  embedding    Unsupported("vector(1536)")?
+  createdAt    DateTime                     @default(now())
 
   project Project? @relation(fields: [projectId], references: [id])
 
@@ -333,22 +334,22 @@ model MemoryEpisode {
 }
 
 model MemorySemantic {
-  id              String   @id @default(cuid())
+  id              String                       @id @default(cuid())
   userId          String
   projectId       String?
   statement       String
-  sourceType      String   // user, conversation, integration, mamba
-  sourceId        String?  // reference to source conversation/message
-  confidence      Float    @default(0.8)
-  epistemicStatus String   // KNOWN, INFERRED, HYPOTHESIS, UNVERIFIED
-  supersededBy    String?  // ID of newer semantic memory
+  sourceType      String // user, conversation, integration, mamba
+  sourceId        String? // reference to source conversation/message
+  confidence      Float                        @default(0.8)
+  epistemicStatus String // KNOWN, INFERRED, HYPOTHESIS, UNVERIFIED
+  supersededBy    String? // ID of newer semantic memory
   retrievedAt     DateTime?
-  scope           String?  @default("general")
-  validFrom       DateTime @default(now())
+  scope           String?                      @default("general")
+  validFrom       DateTime                     @default(now())
   supersededAt    DateTime?
   embedding       Unsupported("vector(1536)")?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
 
   project Project? @relation(fields: [projectId], references: [id])
 
@@ -360,9 +361,9 @@ model MemorySemantic {
 model MemoryProcedural {
   id          String   @id @default(cuid())
   userId      String
-  category    String   // email_tone, report_structure, model_preference, etc.
+  category    String // email_tone, report_structure, model_preference, etc.
   description String
-  details     String?  // JSON string of procedural details
+  details     String? // JSON string of procedural details
   confidence  Float    @default(0.9)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -378,10 +379,10 @@ model Hypothesis {
   userId          String
   projectId       String?
   statement       String
-  epistemicStatus String   // MUST be 'hypothesis' — enforced by DB CHECK
+  epistemicStatus String // MUST be 'hypothesis' — enforced by DB CHECK
   confidence      Float    @default(0.3) // MAX 0.4 — enforced by DB CHECK
   source          String   @default("MAMBA")
-  mambaMode       String?  // OBSIDIAN | null
+  mambaMode       String? // OBSIDIAN | null
   rationale       String?
   supersededBy    String?
   createdAt       DateTime @default(now())
@@ -396,19 +397,19 @@ model Hypothesis {
 // ── Entity / Knowledge Graph ────────────────────────────────────
 
 model EntityNode {
-  id             String   @id @default(cuid())
-  userId         String
-  type           String   // PERSON, ORGANIZATION, PROJECT, DOCUMENT, LOCATION, EVENT
-  canonicalName  String
-  confidence     Float    @default(0.8)
-  metadata       String?  // JSON for additional properties
-  mergedInto     String?  // ID of entity this was merged into
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String
+  type          String // PERSON, ORGANIZATION, PROJECT, DOCUMENT, LOCATION, EVENT
+  canonicalName String
+  confidence    Float    @default(0.8)
+  metadata      String? // JSON for additional properties
+  mergedInto    String? // ID of entity this was merged into
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  aliases    EntityAlias[]
-  edgesFrom  EntityEdge[]  @relation("EdgeFrom")
-  edgesTo    EntityEdge[]  @relation("EdgeTo")
+  aliases   EntityAlias[]
+  edgesFrom EntityEdge[]  @relation("EdgeFrom")
+  edgesTo   EntityEdge[]  @relation("EdgeTo")
 
   @@index([userId, type])
   @@map("entity_nodes")
@@ -452,11 +453,11 @@ model Tool {
   id                  String   @id @default(cuid())
   name                String   @unique
   description         String
-  capabilities        String   // JSON array
-  inputSchema         String?  // JSON schema
-  outputSchema        String?  // JSON schema
+  capabilities        String // JSON array
+  inputSchema         String? // JSON schema
+  outputSchema        String? // JSON schema
   riskClass           String   @default("A") // A, B, C
-  requiredPermissions String?  // JSON array
+  requiredPermissions String? // JSON array
   isActive            Boolean  @default(true)
   version             String   @default("1.0.0")
   createdAt           DateTime @default(now())
@@ -467,14 +468,14 @@ model Tool {
 // ── Execution Plans ─────────────────────────────────────────────
 
 model ExecutionPlan {
-  id          String   @id @default(cuid())
-  userId      String
-  objective   String
-  persona     String   @default("WHINK")
-  riskLevel   String   @default("LOW")
-  status      String   @default("PENDING") // PENDING, RUNNING, COMPLETE, FAILED, CANCELLED
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String
+  objective String
+  persona   String   @default("WHINK")
+  riskLevel String   @default("LOW")
+  status    String   @default("PENDING") // PENDING, RUNNING, COMPLETE, FAILED, CANCELLED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   steps PlanStep[]
 
@@ -483,19 +484,19 @@ model ExecutionPlan {
 }
 
 model PlanStep {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   planId           String
   stepOrder        Int
   capability       String
   description      String?
-  dependencies     String?  // JSON array of step IDs
-  status           String   @default("PENDING")
-  approvalRequired Boolean  @default(false)
-  result           String?  // JSON
+  dependencies     String? // JSON array of step IDs
+  status           String    @default("PENDING")
+  approvalRequired Boolean   @default(false)
+  result           String? // JSON
   error            String?
   startedAt        DateTime?
   completedAt      DateTime?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime  @default(now())
 
   plan ExecutionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
@@ -508,17 +509,17 @@ model PlanStep {
 model Action {
   id                 String   @id @default(cuid())
   userId             String
-  initiator          String   // user | system | automation
-  persona            String?  // WHINK | MAMBA
-  mambaMode          String?  // OBSIDIAN | null
+  initiator          String // user | system | automation
+  persona            String? // WHINK | MAMBA
+  mambaMode          String? // OBSIDIAN | null
   planId             String?
   tool               String?
   action             String
   permissionClass    String   @default("A")
-  confirmationMethod String?  // auto | user_confirmed | delegated
+  confirmationMethod String? // auto | user_confirmed | delegated
   inputSummary       String?
   outputSummary      String?
-  validationResult   String?  // JSON
+  validationResult   String? // JSON
   status             String   @default("SUBMITTED") // SUBMITTED, VALIDATED, FAILED, UNVERIFIED, AWAITING_APPROVAL, DENIED
   outcome            String?
   postmortem         String?
@@ -553,7 +554,7 @@ model Delegation {
   id         String    @id @default(cuid())
   userId     String
   capability String
-  conditions String?   // JSON conditions
+  conditions String? // JSON conditions
   permission String    @default("automatic")
   expiresAt  DateTime?
   isActive   Boolean   @default(true)
@@ -569,7 +570,7 @@ model Delegation {
 
 model TenantConfig {
   id          String   @id @default(cuid())
-  tenantId    String   @unique  // matches userId for single-tenant; org ID for multi
+  tenantId    String   @unique // matches userId for single-tenant; org ID for multi
   productName String   @default("WHINK")
   logoUrl     String?
   accentColor String   @default("#38B6FF")
@@ -585,13 +586,13 @@ model TenantConfig {
 // ── Evaluation Harness ──────────────────────────────────────────
 
 model EvaluationScenario {
-  id               String   @id @default(cuid())
-  category         String   // memory_accuracy, persona_switching, permission_enforcement, context_retrieval
-  title            String
-  input            String
-  expectedBehavior String
+  id                 String   @id @default(cuid())
+  category           String // memory_accuracy, persona_switching, permission_enforcement, context_retrieval
+  title              String
+  input              String
+  expectedBehavior   String
   acceptanceCriteria String?
-  createdAt        DateTime @default(now())
+  createdAt          DateTime @default(now())
 
   runs EvaluationRun[]
 
@@ -599,13 +600,13 @@ model EvaluationScenario {
 }
 
 model EvaluationRun {
-  id          String   @id @default(cuid())
-  scenarioId  String
-  userId      String
-  result      String   // PASS, FAIL, PARTIAL
-  score       Float?
-  details     String?  // JSON
-  executedAt  DateTime @default(now())
+  id         String   @id @default(cuid())
+  scenarioId String
+  userId     String
+  result     String // PASS, FAIL, PARTIAL
+  score      Float?
+  details    String? // JSON
+  executedAt DateTime @default(now())
 
   scenario EvaluationScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
   user     User               @relation(fields: [userId], references: [id])
@@ -623,7 +624,7 @@ model CalendarEvent {
   endAt       DateTime
   location    String?
   allDay      Boolean  @default(false)
-  externalId  String?  // for future Google Calendar sync
+  externalId  String? // for future Google Calendar sync
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -638,7 +639,7 @@ model Note {
   userId    String
   title     String   @default("Untitled")
   content   String
-  tags      String?  // JSON array
+  tags      String? // JSON array
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -701,12 +702,12 @@ model DocumentWorkspace {
 
 model AgentKnowledge {
   id        String   @id @default(cuid())
-  agentId   String   // e.g. "backend-engineer", "frontend-engineer"
-  domain    String   // e.g. "tool-loop", "prisma", "auth", "ui"
-  taskType  String   // e.g. "migration", "api-route", "component", "debug"
-  lesson    String   // The actual lesson — what worked, what failed, why
-  outcome   String   // "success" | "failure" | "partial"
-  tags      String?  // JSON array of keyword tags for retrieval
+  agentId   String // e.g. "backend-engineer", "frontend-engineer"
+  domain    String // e.g. "tool-loop", "prisma", "auth", "ui"
+  taskType  String // e.g. "migration", "api-route", "component", "debug"
+  lesson    String // The actual lesson — what worked, what failed, why
+  outcome   String // "success" | "failure" | "partial"
+  tags      String? // JSON array of keyword tags for retrieval
   accountId String?  @map("account_id") // M1: tenant isolation. null = global/curated lesson
   createdAt DateTime @default(now())
 
@@ -715,4 +716,32 @@ model AgentKnowledge {
   @@index([taskType])
   @@index([accountId])
   @@map("agent_knowledge")
+}
+
+// ── Approvals ───────────────────────────────────────────────────
+// A pending Class C tool call or EAR. Decided by id only; 30 s expiry; executed exactly once.
+
+model ApprovalRequest {
+  id              String    @id @default(cuid())
+  userId          String
+  kind            String // tool_call | ear
+  tool            String?
+  params          Json?
+  contentHash     String // sha256 hex of canonical {kind, tool, params}
+  summary         String
+  permissionClass String
+  status          String    @default("PENDING") // PENDING, APPROVED, EXECUTING, EXECUTED, DENIED, EXPIRED, FAILED
+  correlationId   String
+  conversationId  String?
+  persona         String    @default("WHINK")
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime
+  decidedAt       DateTime?
+  executedAt      DateTime?
+  result          Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, expiresAt])
+  @@map("approval_requests")
 }

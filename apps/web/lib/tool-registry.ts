@@ -1,7 +1,9 @@
 import { prisma } from '@/lib/db';
 import { generateCorrelationId, logger } from '@/lib/logger';
 import { recordAction, recordActionSafe, updateActionStatus } from '@/lib/ledger';
-import { checkPermission, type PermissionClass } from '@/lib/permission-engine';
+import { checkPermission, checkApprovedAction, type PermissionClass } from '@/lib/permission-engine';
+import { createApproval, type ApprovalView } from '@/lib/approvals';
+import { stripFakeUntrustedTags, scanForInjectionPatterns, filterToolResult } from '@/lib/content-isolation';
 import { writeMemory, correctMemory, searchMemory } from '@/lib/memory-engine';
 import { listOpenClawTools, callOpenClawTool } from '@/lib/openclaw-client';
 import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
@@ -86,6 +88,8 @@ export interface ToolExecutionResult {
   data?: any;
   error?: string;
   source?: string;
+  /** Set when a Class C call was queued as an approval request instead of running. */
+  approvalRequired?: ApprovalView;
   timestamp: string;
   toolVersion: string;
 }
@@ -494,16 +498,38 @@ export async function executeTool(
   const permCheck = await checkPermission(userId, toolName, riskClass, cid);
 
   if (!permCheck.allowed) {
-    // Log to action ledger — Class C gets AWAITING_APPROVAL, others get FAILED
+    // Class C: queue a full-fidelity approval request (the ledger row is written by createApproval).
+    if (riskClass === 'C') {
+      try {
+        const approval = await createApproval({
+          userId,
+          kind: 'tool_call',
+          tool: toolName,
+          params,
+          persona,
+          correlationId: cid,
+        });
+        return {
+          success: false,
+          error: 'Awaiting human approval',
+          approvalRequired: approval,
+          timestamp: new Date().toISOString(),
+          toolVersion: '1.0.0',
+        };
+      } catch (e) {
+        logger.error('approval creation failed; tool not run', { userId, tool: toolName, error: (e as Error)?.message });
+        return { success: false, error: 'Could not queue approval; tool not run', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+      }
+    }
     await recordActionSafe({
       userId,
       initiator: 'system',
       persona,
       mambaMode,
       tool: toolName,
-      action: riskClass === 'C' ? 'pending_class_c_approval' : 'tool_execution_denied',
+      action: 'tool_execution_denied',
       permissionClass: riskClass,
-      status: riskClass === 'C' ? 'AWAITING_APPROVAL' : 'FAILED',
+      status: 'FAILED',
       inputSummary: safeJson(params),
       outputSummary: permCheck.reason,
       correlationId: cid,
@@ -581,5 +607,88 @@ export async function executeTool(
       latencyMs: Date.now() - startTime,
     });
     return { success: false, error: error?.message ?? 'Tool execution failed', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  }
+}
+
+const EXTERNAL_RESULT_TOOLS = new Set(['web_fetch', 'web_search', 'document_search']);
+
+/** Sanitise a tool result before it is stored or shown. External results are stripped, filtered and scanned. */
+function sanitiseApprovedResult(toolName: string, result: ToolExecutionResult): ToolExecutionResult {
+  if (!(EXTERNAL_RESULT_TOOLS.has(toolName) || toolName.startsWith('openclaw__'))) return result;
+  if (!result.success) {
+    return { ...result, error: filterToolResult(stripFakeUntrustedTags(result.error ?? 'error')) };
+  }
+  const filtered = filterToolResult(stripFakeUntrustedTags(JSON.stringify(result.data) ?? ''));
+  const scan = scanForInjectionPatterns(filtered);
+  return { ...result, data: scan.suspicious ? `[content withheld: injection patterns detected in tool "${toolName}"]` : filtered };
+}
+
+export interface ApprovedToolCall {
+  id: string;
+  tool: string;
+  /** Params as stored on the approval row. Never from a request body. */
+  params: unknown;
+  contentHash: string;
+  correlationId: string;
+  persona?: string;
+}
+
+/**
+ * Run a human-approved Class C call. The permission engine must allow it
+ * (checkApprovedAction) or nothing runs. Same write-ahead ledger row as executeTool.
+ */
+export async function executeApprovedTool(userId: string, approval: ApprovedToolCall): Promise<ToolExecutionResult> {
+  const startTime = Date.now();
+  const stamp = () => new Date().toISOString();
+  const handler = TOOL_HANDLERS[approval.tool];
+  const riskClass = TOOL_RISK_MAP[approval.tool] ?? 'C';
+  const base = {
+    userId,
+    initiator: 'user' as const,
+    persona: approval.persona,
+    tool: approval.tool,
+    permissionClass: riskClass,
+    correlationId: approval.correlationId,
+  };
+
+  if (!handler) {
+    await recordActionSafe({ ...base, action: 'tool_execution_denied', status: 'DENIED', outputSummary: 'Unknown tool', validationResult: JSON.stringify({ approvalId: approval.id }), latencyMs: 0 });
+    return { success: false, error: `Unknown tool: ${approval.tool}`, timestamp: stamp(), toolVersion: '1.0.0' };
+  }
+
+  const perm = await checkApprovedAction(userId, approval.id, approval.tool, approval.contentHash);
+  if (!perm.allowed) {
+    await recordActionSafe({ ...base, action: 'tool_execution_denied', status: 'DENIED', outputSummary: perm.reason, validationResult: JSON.stringify({ approvalId: approval.id }), latencyMs: 0 });
+    return { success: false, error: perm.reason ?? 'Permission denied', timestamp: stamp(), toolVersion: '1.0.0' };
+  }
+
+  let actionRow: { id: string };
+  try {
+    actionRow = await recordAction({
+      ...base,
+      action: `tool_executed: ${approval.tool}`,
+      confirmationMethod: 'user_confirmed',
+      status: 'SUBMITTED',
+      inputSummary: safeJson(approval.params),
+      validationResult: JSON.stringify({ approvalId: approval.id }),
+      latencyMs: 0,
+    });
+  } catch (e) {
+    logger.error('ledger pre-write failed; approved tool not run', { userId, tool: approval.tool, error: (e as Error)?.message });
+    return { success: false, error: 'Action ledger unavailable; tool not run', timestamp: stamp(), toolVersion: '1.0.0' };
+  }
+
+  try {
+    const raw = await handler(userId, approval.params ?? {});
+    const result = sanitiseApprovedResult(approval.tool, raw);
+    await finaliseRow(userId, actionRow.id, {
+      status: result.success ? 'VALIDATED' : 'FAILED',
+      outputSummary: safeJson(result.data ?? result.error),
+      latencyMs: Date.now() - startTime,
+    });
+    return result;
+  } catch (error: unknown) {
+    await finaliseRow(userId, actionRow.id, { status: 'FAILED', outputSummary: (error as Error)?.message ?? 'Unknown error', latencyMs: Date.now() - startTime });
+    return { success: false, error: 'Tool execution failed', timestamp: stamp(), toolVersion: '1.0.0' };
   }
 }
