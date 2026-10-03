@@ -232,6 +232,10 @@ export function ConversationSurface() {
                   };
                   return updated;
                 });
+              } else if (data.type === 'security') {
+                const patterns = Array.isArray(data.patterns) ? data.patterns.join(', ') : '';
+                const where = data.tool ? ` in ${data.tool}` : '';
+                pushNeuralEvent('security_event', `${data.event ?? 'security'}${where}${patterns ? `: ${patterns}` : ''}`);
               } else if (data.type === 'error') {
                 pushNeuralEvent('error', data.message ?? 'error');
               } else if (data.type === 'done') {

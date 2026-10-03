@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
-import { generateCorrelationId } from '@/lib/logger';
+import { generateCorrelationId, logger } from '@/lib/logger';
+import { recordAction, recordActionSafe, updateActionStatus } from '@/lib/ledger';
 import { checkPermission, type PermissionClass } from '@/lib/permission-engine';
 import { writeMemory, correctMemory, searchMemory } from '@/lib/memory-engine';
 import { listOpenClawTools, callOpenClawTool } from '@/lib/openclaw-client';
@@ -417,6 +418,22 @@ export async function registerOpenClawTools(userId: string): Promise<void> {
   console.log(`[openclaw] registered ${registered} tool(s) for user ${userId}`);
 }
 
+function safeJson(v: unknown): string {
+  try { return (JSON.stringify(v) ?? '').substring(0, 500); } catch { return '[unserialisable]'; }
+}
+
+async function finaliseRow(
+  userId: string,
+  id: string,
+  patch: { status: 'VALIDATED' | 'FAILED'; outputSummary: string; latencyMs: number },
+): Promise<void> {
+  try {
+    await updateActionStatus(userId, id, patch);
+  } catch (e) {
+    logger.error('ledger finalise failed', { userId, actionId: id, error: (e as Error)?.message });
+  }
+}
+
 export async function executeTool(
   userId: string,
   toolName: string,
@@ -428,55 +445,78 @@ export async function executeTool(
   const cid = correlationId ?? generateCorrelationId();
   const startTime = Date.now();
 
-  // Check permission
-  const riskClass = TOOL_RISK_MAP[toolName] ?? 'B';
+  // Unknown tools are denied outright — never default an unregistered tool to a runnable class.
+  const handler = TOOL_HANDLERS[toolName];
+  if (!handler) {
+    await recordActionSafe({
+      userId,
+      initiator: 'system',
+      persona,
+      mambaMode,
+      tool: toolName,
+      action: 'tool_execution_denied',
+      permissionClass: 'C',
+      status: 'DENIED',
+      inputSummary: safeJson(params),
+      outputSummary: 'Unknown tool',
+      correlationId: cid,
+      latencyMs: Date.now() - startTime,
+    });
+    return { success: false, error: `Unknown tool: ${toolName}`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  }
+
+  // Check permission. A registered tool with no explicit risk entry is treated as Class C.
+  const riskClass = TOOL_RISK_MAP[toolName] ?? 'C';
   const permCheck = await checkPermission(userId, toolName, riskClass, cid);
 
   if (!permCheck.allowed) {
     // Log to action ledger — Class C gets AWAITING_APPROVAL, others get FAILED
-    await prisma.action.create({
-      data: {
-        userId,
-        initiator: 'system',
-        persona,
-        mambaMode,
-        tool: toolName,
-        action: riskClass === 'C' ? 'pending_class_c_approval' : 'tool_execution_denied',
-        permissionClass: riskClass,
-        status: riskClass === 'C' ? 'AWAITING_APPROVAL' : 'FAILED',
-        inputSummary: JSON.stringify(params).substring(0, 500),
-        outputSummary: permCheck.reason,
-        correlationId: cid,
-        latencyMs: Date.now() - startTime,
-      },
+    await recordActionSafe({
+      userId,
+      initiator: 'system',
+      persona,
+      mambaMode,
+      tool: toolName,
+      action: riskClass === 'C' ? 'pending_class_c_approval' : 'tool_execution_denied',
+      permissionClass: riskClass,
+      status: riskClass === 'C' ? 'AWAITING_APPROVAL' : 'FAILED',
+      inputSummary: safeJson(params),
+      outputSummary: permCheck.reason,
+      correlationId: cid,
+      latencyMs: Date.now() - startTime,
     });
     return { success: false, error: permCheck.reason ?? 'Permission denied', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   }
 
-  const handler = TOOL_HANDLERS[toolName];
-  if (!handler) {
-    return { success: false, error: `Unknown tool: ${toolName}`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  // Write-ahead ledger row. If this write fails, the handler must NOT run:
+  // no action may execute without a ledger row.
+  let actionRow: { id: string };
+  try {
+    actionRow = await recordAction({
+      userId,
+      initiator: 'system',
+      persona,
+      mambaMode,
+      tool: toolName,
+      action: `tool_executed: ${toolName}`,
+      permissionClass: riskClass,
+      confirmationMethod: permCheck.method,
+      status: 'SUBMITTED',
+      inputSummary: safeJson(params),
+      correlationId: cid,
+      latencyMs: 0,
+    });
+  } catch (e) {
+    logger.error('ledger pre-write failed; tool not run', { userId, tool: toolName, error: (e as Error)?.message });
+    return { success: false, error: 'Action ledger unavailable; tool not run', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   }
 
   try {
     const result = await handler(userId, params);
-    // Log to action ledger
-    const actionRow = await prisma.action.create({
-      data: {
-        userId,
-        initiator: 'system',
-        persona,
-        mambaMode,
-        tool: toolName,
-        action: `tool_executed: ${toolName}`,
-        permissionClass: riskClass,
-        confirmationMethod: permCheck.method,
-        status: result.success ? 'VALIDATED' : 'FAILED',
-        inputSummary: JSON.stringify(params).substring(0, 500),
-        outputSummary: JSON.stringify(result.data ?? result.error).substring(0, 500),
-        correlationId: cid,
-        latencyMs: Date.now() - startTime,
-      },
+    await finaliseRow(userId, actionRow.id, {
+      status: result.success ? 'VALIDATED' : 'FAILED',
+      outputSummary: safeJson(result.data ?? result.error),
+      latencyMs: Date.now() - startTime,
     });
 
     // Fire-and-forget postmortem — only for successful executions
@@ -501,12 +541,9 @@ export async function executeTool(
           let parsed: { outcome?: string; postmortem?: string };
           try { parsed = JSON.parse(raw.trim()); } catch { return; }
           if (!parsed.outcome && !parsed.postmortem) return;
-          await prisma.action.update({
-            where: { id: actionId },
-            data: {
-              outcome: parsed.outcome?.substring(0, 500) ?? null,
-              postmortem: parsed.postmortem?.substring(0, 500) ?? null,
-            },
+          await updateActionStatus(userId, actionId, {
+            outcome: parsed.outcome?.substring(0, 500) ?? null,
+            postmortem: parsed.postmortem?.substring(0, 500) ?? null,
           });
         } catch { /* non-blocking */ }
       })();
@@ -514,21 +551,10 @@ export async function executeTool(
 
     return result;
   } catch (error: any) {
-    await prisma.action.create({
-      data: {
-        userId,
-        initiator: 'system',
-        persona,
-        mambaMode,
-        tool: toolName,
-        action: `tool_execution_error: ${toolName}`,
-        permissionClass: riskClass,
-        status: 'FAILED',
-        inputSummary: JSON.stringify(params).substring(0, 500),
-        outputSummary: error?.message ?? 'Unknown error',
-        correlationId: cid,
-        latencyMs: Date.now() - startTime,
-      },
+    await finaliseRow(userId, actionRow.id, {
+      status: 'FAILED',
+      outputSummary: error?.message ?? 'Unknown error',
+      latencyMs: Date.now() - startTime,
     });
     return { success: false, error: error?.message ?? 'Tool execution failed', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   }

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { executeTool } from '@/lib/tool-registry';
+import { normaliseMambaMode } from '@/lib/types';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
   // L1: Read persona from server-side DB state — never trust client-supplied persona/mambaMode
   const personaState = await prisma.personaState.findUnique({ where: { userId: session.user.id } });
   const persona = personaState?.activePersona ?? 'WHINK';
-  const mambaMode = personaState?.mambaMode ?? undefined;
+  const mambaMode = normaliseMambaMode(personaState?.mambaMode, persona) ?? undefined;
 
   const result = await executeTool(
     session.user.id,

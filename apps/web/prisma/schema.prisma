@@ -134,7 +134,7 @@ model PersonaState {
   id               String   @id @default(cuid())
   userId           String   @unique
   activePersona    String   @default("WHINK")
-  mambaMode        String?  
+  mambaMode        String?  // OBSIDIAN | null
   functionalMode   String?
   activationSource String   @default("system")
   activatedAt      DateTime @default(now())
@@ -170,7 +170,7 @@ model Message {
   role            String   // user | assistant | system
   content         String
   persona         String?  // WHINK | MAMBA
-  mambaMode       String?  // WHITE | GREY
+  mambaMode       String?  // OBSIDIAN | null
   functionalMode  String?
   toolCalls       String?  // JSON string of tool calls
   metadata        String?  // JSON string
@@ -381,7 +381,7 @@ model Hypothesis {
   epistemicStatus String   // MUST be 'hypothesis' — enforced by DB CHECK
   confidence      Float    @default(0.3) // MAX 0.4 — enforced by DB CHECK
   source          String   @default("MAMBA")
-  mambaMode       String?  // WHITE | GREY
+  mambaMode       String?  // OBSIDIAN | null
   rationale       String?
   supersededBy    String?
   createdAt       DateTime @default(now())
@@ -510,7 +510,7 @@ model Action {
   userId             String
   initiator          String   // user | system | automation
   persona            String?  // WHINK | MAMBA
-  mambaMode          String?
+  mambaMode          String?  // OBSIDIAN | null
   planId             String?
   tool               String?
   action             String
@@ -519,7 +519,7 @@ model Action {
   inputSummary       String?
   outputSummary      String?
   validationResult   String?  // JSON
-  status             String   @default("SUBMITTED") // SUBMITTED, VALIDATED, FAILED, UNVERIFIED
+  status             String   @default("SUBMITTED") // SUBMITTED, VALIDATED, FAILED, UNVERIFIED, AWAITING_APPROVAL, DENIED
   outcome            String?
   postmortem         String?
   correlationId      String?

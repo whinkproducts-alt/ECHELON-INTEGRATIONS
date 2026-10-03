@@ -123,7 +123,7 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
               <span className={`h-2 w-2 rounded-full ${
                 isWhink ? 'bg-primary animate-pulse-subtle' : 'bg-amber-400 animate-pulse-subtle'
               }`} />
-              {isWhink ? tenantConfig.productName : `MAMBA • ${personaState.mambaMode ?? 'WHITE'}`}
+              {isWhink ? tenantConfig.productName : `MAMBA • ${personaState.mambaMode ?? 'OBSIDIAN'}`}
             </div>
             {personaState.functionalMode && (
               <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-1 rounded">

@@ -1,20 +1,22 @@
 /**
- * Agentic tool loop — wraps the model router with tool execution.
+ * Agentic tool loop — wraps the model router with tool execution, for every provider.
  *
  * On each turn:
- * 1. Call the model with the current message history + tool definitions.
- * 2. If the model returns a tool_use block, execute the tool via tool-registry.
- * 3. Append the tool result to history and call the model again.
- * 4. Repeat until the model returns a text-only response (max 5 iterations).
- * 5. Stream the final text response back to the caller.
+ * 1. Call the model (via chatWithTools in the model router) with history + tool definitions.
+ * 2. If the model requests tool calls, run each through executeTool (checkPermission + ledger).
+ * 3. Append the (wrapped, if external) results and call the model again.
+ * 4. Repeat until a text-only response (max MAX_TOOL_ITERATIONS).
  *
- * Only wired for Anthropic today. Gemini and OpenAI-compatible paths fall back
- * to streamChat (no tools) until those SDKs are extended.
+ * SSE events: text, tool_call, tool_result, security, done, error.
+ * If the provider rejects tools (e.g. a small local model), falls back to plain streamChat.
  */
 
 import { executeTool } from '@/lib/tool-registry';
 import { wrapUntrustedContent, stripFakeUntrustedTags, scanForInjectionPatterns, filterToolResult } from '@/lib/content-isolation';
-import { prisma } from '@/lib/db';
+import { recordActionSafe } from '@/lib/ledger';
+import { chatWithTools, ToolsUnsupportedError, redactForLog, type NeutralMessage } from '@/lib/model-router-tools';
+import { logger } from '@/lib/logger';
+import { streamChat } from '@/lib/model-router';
 
 const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search', 'document_search']);
 const isExternal = (name: string) => EXTERNAL_TOOLS.has(name) || name.startsWith('openclaw__');
@@ -39,88 +41,98 @@ export interface ToolLoopOptions {
 }
 
 const MAX_TOOL_ITERATIONS = 5;
+export const MAX_TOOL_CALLS_PER_TURN = 8;
 
 export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream<Uint8Array>> {
   const model = opts.model ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
-
-  // Non-Anthropic providers: fall back to plain streaming (no tool use yet)
-  if (!model.startsWith('claude')) {
-    const { streamChat } = await import('@/lib/model-router');
-    return streamChat({ messages: opts.messages, model, maxTokens: opts.maxTokens, apiKey: opts.apiKey });
-  }
-
-  return runAnthropicToolLoop(opts, model);
-}
-
-async function runAnthropicToolLoop(
-  opts: ToolLoopOptions,
-  model: string,
-): Promise<ReadableStream<Uint8Array>> {
-  const key = opts.apiKey ?? process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error('ANTHROPIC_API_KEY not set');
-
-  const { default: Anthropic } = await import('@anthropic-ai/sdk');
-  const client = new Anthropic({ apiKey: key });
   const encoder = new TextEncoder();
 
-  const systemMsg = opts.messages.find((m) => m.role === 'system');
-  const chatMessages: Anthropic.MessageParam[] = opts.messages
-    .filter((m) => m.role !== 'system')
-    .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
-
-  const anthropicTools: Anthropic.Tool[] = opts.tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    input_schema: t.inputSchema as Anthropic.Tool['input_schema'],
-  }));
+  // Fail fast (before streaming starts) when the Anthropic key is missing, as before.
+  if (model.startsWith('claude') && !(opts.apiKey ?? process.env.ANTHROPIC_API_KEY)) {
+    throw new Error('ANTHROPIC_API_KEY not set');
+  }
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       let closed = false;
-      const send = (chunk: object) =>
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+      const send = (chunk: object) => {
+        if (!closed) controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+      };
       const close = () => { if (!closed) { closed = true; controller.close(); } };
 
       try {
-        let history = [...chatMessages];
+        const offered = new Set(opts.tools.map((t) => t.name));
+        let history: NeutralMessage[] = opts.messages.map((m) => ({ role: m.role, content: m.content }) as NeutralMessage);
 
         for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
-          const response = await client.messages.create({
-            model,
-            max_tokens: opts.maxTokens ?? 4000,
-            system: systemMsg?.content,
-            messages: history,
-            tools: anthropicTools,
-          });
-
-          // Collect text and tool_use blocks
-          const textBlocks = response.content.filter((b) => b.type === 'text');
-          const toolUseBlocks = response.content.filter((b) => b.type === 'tool_use');
-
-          // Stream any text the model produced this turn
-          for (const block of textBlocks) {
-            if (block.type === 'text' && block.text) {
-              send({ type: 'text', content: block.text });
+          let response;
+          try {
+            response = await chatWithTools({
+              messages: history,
+              model,
+              tools: opts.tools,
+              apiKey: opts.apiKey,
+              maxTokens: opts.maxTokens,
+            });
+          } catch (err) {
+            if (err instanceof ToolsUnsupportedError && iter === 0) {
+              // Nothing has been emitted yet: fall back to plain streaming, no tools.
+              const plain = await streamChat({ messages: opts.messages, model, maxTokens: opts.maxTokens, apiKey: opts.apiKey });
+              const reader = plain.getReader();
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (!closed) controller.enqueue(value);
+              }
+              return;
             }
+            throw err;
           }
 
-          // If no tool calls, we're done
-          if (toolUseBlocks.length === 0 || response.stop_reason !== 'tool_use') {
+          if (response.text) send({ type: 'text', content: response.text });
+
+          if (response.toolCalls.length === 0 || response.stopReason !== 'tool_use') {
             send({ type: 'done' });
-            close();
             return;
           }
 
-          // Execute each tool call
-          const toolResults: Anthropic.ToolResultBlockParam[] = [];
-          for (const block of toolUseBlocks) {
-            if (block.type !== 'tool_use') continue;
-            send({ type: 'tool_call', tool: block.name, input: block.input });
+          history = [...history, { role: 'assistant', content: response.text, toolCalls: response.toolCalls }];
 
+          for (let idx = 0; idx < response.toolCalls.length; idx++) {
+            const call = response.toolCalls[idx];
+            send({ type: 'tool_call', tool: call.name, input: call.input });
+
+            // Only tools offered to the model may run; and cap calls per response.
+            const refusal = !offered.has(call.name)
+              ? 'tool not offered'
+              : idx >= MAX_TOOL_CALLS_PER_TURN
+                ? 'per-turn tool call cap'
+                : null;
+            if (refusal) {
+              await recordActionSafe({
+                userId: opts.userId,
+                initiator: 'system',
+                persona: opts.persona,
+                mambaMode: opts.mambaMode ?? undefined,
+                tool: call.name.substring(0, 100),
+                action: 'tool_execution_denied',
+                permissionClass: 'C',
+                status: 'DENIED',
+                inputSummary: JSON.stringify(call.input ?? {}).substring(0, 500),
+                outputSummary: refusal,
+                correlationId: opts.correlationId ?? 'unknown',
+                latencyMs: 0,
+              });
+              send({ type: 'tool_result', tool: call.name, success: false, data: refusal });
+              history = [...history, { role: 'tool', toolCallId: call.id, name: call.name, content: `[Tool error: ${refusal}]` }];
+              continue;
+            }
+
+            // Every tool call goes through executeTool -> checkPermission -> ledger.
             const result = await executeTool(
               opts.userId,
-              block.name,
-              block.input,
+              call.name,
+              call.input,
               opts.persona,
               opts.mambaMode ?? undefined,
               opts.correlationId,
@@ -128,70 +140,61 @@ async function runAnthropicToolLoop(
 
             send({
               type: 'tool_result',
-              tool: block.name,
+              tool: call.name,
               success: result.success,
               data: result.data ?? result.error,
             });
 
             // Wrap external tool results to prevent prompt injection
             let toolContent: string;
-            if (isExternal(block.name) && result.success) {
-              // Correct order: strip fake tags → normalize/filter → scan normalized result → wrap
+            if (isExternal(call.name) && result.success) {
+              // Correct order: strip fake tags -> normalize/filter -> scan normalized result -> wrap
               const stripped = stripFakeUntrustedTags(JSON.stringify(result.data));
               const filtered = filterToolResult(stripped);
               const scan = scanForInjectionPatterns(filtered);
               let contentForModel: string;
               if (scan.suspicious) {
-                void prisma.action.create({
-                  data: {
-                    userId: opts.userId,
-                    initiator: 'system',
-                    action: 'tool_result_injection_withheld',
-                    tool: block.name,
-                    permissionClass: 'A',
-                    status: 'FAILED',
-                    inputSummary: block.name,
-                    outputSummary: scan.patterns.join(', '),
-                    correlationId: opts.correlationId ?? 'unknown',
-                    latencyMs: 0,
-                  },
-                }).catch((e: unknown) => console.error('ledger write failed', { error: (e as Error)?.message }));
-                contentForModel = `[content withheld: injection patterns detected in tool "${block.name}"]`;
+                await recordActionSafe({
+                  userId: opts.userId,
+                  initiator: 'system',
+                  action: 'tool_result_injection_withheld',
+                  tool: call.name,
+                  permissionClass: 'A',
+                  status: 'FAILED',
+                  inputSummary: call.name,
+                  outputSummary: scan.patterns.join(', '),
+                  correlationId: opts.correlationId ?? 'unknown',
+                  latencyMs: 0,
+                });
+                send({ type: 'security', event: 'tool_result_withheld', tool: call.name, patterns: scan.patterns });
+                contentForModel = `[content withheld: injection patterns detected in tool "${call.name}"]`;
               } else {
                 contentForModel = filtered;
               }
-              toolContent = wrapUntrustedContent(contentForModel, block.name, result.source ?? block.name);
+              toolContent = wrapUntrustedContent(contentForModel, call.name, result.source ?? call.name);
             } else if (!result.success) {
               const rawErrorContent = `[Tool error: ${result.error ?? 'unknown'}]`;
-              const errorContent = isExternal(block.name)
+              const errorContent = isExternal(call.name)
                 ? filterToolResult(stripFakeUntrustedTags(rawErrorContent))
                 : rawErrorContent;
-              toolContent = isExternal(block.name)
-                ? wrapUntrustedContent(errorContent, block.name, block.name)
+              toolContent = isExternal(call.name)
+                ? wrapUntrustedContent(errorContent, call.name, call.name)
                 : errorContent;
             } else {
               toolContent = JSON.stringify(result.data);
             }
 
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: block.id,
-              content: toolContent,
-            });
+            history = [...history, { role: 'tool', toolCallId: call.id, name: call.name, content: toolContent }];
           }
-
-          // Append assistant turn + tool results to history
-          history = [
-            ...history,
-            { role: 'assistant', content: response.content },
-            { role: 'user', content: toolResults },
-          ];
         }
 
         // Hit max iterations — model is stuck in a tool loop
         send({ type: 'error', error: 'Tool loop exceeded maximum iterations' });
       } catch (err: any) {
-        send({ type: 'error', error: err?.message ?? 'Tool loop failed' });
+        // Never forward provider/upstream error text to the client.
+        logger.error('tool loop failed', { userId: opts.userId, error: redactForLog(String(err?.message ?? err)) });
+        const status = /\b([1-5]\d\d)\b/.exec(String(err?.message ?? ''))?.[1];
+        send({ type: 'error', error: status ? `Model provider error (${status})` : 'Model provider error' });
       } finally {
         close();
       }

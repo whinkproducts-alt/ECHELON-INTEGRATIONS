@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { recordAction, type LedgerStatus } from '@/lib/ledger';
 
 export type PermissionClass = 'A' | 'B' | 'C';
 
@@ -72,19 +73,18 @@ export async function logSecurityEvent(
   userId: string,
   event: string,
   details: string,
-  correlationId?: string
+  correlationId?: string,
+  status: LedgerStatus = 'VALIDATED'
 ) {
   logger.security(event, { userId, details });
-  await prisma.action.create({
-    data: {
-      userId,
-      initiator: 'system',
-      persona: 'WHINK',
-      action: `SECURITY_EVENT: ${event}`,
-      permissionClass: 'C',
-      status: 'VALIDATED',
-      inputSummary: details,
-      correlationId,
-    },
+  await recordAction({
+    userId,
+    initiator: 'system',
+    persona: 'WHINK',
+    action: `SECURITY_EVENT: ${event}`,
+    permissionClass: 'C',
+    status,
+    inputSummary: details,
+    correlationId,
   });
 }

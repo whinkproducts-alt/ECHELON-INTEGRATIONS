@@ -4,6 +4,7 @@ import { assembleContext, formatContextForPrompt } from '@/lib/context-engine';
 import { buildSystemPrompt } from '@/prompts/build-prompt';
 import { checkMetaAuthorization, logSecurityEvent } from '@/lib/permission-engine';
 import { scanUserInput, scanForInjectionPatterns } from '@/lib/content-isolation';
+import { normaliseMambaMode } from '@/lib/types';
 import { readContext, writeDebrief } from '@/lib/agent-memory';
 
 const PERSONA_SWITCH_PATTERNS: Array<{ regex: RegExp; persona: string; mode?: string }> = [
@@ -47,6 +48,11 @@ export interface OrchestratorResult {
   systemPrompt: string;
   metaAuthViolation: boolean;
   injectionDetected: boolean;
+  /** True when the user message was blocked and must not reach the model. */
+  injectionBlocked: boolean;
+  /** True when the message tried to grant itself authorisation; must not reach the model. */
+  metaAuthBlocked: boolean;
+  injectionPatterns: string[];
 }
 
 export async function processInput(input: OrchestratorInput): Promise<OrchestratorResult> {
@@ -57,6 +63,21 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
   const metaAuthViolation = checkMetaAuthorization(message);
   if (metaAuthViolation) {
     await logSecurityEvent(userId, 'META_AUTH_ATTEMPT', `User attempted meta-authorization: "${message.substring(0, 200)}"`, correlationId);
+    // Blocked: no persona switch, no context assembly, nothing reaches the model.
+    const current = await prisma.personaState.findUnique({ where: { userId } });
+    const persona = current?.activePersona ?? 'WHINK';
+    return {
+      personaSwitched: false,
+      newPersona: persona,
+      newMambaMode: normaliseMambaMode(current?.mambaMode, persona),
+      functionalMode: current?.functionalMode ?? null,
+      systemPrompt: '',
+      metaAuthViolation: true,
+      injectionDetected: false,
+      injectionBlocked: false,
+      metaAuthBlocked: true,
+      injectionPatterns: [],
+    };
   }
 
   // 2. Check for injection patterns in user input (tighter regexes, caller decides to block)
@@ -66,8 +87,24 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
       userId,
       'INJECTION_ATTEMPT',
       `Injection patterns detected (${injectionScan.patterns.join(', ')}): "${message.substring(0, 200)}"`,
-      correlationId
+      correlationId,
+      'DENIED'
     );
+    // Blocked: no persona switch, no context assembly, nothing reaches the model.
+    const current = await prisma.personaState.findUnique({ where: { userId } });
+    const persona = current?.activePersona ?? 'WHINK';
+    return {
+      personaSwitched: false,
+      newPersona: persona,
+      newMambaMode: normaliseMambaMode(current?.mambaMode, persona),
+      functionalMode: current?.functionalMode ?? null,
+      systemPrompt: '',
+      metaAuthViolation,
+      injectionDetected: true,
+      injectionBlocked: true,
+      metaAuthBlocked: false,
+      injectionPatterns: injectionScan.patterns,
+    };
   }
 
   // 3. Detect persona switch
@@ -79,7 +116,7 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
     if (pattern.regex.test(message)) {
       personaSwitched = true;
       newPersona = pattern.persona;
-      newMambaMode = pattern.mode ?? null;
+      newMambaMode = normaliseMambaMode(pattern.mode, pattern.persona);
       // Update persona state in DB
       await prisma.personaState.upsert({
         where: { userId },
@@ -112,7 +149,10 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
   // 5. Get current persona state
   const personaState = await prisma.personaState.findUnique({ where: { userId } });
   const activePersona = newPersona ?? personaState?.activePersona ?? 'WHINK';
-  const activeMambaMode = newMambaMode !== undefined ? newMambaMode : (personaState?.mambaMode ?? null);
+  const activeMambaMode = normaliseMambaMode(
+    newMambaMode !== undefined ? newMambaMode : personaState?.mambaMode,
+    activePersona,
+  );
   const activeFunctionalMode = functionalMode ?? personaState?.functionalMode ?? null;
 
   // Update functional mode if changed
@@ -163,6 +203,9 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
     systemPrompt,
     metaAuthViolation,
     injectionDetected: injectionScan.suspicious,
+    injectionBlocked: false,
+    metaAuthBlocked: false,
+    injectionPatterns: [],
   };
 }
 
