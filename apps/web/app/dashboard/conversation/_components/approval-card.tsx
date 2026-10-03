@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ShieldAlert, Check, X } from 'lucide-react';
+import { ShieldAlert, Check, X, Mic } from 'lucide-react';
+import { useDecisionListener } from '@/lib/hooks/useDecisionListener';
 import {
   type ApprovalView, type CardState, formatParams, isTerminal, secondsRemaining,
 } from '@/lib/hooks/approval-state';
@@ -12,6 +13,8 @@ interface ApprovalCardProps {
   /** Called every second with seconds left so the owner can expire the card. */
   onTick: (secondsLeft: number) => void;
   onDecide: (decision: 'approve' | 'deny') => void;
+  /** 4-digit confirmation code, generated client-side. Never sent to the server or the model. */
+  code: string;
 }
 
 const AMBER = 'hsl(var(--pending-amber))';
@@ -29,7 +32,7 @@ function statusLabel(state: CardState): { text: string; color: string } | null {
   }
 }
 
-export function ApprovalCard({ approval, state, onTick, onDecide }: ApprovalCardProps) {
+export function ApprovalCard({ approval, state, onTick, onDecide, code }: ApprovalCardProps) {
   const [now, setNow] = useState(() => Date.now());
   const terminal = isTerminal(state.phase);
 
@@ -50,6 +53,7 @@ export function ApprovalCard({ approval, state, onTick, onDecide }: ApprovalCard
   const busy = state.phase === 'submitting';
   const disabled = busy || terminal;
   const status = statusLabel(state);
+  const voice = useDecisionListener({ code, onDecision: onDecide, disabled });
   const title = approval.tool ?? (approval.kind === 'ear' ? 'external action request' : 'action');
 
   return (
@@ -99,6 +103,53 @@ export function ApprovalCard({ approval, state, onTick, onDecide }: ApprovalCard
         <p className="text-xs font-mono" style={{ color: DENIAL }} role="alert">
           {state.requestError}. Nothing was decided; you can try again.
         </p>
+      )}
+
+      {!terminal && (
+        <div className="space-y-1.5 rounded-md border border-border p-2">
+          <p className="text-xs text-muted-foreground">
+            Voice: hold the button and say &quot;approve&quot; followed by this code, or say &quot;deny&quot;.
+          </p>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">Confirmation code</span>
+            <span
+              className="font-mono text-lg tracking-widest tabular-nums text-foreground"
+              aria-label={`Confirmation code ${code.split('').join(' ')}`}
+            >
+              {code}
+            </span>
+          </div>
+          <button
+            type="button"
+            disabled={disabled}
+            aria-pressed={voice.listening}
+            aria-label="Hold to speak decision. Press and hold Space, or press Enter to start and stop."
+            onPointerDown={(e) => { e.preventDefault(); voice.begin(); }}
+            onPointerUp={voice.end}
+            onPointerCancel={voice.end}
+            onPointerLeave={voice.end}
+            onKeyDown={(e) => {
+              if (e.repeat) return;
+              if (e.key === ' ') { e.preventDefault(); voice.begin(); }
+              else if (e.key === 'Enter') { e.preventDefault(); voice.toggle(); }
+            }}
+            onKeyUp={(e) => { if (e.key === ' ') { e.preventDefault(); voice.end(); } }}
+            onBlur={voice.end}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-opacity disabled:opacity-40"
+            style={{ color: ACCENT, borderColor: ACCENT }}
+          >
+            <Mic className="h-3 w-3" aria-hidden />
+            {voice.listening ? 'Listening\u2026 release to send' : 'Hold to speak decision'}
+          </button>
+          {voice.listening && (
+            <p className="text-xs font-mono" style={{ color: ACCENT }} role="status">
+              Microphone live. Release to stop.
+            </p>
+          )}
+          {voice.message && !voice.listening && (
+            <p className="text-xs font-mono text-muted-foreground" role="status">{voice.message}</p>
+          )}
+        </div>
       )}
 
       <div className="flex gap-2">
