@@ -64,11 +64,9 @@ describe('key-encryption', () => {
 
   it('uses dev fallback key when ENCRYPTION_KEY is unset (non-production)', async () => {
     delete process.env.ENCRYPTION_KEY;
-    const originalEnv = process.env.NODE_ENV;
     // Vitest runs as 'test' which is not 'production', so dev fallback applies
     const { encryptKey, decryptKey } = await import('../key-encryption');
     const plaintext = 'sk-ant-api03-devtest';
     expect(decryptKey(encryptKey(plaintext))).toBe(plaintext);
-    process.env.NODE_ENV = originalEnv;
   });
 });
