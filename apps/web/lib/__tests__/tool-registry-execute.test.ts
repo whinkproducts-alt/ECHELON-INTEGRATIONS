@@ -25,7 +25,7 @@ describe('executeTool registry gating', () => {
 
   it('denies an unregistered tool, records DENIED, never checks permission or runs a handler', async () => {
     const { executeTool } = await import('../tool-registry');
-    const res = await executeTool('u1', 'rm_rf_everything', { x: 1 }, 'WHINK', null, 'cid-1');
+    const res = await executeTool('u1', 'rm_rf_everything', { x: 1 }, 'WHINK', undefined, 'cid-1');
     expect(res.success).toBe(false);
     expect(res.error).toMatch(/Unknown tool/);
     expect(checkPermission).not.toHaveBeenCalled();

@@ -8,9 +8,6 @@ const nextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   outputFileTracingRoot: process.env.NEXT_OUTPUT_MODE ? path.join(__dirname, '../') : '/',
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: { unoptimized: true },
   // Transpile the org-kit workspace package (TypeScript source, no build step)
   transpilePackages: ['@whink/org-kit'],

@@ -32,10 +32,10 @@ vi.mock('@/lib/db', () => ({
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function makeRequest(method: string, body?: unknown): NextRequest {
-  const init: RequestInit = { method };
+  const init: ConstructorParameters<typeof NextRequest>[1] = { method };
   if (body) {
     init.body = JSON.stringify(body);
-    (init as any).headers = { 'Content-Type': 'application/json' };
+    init.headers = { 'Content-Type': 'application/json' };
   }
   return new NextRequest('http://localhost/api/settings/api-keys', init);
 }

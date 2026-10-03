@@ -320,7 +320,7 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
 
   task_create: async (userId: string, params: any) => {
     // Cross-tenant ownership check: verify project belongs to caller
-    const project = await prisma.project.findFirst({ where: { id: params.projectId, userId } });
+    const project = await prisma.project.findFirst({ where: { id: params.projectId, ownerId: userId } });
     if (!project) return { success: false, error: 'Project not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
     const task = await prisma.projectTask.create({
       data: {

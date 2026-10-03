@@ -67,8 +67,8 @@ function listenForDecision(): Promise<'approved' | 'denied' | 'timeout'> {
     if (typeof window === 'undefined') { resolve('timeout'); return; }
 
     const SpeechRecognitionCtor =
-      (window as Window & typeof globalThis & { webkitSpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition ??
-      (window as Window & typeof globalThis & { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
+      (window as Window & typeof globalThis & { webkitSpeechRecognition?: SpeechRecognitionConstructor }).SpeechRecognition ??
+      (window as Window & typeof globalThis & { webkitSpeechRecognition?: SpeechRecognitionConstructor }).webkitSpeechRecognition;
 
     // Server STT path (MediaRecorder)
     if (!SpeechRecognitionCtor && typeof MediaRecorder !== 'undefined') {

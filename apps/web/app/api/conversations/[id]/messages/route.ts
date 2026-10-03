@@ -119,7 +119,7 @@ export async function POST(
       take: 50,
     })).reverse();
 
-    const messages = [
+    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: orchResult.systemPrompt },
       ...(history ?? []).map((m: any) => ({
         role: m.role === 'user' ? 'user' as const : 'assistant' as const,

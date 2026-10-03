@@ -13,7 +13,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── mock embedding service ────────────────────────────────────────────────────
-const mockGenerateEmbedding = vi.fn<[], Promise<number[] | null>>();
+const mockGenerateEmbedding = vi.fn<() => Promise<number[] | null>>();
 vi.mock('@/lib/embedding-service', () => ({
   generateEmbedding: mockGenerateEmbedding,
 }));

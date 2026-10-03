@@ -42,6 +42,13 @@ interface Project {
   name: string;
 }
 
+function findLastIndexOf<T>(items: readonly T[], predicate: (item: T) => boolean): number {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (predicate(items[i])) return i;
+  }
+  return -1;
+}
+
 export function ConversationSurface() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
@@ -222,8 +229,8 @@ export function ConversationSurface() {
                 setTraceEntries(prev => {
                   // Match by id if available, otherwise update the last running entry for this tool
                   const idx = traceId
-                    ? prev.findLastIndex(e => e.id === traceId)
-                    : prev.findLastIndex(e => e.result === undefined);
+                    ? findLastIndexOf(prev, e => e.id === traceId)
+                    : findLastIndexOf(prev, e => e.result === undefined);
                   if (idx === -1) return prev;
                   const updated = [...prev];
                   updated[idx] = {
