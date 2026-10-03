@@ -1,8 +1,9 @@
 'use client';
 
 export interface ApprovalRequest {
-  action: string;
-  risk: string;
+  /** Server approval id. The caller must act on exactly this id with the decision endpoint. */
+  id: string;
+  tool: string | null;
   summary: string;
 }
 
@@ -11,18 +12,20 @@ const DENY_WORDS = ['denied', 'deny', 'no', 'stop', 'cancel', 'reject'];
 const TIMEOUT_MS = 30_000;
 
 /**
- * Speaks the EAR summary via server TTS (falls back to browser synthesis),
+ * Speaks the approval summary via server TTS (falls back to browser synthesis),
  * then listens for a spoken decision via server STT (falls back to Web Speech).
- * Returns 'approved', 'denied', or 'timeout'.
+ * Returns 'approved', 'denied', or 'timeout'. This only captures the user's words:
+ * the caller turns the result into a call to POST /api/approvals/{id}/decision
+ * for `ear.id`. It never sends chat text.
  */
 export async function speakApprovalRequest(
   ear: ApprovalRequest,
 ): Promise<'approved' | 'denied' | 'timeout'> {
+  const name = ear.tool ? `Action: ${ear.tool}. ` : '';
   const text =
-    `Approval required. Action: ${ear.action}. ` +
-    `Risk level: ${ear.risk}. ` +
-    `Summary: ${ear.summary}. ` +
-    `Say "approved" to allow or "denied" to reject.`;
+    `Approval required. ${name}` +
+    `${ear.summary}. ` +
+    `Say "approved" to allow or "denied" to reject. This applies to this request only.`;
 
   await speakServer(text);
   return listenForDecision();
