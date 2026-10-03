@@ -2,7 +2,9 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { recordAction } from '@/lib/ledger';
+import { createApproval, listPending } from '@/lib/approvals';
 
 const INTERRUPTION = ['QUIET', 'BALANCED', 'PROACTIVE', 'EXECUTIVE'] as const;
 const VERBOSITY = ['QUICK', 'STANDARD', 'DEEP', 'EXECUTIVE'] as const;
@@ -129,37 +131,34 @@ export async function PATCH(req: NextRequest) {
     if (raw.name.trim()) name = raw.name.trim();
   }
 
-  // Autonomy: lowering applies, raising is refused. Nothing is written when refused.
-  let autonomyChange: { from: number; to: number } | null = null;
+  // Autonomy: lowering applies now. Raising is Class C: everything else is applied,
+  // the level is untouched, and an approval is created. Same level is ignored.
+  let lowerTo: number | null = null;
+  let lowerFrom = DEFAULT_AUTONOMY;
+  let raise: { from: number; to: number } | null = null;
   if (requestedAutonomy !== undefined) {
     const current = await prisma.userProfile.findUnique({
       where: { userId },
       select: { autonomyLevel: true },
     });
     const from = current?.autonomyLevel ?? DEFAULT_AUTONOMY;
-    if (requestedAutonomy !== from) {
-      autonomyChange = { from, to: requestedAutonomy };
-      if (requestedAutonomy > from) {
-        await recordAction({
-          userId,
-          action: 'autonomy_level_change',
-          permissionClass: 'C',
-          status: 'DENIED',
-          initiator: 'user',
-          inputSummary: JSON.stringify({ from, to: requestedAutonomy }),
-          outputSummary: 'Raising autonomy requires approval',
-        });
+    if (requestedAutonomy < from) { lowerTo = requestedAutonomy; lowerFrom = from; }
+    else if (requestedAutonomy > from) {
+      const pending = (await listPending(userId)).find((v) => v.kind === 'autonomy_change');
+      if (pending) {
         return NextResponse.json(
-          { error: 'Raising autonomy requires approval', requiresApproval: true },
+          { error: 'An autonomy change is already awaiting approval', approval: pending },
           { status: 409 }
         );
       }
+      raise = { from, to: requestedAutonomy };
     }
   }
 
-  if (profileData || autonomyChange) {
+  if (profileData || lowerTo !== null || raise) {
     const base: ProfileData = profileData ?? {};
-    const level = autonomyChange ? { autonomyLevel: autonomyChange.to } : {};
+    const level = lowerTo !== null ? { autonomyLevel: lowerTo } : {};
+    // Raising never writes autonomyLevel; the upsert only guarantees the row exists.
     await prisma.userProfile.upsert({
       where: { userId },
       update: { ...base, ...level },
@@ -176,16 +175,28 @@ export async function PATCH(req: NextRequest) {
   if (name) {
     await prisma.user.update({ where: { id: userId }, data: { name } });
   }
-  if (autonomyChange) {
+  if (lowerTo !== null) {
     await recordAction({
       userId,
       action: 'autonomy_level_change',
       permissionClass: 'B',
       status: 'VALIDATED',
       initiator: 'user',
-      inputSummary: JSON.stringify(autonomyChange),
+      inputSummary: JSON.stringify({ from: lowerFrom, to: lowerTo }),
       outputSummary: 'Autonomy lowered',
     });
+  }
+  if (raise) {
+    const approval = await createApproval({
+      userId,
+      kind: 'autonomy_change',
+      tool: null,
+      params: { from: raise.from, to: raise.to },
+      summary: `Raise autonomy from level ${raise.from} to level ${raise.to}`,
+      permissionClass: 'C',
+      correlationId: randomUUID(),
+    });
+    return NextResponse.json({ requiresApproval: true, approval }, { status: 202 });
   }
   return NextResponse.json({ success: true });
 }

@@ -22,7 +22,7 @@ export const APPROVAL_TTL_MS = 30_000;
 export const EXECUTING_STUCK_MS = 2 * 60_000;
 const RESULT_CAP = 4000;
 
-export type ApprovalKind = 'tool_call' | 'ear';
+export type ApprovalKind = 'tool_call' | 'ear' | 'autonomy_change';
 export type Clock = () => Date;
 
 export interface ApprovalView {
@@ -294,6 +294,55 @@ async function finish(
   return { id: row.id, status, result: capped };
 }
 
+const MAX_AUTONOMY = 4;
+
+function parseAutonomyParams(params: unknown): { from: number; to: number } | null {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) return null;
+  const { from, to } = params as { from?: unknown; to?: unknown };
+  if (typeof from !== 'number' || typeof to !== 'number') return null;
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
+  if (from < 0 || to > MAX_AUTONOMY || from >= to) return null;
+  return { from, to };
+}
+
+/**
+ * The only code path that can raise autonomy. Runs after the approval won
+ * PENDING to EXECUTING and the hash check. Compare-and-set on the current level
+ * so a level changed since the request means nothing is applied.
+ */
+async function applyAutonomyChange(row: ApprovalRow, clock: Clock): Promise<DecisionOutcome> {
+  const perm = await checkApprovedAction(row.userId, row.id, 'autonomy_change', row.contentHash);
+  if (!perm.allowed) {
+    return finish(row, 'EXECUTING', 'FAILED', { success: false, error: perm.reason ?? 'Permission denied' }, clock);
+  }
+  const change = parseAutonomyParams(row.params);
+  if (!change) {
+    return finish(row, 'EXECUTING', 'FAILED', { success: false, error: 'Invalid autonomy change; not applied' }, clock);
+  }
+  const res = await prisma.userProfile.updateMany({
+    where: { userId: row.userId, autonomyLevel: change.from },
+    data: { autonomyLevel: change.to },
+  });
+  const applied = res.count === 1;
+  await recordActionSafe({
+    userId: row.userId,
+    initiator: 'user',
+    persona: row.persona,
+    action: 'autonomy_level_change',
+    permissionClass: 'C',
+    status: applied ? 'VALIDATED' : 'FAILED',
+    confirmationMethod: 'user_confirmed',
+    inputSummary: JSON.stringify(change),
+    outputSummary: applied ? 'Autonomy raised' : 'Autonomy level changed since request; not applied',
+    validationResult: JSON.stringify({ ...change, approvalId: row.id }),
+    correlationId: row.correlationId,
+  });
+  if (!applied) {
+    return finish(row, 'EXECUTING', 'FAILED', { success: false, error: 'Autonomy level changed since the request; not applied' }, clock);
+  }
+  return finish(row, 'EXECUTING', 'EXECUTED', { success: true, data: change }, clock);
+}
+
 export async function decide(
   userId: string,
   id: string,
@@ -360,6 +409,9 @@ export async function decide(
   }
 
   try {
+    if (row.kind === 'autonomy_change') {
+      return await applyAutonomyChange(row, clock);
+    }
     if (row.kind === 'ear') {
       // B3: the engine decides, even for EARs.
       const perm = await checkApprovedAction(userId, row.id, 'ear', row.contentHash);

@@ -205,4 +205,35 @@ describe('approvals integration (real Postgres)', () => {
     const expired = (await ledgerFor(userA, exp.id)).find((r) => r.action === 'approval_expired');
     expect(expired?.status).toBe('DENIED');
   }, 30000);
+
+  it('autonomy_change: approve raises the level once; deny does not', async (ctx) => {
+    need(ctx);
+    const u = await prisma.user.create({ data: { email: `approvals-itest-c-${stamp}@example.test`, name: 'itest C' } });
+    try {
+      await prisma.userProfile.create({ data: { userId: u.id, autonomyLevel: 1 } });
+      const mk = () => approvals.createApproval({
+        userId: u.id, kind: 'autonomy_change', params: { from: 1, to: 2 },
+        summary: 'Raise autonomy from level 1 to level 2', correlationId: `itest-${stamp}-auto`,
+      });
+      const denied = await mk();
+      await approvals.decide(u.id, denied.id, 'deny');
+      expect((await prisma.userProfile.findUnique({ where: { userId: u.id } }))?.autonomyLevel).toBe(1);
+
+      const a = await mk();
+      const outs = await Promise.all(Array.from({ length: 5 }, () => approvals.decide(u.id, a.id, 'approve')));
+      expect(outs.filter((o) => o.status === 'EXECUTED')).toHaveLength(1);
+      expect((await prisma.userProfile.findUnique({ where: { userId: u.id } }))?.autonomyLevel).toBe(2);
+      const rowsL = (await prisma.action.findMany({ where: { userId: u.id } })).filter((r) => r.action === 'autonomy_level_change');
+      expect(rowsL).toHaveLength(1);
+      expect(rowsL[0].status).toBe('VALIDATED');
+
+      // Cross-user cannot decide.
+      const other = await mk();
+      expect((await approvals.decide(userA, other.id, 'approve')).status).toBe('NOT_FOUND');
+    } finally {
+      await prisma.approvalRequest.deleteMany({ where: { userId: u.id } });
+      await prisma.action.deleteMany({ where: { userId: u.id } });
+      await prisma.user.deleteMany({ where: { id: u.id } });
+    }
+  }, 30000);
 });
