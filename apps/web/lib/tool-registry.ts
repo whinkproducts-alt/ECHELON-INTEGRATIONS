@@ -4,6 +4,8 @@ import { recordAction, recordActionSafe, updateActionStatus } from '@/lib/ledger
 import { checkPermission, type PermissionClass } from '@/lib/permission-engine';
 import { writeMemory, correctMemory, searchMemory } from '@/lib/memory-engine';
 import { listOpenClawTools, callOpenClawTool } from '@/lib/openclaw-client';
+import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
+import { validateTaskInput } from '@/lib/task-input';
 import dns from 'dns';
 import net from 'net';
 
@@ -91,11 +93,16 @@ export interface ToolExecutionResult {
 // Use null-prototype objects to prevent __proto__ injection
 const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<ToolExecutionResult>> = Object.assign(Object.create(null), {
   memory_write: async (userId: string, params: any) => {
+    let projectId: string | null = null;
+    if (hasProjectId(params.projectId)) {
+      projectId = await assertOwnedProject(userId, params.projectId);
+      if (!projectId) return { success: false, error: 'Project not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
     const result = await writeMemory({
       userId,
       type: params.type ?? 'semantic',
       statement: params.statement,
-      projectId: params.projectId,
+      projectId,
       source: params.source ?? 'conversation',
       confidence: params.confidence,
       epistemicStatus: params.epistemicStatus ?? 'KNOWN',
@@ -110,7 +117,12 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
   },
 
   memory_correct: async (userId: string, params: any) => {
-    const result = await correctMemory(userId, params.oldStatement, params.newStatement, params.projectId);
+    let projectId: string | null = null;
+    if (hasProjectId(params.projectId)) {
+      projectId = await assertOwnedProject(userId, params.projectId);
+      if (!projectId) return { success: false, error: 'Project not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+    const result = await correctMemory(userId, params.oldStatement, params.newStatement, projectId);
     return { success: true, data: result, source: 'memory_engine', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
@@ -140,6 +152,12 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
       const to = await prisma.entityNode.findFirst({ where: { id: params.relationship.toId, userId } });
       if (!to) return { success: false, error: 'Entity not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
 
+      let edgeProjectId: string | null = null;
+      if (hasProjectId(params.projectId)) {
+        edgeProjectId = await assertOwnedProject(userId, params.projectId);
+        if (!edgeProjectId) return { success: false, error: 'Project not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+      }
+
       // Supersede old relationship if exists
       if (params.supersede) {
         const old = await prisma.entityEdge.findFirst({
@@ -158,7 +176,7 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
               relationshipType: params.relationship.type,
               context: params.relationship.context,
               confidence: params.relationship.confidence ?? 0.8,
-              projectId: params.projectId,
+              projectId: edgeProjectId,
             },
           });
           await prisma.entityEdge.update({ where: { id: old.id }, data: { supersededBy: newEdge.id } });
@@ -171,7 +189,7 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
           toId: params.relationship.toId,
           relationshipType: params.relationship.type,
           context: params.relationship.context,
-          projectId: params.projectId,
+          projectId: edgeProjectId,
         },
       });
       return { success: true, data: edge, source: 'knowledge_graph', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
@@ -319,17 +337,23 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
   },
 
   task_create: async (userId: string, params: any) => {
+    if (typeof params?.projectId !== 'string' || params.projectId.length === 0) {
+      return { success: false, error: 'projectId required', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
     // Cross-tenant ownership check: verify project belongs to caller
-    const project = await prisma.project.findFirst({ where: { id: params.projectId, ownerId: userId } });
-    if (!project) return { success: false, error: 'Project not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    const projectId = await assertOwnedProject(userId, params.projectId);
+    if (!projectId) return { success: false, error: 'Project not found', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    // assignee and status are not declared in the tool schema, so they are ignored on this path.
+    const parsed = validateTaskInput(params, { allowAssignee: false, allowStatus: false });
+    if ('error' in parsed) return { success: false, error: parsed.error, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    const v = parsed.value;
     const task = await prisma.projectTask.create({
       data: {
-        projectId: params.projectId,
-        title: params.title,
-        description: params.description,
-        priority: params.priority ?? 'MEDIUM',
-        assignee: params.assignee,
-        dueDate: params.dueDate ? new Date(params.dueDate) : null,
+        projectId,
+        title: v.title,
+        description: v.description,
+        priority: v.priority,
+        dueDate: v.dueDate,
         source: 'whink',
       },
     });

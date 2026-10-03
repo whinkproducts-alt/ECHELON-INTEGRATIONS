@@ -12,6 +12,7 @@ import { writeMemory } from '@/lib/memory-engine';
 import { chatOnce } from '@/lib/model-router';
 import { decryptKey } from '@/lib/key-encryption';
 import { recordActionSafe } from '@/lib/ledger';
+import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
 import { normaliseMambaMode } from '@/lib/types';
 
 export async function GET(
@@ -41,7 +42,7 @@ export async function POST(
   try {
     const body = await req.json();
     const userMessage = body?.message ?? '';
-    const projectId = body?.projectId ?? null;
+    const rawProjectId = body?.projectId ?? null;
     const requestedModel = body?.model as string | undefined;
 
     // Verify conversation ownership
@@ -49,6 +50,12 @@ export async function POST(
       where: { id: conversationId, userId: session.user.id },
     });
     if (!conv) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+
+    let projectId: string | null = null;
+    if (hasProjectId(rawProjectId)) {
+      projectId = await assertOwnedProject(session.user.id, rawProjectId);
+      if (!projectId) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    }
 
     // Process through orchestrator FIRST — before saving the user message
     const orchResult = await processInput({
