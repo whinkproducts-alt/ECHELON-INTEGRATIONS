@@ -8,6 +8,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { id } = await params;
 
+  // JSON only: text/plain and form bodies are the classic cross-site POST vehicles.
+  const contentType = (req.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+  if (contentType !== 'application/json') {
+    return NextResponse.json({ error: 'Content-Type must be application/json' }, { status: 415 });
+  }
+
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 

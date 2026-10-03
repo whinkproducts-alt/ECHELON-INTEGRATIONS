@@ -18,6 +18,8 @@ import { buildDispatchMessage } from '@/lib/approval-handler';
 import type { ExecutionAuthorizationRequest } from '@whink/org-kit';
 
 export const APPROVAL_TTL_MS = 30_000;
+/** An approval stuck in EXECUTING this long is failed by the sweeper and never re-run. */
+export const EXECUTING_STUCK_MS = 2 * 60_000;
 const RESULT_CAP = 4000;
 
 export type ApprovalKind = 'tool_call' | 'ear';
@@ -99,9 +101,11 @@ async function ledger(
   row: Pick<ApprovalRow, 'id' | 'userId' | 'tool' | 'permissionClass' | 'correlationId' | 'persona'>,
   action: string,
   status: LedgerStatus,
-  extra: { outputSummary?: string; confirmationMethod?: string } = {},
+  extra: { outputSummary?: string; confirmationMethod?: string; strict?: boolean } = {},
 ): Promise<void> {
-  await recordActionSafe({
+  // strict: throws when the ledger is down, for transitions that must not proceed unrecorded.
+  const write = extra.strict ? recordAction : recordActionSafe;
+  await write({
     userId: row.userId,
     initiator: 'user',
     persona: row.persona,
@@ -188,7 +192,59 @@ export async function createApproval(input: CreateApprovalInput): Promise<Approv
   return toView(row);
 }
 
+/**
+ * Terminal housekeeping for one user's approvals (always scoped by userId).
+ * (a) PENDING rows past expiresAt become EXPIRED, one approval_expired ledger row each.
+ * (b) EXECUTING rows older than EXECUTING_STUCK_MS become FAILED (approval_stuck_failed).
+ *     Stuck rows are never re-run. Each move is an atomic conditional update, so
+ *     concurrent sweeps and decisions ledger each row at most once.
+ * Ledger writes here are best-effort (recordActionSafe): the state change has already
+ * committed and cannot be retried, and a ledger outage must not break listing.
+ */
+export async function sweepApprovals(now: Date, userId: string): Promise<{ expired: number; stuckFailed: number }> {
+  if (!userId) throw new Error('approvals: userId is required');
+  let expired = 0;
+  let stuckFailed = 0;
+
+  const stale = await prisma.approvalRequest.findMany({
+    where: { userId, status: 'PENDING', expiresAt: { lte: now } },
+  }) as ApprovalRow[];
+  for (const row of stale) {
+    const won = await prisma.approvalRequest.updateMany({
+      where: { id: row.id, userId, status: 'PENDING', expiresAt: { lte: now } },
+      data: { status: 'EXPIRED', decidedAt: now },
+    });
+    if (won.count !== 1) continue;
+    expired++;
+    await ledger(row, 'approval_expired', 'DENIED', { outputSummary: 'Expired before a decision' });
+  }
+
+  const cutoff = new Date(now.getTime() - EXECUTING_STUCK_MS);
+  const stuck = await prisma.approvalRequest.findMany({
+    where: { userId, status: 'EXECUTING', decidedAt: { lt: cutoff } },
+  }) as ApprovalRow[];
+  for (const row of stuck) {
+    const won = await prisma.approvalRequest.updateMany({
+      where: { id: row.id, userId, status: 'EXECUTING', decidedAt: { lt: cutoff } },
+      data: { status: 'FAILED', result: { success: false, error: 'Execution did not complete; not re-run' } },
+    });
+    if (won.count !== 1) continue;
+    stuckFailed++;
+    await ledger(row, 'approval_stuck_failed', 'FAILED', { outputSummary: 'Stuck in EXECUTING; failed, never re-run' });
+  }
+  return { expired, stuckFailed };
+}
+
+async function sweepQuietly(userId: string, now: Date): Promise<void> {
+  try {
+    await sweepApprovals(now, userId);
+  } catch (e) {
+    logger.error('approval sweep failed', { userId, error: (e as Error)?.message });
+  }
+}
+
 export async function listPending(userId: string, now: Clock = systemClock): Promise<ApprovalView[]> {
+  await sweepQuietly(userId, now());
   const rows = await prisma.approvalRequest.findMany({
     where: { userId, status: 'PENDING', expiresAt: { gt: now() } },
     orderBy: { createdAt: 'asc' },
@@ -246,6 +302,7 @@ export async function decide(
 ): Promise<DecisionOutcome> {
   const clock = deps.now ?? systemClock;
   const now = clock();
+  await sweepQuietly(userId, now);
 
   // B4: atomically expire a stale PENDING row.
   const expired = await prisma.approvalRequest.updateMany({
@@ -278,10 +335,25 @@ export async function decide(
 
   const row = await prisma.approvalRequest.findFirst({ where: { id, userId } }) as ApprovalRow | null;
   if (!row) return { id, status: 'FAILED', result: { success: false, error: 'Approval vanished' } };
-  await ledger(row, 'approval_approved', 'VALIDATED', { confirmationMethod: 'user_confirmed' });
+  // L4: no execution without the approval being on the ledger first. If the write fails, fail the row, run nothing.
+  try {
+    await ledger(row, 'approval_approved', 'VALIDATED', { confirmationMethod: 'user_confirmed', strict: true });
+  } catch (e) {
+    logger.error('approval_approved ledger write failed; not run', { userId, approvalId: row.id, error: (e as Error)?.message });
+    await prisma.approvalRequest.updateMany({
+      where: { id: row.id, userId, status: 'EXECUTING' },
+      data: { status: 'FAILED', executedAt: clock(), result: { success: false, error: 'Action ledger unavailable; not run' } },
+    });
+    return { id, status: 'FAILED', result: { success: false, error: 'Action ledger unavailable; not run' } };
+  }
 
   // B6: hash lock on the stored content.
-  const recomputed = approvalContentHash({ kind: row.kind, tool: row.tool, params: row.params });
+  let recomputed = '';
+  try {
+    recomputed = approvalContentHash({ kind: row.kind, tool: row.tool, params: row.params });
+  } catch {
+    recomputed = '';
+  }
   if (recomputed !== row.contentHash) {
     await logSecurityEvent(userId, 'approval_hash_mismatch', `Approval ${row.id} content changed after creation; not run`, row.correlationId);
     return finish(row, 'EXECUTING', 'FAILED', { success: false, error: 'Approved content no longer matches; not run' }, clock);

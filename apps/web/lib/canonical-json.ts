@@ -1,13 +1,31 @@
 import { createHash } from 'crypto';
 
-/** Deterministic JSON: object keys sorted recursively, undefined dropped. */
+/**
+ * Deterministic JSON: object keys sorted recursively, undefined object properties dropped.
+ * Strict: throws on anything JSON cannot represent exactly (Dates, Maps, Sets, class
+ * instances, functions, symbols, bigint, undefined in arrays or at the top level, NaN/Infinity),
+ * so two different inputs can never silently hash alike.
+ */
 export function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    const s = JSON.stringify(value);
-    return s === undefined ? 'null' : s;
+  if (value === null) return 'null';
+  switch (typeof value) {
+    case 'string':
+    case 'boolean':
+      return JSON.stringify(value);
+    case 'number':
+      if (!Number.isFinite(value)) throw new TypeError('canonicalJson: non-finite number');
+      return JSON.stringify(value);
+    case 'object':
+      break;
+    default:
+      throw new TypeError(`canonicalJson: unsupported type ${typeof value}`);
   }
   if (Array.isArray(value)) {
-    return `[${value.map((v) => (v === undefined ? 'null' : canonicalJson(v))).join(',')}]`;
+    return `[${value.map((v) => canonicalJson(v)).join(',')}]`;
+  }
+  const proto = Object.getPrototypeOf(value) as unknown;
+  if (proto !== Object.prototype && proto !== null) {
+    throw new TypeError('canonicalJson: only plain objects are allowed');
   }
   const obj = value as Record<string, unknown>;
   const parts: string[] = [];

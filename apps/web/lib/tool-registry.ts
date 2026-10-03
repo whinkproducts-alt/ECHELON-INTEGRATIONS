@@ -453,7 +453,7 @@ function safeJson(v: unknown): string {
 async function finaliseRow(
   userId: string,
   id: string,
-  patch: { status: 'VALIDATED' | 'FAILED'; outputSummary: string; latencyMs: number },
+  patch: { status: 'VALIDATED' | 'FAILED' | 'DENIED'; outputSummary: string; latencyMs: number },
 ): Promise<void> {
   try {
     await updateActionStatus(userId, id, patch);
@@ -468,7 +468,8 @@ export async function executeTool(
   params: any,
   persona?: string,
   mambaMode?: string,
-  correlationId?: string
+  correlationId?: string,
+  opts: { approvalAlreadyPending?: boolean } = {}
 ): Promise<ToolExecutionResult> {
   const cid = correlationId ?? generateCorrelationId();
   const startTime = Date.now();
@@ -499,6 +500,24 @@ export async function executeTool(
 
   if (!permCheck.allowed) {
     // Class C: queue a full-fidelity approval request (the ledger row is written by createApproval).
+    if (riskClass === 'C' && opts.approvalAlreadyPending) {
+      // L7: one approval per tool-loop run. Further Class C calls in the same run are denied, not queued.
+      await recordActionSafe({
+        userId,
+        initiator: 'system',
+        persona,
+        mambaMode,
+        tool: toolName,
+        action: 'approval_already_pending_this_turn',
+        permissionClass: 'C',
+        status: 'DENIED',
+        inputSummary: safeJson(params),
+        outputSummary: 'An approval is already pending this turn; call not queued',
+        correlationId: cid,
+        latencyMs: Date.now() - startTime,
+      });
+      return { success: false, error: 'An approval is already pending this turn; call not queued', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
     if (riskClass === 'C') {
       try {
         const approval = await createApproval({
@@ -676,6 +695,16 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
   } catch (e) {
     logger.error('ledger pre-write failed; approved tool not run', { userId, tool: approval.tool, error: (e as Error)?.message });
     return { success: false, error: 'Action ledger unavailable; tool not run', timestamp: stamp(), toolVersion: '1.0.0' };
+  }
+
+  // M2: consume the approval. Exactly one caller may move executedAt from null; only then does the handler run.
+  const claim = await prisma.approvalRequest.updateMany({
+    where: { id: approval.id, userId, status: 'EXECUTING', executedAt: null },
+    data: { executedAt: new Date() },
+  });
+  if (claim.count !== 1) {
+    await finaliseRow(userId, actionRow.id, { status: 'DENIED', outputSummary: 'Approval already consumed; tool not run', latencyMs: Date.now() - startTime });
+    return { success: false, error: 'Approval already consumed; tool not run', timestamp: stamp(), toolVersion: '1.0.0' };
   }
 
   try {

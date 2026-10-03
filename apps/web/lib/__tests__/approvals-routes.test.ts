@@ -18,9 +18,12 @@ describe('approvals routes', () => {
     vi.doMock('@/lib/approvals', () => ({ decide, listPending }));
   });
 
-  const post = async (body: unknown, id = 'ap1', raw = false) => {
+  const post = async (body: unknown, id = 'ap1', raw = false, contentType: string | null = 'application/json') => {
     const { POST } = await import('../../app/api/approvals/[id]/decision/route');
-    const req = { json: async () => { if (raw) throw new Error('bad json'); return body; } } as never;
+    const req = {
+      headers: new Headers(contentType ? { 'content-type': contentType } : {}),
+      json: async () => { if (raw) throw new Error('bad json'); return body; },
+    } as never;
     return POST(req, { params: Promise.resolve({ id }) });
   };
 
@@ -53,6 +56,16 @@ describe('approvals routes', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ id: 'ap1', status: 'EXECUTED', result: { success: true } });
     expect(decide).toHaveBeenCalledWith('u1', 'ap1', 'approve');
+  });
+
+  it('POST 415 unless Content-Type is application/json (text/plain, form, none)', async () => {
+    decide.mockResolvedValue({ id: 'ap1', status: 'DENIED', result: null });
+    for (const ct of ['text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data', null]) {
+      expect((await post({ decision: 'approve' }, 'ap1', false, ct)).status).toBe(415);
+    }
+    expect((await post({ decision: 'deny' }, 'ap1', false, 'application/json; charset=utf-8')).status).not.toBe(415);
+    expect(decide).toHaveBeenCalledTimes(1);
+    expect(decide).toHaveBeenCalledWith('u1', 'ap1', 'deny');
   });
 
   it('POST 404 on NOT_FOUND', async () => {

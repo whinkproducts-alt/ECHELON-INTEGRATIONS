@@ -6,7 +6,7 @@ interface Row {
   summary: string; permissionClass: string; status: string; correlationId: string; conversationId: string | null;
   persona: string; createdAt: Date; expiresAt: Date; decidedAt: Date | null; executedAt: Date | null; result: unknown;
 }
-type Where = { id?: string; userId?: string; status?: string; expiresAt?: { gt?: Date; lte?: Date } };
+type Where = { id?: string; userId?: string; status?: string; executedAt?: null; expiresAt?: { gt?: Date; lte?: Date }; decidedAt?: { lt?: Date } };
 
 function matches(r: Row, w: Where): boolean {
   if (w.id !== undefined && r.id !== w.id) return false;
@@ -14,6 +14,8 @@ function matches(r: Row, w: Where): boolean {
   if (w.status !== undefined && r.status !== w.status) return false;
   if (w.expiresAt?.gt && !(r.expiresAt.getTime() > w.expiresAt.gt.getTime())) return false;
   if (w.expiresAt?.lte && !(r.expiresAt.getTime() <= w.expiresAt.lte.getTime())) return false;
+  if (w.executedAt === null && r.executedAt !== null) return false;
+  if (w.decidedAt?.lt && !(r.decidedAt && r.decidedAt.getTime() < w.decidedAt.lt.getTime())) return false;
   return true;
 }
 
@@ -28,12 +30,13 @@ describe('approvals', () => {
   let autonomy: number;
   let delegation: boolean;
   let seq: number;
+  let failLedger: Set<string>;
 
   async function setup(opts: { permissionEngine?: 'real' | 'refuse' } = {}) {
     vi.resetModules();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(T0);
-    rows = []; ledgerRows = []; seq = 0; autonomy = 1; delegation = false;
+    rows = []; ledgerRows = []; failLedger = new Set(); seq = 0; autonomy = 1; delegation = false;
     handler = vi.fn().mockResolvedValue({ posted: true });
     const approvalRequest = {
       create: async ({ data }: { data: Partial<Row> }) => {
@@ -59,7 +62,10 @@ describe('approvals', () => {
       },
     }));
     vi.doMock('@/lib/ledger', () => ({
-      recordAction: async (e: Record<string, any>) => { ledgerRows.push(e); return { id: `l${ledgerRows.length}` }; },
+      recordAction: async (e: Record<string, any>) => {
+        if (failLedger.has(e.action)) throw new Error('ledger down');
+        ledgerRows.push(e); return { id: `l${ledgerRows.length}` };
+      },
       recordActionSafe: async (e: Record<string, any>) => { ledgerRows.push(e); return { id: `l${ledgerRows.length}` }; },
       updateActionStatus: async () => true,
     }));
@@ -247,5 +253,109 @@ describe('approvals', () => {
     await approvals.decide('u1', b.id, 'deny', { now: at(1000) });
     expect(rowsFor('approval_denied')).toHaveLength(1);
     expect(rowsFor('approval_denied')[0].validationResult).toContain(b.id);
+  });
+
+  it('M2: the handler runs only for the caller that consumes executedAt; a replay is denied and ledgered', async () => {
+    const { registry, approvals } = await setup();
+    const a = await queue(registry, { text: 'once' });
+    await approvals.decide('u1', a.id, 'approve', { now: at(1000) });
+    expect(handler).toHaveBeenCalledTimes(1);
+    // Replay the execution path against the same (now terminal) row.
+    const stored = rows[0];
+    const replay = await registry.executeApprovedTool('u1', { id: a.id, tool: TOOL, params: stored.params, contentHash: stored.contentHash, correlationId: 'cid-1' });
+    expect(replay.success).toBe(false);
+    expect(handler).toHaveBeenCalledTimes(1);
+    // Even if the row is forced back to EXECUTING, a consumed approval cannot run again.
+    stored.status = 'EXECUTING';
+    const replay2 = await registry.executeApprovedTool('u1', { id: a.id, tool: TOOL, params: stored.params, contentHash: stored.contentHash, correlationId: 'cid-1' });
+    expect(replay2.success).toBe(false);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(ledgerRows.some((l) => l.action === 'tool_execution_denied' && l.status === 'DENIED')).toBe(true);
+  });
+
+  it('M2: losing the executedAt claim denies and does not run the handler', async () => {
+    const { registry } = await setup();
+    const a = await queue(registry, { text: 'race' });
+    const r = rows[0];
+    r.status = 'EXECUTING'; r.decidedAt = T0;
+    const [x, y] = await Promise.all([
+      registry.executeApprovedTool('u1', { id: a.id, tool: TOOL, params: r.params, contentHash: r.contentHash, correlationId: 'c' }),
+      registry.executeApprovedTool('u1', { id: a.id, tool: TOOL, params: r.params, contentHash: r.contentHash, correlationId: 'c' }),
+    ]);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect([x.success, y.success].filter(Boolean)).toHaveLength(1);
+  });
+
+  it('sweep: expires stale PENDING rows with one approval_expired ledger row each, scoped by user', async () => {
+    const { registry, approvals } = await setup();
+    const a = await queue(registry, { text: 'a' });
+    await queue(registry, { text: 'b' });
+    rows.push({ ...rows[0], id: 'other', userId: 'u2' });
+    const out = await approvals.sweepApprovals(at(31_000)(), 'u1');
+    expect(out).toEqual({ expired: 2, stuckFailed: 0 });
+    expect(rows.filter((r) => r.userId === 'u1').every((r) => r.status === 'EXPIRED')).toBe(true);
+    expect(rows.find((r) => r.id === 'other')?.status).toBe('PENDING');
+    expect(rowsFor('approval_expired')).toHaveLength(2);
+    expect(rowsFor('approval_expired')[0].validationResult).toContain(a.id);
+    expect(await approvals.sweepApprovals(at(32_000)(), 'u1')).toEqual({ expired: 0, stuckFailed: 0 });
+    expect(rowsFor('approval_expired')).toHaveLength(2);
+  });
+
+  it('sweep: EXECUTING older than 2 minutes becomes FAILED with approval_stuck_failed and is never re-run', async () => {
+    const { registry, approvals } = await setup();
+    await queue(registry, { text: 'stuck' });
+    rows[0].status = 'EXECUTING'; rows[0].decidedAt = T0;
+    expect(await approvals.sweepApprovals(at(119_000)(), 'u1')).toEqual({ expired: 0, stuckFailed: 0 });
+    expect(await approvals.sweepApprovals(at(121_000)(), 'u1')).toEqual({ expired: 0, stuckFailed: 1 });
+    expect(rows[0].status).toBe('FAILED');
+    expect(rowsFor('approval_stuck_failed')).toHaveLength(1);
+    expect(handler).not.toHaveBeenCalled();
+    const out = await approvals.decide('u1', rows[0].id, 'approve', { now: at(122_000) });
+    expect(out.status).toBe('ALREADY_DECIDED');
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('sweep runs from listPending and decide', async () => {
+    const { registry, approvals } = await setup();
+    await queue(registry, { text: 'a' });
+    expect(await approvals.listPending('u1', at(31_000))).toEqual([]);
+    expect(rows[0].status).toBe('EXPIRED');
+    expect(rowsFor('approval_expired')).toHaveLength(1);
+    const b = await queue(registry, { text: 'b' });
+    const out = await approvals.decide('u1', b.id, 'approve', { now: at(100_000) });
+    expect(out.status).toBe('EXPIRED');
+    expect(rowsFor('approval_expired')).toHaveLength(2);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('L4: if approval_approved cannot be ledgered the row is FAILED and nothing runs', async () => {
+    const { registry, approvals } = await setup();
+    const a = await queue(registry, { text: 'x' });
+    failLedger.add('approval_approved');
+    const out = await approvals.decide('u1', a.id, 'approve', { now: at(1000) });
+    expect(out.status).toBe('FAILED');
+    expect(rows[0].status).toBe('FAILED');
+    expect(handler).not.toHaveBeenCalled();
+    expect(rowsFor('approval_executed')).toHaveLength(0);
+  });
+
+  it('L3-adjacent: a malformed stored payload fails the hash lock instead of throwing', async () => {
+    const { registry, approvals } = await setup();
+    const a = await queue(registry, { text: 'x' });
+    rows[0].params = { text: new Date() };
+    const out = await approvals.decide('u1', a.id, 'approve', { now: at(1000) });
+    expect(out.status).toBe('FAILED');
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('L7: with an approval already pending this turn, a Class C call is denied and ledgered, not queued', async () => {
+    const { registry } = await setup();
+    const res = await registry.executeTool('u1', TOOL, { text: 'second' }, 'WHINK', undefined, 'cid-2', { approvalAlreadyPending: true });
+    expect(res.approvalRequired).toBeUndefined();
+    expect(res.success).toBe(false);
+    expect(rows).toHaveLength(0);
+    expect(rowsFor('approval_already_pending_this_turn')).toHaveLength(1);
+    expect(rowsFor('approval_already_pending_this_turn')[0].status).toBe('DENIED');
+    expect(handler).not.toHaveBeenCalled();
   });
 });

@@ -64,6 +64,9 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
         const offered = new Set(opts.tools.map((t) => t.name));
         let history: NeutralMessage[] = opts.messages.map((m) => ({ role: m.role, content: m.content }) as NeutralMessage);
 
+        // L7: at most one approval per run.
+        let approvalPending = false;
+
         for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
           let response;
           try {
@@ -136,16 +139,18 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
               opts.persona,
               opts.mambaMode ?? undefined,
               opts.correlationId,
+              { approvalAlreadyPending: approvalPending },
             );
 
             if (result.approvalRequired) {
+              approvalPending = true;
               send({ type: 'approval_required', approval: result.approvalRequired });
               send({ type: 'tool_result', tool: call.name, success: false, data: 'awaiting approval' });
               history = [...history, {
                 role: 'tool',
                 toolCallId: call.id,
                 name: call.name,
-                content: `Awaiting human approval (id ${result.approvalRequired.id}). Do not retry; the user will decide.`,
+                content: 'Awaiting human approval. Do not retry; the user will decide.',
               }];
               continue;
             }
@@ -197,6 +202,12 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
             }
 
             history = [...history, { role: 'tool', toolCallId: call.id, name: call.name, content: toolContent }];
+          }
+
+          // The human must decide before the model acts again this turn.
+          if (approvalPending) {
+            send({ type: 'done' });
+            return;
           }
         }
 

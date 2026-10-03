@@ -74,9 +74,15 @@ export async function checkApprovedAction(
   const row = await prisma.approvalRequest.findFirst({ where: { id: approvalId, userId } });
   if (!row) return deny('Approval not found');
   if (row.status !== 'EXECUTING') return deny(`Approval is ${row.status}, not approved for execution`);
+  if (row.executedAt) return deny('Approval already consumed');
   if ((row.tool ?? row.kind) !== capability) return deny('Approval does not match this action');
   if (!row.decidedAt || row.decidedAt.getTime() > row.expiresAt.getTime()) return deny('Approval was not decided before expiry');
-  const recomputed = approvalContentHash({ kind: row.kind, tool: row.tool, params: row.params });
+  let recomputed: string;
+  try {
+    recomputed = approvalContentHash({ kind: row.kind, tool: row.tool, params: row.params });
+  } catch {
+    return deny('Approved content hash mismatch');
+  }
   if (recomputed !== row.contentHash || contentHash !== row.contentHash) return deny('Approved content hash mismatch');
   return { allowed: true, method: 'human_approved' };
 }
