@@ -10,8 +10,9 @@
 
 import { loadGatewayTools } from '@/lib/tool-registry';
 import { canUseGateway } from '@/lib/gateway-access';
+import { hasActiveConnection } from '@/lib/social/connections';
 import { recordActionSafe } from '@/lib/ledger';
-import type { ToolDefinition } from '@/lib/tool-loop';
+import { SOCIAL_SCHEDULE_TOOL, type ToolDefinition } from '@/lib/tool-loop';
 
 export async function resolveChatTools(opts: {
   userId: string;
@@ -19,8 +20,19 @@ export async function resolveChatTools(opts: {
   persona: string;
   correlationId: string;
 }): Promise<ToolDefinition[]> {
-  // H1: gateway tools are owner-only. Anyone else gets standard tools and no gateway load.
-  if (!(await canUseGateway(opts.userId))) return opts.standardTools;
+  // The scheduling tool is offered only to a user with an active X connection.
+  let base = opts.standardTools;
+  try {
+    if (!base.some((t) => t.name === SOCIAL_SCHEDULE_TOOL.name) && (await hasActiveConnection(opts.userId, 'x'))) {
+      base = [...base, SOCIAL_SCHEDULE_TOOL];
+    }
+  } catch {
+    base = opts.standardTools;
+  }
+
+  // H1: owner-only gateway tools stay owner-only. Everyone else gets at most the social platforms,
+  // which loadGatewayTools filters for them.
+  const owner = await canUseGateway(opts.userId);
 
   let gateway: { available: boolean; disabled?: boolean; tools: ToolDefinition[] };
   try {
@@ -30,24 +42,27 @@ export async function resolveChatTools(opts: {
   }
 
   // Gateway not configured: not an outage, so no network call and no ledger row.
-  if (gateway.disabled) return opts.standardTools;
+  if (gateway.disabled) return base;
 
   if (!gateway.available) {
-    await recordActionSafe({
-      userId: opts.userId,
-      initiator: 'system',
-      persona: opts.persona,
-      action: 'gateway_unavailable',
-      tool: 'openclaw',
-      permissionClass: 'A',
-      status: 'FAILED',
-      outputSummary: 'Gateway unreachable; this turn ran with standard tools only.',
-      correlationId: opts.correlationId,
-    });
-    return opts.standardTools;
+    // Only the owner gets an outage row: other users were never promised the gateway.
+    if (owner) {
+      await recordActionSafe({
+        userId: opts.userId,
+        initiator: 'system',
+        persona: opts.persona,
+        action: 'gateway_unavailable',
+        tool: 'openclaw',
+        permissionClass: 'A',
+        status: 'FAILED',
+        outputSummary: 'Gateway unreachable; this turn ran with standard tools only.',
+        correlationId: opts.correlationId,
+      });
+    }
+    return base;
   }
 
   // Standard tool names win: a gateway tool can never shadow one.
-  const taken = new Set(opts.standardTools.map((t) => t.name));
-  return [...opts.standardTools, ...gateway.tools.filter((t) => !taken.has(t.name))];
+  const taken = new Set(base.map((t) => t.name));
+  return [...base, ...gateway.tools.filter((t) => !taken.has(t.name))];
 }

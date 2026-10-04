@@ -1,7 +1,31 @@
 {
-  "_comment": "WHINK-side permission classes for gateway tools, keyed by full WHINK tool name. Any gateway tool not listed here, or whose sanitised definition no longer matches defHash, is Class C (always needs a human). Compute defHash with scripts/tool-def-hash.ts after reviewing the tool. A class or annotation sent by the gateway is ignored.",
+  "_comment": "WHINK-side permission classes for gateway tools, keyed by full WHINK tool name. Any gateway tool not listed here, or whose sanitised definition no longer matches defHash, is Class C (always needs a human). Compute defHash with scripts/tool-def-hash.ts after reviewing the tool. A class or annotation sent by the gateway is ignored. Social read tools (2d) are hashed against services/openclaw/upstreams/social/src/tools.ts; re-run scripts/tool-def-hash.ts against the live gateway if a hash ever mismatches (a mismatch only makes the tool Class C). Social write tools are deliberately absent: Class C by default.",
   "openclaw__ref__echo": {
     "class": "A",
     "defHash": "e35aa3e0379809f1c80652111d7beae5c4ecc52be5668e63a18db2d5c6e3667b"
+  },
+  "openclaw__x__read_home_timeline": {
+    "class": "A",
+    "defHash": "fad0ddf0c1057869cdde0d2b319ce2585442b6047cf9503e3170e5ef91781211"
+  },
+  "openclaw__x__read_mentions": {
+    "class": "A",
+    "defHash": "aed8b209d9fea9c07d4a53f6c2de843f86b176e3350bcdba2a45d6b2aa0668c6"
+  },
+  "openclaw__x__read_dms": {
+    "class": "A",
+    "defHash": "aedfdaec6f00ca3969f45908eddd15e4f121cf3fc7b299be7d067cbbcbfba552"
+  },
+  "openclaw__instagram__read_media": {
+    "class": "A",
+    "defHash": "07f38b3274a80d8515da3d60ef6cf8dcb128c4eaefbd45d7b752545bb393901f"
+  },
+  "openclaw__instagram__read_comments": {
+    "class": "A",
+    "defHash": "e6e110fc5b56f198ea3d593a2a928d3767a4ba7a19716b0422b8af0ef4dd7e4f"
+  },
+  "openclaw__tiktok__read_videos": {
+    "class": "A",
+    "defHash": "0aa006a3c438065bb37af203800de55f89305950899764a0a7fc6e42a0686c5a"
   }
 }

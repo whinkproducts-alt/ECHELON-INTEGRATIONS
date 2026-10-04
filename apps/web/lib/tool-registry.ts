@@ -6,7 +6,10 @@ import { createApproval, type ApprovalView } from '@/lib/approvals';
 import { stripFakeUntrustedTags, scanForInjectionPatterns, filterToolResult } from '@/lib/content-isolation';
 import { writeMemory, correctMemory, searchMemory } from '@/lib/memory-engine';
 import { listOpenClawTools, callOpenClawTool, isGatewayConfigured } from '@/lib/openclaw-client';
-import { canUseGateway, isGatewayTool } from '@/lib/gateway-access';
+import { canUseGateway, canUseGatewayTool, isGatewayTool, socialPlatformOf } from '@/lib/gateway-access';
+import { callSocialTool } from '@/lib/social/execute';
+import { hasActiveConnection } from '@/lib/social/connections';
+import { SCHEDULE_TOOL_NAME, createScheduleApproval, parseScheduleInput } from '@/lib/social/scheduler';
 import { defHash, neutralDescription, redactSchemaForUnreviewed } from '@/lib/tool-definition';
 import toolClassesConfig from '@/config/tool-classes.json';
 import type { ToolDefinition } from '@/lib/tool-loop';
@@ -344,6 +347,14 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
     return { success: true, data: results, source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
+  // Never runs directly: Class C, queued as a 'scheduled_post' approval in executeTool.
+  [SCHEDULE_TOOL_NAME]: async () => ({
+    success: false,
+    error: 'Scheduling runs only through an approval',
+    timestamp: new Date().toISOString(),
+    toolVersion: '1.0.0',
+  }),
+
   task_create: async (userId: string, params: any) => {
     if (typeof params?.projectId !== 'string' || params.projectId.length === 0) {
       return { success: false, error: 'projectId required', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
@@ -370,6 +381,8 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
 });
 
 const TOOL_RISK_MAP: Record<string, PermissionClass> = Object.assign(Object.create(null), {
+  // Class C always: runs only through an approval of kind 'scheduled_post' (never as a direct call).
+  [SCHEDULE_TOOL_NAME]: 'C',
   memory_write: 'A',
   memory_read: 'A',
   memory_correct: 'B',
@@ -519,7 +532,14 @@ export async function registerOpenClawTools(userId: string): Promise<GatewayRegi
   const registered: ToolDefinition[] = [];
   for (const p of plans) {
     const original = p.original;
-    TOOL_HANDLERS[p.full] = async (_uid: string, params: any): Promise<ToolExecutionResult> => {
+    const socialPlatform = socialPlatformOf(p.full);
+    TOOL_HANDLERS[p.full] = async (uid: string, params: any): Promise<ToolExecutionResult> => {
+      if (socialPlatform) {
+        // Per-user credential path: the caller's own connection, or not_connected with no gateway call.
+        const res = await callSocialTool(uid, socialPlatform, original, params);
+        if (!res.success) return { success: false, error: res.error, source: 'openclaw', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+        return { success: true, data: res.data, source: 'openclaw', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+      }
       const data = await callOpenClawTool(original, params);
       return { success: true, data, source: 'openclaw', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
     };
@@ -556,8 +576,14 @@ let gatewayInflight: Promise<GatewayRegistration> | null = null;
  */
 export async function loadGatewayTools(userId: string, opts: { fresh?: boolean } = {}): Promise<GatewayRegistration> {
   if (!isGatewayConfigured()) return { available: false, disabled: true, tools: [] };
-  // H1: non-owners never trigger a load and never see the cached tool list.
-  if (!(await canUseGateway(userId))) return { available: false, disabled: true, tools: [] };
+  if (!userId) return { available: false, disabled: true, tools: [] };
+  const full = await loadFullGatewayTools(userId, opts);
+  // H1: non-owners see only the social platforms (per-user credentials). Never the owner-only tools.
+  if (await canUseGateway(userId)) return full;
+  return { ...full, tools: full.tools.filter((t) => socialPlatformOf(t.name) !== null) };
+}
+
+async function loadFullGatewayTools(userId: string, opts: { fresh?: boolean }): Promise<GatewayRegistration> {
   if (gatewayCache && !opts.fresh) {
     const ttl = gatewayCache.value.available ? GATEWAY_TTL_OK_MS : GATEWAY_TTL_FAIL_MS;
     if (Date.now() - gatewayCache.at < ttl) return gatewayCache.value;
@@ -603,8 +629,9 @@ export async function executeTool(
   const cid = correlationId ?? generateCorrelationId();
   const startTime = Date.now();
 
-  // H1: gateway tools are owner-only. Denied before lookup, permission check or approval.
-  if (isGatewayTool(toolName) && !(await canUseGateway(userId))) {
+  // H1: gateway tools are owner-only, except the social platforms (per-user credentials).
+  // Denied before lookup, permission check or approval.
+  if (isGatewayTool(toolName) && !(await canUseGatewayTool(userId, toolName))) {
     await recordActionSafe({
       userId,
       initiator: 'system',
@@ -666,7 +693,37 @@ export async function executeTool(
       });
       return { success: false, error: 'An approval is already pending this turn; call not queued', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
     }
+    if (riskClass === 'C' && toolName === SCHEDULE_TOOL_NAME) {
+      const deny = async (reason: string): Promise<ToolExecutionResult> => {
+        await recordActionSafe({
+          userId, initiator: 'system', persona, mambaMode, tool: toolName, action: 'tool_execution_denied',
+          permissionClass: 'C', status: 'DENIED', inputSummary: safeJson(params), outputSummary: reason,
+          correlationId: cid, latencyMs: Date.now() - startTime,
+        });
+        return { success: false, error: reason, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+      };
+      const parsed = parseScheduleInput(params);
+      if (!parsed.ok) return deny(parsed.error);
+      if (!(await hasActiveConnection(userId, 'x'))) return deny('not_connected: X is not connected. Connect it in Settings, Connected Apps.');
+      try {
+        const approval = await createScheduleApproval(userId, parsed.value, cid, persona);
+        return { success: false, error: 'Awaiting human approval', approvalRequired: approval, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+      } catch (e) {
+        logger.error('approval creation failed; tool not run', { userId, tool: toolName, error: (e as Error)?.message });
+        return { success: false, error: 'Could not queue approval; tool not run', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+      }
+    }
     if (riskClass === 'C') {
+      // Social write with no connection: say so now instead of queuing an approval that cannot run.
+      const sp = socialPlatformOf(toolName);
+      if (sp && !(await hasActiveConnection(userId, sp))) {
+        await recordActionSafe({
+          userId, initiator: 'system', persona, mambaMode, tool: toolName, action: 'social_not_connected',
+          permissionClass: 'C', status: 'DENIED', inputSummary: safeJson(params), outputSummary: 'not_connected',
+          correlationId: cid, latencyMs: Date.now() - startTime,
+        });
+        return { success: false, error: `not_connected: ${sp} is not connected. Connect it in Settings, Connected Apps.`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+      }
       try {
         const approval = await createApproval({
           userId,
@@ -822,7 +879,7 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
 
   if (gateway) {
     // H1: checked before anything else, including on approvals created before this rule existed.
-    if (!(await canUseGateway(userId))) {
+    if (!(await canUseGatewayTool(userId, approval.tool))) {
       await recordActionSafe({ ...baseEarly, action: 'gateway_not_permitted', status: 'DENIED', outputSummary: 'gateway_not_permitted', validationResult: JSON.stringify({ approvalId: approval.id }), latencyMs: 0 });
       return { success: false, error: 'Gateway tools are not available to this account', timestamp: stamp(), toolVersion: '1.0.0' };
     }

@@ -14,6 +14,19 @@ import type { ToolDefinition } from '@/lib/tool-loop';
 import { logger } from '@/lib/logger';
 import { sanitiseToolDefinition } from '@/lib/tool-definition';
 
+/** MCP request _meta key under which the gateway receives a per-call credential. */
+export const CREDENTIAL_META_KEY = 'dev.whink/credential';
+
+/** Strings to redact from any log line for a call that carried this credential. */
+function credentialSecrets(credential: string): string[] {
+  const out = [credential];
+  try {
+    const parsed = JSON.parse(credential) as { access_token?: unknown };
+    if (typeof parsed.access_token === 'string' && parsed.access_token) out.push(parsed.access_token);
+  } catch { /* not JSON: the whole string is already listed */ }
+  return out;
+}
+
 /** Errors whose message is a fixed string, safe to surface. Upstream text never goes into one. */
 class GatewayError extends Error {}
 
@@ -48,10 +61,11 @@ function endpoint(): URL {
 }
 
 /** Log upstream error text server-side only: token redacted, truncated. */
-function logUpstream(what: string, err: unknown): void {
+function logUpstream(what: string, err: unknown, secrets: string[] = []): void {
   let text = err instanceof Error ? err.message : String(err);
   const token = process.env.OPENCLAW_TOKEN?.trim();
   if (token) text = text.split(token).join('[redacted]');
+  for (const secret of secrets) if (secret) text = text.split(secret).join('[redacted]');
   logger.warn(`openclaw ${what} failed`, { detail: text.slice(0, 300) });
 }
 
@@ -67,7 +81,7 @@ function assertTokenPresent(url: URL): void {
   }
 }
 
-async function withClient<T>(timeoutMs: number, fn: (client: Client) => Promise<T>): Promise<T> {
+async function withClient<T>(timeoutMs: number, fn: (client: Client) => Promise<T>, secrets: string[] = []): Promise<T> {
   const url = endpoint();
   assertTokenPresent(url);
   const token = process.env.OPENCLAW_TOKEN?.trim();
@@ -81,7 +95,7 @@ async function withClient<T>(timeoutMs: number, fn: (client: Client) => Promise<
     return await fn(client);
   } catch (err) {
     if (err instanceof GatewayError) throw err;
-    logUpstream('request', err);
+    logUpstream('request', err, secrets);
     const status = statusOf(err);
     throw new GatewayError(status ? `OpenClaw gateway request failed (status ${status})` : 'OpenClaw gateway request failed');
   } finally {
@@ -141,10 +155,27 @@ export async function listOpenClawTools(): Promise<ToolDefinition[]> {
  * The caller must treat the returned value as untrusted external content.
  * A tool-level error is thrown so the permission and ledger layers see a failure.
  */
-export async function callOpenClawTool(toolName: string, params: unknown): Promise<unknown> {
+export async function callOpenClawTool(
+  toolName: string,
+  params: unknown,
+  opts: { credential?: string } = {},
+): Promise<unknown> {
   const args = params && typeof params === 'object' && !Array.isArray(params) ? (params as Record<string, unknown>) : {};
-  const res = await withClient(CALL_TIMEOUT_MS, (client) =>
-    client.callTool({ name: toolName, arguments: args }, undefined, { timeout: CALL_TIMEOUT_MS }),
+  // The credential rides in MCP request _meta for this one call only. It is never part of
+  // the tool arguments, so it cannot reach an approval, the ledger or the model context.
+  const credential = opts.credential;
+  const secrets = credential ? credentialSecrets(credential) : [];
+  const res = await withClient(
+    CALL_TIMEOUT_MS,
+    (client) =>
+      client.callTool(
+        credential
+          ? { name: toolName, arguments: args, _meta: { [CREDENTIAL_META_KEY]: credential } }
+          : { name: toolName, arguments: args },
+        undefined,
+        { timeout: CALL_TIMEOUT_MS },
+      ),
+    secrets,
   );
 
   const parts: string[] = [];
@@ -159,7 +190,7 @@ export async function callOpenClawTool(toolName: string, params: unknown): Promi
   const text = joined.length > MAX_RESULT_CHARS ? `${joined.slice(0, MAX_RESULT_CHARS)}\n[truncated]` : joined;
 
   if (res.isError === true) {
-    logUpstream('tool call', new Error(text));
+    logUpstream('tool call', new Error(text), secrets);
     throw new GatewayError('OpenClaw tool reported an error');
   }
   return text;

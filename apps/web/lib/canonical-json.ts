@@ -48,3 +48,8 @@ export function approvalContentHash(a: HashableApproval): string {
     .update(canonicalJson({ kind: a.kind, tool: a.tool ?? null, params: a.params ?? null }))
     .digest('hex');
 }
+
+/** sha256 hex of the canonical JSON of {tool, args}. Binds a scheduled send to what the human approved. */
+export function toolArgsHash(a: { tool: string; args: unknown }): string {
+  return createHash('sha256').update(canonicalJson({ tool: a.tool, args: a.args ?? null })).digest('hex');
+}

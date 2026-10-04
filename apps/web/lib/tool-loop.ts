@@ -378,3 +378,21 @@ export const STANDARD_TOOLS: ToolDefinition[] = [
     },
   },
 ];
+
+/**
+ * Built-in scheduling tool. Class C: it only ever queues an approval. Not part of STANDARD_TOOLS:
+ * lib/gateway-chat.ts offers it only when the user has an active X connection.
+ */
+export const SOCIAL_SCHEDULE_TOOL: ToolDefinition = {
+  name: 'social_schedule_post',
+  description: 'Schedule a post on X for a future time. The user must approve the exact text and time before it is saved, and the post is sent later only if the content is unchanged.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      platform: { type: 'string', enum: ['x'] },
+      text: { type: 'string', description: 'Post text, up to 280 characters' },
+      send_at: { type: 'string', description: 'ISO 8601 date-time in the future, with a timezone offset' },
+    },
+    required: ['platform', 'text', 'send_at'],
+  },
+};

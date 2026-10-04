@@ -21,22 +21,25 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts         Account[]
-  sessions         Session[]
-  profile          UserProfile?
-  preferences      UserPreference?
-  apiKeys          UserApiKey[]
-  conversations    Conversation[]
-  projects         ProjectMember[]
-  ownedProjects    Project[]
-  personaState     PersonaState?
-  actions          Action[]
-  permissions      Permission[]
-  delegations      Delegation[]
-  evaluationRuns   EvaluationRun[]
-  calendarEvents   CalendarEvent[]
-  notes            Note[]
-  approvalRequests ApprovalRequest[]
+  accounts          Account[]
+  sessions          Session[]
+  profile           UserProfile?
+  preferences       UserPreference?
+  apiKeys           UserApiKey[]
+  conversations     Conversation[]
+  projects          ProjectMember[]
+  ownedProjects     Project[]
+  personaState      PersonaState?
+  actions           Action[]
+  permissions       Permission[]
+  delegations       Delegation[]
+  evaluationRuns    EvaluationRun[]
+  calendarEvents    CalendarEvent[]
+  notes             Note[]
+  approvalRequests  ApprovalRequest[]
+  socialConnections SocialConnection[]
+  oauthStates       OAuthState[]
+  scheduledPosts    ScheduledPost[]
 
   @@map("users")
 }
@@ -724,7 +727,7 @@ model AgentKnowledge {
 model ApprovalRequest {
   id              String    @id @default(cuid())
   userId          String
-  kind            String // tool_call | ear
+  kind            String // tool_call | ear | autonomy_change | scheduled_post
   tool            String?
   params          Json?
   contentHash     String // sha256 hex of canonical {kind, tool, params}
@@ -744,4 +747,64 @@ model ApprovalRequest {
 
   @@index([userId, status, expiresAt])
   @@map("approval_requests")
+}
+
+model SocialConnection {
+  id              String    @id @default(cuid())
+  userId          String
+  platform        String // x | instagram | tiktok
+  accessTokenEnc  String // AES-256-GCM via lib/key-encryption.ts, never plaintext
+  refreshTokenEnc String?
+  scopes          String    @default("")
+  expiresAt       DateTime?
+  platformUserId  String?
+  platformHandle  String?
+  status          String    @default("active") // active | expired | revoked
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform])
+  @@map("social_connections")
+}
+
+model OAuthState {
+  id              String    @id @default(cuid())
+  userId          String
+  platform        String
+  stateHash       String    @unique // sha256 hex of the state value; the state itself is never stored
+  codeVerifierEnc String // PKCE verifier, encrypted
+  redirectUri     String
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime
+  usedAt          DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, platform])
+  @@map("oauth_states")
+}
+
+model ScheduledPost {
+  id          String    @id @default(cuid())
+  userId      String
+  approvalId  String
+  platform    String
+  tool        String
+  args        Json
+  contentHash String // sha256 of canonical {tool, args} as approved
+  sendAt      DateTime
+  status      String    @default("scheduled") // scheduled | sending | sent | failed | cancelled
+  error       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  sentAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([approvalId])
+  @@index([status, sendAt])
+  @@index([userId, status])
+  @@map("scheduled_posts")
 }
