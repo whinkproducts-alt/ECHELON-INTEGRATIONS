@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { BillingSurface } from '../billing/_components/billing-surface';
 import { AutonomyApprovalPanel } from './autonomy-approval-panel';
+import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import {
   interpretPatchResponse, pickPendingAutonomy, resolveDecision, type AutonomyApproval,
 } from '@/lib/autonomy-approval';
@@ -361,6 +362,7 @@ export function SettingsSurface() {
 }
 
 function ApiKeysSurface() {
+  const { productName } = useTenantConfig();
   const [keys, setKeys] = useState<{ provider: string; keyHint: string; createdAt: string }[]>([]);
   const [anthropicInput, setAnthropicInput] = useState('');
   const [openaiInput, setOpenaiInput] = useState('');
@@ -415,7 +417,7 @@ function ApiKeysSurface() {
     <div className="space-y-4">
       <Section title="Your API Keys (BYOK)" icon={<Key className="h-4 w-4" />}>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Connect your own provider keys. WHINK will use them instead of the server keys for your sessions.
+          Connect your own provider keys. {productName} will use them instead of the server keys for your sessions.
           Keys are encrypted at rest with AES-256-GCM. Your billing stays under your own provider dashboard.
         </p>
 

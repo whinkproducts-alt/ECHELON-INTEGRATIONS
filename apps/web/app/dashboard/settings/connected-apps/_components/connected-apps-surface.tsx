@@ -156,7 +156,7 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
                     <span
                       className={`inline-block text-xs font-medium px-2 py-0.5 rounded border ${
                         row.status === 'expired'
-                          ? 'border-destructive text-destructive'
+                          ? 'border-[hsl(var(--pending-amber))] text-[hsl(var(--pending-amber))]'
                           : row.status === 'connected'
                             ? 'border-primary text-primary'
                             : 'border-border text-muted-foreground'
