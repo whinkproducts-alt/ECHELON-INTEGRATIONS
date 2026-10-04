@@ -14,7 +14,7 @@ import type { ServerConfig } from '../src/config.js';
 
 const KEY = 'dev.whink/credential';
 const CRED = JSON.stringify({ access_token: 'tok_TOPSECRET_999', platform_user_id: '1' });
-const cfg: ServerConfig[] = [{ platform: 'x', transport: 'stdio', command: 'x', args: [], envNames: [] }];
+const cfg: ServerConfig[] = [{ platform: 'x', transport: 'stdio', command: 'x', args: [], envNames: [], builtin: true }];
 
 /** A real SDK upstream over in-memory transport that records the _meta it receives. */
 function stubConnector(seen: unknown[]): Connector {
@@ -53,11 +53,38 @@ async function gateway(agg: Aggregator) {
 
 describe('forwardMeta', () => {
   it('keeps only the credential string and progressToken', () => {
-    expect(forwardMeta({ [KEY]: CRED, progressToken: 5, other: 'x', 'io.modelcontextprotocol/related-task': { taskId: 't' } })).toEqual({ [KEY]: CRED, progressToken: 5 });
+    expect(forwardMeta({ [KEY]: CRED, progressToken: 5, other: 'x', 'io.modelcontextprotocol/related-task': { taskId: 't' } }, true)).toEqual({ [KEY]: CRED, progressToken: 5 });
     expect(forwardMeta({ other: 1 })).toBeUndefined();
-    expect(forwardMeta({ [KEY]: { not: 'string' } })).toBeUndefined();
-    expect(forwardMeta({ [KEY]: 'x'.repeat(9000) })).toBeUndefined();
+    expect(forwardMeta({ [KEY]: { not: 'string' } }, true)).toBeUndefined();
+    expect(forwardMeta({ [KEY]: 'x'.repeat(9000) }, true)).toBeUndefined();
     expect(forwardMeta(undefined)).toBeUndefined();
+  });
+});
+
+describe('credential routing (M1)', () => {
+  it('never forwards the credential to a non-social route, and warns without the value', async () => {
+    const out: string[] = [];
+    const w1 = vi.spyOn(process.stdout, 'write').mockImplementation((c: unknown) => { out.push(String(c)); return true; });
+    const w2 = vi.spyOn(process.stderr, 'write').mockImplementation((c: unknown) => { out.push(String(c)); return true; });
+    const seen: unknown[] = [];
+    const other: ServerConfig[] = [{ platform: 'gh', transport: 'stdio', command: 'x', args: [], envNames: [] }];
+    const spoof: ServerConfig[] = [{ platform: 'x', transport: 'stdio', command: 'x', args: [], envNames: [] }]; // reserved name, not validated
+    for (const c of [other, spoof]) {
+      const agg = new Aggregator(c, stubConnector(seen), {});
+      const name = `${c[0].platform}__read_mentions`;
+      await agg.listTools();
+      await agg.callTool(name, {}, { [KEY]: CRED, progressToken: 'p' });
+    }
+    w1.mockRestore();
+    w2.mockRestore();
+    expect(seen).toEqual([{ progressToken: 'p' }, { progressToken: 'p' }]);
+    expect(out.join('')).not.toContain('TOPSECRET');
+    expect(forwardMeta({ [KEY]: CRED })).toBeUndefined();
+  });
+  it('still forwards to a validated social route', async () => {
+    const seen: unknown[] = [];
+    await new Aggregator(cfg, stubConnector(seen), {}).callTool('x__read_mentions', {}, { [KEY]: CRED });
+    expect(seen[0]).toEqual({ [KEY]: CRED });
   });
 });
 

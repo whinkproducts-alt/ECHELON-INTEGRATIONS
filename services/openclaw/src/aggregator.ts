@@ -2,7 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { ServerConfig } from './config.js';
-import { resolveHeaders } from './config.js';
+import { resolveHeaders, RESERVED_SOCIAL_PLATFORMS } from './config.js';
 import { assignNames } from './namespace.js';
 import { log } from './log.js';
 
@@ -14,12 +14,15 @@ const MAX_CREDENTIAL_CHARS = 8192;
  * Build the upstream _meta for ONE call from the incoming one. Only the credential (a string) and the
  * MCP-standard progressToken pass; every other key is dropped. The result is never logged or stored.
  */
-export function forwardMeta(incoming: unknown): Record<string, unknown> | undefined {
+export function forwardMeta(incoming: unknown, allowCredential = false): Record<string, unknown> | undefined {
   if (!incoming || typeof incoming !== 'object') return undefined;
   const m = incoming as Record<string, unknown>;
   const out: Record<string, unknown> = {};
   const cred = m[CREDENTIAL_META_KEY];
-  if (typeof cred === 'string' && cred.length > 0 && cred.length <= MAX_CREDENTIAL_CHARS) out[CREDENTIAL_META_KEY] = cred;
+  if (cred !== undefined && !allowCredential) {
+    // Fixed message, never the value: only the validated built-in social connector may receive a credential.
+    log.warn('credential dropped: upstream is not the built-in social connector');
+  } else if (typeof cred === 'string' && cred.length > 0 && cred.length <= MAX_CREDENTIAL_CHARS) out[CREDENTIAL_META_KEY] = cred;
   const pt = m.progressToken;
   if (typeof pt === 'string' || typeof pt === 'number') out.progressToken = pt;
   return Object.keys(out).length > 0 ? out : undefined;
@@ -106,6 +109,8 @@ function withTimeout<T>(ms: number, fn: () => Promise<T>): Promise<T> {
 interface Route {
   platform: string;
   original: string;
+  /** Created from the validated reserved social config. Only these routes may receive a credential. */
+  social: boolean;
 }
 
 function isObjectSchema(s: unknown): s is { type: 'object'; [k: string]: unknown } {
@@ -202,7 +207,11 @@ export class Aggregator {
     for (const r of rejected) log.warn('rejected upstream tool name', { platform: cfg.platform, tool: r.tool, reason: r.reason });
     const snap: Snapshot = { tools: [], routes: new Map() };
     for (const a of accepted) {
-      snap.routes.set(a.exposed, { platform: cfg.platform, original: a.original });
+      snap.routes.set(a.exposed, {
+        platform: cfg.platform,
+        original: a.original,
+        social: cfg.transport === 'stdio' && cfg.builtin === true && RESERVED_SOCIAL_PLATFORMS.has(cfg.platform),
+      });
       snap.tools.push({
         name: a.exposed,
         description: String(a.tool.description ?? '').slice(0, MAX_DESCRIPTION_LEN),
@@ -224,7 +233,7 @@ export class Aggregator {
     const client = this.clients.get(route.platform);
     if (!client) return errorResult('upstream unavailable');
     try {
-      const fwd = forwardMeta(meta);
+      const fwd = forwardMeta(meta, route.social);
       const res = await client.callTool(
         { name: route.original, arguments: args ?? {}, ...(fwd ? { _meta: fwd } : {}) },
         undefined,
