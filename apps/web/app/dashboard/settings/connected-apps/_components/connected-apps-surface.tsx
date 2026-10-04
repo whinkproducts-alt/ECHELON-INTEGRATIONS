@@ -6,7 +6,7 @@ import { ArrowLeft, Link2, ShieldCheck, AlertTriangle, CheckCircle, Loader2 } fr
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import {
   PLATFORM_LABELS, PLATFORM_NOTES, SOCIAL_PLATFORMS, parseConnections, statusLabel,
-  connectButtonLabel, interpretConnectResponse, errorMessage,
+  connectButtonLabel, interpretConnectResponse, errorMessage, consentText, DAILY_LIMITS_NOTE,
   type SocialConnectionView, type SocialPlatform, type CallbackNotice,
 } from '@/lib/social-ui';
 
@@ -27,6 +27,9 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
   const [notice, setNotice] = useState<CallbackNotice>(initialNotice);
   const [busy, setBusy] = useState<SocialPlatform | null>(null);
   const [confirming, setConfirming] = useState<SocialPlatform | null>(null);
+  // Consent is UX-only and held in memory. TODO: store consent server-side (who, when, text version) before connect.
+  const [consenting, setConsenting] = useState<SocialPlatform | null>(null);
+  const [agreed, setAgreed] = useState(false);
 
   const load = useCallback(() => {
     return fetch('/api/social/connections')
@@ -46,6 +49,7 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
   }, [load]);
 
   const connect = (platform: SocialPlatform) => {
+    if (consenting !== platform || !agreed) return;
     setBusy(platform);
     setNotice(null);
     fetch(`/api/social/${platform}/connect`, { method: 'POST' })
@@ -57,11 +61,15 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
         } else {
           setNotice({ kind: 'error', text: outcome.message });
           setBusy(null);
+          setConsenting(null);
+          setAgreed(false);
         }
       })
       .catch(() => {
         setNotice({ kind: 'error', text: errorMessage('server_error') });
         setBusy(null);
+        setConsenting(null);
+        setAgreed(false);
       });
   };
 
@@ -98,6 +106,10 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
         <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0 text-foreground" />
         <p>Posting, replying, DMs, follows and deletes always ask for your approval first. Reading does not.</p>
       </div>
+
+      <p className="text-xs text-muted-foreground">
+        <span className="font-medium text-[hsl(var(--pending-amber))]">Limit:</span> {DAILY_LIMITS_NOTE}
+      </p>
 
       {notice && (
         <div
@@ -168,11 +180,14 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
                   <div className="flex items-center gap-2">
                     {row.status !== 'connected' && (
                       <button
-                        onClick={() => connect(row.platform)}
-                        disabled={busy !== null}
+                        onClick={() => {
+                          setConsenting(row.platform);
+                          setAgreed(false);
+                          setNotice(null);
+                        }}
+                        disabled={busy !== null || consenting === row.platform}
                         className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
                       >
-                        {isBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                         {connectButtonLabel(row.status)}
                       </button>
                     )}
@@ -187,6 +202,48 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
                     )}
                   </div>
                 </div>
+
+                {row.status !== 'connected' && consenting === row.platform && (
+                  <div
+                    role="group"
+                    aria-label={`Consent to connect ${PLATFORM_LABELS[row.platform]}`}
+                    className="border border-border rounded-md p-3 space-y-3"
+                  >
+                    <p className="text-sm font-medium">What connecting {PLATFORM_LABELS[row.platform]} allows</p>
+                    {consentText(row.platform, productName).map((t) => (
+                      <p key={t} className="text-sm text-muted-foreground">{t}</p>
+                    ))}
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={agreed}
+                        onChange={(e) => setAgreed(e.target.checked)}
+                        disabled={busy !== null}
+                      />
+                      I understand and agree
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => connect(row.platform)}
+                        disabled={!agreed || busy !== null}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                      >
+                        {isBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        Continue
+                      </button>
+                      <button
+                        onClick={() => {
+                          setConsenting(null);
+                          setAgreed(false);
+                        }}
+                        disabled={busy !== null}
+                        className="px-3 py-1.5 bg-secondary text-foreground rounded-md text-sm font-medium hover:opacity-80"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {connected && confirming === row.platform && (
                   <div role="alertdialog" aria-label={`Confirm disconnect ${PLATFORM_LABELS[row.platform]}`} className="flex items-center justify-between gap-3 flex-wrap border border-destructive rounded-md p-3">

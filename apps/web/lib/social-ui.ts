@@ -100,8 +100,35 @@ export function validateAuthorizeUrl(platform: SocialPlatform, value: unknown): 
   return u.toString();
 }
 
+export const DAILY_LIMITS_NOTE =
+  'Daily limits apply to posts, replies, messages and follows to protect your account.';
+
+/** Exact wording of what a connection allows, shown before the user may continue. */
+export function consentText(platform: SocialPlatform, productName: string): string[] {
+  switch (platform) {
+    case 'x':
+      return [
+        `${productName} can read your timeline, mentions and direct messages, and can post, reply, send direct messages, follow, unfollow and delete posts for you. Every action that changes something waits for your approval. What it reads is sent to an AI model provider and may be processed outside Canada, and includes other people's messages. You are responsible for having the right to message people. Disconnect at any time to delete the stored access.`,
+      ];
+    case 'instagram':
+      return [
+        `${productName} can post to your Instagram account for you. Every action that changes something waits for your approval. This requires an Instagram Business or Creator account. Disconnect at any time to delete the stored access.`,
+      ];
+    default:
+      return [
+        `${productName} can publish posts to your TikTok account for you. This is posting only. Every action that changes something waits for your approval. Posts may be private until the platform audit completes. Disconnect at any time to delete the stored access.`,
+      ];
+  }
+}
+
 const ERROR_TEXT: Record<string, string> = {
   access_denied: 'You declined the connection, so nothing was linked.',
+  denied: 'You declined the connection, so nothing was linked.',
+  exchange_failed: 'The platform did not accept the sign-in. Please try again.',
+  missing_params: 'The platform sent back an incomplete response. Please try connecting again.',
+  storage_failed: 'We could not save the connection securely. Please try again.',
+  identity_failed: 'We could not confirm which account you signed in with. Please try again.',
+  encryption_not_configured: "Secure storage isn't configured on this server yet.",
   invalid_state: 'That sign-in link expired or was already used. Please try connecting again.',
   state_expired: 'That sign-in link expired. Please try connecting again.',
   token_exchange_failed: 'The platform did not accept the sign-in. Please try again.',
@@ -147,8 +174,8 @@ export function interpretConnectResponse(
     body && typeof body === 'object' && typeof (body as { error?: unknown }).error === 'string'
       ? (body as { error: string }).error
       : null;
-  if (status === 503 && errCode === 'platform_not_configured') {
-    return { ok: false, message: ERROR_TEXT.platform_not_configured };
+  if (status === 503 && (errCode === 'platform_not_configured' || errCode === 'encryption_not_configured')) {
+    return { ok: false, message: ERROR_TEXT[errCode] };
   }
   if (status < 200 || status >= 300) {
     return { ok: false, message: errorMessage(errCode) };

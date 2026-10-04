@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseConnections, statusLabel, connectButtonLabel, validateAuthorizeUrl,
-  errorMessage, noticeFromQuery, interpretConnectResponse,
+  errorMessage, noticeFromQuery, interpretConnectResponse, consentText, DAILY_LIMITS_NOTE,
 } from '../social-ui';
 
 describe('parseConnections', () => {
@@ -81,5 +81,39 @@ describe('interpretConnectResponse', () => {
   });
   it('other failures', () => {
     expect(interpretConnectResponse('x', 500, null).ok).toBe(false);
+  });
+});
+
+describe('callback error codes', () => {
+  const codes = ['exchange_failed', 'denied', 'missing_params', 'storage_failed', 'identity_failed',
+    'invalid_state', 'redirect_not_allowed', 'platform_not_configured', 'encryption_not_configured', 'unknown_platform'];
+  it('maps every backend code to fixed text, not the generic one', () => {
+    const generic = errorMessage('totally_unknown');
+    for (const c of codes) {
+      expect(errorMessage(c)).toBeTruthy();
+      expect(errorMessage(c)).not.toBe(generic);
+    }
+    expect(errorMessage('totally_unknown')).toMatch(/could not be completed/);
+  });
+  it('503 encryption_not_configured', () => {
+    expect(interpretConnectResponse('x', 503, { error: 'encryption_not_configured' }))
+      .toEqual({ ok: false, message: "Secure storage isn't configured on this server yet." });
+  });
+});
+
+describe('consent text', () => {
+  it('X lists the full scope with the tenant product name', () => {
+    const t = consentText('x', 'Acme')[0];
+    expect(t).toContain('Acme can read your timeline, mentions and direct messages');
+    expect(t).toContain('outside Canada');
+    expect(t).toContain("other people's messages");
+    expect(t).toContain('Disconnect at any time');
+  });
+  it('instagram and tiktok notes', () => {
+    expect(consentText('instagram', 'Acme').join(' ')).toContain('Business or Creator');
+    expect(consentText('tiktok', 'Acme').join(' ')).toContain('private until the platform audit completes');
+  });
+  it('limits note', () => {
+    expect(DAILY_LIMITS_NOTE).toMatch(/Daily limits apply/);
   });
 });
