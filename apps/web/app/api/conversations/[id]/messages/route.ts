@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { processInput, debriefTurn } from '@/lib/orchestrator';
-import { runToolLoop, STANDARD_TOOLS } from '@/lib/tool-loop';
+import { runToolLoop, STANDARD_TOOLS, isExternalTool } from '@/lib/tool-loop';
 import { logger, generateCorrelationId } from '@/lib/logger';
 import { runTaskGate } from '@/lib/task-gate';
 import { scanForInjectionPatterns } from '@/lib/content-isolation';
@@ -298,6 +298,8 @@ export async function POST(
     let fullContent = switchAnnouncement ? switchAnnouncement + '\n\n' : '';
     let memoryWriteCalledInLoop = false;
     let toolRanThisTurn = false;
+    // M3: any external read this turn (web, documents, any gateway tool incl. social DMs and feeds).
+    let externalContentThisTurn = false;
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -330,9 +332,11 @@ export async function POST(
                   fullContent += parsed.content;
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', content: parsed.content, persona: activePersona, mambaMode: activeMambaMode })}\n\n`));
                 } else if (parsed.type === 'tool_call') {
+                  if (typeof parsed.tool === 'string' && isExternalTool(parsed.tool)) externalContentThisTurn = true;
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'tool_call', tool: parsed.tool, input: parsed.input, persona: activePersona })}\n\n`));
                 } else if (parsed.type === 'tool_result') {
                   if (parsed.tool === 'memory_write') memoryWriteCalledInLoop = true;
+                  if (typeof parsed.tool === 'string' && isExternalTool(parsed.tool)) externalContentThisTurn = true;
                   toolRanThisTurn = true;
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'tool_result', tool: parsed.tool, success: parsed.success, persona: activePersona })}\n\n`));
                 } else if (parsed.type === 'approval_required' && parsed.approval) {
@@ -361,7 +365,9 @@ export async function POST(
           });
 
           // Auto memory extraction (detached — does not block the response)
-          if (!memoryWriteCalledInLoop && !toolRanThisTurn && fullContent.length > 100) {
+          // Skipped when external content was read: the assistant text may restate it, and auto-saved
+          // memory from an injected page or DM would be a persistence channel for the attacker.
+          if (!memoryWriteCalledInLoop && !toolRanThisTurn && !externalContentThisTurn && fullContent.length > 100) {
             const autoMemoryUserId = session.user.id;
             const autoMemoryConvId = conversationId;
             const autoMemoryContent = fullContent;
@@ -431,7 +437,7 @@ Assistant: ${autoMemoryContent}`;
               userMessage,
               assistantResponse: fullContent,
               accountId: session.user.id,
-              externalToolRan: toolRanThisTurn,
+              externalToolRan: toolRanThisTurn || externalContentThisTurn,
             });
           }
 
@@ -452,7 +458,10 @@ Assistant: ${autoMemoryContent}`;
             confirmationMethod: 'auto',
             status: 'VALIDATED',
             inputSummary: userMessage,
-            outputSummary: fullContent,
+            // Never put text that may restate DMs or feed content into the ledger.
+            outputSummary: externalContentThisTurn
+              ? `[response withheld from ledger: external content was read this turn; ${fullContent.length} chars]`
+              : fullContent,
             correlationId,
           });
 

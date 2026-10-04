@@ -787,19 +787,21 @@ model OAuthState {
 }
 
 model ScheduledPost {
-  id          String    @id @default(cuid())
-  userId      String
-  approvalId  String
-  platform    String
-  tool        String
-  args        Json
-  contentHash String // sha256 of canonical {tool, args} as approved
-  sendAt      DateTime
-  status      String    @default("scheduled") // scheduled | sending | sent | failed | cancelled
-  error       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  sentAt      DateTime?
+  id             String    @id @default(cuid())
+  userId         String
+  approvalId     String
+  platform       String
+  // Platform account id the post was approved for; a send is refused if the connection now differs.
+  platformUserId String?
+  tool           String
+  args           Json
+  contentHash    String // sha256 of canonical {tool, args} as approved
+  sendAt         DateTime
+  status         String    @default("scheduled") // scheduled | sending | sent | failed | cancelled
+  error          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  sentAt         DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

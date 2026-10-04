@@ -6,10 +6,11 @@ import { createApproval, type ApprovalView } from '@/lib/approvals';
 import { stripFakeUntrustedTags, scanForInjectionPatterns, filterToolResult } from '@/lib/content-isolation';
 import { writeMemory, correctMemory, searchMemory } from '@/lib/memory-engine';
 import { listOpenClawTools, callOpenClawTool, isGatewayConfigured } from '@/lib/openclaw-client';
-import { canUseGateway, canUseGatewayTool, isGatewayTool, socialPlatformOf } from '@/lib/gateway-access';
+import { canUseGateway, canUseGatewayTool, isGatewayTool, isSocialTool, socialPlatformOf } from '@/lib/gateway-access';
 import { callSocialTool } from '@/lib/social/execute';
 import { hasActiveConnection } from '@/lib/social/connections';
-import { SCHEDULE_TOOL_NAME, createScheduleApproval, parseScheduleInput } from '@/lib/social/scheduler';
+import { SCHEDULE_TOOL_NAME, checkScheduleCap, createScheduleApproval, parseScheduleInput } from '@/lib/social/scheduler';
+import { DAILY_CAP_ERROR, capCategoryOf, checkDailyCap, ledgerCapRefusal } from '@/lib/social/caps';
 import { defHash, neutralDescription, redactSchemaForUnreviewed } from '@/lib/tool-definition';
 import toolClassesConfig from '@/config/tool-classes.json';
 import type { ToolDefinition } from '@/lib/tool-loop';
@@ -434,6 +435,11 @@ const GATEWAY_CLASS_ALLOWLIST = loadToolClassAllowList();
 const GATEWAY_TOOLS = new Map<string, ToolDefinition>();
 /** Hash of the sanitised definition as last advertised by the gateway, by full name. */
 const GATEWAY_DEF_HASH = new Map<string, string>();
+/** Sanitised-definition hash of a gateway tool as last advertised, or null when it is not registered. */
+export function getGatewayDefHash(fullName: string): string | null {
+  return GATEWAY_DEF_HASH.get(fullName) ?? null;
+}
+
 /** Last hash reported as differing from the reviewed one, per tool: one event per distinct hash. */
 const REPORTED_DEF_HASH = new Map<string, string>();
 
@@ -553,8 +559,14 @@ export async function registerOpenClawTools(userId: string): Promise<GatewayRegi
   for (const p of plans) {
     if (!p.unreviewedChange || REPORTED_DEF_HASH.get(p.full) === p.hash) continue;
     REPORTED_DEF_HASH.set(p.full, p.hash);
+    const detail = `Gateway tool ${p.full} no longer matches its reviewed definition hash (now ${p.hash.slice(0, 12)}); treated as Class C`;
+    // L1: an owner-only tool's change is operator news. It is never written to a non-owner's ledger.
+    if (!(await canUseGatewayTool(userId, p.full))) {
+      logger.security('tool_definition_changed', { tool: p.full, details: `${detail} (not ledgered: caller may not use this tool)` });
+      continue;
+    }
     try {
-      await logSecurityEvent(userId, 'tool_definition_changed', `Gateway tool ${p.full} no longer matches its reviewed definition hash (now ${p.hash.slice(0, 12)}); treated as Class C`);
+      await logSecurityEvent(userId, 'tool_definition_changed', detail);
     } catch (e) {
       logger.error('security event write failed', { userId, tool: p.full, error: (e as Error)?.message });
     }
@@ -601,6 +613,40 @@ async function loadFullGatewayTools(userId: string, opts: { fresh?: boolean }): 
   return gatewayInflight;
 }
 
+/**
+ * Tools that persist or send data outward. Class A as written, but after external content was read
+ * in the same tool-loop run they need a human (tainted turn). Class B tools are escalated by class.
+ */
+const TAINT_ESCALATED_TOOLS: ReadonlySet<string> = new Set([
+  'web_search', 'web_fetch', 'memory_write', 'memory_correct', 'note_write',
+  'entity_create', 'entity_update', 'task_create', 'calendar_create',
+]);
+
+export function effectiveClassForTaint(toolName: string, base: PermissionClass, tainted: boolean): PermissionClass {
+  if (!tainted || base === 'C') return base;
+  return base === 'B' || TAINT_ESCALATED_TOOLS.has(toolName) ? 'C' : base;
+}
+
+/** Count and size only. Social content (DMs, feed text) never goes into the ledger. */
+function summariseSocialResult(result: ToolExecutionResult): string {
+  if (!result.success) return `error: ${String(result.error ?? 'failed').substring(0, 200)}`;
+  let bytes = 0;
+  try { bytes = (JSON.stringify(result.data) ?? '').length; } catch { bytes = 0; }
+  const d = result.data as unknown;
+  let items: number | null = null;
+  if (Array.isArray(d)) items = d.length;
+  else if (d && typeof d === 'object') {
+    for (const v of Object.values(d as Record<string, unknown>)) {
+      if (Array.isArray(v)) { items = v.length; break; }
+    }
+  }
+  return `ok items=${items ?? 'n/a'} bytes=${bytes}`;
+}
+
+function summariseOutput(toolName: string, result: ToolExecutionResult): string {
+  return isSocialTool(toolName) ? summariseSocialResult(result) : safeJson(result.data ?? result.error);
+}
+
 function safeJson(v: unknown): string {
   try { return (JSON.stringify(v) ?? '').substring(0, 500); } catch { return '[unserialisable]'; }
 }
@@ -624,7 +670,7 @@ export async function executeTool(
   persona?: string,
   mambaMode?: string,
   correlationId?: string,
-  opts: { approvalAlreadyPending?: boolean } = {}
+  opts: { approvalAlreadyPending?: boolean; tainted?: boolean } = {}
 ): Promise<ToolExecutionResult> {
   const cid = correlationId ?? generateCorrelationId();
   const startTime = Date.now();
@@ -670,7 +716,25 @@ export async function executeTool(
   }
 
   // Check permission. A registered tool with no explicit risk entry is treated as Class C.
-  const riskClass = TOOL_RISK_MAP[toolName] ?? 'C';
+  const baseClass = TOOL_RISK_MAP[toolName] ?? 'C';
+  // M3: once external content was read this run, Class B and outbound/persisting tools need a human.
+  const riskClass = effectiveClassForTaint(toolName, baseClass, opts.tainted === true);
+  if (riskClass !== baseClass) {
+    await recordActionSafe({
+      userId,
+      initiator: 'system',
+      persona,
+      mambaMode,
+      tool: toolName,
+      action: 'taint_escalation',
+      permissionClass: 'C',
+      status: 'AWAITING_APPROVAL',
+      inputSummary: safeJson(params),
+      outputSummary: `tainted_turn: escalated from class ${baseClass} to C`,
+      correlationId: cid,
+      latencyMs: Date.now() - startTime,
+    });
+  }
   const permCheck = await checkPermission(userId, toolName, riskClass, cid);
 
   if (!permCheck.allowed) {
@@ -705,6 +769,8 @@ export async function executeTool(
       const parsed = parseScheduleInput(params);
       if (!parsed.ok) return deny(parsed.error);
       if (!(await hasActiveConnection(userId, 'x'))) return deny('not_connected: X is not connected. Connect it in Settings, Connected Apps.');
+      const scheduleCap = await checkScheduleCap(userId, parsed.value.send_at, persona, cid);
+      if (!scheduleCap.allowed) return { success: false, error: scheduleCap.error, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
       try {
         const approval = await createScheduleApproval(userId, parsed.value, cid, persona);
         return { success: false, error: 'Awaiting human approval', approvalRequired: approval, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
@@ -723,6 +789,14 @@ export async function executeTool(
           correlationId: cid, latencyMs: Date.now() - startTime,
         });
         return { success: false, error: `not_connected: ${sp} is not connected. Connect it in Settings, Connected Apps.`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+      }
+      const capCategory = capCategoryOf(toolName);
+      if (capCategory) {
+        const cap = await checkDailyCap(userId, capCategory);
+        if (!cap.allowed) {
+          await ledgerCapRefusal(userId, toolName, cap, { persona, mambaMode, correlationId: cid, stage: 'before_approval' });
+          return { success: false, error: DAILY_CAP_ERROR, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+        }
       }
       try {
         const approval = await createApproval({
@@ -790,12 +864,13 @@ export async function executeTool(
     const result = await handler(userId, params);
     await finaliseRow(userId, actionRow.id, {
       status: result.success ? 'VALIDATED' : 'FAILED',
-      outputSummary: safeJson(result.data ?? result.error),
+      outputSummary: summariseOutput(toolName, result),
       latencyMs: Date.now() - startTime,
     });
 
-    // Fire-and-forget postmortem — only for successful executions
-    if (result.success) {
+    // Fire-and-forget postmortem — only for successful executions. Never for social tools:
+    // their output is private message and feed content and must not be sent to a model for a ledger note.
+    if (result.success && !isSocialTool(toolName)) {
       const actionId = actionRow.id;
       const capturedTool = toolName;
       const capturedParams = params;
@@ -930,6 +1005,16 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
     return { success: false, error: 'Tool definition changed since approval was requested; not run', timestamp: stamp(), toolVersion: '1.0.0' };
   }
 
+  // Daily cap, again at execution.
+  const approvedCapCategory = capCategoryOf(approval.tool);
+  if (approvedCapCategory) {
+    const cap = await checkDailyCap(userId, approvedCapCategory);
+    if (!cap.allowed) {
+      await ledgerCapRefusal(userId, approval.tool, cap, { persona: approval.persona, correlationId: approval.correlationId, stage: 'at_execution' });
+      return { success: false, error: DAILY_CAP_ERROR, timestamp: stamp(), toolVersion: '1.0.0' };
+    }
+  }
+
   let actionRow: { id: string };
   try {
     actionRow = await recordAction({
@@ -961,7 +1046,7 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
     const result = sanitiseApprovedResult(approval.tool, raw);
     await finaliseRow(userId, actionRow.id, {
       status: result.success ? 'VALIDATED' : 'FAILED',
-      outputSummary: safeJson(result.data ?? result.error),
+      outputSummary: summariseOutput(approval.tool, result),
       latencyMs: Date.now() - startTime,
     });
     return result;

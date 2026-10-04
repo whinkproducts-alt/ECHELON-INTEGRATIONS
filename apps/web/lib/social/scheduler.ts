@@ -17,30 +17,44 @@
 import { prisma } from '@/lib/db';
 import { logger, generateCorrelationId } from '@/lib/logger';
 import { recordAction, recordActionSafe, updateActionStatus } from '@/lib/ledger';
-import { checkApprovedAction, checkScheduledSend, logSecurityEvent } from '@/lib/permission-engine';
+import { SCHEDULED_DEF_CHANGED, checkApprovedAction, checkScheduledSend, logSecurityEvent } from '@/lib/permission-engine';
 import { toolArgsHash } from '@/lib/canonical-json';
 import { createApproval, type ApprovalView } from '@/lib/approvals';
-import { GATEWAY_TOOL_PREFIX } from '@/lib/gateway-access';
 import { callSocialTool } from '@/lib/social/execute';
-import { hasActiveConnection } from '@/lib/social/connections';
+import { getConnectedPlatformUserId, hasActiveConnection } from '@/lib/social/connections';
+import { sweepOAuthStates } from '@/lib/social/oauth';
+import { SCHEDULED_POST_TOOL } from '@/lib/social/scheduled-store';
+import { DAILY_CAP_ERROR, checkDailyCap, ledgerCapRefusal } from '@/lib/social/caps';
 
 export const SCHEDULE_TOOL_NAME = 'social_schedule_post';
-/** The one schedulable tool: an X post. Built from the gateway prefix so no gateway tool name is hardcoded. */
-export const SCHEDULED_POST_TOOL = `${GATEWAY_TOOL_PREFIX}x__post` as const;
+export { SCHEDULED_POST_TOOL };
 export const MAX_POST_CHARS = 280;
 const MAX_HORIZON_MS = 365 * 24 * 60 * 60_000;
 /** A row stuck in 'sending' this long is failed and never re-sent (a duplicate post is worse than a missed one). */
 export const SENDING_STUCK_MS = 10 * 60_000;
 const BATCH = 10;
 
-export interface ScheduleParams {
+/** The model-supplied part of a schedule request, validated. */
+export interface ScheduleCore {
   platform: 'x';
   tool: typeof SCHEDULED_POST_TOOL;
   args: { text: string };
   send_at: string;
 }
 
-export type ParseResult = { ok: true; value: ScheduleParams } | { ok: false; error: string };
+/**
+ * Approval params for a scheduled post. defHash is the sanitised definition hash of
+ * the scheduled gateway tool at request time; it is set by the server, never by the model, and the
+ * approval content hash covers it. A send is refused if the live definition differs.
+ */
+export interface ScheduleParams extends ScheduleCore {
+  defHash: string;
+}
+
+export type ParseResult = { ok: true; value: ScheduleCore } | { ok: false; error: string };
+
+/** send_at must carry an explicit offset: Z or +/-hh:mm. A bare local time is ambiguous and refused. */
+const ISO_WITH_OFFSET_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 /** Validate model-supplied tool input into the canonical approval params. Never trusts extra keys. */
 export function parseScheduleInput(input: unknown, now: Date = new Date()): ParseResult {
@@ -50,7 +64,9 @@ export function parseScheduleInput(input: unknown, now: Date = new Date()): Pars
   if (typeof i.text !== 'string' || i.text.trim().length === 0 || i.text.length > MAX_POST_CHARS) {
     return { ok: false, error: `text must be 1 to ${MAX_POST_CHARS} characters` };
   }
-  if (typeof i.send_at !== 'string' || !i.send_at.includes('T')) return { ok: false, error: 'send_at must be an ISO 8601 date-time' };
+  if (typeof i.send_at !== 'string' || !ISO_WITH_OFFSET_RE.test(i.send_at)) {
+    return { ok: false, error: 'send_at must be an ISO 8601 date-time with a timezone (Z or +/-hh:mm)' };
+  }
   const at = new Date(i.send_at);
   if (Number.isNaN(at.getTime())) return { ok: false, error: 'send_at must be an ISO 8601 date-time' };
   if (at.getTime() <= now.getTime()) return { ok: false, error: 'send_at must be in the future' };
@@ -65,6 +81,32 @@ function parseStoredParams(params: unknown, now: Date): ParseResult {
   const args = p.args as { text?: unknown } | null;
   if (p.tool !== SCHEDULED_POST_TOOL || !args || typeof args !== 'object') return { ok: false, error: 'Invalid scheduled post' };
   return parseScheduleInput({ platform: p.platform, text: args.text, send_at: p.send_at }, now);
+}
+
+/**
+ * The live sanitised-definition hash of the scheduled tool, from a registration of the gateway.
+ * Null when the gateway is unavailable or does not advertise the tool. Imported lazily because
+ * tool-registry imports this module.
+ */
+async function liveScheduledToolDefHash(userId: string, fresh: boolean): Promise<string | null> {
+  const reg = await import('@/lib/tool-registry');
+  const loaded = await reg.loadGatewayTools(userId, { fresh }).catch(() => null);
+  if (!loaded || !loaded.available) return null;
+  return reg.getGatewayDefHash(SCHEDULED_POST_TOOL);
+}
+
+/** Daily-cap gate for a schedule request, evaluated for the day the post would go out. */
+export async function checkScheduleCap(
+  userId: string,
+  sendAtIso: string,
+  persona: string | undefined,
+  correlationId: string,
+  excludeScheduledId?: string,
+): Promise<{ allowed: true } | { allowed: false; error: string }> {
+  const check = await checkDailyCap(userId, 'posts', { day: new Date(sendAtIso), excludeScheduledId });
+  if (check.allowed) return { allowed: true };
+  await ledgerCapRefusal(userId, SCHEDULED_POST_TOOL, check, { persona, correlationId, stage: 'before_approval' });
+  return { allowed: false, error: DAILY_CAP_ERROR };
 }
 
 export interface ActivateResult {
@@ -89,6 +131,8 @@ export async function activateScheduledPost(
   }
   const v = parsed.value;
   if (!(await hasActiveConnection(row.userId, v.platform))) return { success: false, error: 'X is not connected; not scheduled' };
+  const platformUserId = await getConnectedPlatformUserId(row.userId, v.platform);
+  if (!platformUserId) return { success: false, error: 'The connected X account could not be identified; reconnect X. Not scheduled' };
 
   const sendAt = new Date(v.send_at);
   const created = await prisma.scheduledPost.create({
@@ -96,6 +140,7 @@ export async function activateScheduledPost(
       userId: row.userId,
       approvalId: row.id,
       platform: v.platform,
+      platformUserId,
       tool: v.tool,
       args: v.args,
       contentHash: toolArgsHash({ tool: v.tool, args: v.args }),
@@ -173,7 +218,10 @@ export async function editScheduledPost(
   id: string,
   changes: { text?: unknown; send_at?: unknown },
   now: Date = new Date(),
-): Promise<{ ok: true; approval: ApprovalView } | { ok: false; error: string; status: 400 | 404 | 409 }> {
+): Promise<
+  | { ok: true; approval: ApprovalView }
+  | { ok: false; error: string; status: 400 | 404 | 409 | 429 | 500; cancelled?: boolean }
+> {
   if (!userId || !id) throw new Error('social: userId and id are required');
   const existing = await prisma.scheduledPost.findFirst({ where: { id, userId } });
   if (!existing) return { ok: false, error: 'Not found', status: 404 };
@@ -190,24 +238,43 @@ export async function editScheduledPost(
   );
   if (!parsed.ok) return { ok: false, error: parsed.error, status: 400 };
 
+  const correlationId = generateCorrelationId();
+  // Cap check before cancelling, not counting the post being replaced.
+  const cap = await checkScheduleCap(userId, parsed.value.send_at, undefined, correlationId, id);
+  if (!cap.allowed) return { ok: false, error: cap.error, status: 429 };
+
   if (!(await cancelScheduledPost(userId, id, 'edited_new_approval_required'))) {
     return { ok: false, error: 'Post is no longer editable', status: 409 };
   }
-  const approval = await createScheduleApproval(userId, parsed.value, generateCorrelationId());
-  return { ok: true, approval };
+  try {
+    const approval = await createScheduleApproval(userId, parsed.value, correlationId);
+    return { ok: true, approval };
+  } catch (e) {
+    // The old post is already cancelled and nothing was sent. Say so cleanly instead of a bare 500.
+    logger.error('scheduled post edit: approval creation failed after cancel', { userId, scheduledPostId: id, error: (e as Error)?.message });
+    return {
+      ok: false,
+      error: 'The old scheduled post was cancelled but the new approval could not be created. Nothing was sent. Schedule it again.',
+      status: 500,
+      cancelled: true,
+    };
+  }
 }
 
 /** Create the 'scheduled_post' approval for validated params. */
 export async function createScheduleApproval(
   userId: string,
-  value: ScheduleParams,
+  value: ScheduleCore,
   correlationId: string,
   persona?: string,
 ): Promise<ApprovalView> {
+  const defHash = await liveScheduledToolDefHash(userId, false);
+  if (!defHash) throw new Error('gateway_definition_unavailable');
+  const params: ScheduleParams = { ...value, defHash };
   return createApproval({
     userId,
     kind: 'scheduled_post',
-    params: value,
+    params,
     persona,
     correlationId,
     permissionClass: 'C',
@@ -245,11 +312,11 @@ export async function sendScheduledPost(userId: string, id: string): Promise<'se
     correlationId,
     validationResult: JSON.stringify({ approvalId: row.approvalId, scheduledPostId: row.id }),
   };
-  const fail = async (error: string, security = false): Promise<'failed'> => {
+  const fail = async (error: string, securityEvent?: { name: string; detail: string }): Promise<'failed'> => {
     await finishRow(userId, id, 'failed', error);
-    if (security) {
+    if (securityEvent) {
       try {
-        await logSecurityEvent(userId, 'scheduled_post_hash_mismatch', `Scheduled post ${row.id} content no longer matches the approved hash; not sent`, correlationId, 'FAILED');
+        await logSecurityEvent(userId, securityEvent.name, securityEvent.detail, correlationId, 'FAILED');
       } catch (e) {
         logger.error('security event write failed', { userId, error: (e as Error)?.message });
       }
@@ -261,13 +328,40 @@ export async function sendScheduledPost(userId: string, id: string): Promise<'se
   // Hash re-check against what is stored now.
   let recomputed = '';
   try { recomputed = toolArgsHash({ tool: row.tool, args: row.args }); } catch { recomputed = ''; }
-  if (recomputed !== row.contentHash) return fail('Content changed since approval; not sent', true);
+  if (recomputed !== row.contentHash) return fail('Content changed since approval; not sent', { name: 'scheduled_post_hash_mismatch', detail: `Scheduled post ${row.id} content no longer matches the approved hash; not sent` });
 
   // Only the approved shape may be sent: an X post, nothing else.
   if (row.tool !== SCHEDULED_POST_TOOL || row.platform !== 'x') return fail('Unsupported scheduled tool; not sent');
 
-  const perm = await checkScheduledSend(userId, row.approvalId, { tool: row.tool, args: row.args, contentHash: row.contentHash });
-  if (!perm.allowed) return fail(perm.reason ?? 'Permission denied', perm.reason === 'Scheduled content does not match the approved content');
+  // The connected platform account must still be the one the post was approved for.
+  const currentPlatformUserId = await getConnectedPlatformUserId(userId, 'x');
+  if (!row.platformUserId || !currentPlatformUserId || row.platformUserId !== currentPlatformUserId) {
+    return fail('Connected account changed since scheduling; not sent', { name: 'scheduled_post_account_changed', detail: `Scheduled post ${row.id}: the connected X account differs from the approved one; not sent` });
+  }
+
+  // Fresh registration: the tool definition must still be the one the human approved.
+  const liveDefHash = await liveScheduledToolDefHash(userId, true);
+  if (!liveDefHash) return fail('Gateway unavailable; not sent');
+
+  const perm = await checkScheduledSend(userId, row.approvalId, { tool: row.tool, args: row.args, contentHash: row.contentHash, liveDefHash });
+  if (!perm.allowed) {
+    if (perm.reason === SCHEDULED_DEF_CHANGED) {
+      return fail(perm.reason, { name: 'tool_definition_changed', detail: `Gateway tool ${row.tool} changed since scheduled post ${row.id} was approved; not sent` });
+    }
+    return fail(
+      perm.reason ?? 'Permission denied',
+      perm.reason === 'Scheduled content does not match the approved content'
+        ? { name: 'scheduled_post_hash_mismatch', detail: `Scheduled post ${row.id} content no longer matches the approved hash; not sent` }
+        : undefined,
+    );
+  }
+
+  // Daily cap, again at execution (this row is already 'sending', so exclude it from the count).
+  const cap = await checkDailyCap(userId, 'posts', { excludeScheduledId: row.id });
+  if (!cap.allowed) {
+    await ledgerCapRefusal(userId, row.tool, cap, { correlationId, stage: 'at_execution' });
+    return fail('daily_cap_reached');
+  }
 
   let ledgerRow: { id: string };
   try {
@@ -309,6 +403,11 @@ export async function processDueScheduledPosts(now: Date = new Date()): Promise<
   let sent = 0;
   let failed = 0;
   try {
+    try {
+      await sweepOAuthStates(now);
+    } catch (e) {
+      logger.error('oauth state sweep failed', { error: (e as Error)?.message });
+    }
     const stuck = await prisma.scheduledPost.findMany({
       where: { status: 'sending', updatedAt: { lt: new Date(now.getTime() - SENDING_STUCK_MS) } },
       select: { id: true, userId: true },

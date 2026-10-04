@@ -18,6 +18,8 @@ export type SocialCallResult =
 
 const LABEL: Record<SocialPlatform, string> = { x: 'X', instagram: 'Instagram', tiktok: 'TikTok' };
 
+export const ENCRYPTION_NOT_CONFIGURED_MESSAGE = 'encryption_not_configured: the server encryption key is not set, so social connections cannot be used.';
+
 export function notConnectedMessage(platform: SocialPlatform, expired: boolean): string {
   return expired
     ? `not_connected: the ${LABEL[platform]} connection has expired. Reconnect it in Settings, Connected Apps.`
@@ -34,6 +36,7 @@ export async function callSocialTool(
   params: unknown,
 ): Promise<SocialCallResult> {
   const cred = await loadCredential(userId, platform);
+  if (!cred.ok && cred.reason === 'encryption_not_configured') return { success: false, error: ENCRYPTION_NOT_CONFIGURED_MESSAGE };
   if (!cred.ok) return { success: false, error: notConnectedMessage(platform, cred.reason === 'expired') };
   const data = await callOpenClawTool(gatewayName, params, { credential: cred.credential });
   return { success: true, data };

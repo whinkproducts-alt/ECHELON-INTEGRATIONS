@@ -57,7 +57,8 @@ export const PLATFORM_CONFIG: Record<SocialPlatform, PlatformConfig> = {
   tiktok: {
     authorizeUrl: 'https://www.tiktok.com/v2/auth/authorize/',
     tokenUrl: 'https://open.tiktokapis.com/v2/oauth/token/',
-    revokeUrl: null,
+    // TikTok Login Kit revoke endpoint (POST form: client_key, client_secret, token). Best effort.
+    revokeUrl: 'https://open.tiktokapis.com/v2/oauth/revoke/',
     scopes: ['user.info.basic', 'video.list', 'video.publish'],
     scopeSeparator: ',',
     clientIdParam: 'client_key',
@@ -77,13 +78,19 @@ export function clientCredentials(platform: SocialPlatform): { id: string; secre
 
 export const STATE_TTL_MS = 10 * 60_000;
 
-/** Build the redirect URI server-side. Null when SOCIAL_OAUTH_REDIRECT_BASE is unset or not a valid URL. */
+/** https anywhere; http only for a loopback host. Anything else is refused. */
+function isAcceptableBase(u: URL): boolean {
+  if (u.protocol === 'https:') return true;
+  return u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1');
+}
+
+/** Build the redirect URI server-side. Null when SOCIAL_OAUTH_REDIRECT_BASE is unset or not an acceptable URL. */
 export function buildRedirectUri(platform: SocialPlatform): string | null {
   const base = process.env.SOCIAL_OAUTH_REDIRECT_BASE?.trim();
   if (!base) return null;
   try {
     const u = new URL(base);
-    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+    if (!isAcceptableBase(u)) return null;
     return `${u.origin}/api/social/${platform}/callback`;
   } catch {
     return null;
@@ -100,13 +107,21 @@ export function isRedirectAllowed(uri: string): boolean {
 }
 
 /**
- * Absolute URL of the Connected Apps screen, for callback redirects. The origin is the configured
- * redirect base when set, else the fallback (the request origin). Params are fixed codes only.
+ * Location of the Connected Apps screen, for callback redirects. The origin is NEVER taken from the
+ * request (Host header is attacker-influenced). It comes from SOCIAL_OAUTH_REDIRECT_BASE, then AUTH_URL,
+ * then NEXTAUTH_URL, each only when acceptable (https, or http on localhost/127.0.0.1). When none is
+ * usable the result is a relative path, which is a valid Location value. Params are fixed codes only.
  */
-export function connectedAppsUrl(params: Record<string, string>, fallbackOrigin: string): string {
-  const base = process.env.SOCIAL_OAUTH_REDIRECT_BASE?.trim() ?? '';
-  let origin = fallbackOrigin;
-  try { origin = new URL(base).origin; } catch { /* use fallback */ }
+export function connectedAppsUrl(params: Record<string, string>): string {
   const qs = new URLSearchParams(params).toString();
-  return `${origin}/dashboard/settings/connected-apps?${qs}`;
+  const path = `/dashboard/settings/connected-apps?${qs}`;
+  for (const raw of [process.env.SOCIAL_OAUTH_REDIRECT_BASE, process.env.AUTH_URL, process.env.NEXTAUTH_URL]) {
+    const v = raw?.trim();
+    if (!v) continue;
+    try {
+      const u = new URL(v);
+      if (isAcceptableBase(u)) return `${u.origin}${path}`;
+    } catch { /* try the next source */ }
+  }
+  return path;
 }

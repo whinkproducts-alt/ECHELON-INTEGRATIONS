@@ -12,12 +12,13 @@ import { completeCallback } from '@/lib/social/oauth';
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ platform: string }> }) {
   const { platform } = await params;
-  const origin = req.nextUrl.origin;
-  const back = (q: Record<string, string>) => NextResponse.redirect(connectedAppsUrl(q, origin), 302);
+  // Redirects never use the request origin: Location is absolute only from configured URLs, else relative.
+  const redirect = (location: string) => new NextResponse(null, { status: 302, headers: { Location: location } });
+  const back = (q: Record<string, string>) => redirect(connectedAppsUrl(q));
 
   if (!isSocialPlatform(platform)) return back({ error: 'unknown_platform' });
   const session = await auth();
-  if (!session?.user?.id) return NextResponse.redirect(new URL('/login', origin), 302);
+  if (!session?.user?.id) return redirect('/login');
 
   const sp = req.nextUrl.searchParams;
   const result = await completeCallback(session.user.id, platform, {

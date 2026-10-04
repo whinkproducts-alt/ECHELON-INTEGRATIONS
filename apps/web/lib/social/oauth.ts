@@ -13,7 +13,8 @@ import { createHash, randomBytes } from 'crypto';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { recordActionSafe } from '@/lib/ledger';
-import { decryptKey, encryptKey } from '@/lib/key-encryption';
+import { decryptKey, encryptKey, isEncryptionConfigured } from '@/lib/key-encryption';
+import { cancelScheduledRowsForPlatform } from '@/lib/social/scheduled-store';
 import {
   PLATFORM_CONFIG,
   STATE_TTL_MS,
@@ -43,10 +44,11 @@ export function hashState(state: string): string {
 
 export type StartResult =
   | { ok: true; authorizeUrl: string }
-  | { ok: false; status: 400 | 503; error: 'platform_not_configured' | 'redirect_not_allowed' };
+  | { ok: false; status: 400 | 503; error: 'platform_not_configured' | 'redirect_not_allowed' | 'encryption_not_configured' };
 
 export async function startConnect(userId: string, platform: SocialPlatform): Promise<StartResult> {
   if (!userId) throw new Error('social: userId is required');
+  if (!isEncryptionConfigured()) return { ok: false, status: 503, error: 'encryption_not_configured' };
   const creds = clientCredentials(platform);
   const redirectUri = buildRedirectUri(platform);
   if (!creds || !redirectUri) return { ok: false, status: 503, error: 'platform_not_configured' };
@@ -130,8 +132,12 @@ export async function postTokenRequest(platform: SocialPlatform, form: Record<st
   };
 }
 
-/** Best-effort lookup of the connected account's id and handle. Failure is not an error. */
-async function lookupIdentity(platform: SocialPlatform, accessToken: string): Promise<{ id: string | null; handle: string | null }> {
+/**
+ * Look up the connected account's id and handle. For X this is required: null means the lookup
+ * failed and the callback must fail without storing anything. Platforms without a lookup
+ * (skeletons) return empty identity.
+ */
+async function lookupIdentity(platform: SocialPlatform, accessToken: string): Promise<{ id: string | null; handle: string | null } | null> {
   if (platform !== 'x') return { id: null, handle: null };
   try {
     const res = await fetch('https://api.x.com/2/users/me', {
@@ -139,13 +145,14 @@ async function lookupIdentity(platform: SocialPlatform, accessToken: string): Pr
       redirect: 'error',
       signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
     });
-    if (!res.ok) return { id: null, handle: null };
+    if (!res.ok) return null;
     const json = (await res.json()) as { data?: { id?: unknown; username?: unknown } };
-    const id = typeof json.data?.id === 'string' ? json.data.id.slice(0, 40) : null;
+    const id = typeof json.data?.id === 'string' && json.data.id ? json.data.id.slice(0, 40) : null;
+    if (!id) return null;
     const handle = typeof json.data?.username === 'string' ? json.data.username.slice(0, 60) : null;
     return { id, handle };
   } catch {
-    return { id: null, handle: null };
+    return null;
   }
 }
 
@@ -156,6 +163,7 @@ export type CallbackErrorCode =
   | 'platform_not_configured'
   | 'exchange_failed'
   | 'denied'
+  | 'identity_failed'
   | 'storage_failed';
 
 export type CallbackResult = { ok: true } | { ok: false; error: CallbackErrorCode };
@@ -192,6 +200,9 @@ export async function completeCallback(
   if (claimed.count !== 1) return fail(userId, platform, 'invalid_state');
   const row = await prisma.oAuthState.findFirst({ where: { stateHash, userId, platform } });
   if (!row) return fail(userId, platform, 'invalid_state');
+  // Single use is already enforced by the claim above. Drop the row now so the encrypted PKCE
+  // verifier does not outlive the one callback that needs it (row is held in memory).
+  await prisma.oAuthState.deleteMany({ where: { id: row.id, userId } });
 
   if (params.error) return fail(userId, platform, 'denied');
   if (!code || code.length > 2000) return fail(userId, platform, 'missing_params');
@@ -202,6 +213,7 @@ export async function completeCallback(
     return fail(userId, platform, 'redirect_not_allowed');
   }
   if (!clientCredentials(platform)) return fail(userId, platform, 'platform_not_configured');
+  if (!isEncryptionConfigured()) return fail(userId, platform, 'storage_failed');
 
   let tokens: TokenSet;
   try {
@@ -216,6 +228,8 @@ export async function completeCallback(
   }
 
   const identity = await lookupIdentity(platform, tokens.accessToken);
+  // X: no verified identity, no connection. Nothing is stored.
+  if (!identity) return fail(userId, platform, 'identity_failed');
   const scopes = tokens.scopes || PLATFORM_CONFIG[platform].scopes.join(' ');
   const data = {
     accessTokenEnc: encryptKey(tokens.accessToken),
@@ -227,11 +241,20 @@ export async function completeCallback(
     status: 'active',
   };
   try {
+    const existing = await prisma.socialConnection.findFirst({
+      where: { userId, platform },
+      select: { platformUserId: true },
+    });
+    const accountChanged = Boolean(existing && existing.platformUserId !== identity.id);
     await prisma.socialConnection.upsert({
       where: { userId_platform: { userId, platform } },
       create: { userId, platform, ...data },
       update: data,
     });
+    if (accountChanged) {
+      // A different platform account is now connected: posts approved for the old one must not go out.
+      await cancelScheduledRowsForPlatform(userId, platform, 'platform_account_changed');
+    }
   } catch {
     logger.error('social connection store failed', { userId, platform });
     return fail(userId, platform, 'storage_failed');
@@ -247,4 +270,12 @@ export async function completeCallback(
     outputSummary: `connected ${platform}${identity.handle ? ` as @${identity.handle}` : ''}`,
   });
   return { ok: true };
+}
+
+/** Remove expired and already-used OAuth states (all users). Run from the worker. Returns rows removed. */
+export async function sweepOAuthStates(now: Date = new Date()): Promise<number> {
+  const res = await prisma.oAuthState.deleteMany({
+    where: { OR: [{ expiresAt: { lt: now } }, { usedAt: { not: null } }] },
+  });
+  return res.count;
 }

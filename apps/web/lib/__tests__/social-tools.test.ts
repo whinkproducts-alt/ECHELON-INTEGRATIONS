@@ -18,6 +18,8 @@ const createApproval = vi.fn();
 const recordAction = vi.fn();
 const recordActionSafe = vi.fn();
 const updateActionStatus = vi.fn();
+const countToolExecutions = vi.fn(async (_userId: string, _tools: string[], _since: Date, _until?: Date) => 0);
+const scheduledCount = vi.fn(async () => 0);
 const autonomy = { level: 1 };
 const conn = { current: null as null | Record<string, unknown> };
 const socialUpdateMany = vi.fn();
@@ -54,10 +56,11 @@ async function load() {
         updateMany: socialUpdateMany,
       },
       approvalRequest: { findFirst: approvalFindFirst, updateMany: approvalUpdateMany },
+      scheduledPost: { count: scheduledCount },
     },
   }));
   vi.doMock('@/lib/memory-engine', () => ({ writeMemory: vi.fn(), correctMemory: vi.fn(), searchMemory: vi.fn() }));
-  vi.doMock('@/lib/ledger', () => ({ recordAction, recordActionSafe, updateActionStatus }));
+  vi.doMock('@/lib/ledger', () => ({ recordAction, recordActionSafe, updateActionStatus, countToolExecutions }));
   vi.doMock('@/lib/approvals', () => ({ createApproval }));
   vi.doMock('@/lib/logger', () => ({ generateCorrelationId: () => 'cid', logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), security: vi.fn() } }));
   return import('@/lib/tool-registry');
@@ -67,9 +70,12 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   process.env.OPENCLAW_ALLOWED_USER_IDS = 'owner-only';
+  process.env.ENCRYPTION_KEY = 'c'.repeat(64);
   process.env.X_CLIENT_ID = 'cid';
   process.env.X_CLIENT_SECRET = 'csecret';
   autonomy.level = 1;
+  countToolExecutions.mockResolvedValue(0);
+  scheduledCount.mockResolvedValue(0);
   conn.current = activeRow();
   listOpenClawTools.mockResolvedValue(sanitised);
   callOpenClawTool.mockResolvedValue('{"data":[]}');
@@ -294,5 +300,215 @@ describe('executeApprovedTool uses the same credential path', () => {
     expect(res.success).toBe(false);
     expect(res.error).toMatch(/^not_connected/);
     expect(callOpenClawTool).not.toHaveBeenCalled();
+  });
+});
+
+describe('M3: tainted turn escalates Class B and outbound/persisting tools to Class C', () => {
+  beforeEach(() => { autonomy.level = 5; });
+
+  it('DM read, then memory_write in the same run: approval required, handler not run, ledgered tainted_turn', async () => {
+    const { registerOpenClawTools, executeTool } = await load();
+    await registerOpenClawTools('u2');
+    const read = await executeTool('u2', 'openclaw__x__read_dms', {});
+    expect(read.success).toBe(true); // social reads stay Class A even when tainted
+    const readTainted = await executeTool('u2', 'openclaw__x__read_dms', {}, 'WHINK', undefined, 'cid', { tainted: true });
+    expect(readTainted.success).toBe(true);
+
+    createApproval.mockClear();
+    const write = await executeTool('u2', 'memory_write', { type: 'semantic', statement: 'x', source: 'conversation' }, 'WHINK', undefined, 'cid', { tainted: true });
+    expect(write.success).toBe(false);
+    expect(write.approvalRequired).toBeDefined();
+    expect(createApproval).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u2', kind: 'tool_call', tool: 'memory_write' }));
+    expect(recordActionSafe).toHaveBeenCalledWith(expect.objectContaining({ action: 'taint_escalation', tool: 'memory_write', outputSummary: expect.stringContaining('tainted_turn') }));
+  });
+
+  it.each(['web_fetch', 'web_search', 'memory_correct', 'note_write', 'entity_create', 'entity_update', 'task_create', 'calendar_create'])(
+    'tainted %s needs approval even at autonomy 5 with a delegation',
+    async (tool) => {
+      const { executeTool } = await load();
+      createApproval.mockClear();
+      const res = await executeTool('u2', tool, { url: 'https://example.com', query: 'q' }, 'WHINK', undefined, 'cid', { tainted: true });
+      expect(res.approvalRequired, tool).toBeDefined();
+      expect(createApproval).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('untainted turn is unchanged: memory_write (A) and a delegated Class B tool run without approval', async () => {
+    const { executeTool } = await load();
+    createApproval.mockClear();
+    const w = await executeTool('u2', 'memory_write', { type: 'semantic', statement: 'x', source: 'conversation' });
+    expect(w.approvalRequired).toBeUndefined();
+    const wFalse = await executeTool('u2', 'memory_write', { type: 'semantic', statement: 'x', source: 'conversation' }, 'WHINK', undefined, 'cid', { tainted: false });
+    expect(wFalse.approvalRequired).toBeUndefined();
+    // Not escalated: no approval, and no taint ledger row. (The handler itself is stubbed at the db boundary.)
+    expect(createApproval).not.toHaveBeenCalled();
+    expect(recordActionSafe).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'taint_escalation' }));
+    expect(recordAction).toHaveBeenCalledWith(expect.objectContaining({ tool: 'memory_write', permissionClass: 'A', status: 'SUBMITTED' }));
+  });
+
+  it('tainted read-only tools (memory_read, calendar_list) still run', async () => {
+    const { executeTool, effectiveClassForTaint } = await load();
+    expect(effectiveClassForTaint('memory_read', 'A', true)).toBe('A');
+    expect(effectiveClassForTaint('memory_write', 'A', true)).toBe('C');
+    expect(effectiveClassForTaint('memory_correct', 'B', true)).toBe('C');
+    expect(effectiveClassForTaint('memory_write', 'A', false)).toBe('A');
+    const r = await executeTool('u2', 'memory_read', { query: 'q' }, 'WHINK', undefined, 'cid', { tainted: true });
+    expect(r.approvalRequired).toBeUndefined();
+  });
+});
+
+describe('Compliance P2: per-user daily caps on social writes', () => {
+  it('posts: refused at 25 before any approval is created, ledgered daily_cap_reached', async () => {
+    countToolExecutions.mockResolvedValue(25);
+    const { registerOpenClawTools, executeTool } = await load();
+    await registerOpenClawTools('u2');
+    const res = await executeTool('u2', 'openclaw__x__post', { text: 'hi' });
+    expect(res.success).toBe(false);
+    expect(res.approvalRequired).toBeUndefined();
+    expect(res.error).toMatch(/^daily_cap_reached/);
+    expect(createApproval).not.toHaveBeenCalled();
+    expect(recordActionSafe).toHaveBeenCalledWith(expect.objectContaining({ action: 'social_daily_cap_reached', status: 'DENIED', userId: 'u2' }));
+  });
+
+  it('defaults: posts 25, replies 50, dms 20, follows+unfollows 10 combined, deletes 20 (one under allowed, at limit refused)', async () => {
+    const { registerOpenClawTools, executeTool } = await load();
+    await registerOpenClawTools('u2');
+    const table: Array<[string, number]> = [['x__post', 25], ['x__reply', 50], ['x__send_dm', 20], ['x__follow', 10], ['x__unfollow', 10], ['x__delete_post', 20]];
+    for (const [tool, limit] of table) {
+      createApproval.mockClear();
+      countToolExecutions.mockResolvedValue(limit - 1);
+      const ok = await executeTool('u2', `openclaw__${tool}`, { text: 'a', in_reply_to_id: '1', target_user_id: '1', post_id: '1', recipient_id: '1' });
+      expect(ok.approvalRequired, `${tool} under cap`).toBeDefined();
+      countToolExecutions.mockResolvedValue(limit);
+      const no = await executeTool('u2', `openclaw__${tool}`, { text: 'a' });
+      expect(no.error, `${tool} at cap`).toMatch(/^daily_cap_reached/);
+    }
+    // follow and unfollow share one counter
+    const toolsArg = countToolExecutions.mock.calls.map((c) => c[1]).find((t) => t.includes('openclaw__x__follow'));
+    expect(toolsArg).toContain('openclaw__x__unfollow');
+  });
+
+  it('SOCIAL_DAILY_CAPS overrides a default; invalid JSON falls back to defaults', async () => {
+    const { registerOpenClawTools, executeTool } = await load();
+    await registerOpenClawTools('u2');
+    process.env.SOCIAL_DAILY_CAPS = '{"dms":2}';
+    try {
+      countToolExecutions.mockResolvedValue(2);
+      expect((await executeTool('u2', 'openclaw__x__send_dm', { text: 'a' })).error).toMatch(/^daily_cap_reached/);
+      process.env.SOCIAL_DAILY_CAPS = 'not json';
+      expect((await executeTool('u2', 'openclaw__x__send_dm', { text: 'a' })).approvalRequired).toBeDefined();
+    } finally {
+      delete process.env.SOCIAL_DAILY_CAPS;
+    }
+  });
+
+  it('scheduled posts count toward the posts cap', async () => {
+    countToolExecutions.mockResolvedValue(0);
+    scheduledCount.mockResolvedValue(25);
+    const { executeTool } = await load();
+    const res = await executeTool('u2', 'social_schedule_post', { platform: 'x', text: 'later', send_at: new Date(Date.now() + 3600_000).toISOString() });
+    expect(res.error).toMatch(/^daily_cap_reached/);
+    expect(createApproval).not.toHaveBeenCalled();
+  });
+
+  it('enforced again at execution of an approved call: no gateway call, ledgered', async () => {
+    const tool = 'openclaw__x__post';
+    const mod = await load();
+    await mod.registerOpenClawTools('u2');
+    const def = sanitised.find((t) => t.name === 'x__post')!;
+    const params = { args: { text: 'hello' }, defHash: defHash({ description: def.description, inputSchema: def.inputSchema }) };
+    const contentHash = approvalContentHash({ kind: 'tool_call', tool, params });
+    const now = Date.now();
+    approvalFindFirst.mockResolvedValue({
+      id: 'ap1', userId: 'u2', kind: 'tool_call', tool, params, contentHash, status: 'EXECUTING', executedAt: null,
+      decidedAt: new Date(now - 1000), expiresAt: new Date(now + 29_000),
+    });
+    countToolExecutions.mockResolvedValue(25);
+    const res = await mod.executeApprovedTool('u2', { id: 'ap1', tool, params, contentHash, correlationId: 'c' });
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/^daily_cap_reached/);
+    expect(callOpenClawTool).not.toHaveBeenCalled();
+    expect(recordActionSafe).toHaveBeenCalledWith(expect.objectContaining({ action: 'social_daily_cap_reached' }));
+  });
+
+  it('at most one social write approval per turn: a second write in the same run is denied, not queued', async () => {
+    const { registerOpenClawTools, executeTool } = await load();
+    await registerOpenClawTools('u2');
+    createApproval.mockClear();
+    const first = await executeTool('u2', 'openclaw__x__post', { text: 'a' }, 'WHINK', undefined, 'cid', { approvalAlreadyPending: false });
+    expect(first.approvalRequired).toBeDefined();
+    const second = await executeTool('u2', 'openclaw__x__post', { text: 'b' }, 'WHINK', undefined, 'cid', { approvalAlreadyPending: true });
+    expect(second.approvalRequired).toBeUndefined();
+    expect(second.error).toMatch(/already pending/);
+    expect(createApproval).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('L11: social read content never reaches the ledger and never a postmortem model', () => {
+  it('ledger output is a count/size summary only; no postmortem call', async () => {
+    const chatOnce = vi.fn(async () => '{}');
+    vi.doMock('@/lib/model-router', () => ({ chatOnce }));
+    callOpenClawTool.mockResolvedValue({ data: [{ text: 'SECRET DM BODY one' }, { text: 'SECRET DM BODY two' }] });
+    const { registerOpenClawTools, executeTool } = await load();
+    await registerOpenClawTools('u2');
+    const res = await executeTool('u2', 'openclaw__x__read_dms', { max_results: 5 });
+    expect(res.success).toBe(true);
+    await new Promise((r) => setTimeout(r, 20));
+    const ledger = JSON.stringify([recordAction.mock.calls, recordActionSafe.mock.calls, updateActionStatus.mock.calls]);
+    expect(ledger).not.toContain('SECRET DM BODY');
+    expect(String(updateActionStatus.mock.calls.at(-1)?.[2].outputSummary)).toMatch(/^ok items=2 bytes=\d+$/);
+    expect(chatOnce).not.toHaveBeenCalled();
+  });
+});
+
+describe('L1: tool_definition_changed events for owner-only tools', () => {
+  const changedEcho = { name: 'ref__echo', description: 'a changed description', inputSchema: { type: 'object' } };
+
+  it('are not written to a non-owner\'s ledger (server log only)', async () => {
+    listOpenClawTools.mockResolvedValue([changedEcho]);
+    const { registerOpenClawTools } = await load();
+    await registerOpenClawTools('u2');
+    const rows = [...recordAction.mock.calls, ...recordActionSafe.mock.calls].map((c) => JSON.stringify(c[0]));
+    expect(rows.some((r) => r.includes('tool_definition_changed'))).toBe(false);
+  });
+
+  it('are written to the owner\'s ledger', async () => {
+    listOpenClawTools.mockResolvedValue([changedEcho]);
+    const { registerOpenClawTools } = await load();
+    await registerOpenClawTools('owner-only');
+    const rows = recordAction.mock.calls.map((c) => c[0]);
+    expect(rows.some((r) => r.userId === 'owner-only' && String(r.action).includes('tool_definition_changed'))).toBe(true);
+  });
+});
+
+describe('L6: refresh race', () => {
+  it('a concurrent refresh that rotated the token is picked up on re-read; a null expiresAt is valid', async () => {
+    const first = activeRow({ expiresAt: new Date(Date.now() - 1000) });
+    const rotated = activeRow({ expiresAt: null, accessTokenEnc: encryptKey('AT-rotated'), refreshTokenEnc: encryptKey('RT-rotated') });
+    let reads = 0;
+    conn.current = first;
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"error":"invalid_grant"}', { status: 400 })));
+    const { registerOpenClawTools, executeTool } = await load();
+    await registerOpenClawTools('u2');
+    // First read (loadCredential) returns the stale row; later re-reads show the rotation.
+    const db = (await import('@/lib/db')).prisma as unknown as { socialConnection: { findFirst: ReturnType<typeof vi.fn> } };
+    db.socialConnection.findFirst.mockImplementation(async () => (reads++ === 0 ? first : rotated));
+    const res = await executeTool('u2', 'openclaw__x__read_mentions', {});
+    expect(res.success).toBe(true);
+    expect(JSON.parse(callOpenClawTool.mock.calls[0][2].credential).access_token).toBe('AT-rotated');
+    expect(socialUpdateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'expired' } }));
+  });
+});
+
+describe('M2: no encryption key means no social credential use', () => {
+  it('a missing ENCRYPTION_KEY returns encryption_not_configured and does NOT mark the connection expired', async () => {
+    const { registerOpenClawTools, executeTool } = await load();
+    await registerOpenClawTools('u2');
+    delete process.env.ENCRYPTION_KEY;
+    const res = await executeTool('u2', 'openclaw__x__read_mentions', {});
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/^encryption_not_configured/);
+    expect(callOpenClawTool).not.toHaveBeenCalled();
+    expect(socialUpdateMany).not.toHaveBeenCalled();
   });
 });

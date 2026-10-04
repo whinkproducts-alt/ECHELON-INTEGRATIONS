@@ -92,12 +92,14 @@ export async function checkApprovedAction(
  * was consumed (EXECUTED) when the schedule was created, so this is a separate, narrower
  * path: the approval must belong to this user, be a scheduled_post approval that was
  * executed, still hash to what the human saw, and its approved {tool, args} must hash to
- * the hash held by the scheduled row. Autonomy and delegations are never consulted.
+ * the hash held by the scheduled row, and the approved definition hash must equal the live one. Autonomy and delegations are never consulted.
  */
+export const SCHEDULED_DEF_CHANGED = 'Tool definition changed since approval; not sent';
+
 export async function checkScheduledSend(
   userId: string,
   approvalId: string,
-  scheduled: { tool: string; args: unknown; contentHash: string }
+  scheduled: { tool: string; args: unknown; contentHash: string; liveDefHash: string | null }
 ): Promise<PermissionCheckResult> {
   const deny = (reason: string): PermissionCheckResult => ({ allowed: false, method: 'requires_confirmation', reason });
   if (!userId || !approvalId) return deny('Approval required');
@@ -114,6 +116,11 @@ export async function checkScheduledSend(
     const approvedHash = toolArgsHash({ tool: p.tool, args: p.args });
     if (approvedHash !== scheduled.contentHash || toolArgsHash(scheduled) !== approvedHash) {
       return deny('Scheduled content does not match the approved content');
+    }
+    // The tool definition the human approved must be the live one. Absent or different: not sent.
+    const approvedDef = (row.params as { defHash?: unknown } | null)?.defHash;
+    if (typeof approvedDef !== 'string' || !scheduled.liveDefHash || approvedDef !== scheduled.liveDefHash) {
+      return deny(SCHEDULED_DEF_CHANGED);
     }
   } catch {
     return deny('Approved content hash mismatch');

@@ -30,6 +30,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   const { text, send_at } = body as { text?: unknown; send_at?: unknown };
   const res = await editScheduledPost(session.user.id, id, { text, send_at });
-  if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.status });
+  if (!res.ok) return NextResponse.json({ error: res.error, ...(res.cancelled ? { cancelled: true } : {}) }, { status: res.status });
   return NextResponse.json({ cancelled: true, approval: res.approval });
 }

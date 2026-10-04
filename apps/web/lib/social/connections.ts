@@ -7,9 +7,10 @@
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { recordActionSafe } from '@/lib/ledger';
-import { decryptKey, encryptKey } from '@/lib/key-encryption';
+import { EncryptionNotConfiguredError, decryptKey, encryptKey } from '@/lib/key-encryption';
 import { PLATFORM_CONFIG, SOCIAL_PLATFORMS, type SocialPlatform } from '@/lib/social/platforms';
 import { postTokenRequest } from '@/lib/social/oauth';
+import { deleteScheduledRowsForPlatform } from '@/lib/social/scheduled-store';
 
 export interface ConnectionView {
   platform: SocialPlatform;
@@ -21,6 +22,7 @@ export interface ConnectionView {
 
 /** Refresh this long before the stored expiry. */
 const REFRESH_SKEW_MS = 60_000;
+const REFRESH_REREAD_DELAY_MS = 150;
 
 /** The fields safe to read for listing. Token columns are never selected here. */
 const VIEW_SELECT = { platform: true, status: true, platformHandle: true, createdAt: true, scopes: true } as const;
@@ -50,7 +52,17 @@ export async function hasActiveConnection(userId: string, platform: SocialPlatfo
 
 export type CredentialResult =
   | { ok: true; credential: string }
-  | { ok: false; reason: 'not_connected' | 'expired' };
+  | { ok: false; reason: 'not_connected' | 'expired' | 'encryption_not_configured' };
+
+/** The platform account id stored for this user's connection, or null. No token is read. */
+export async function getConnectedPlatformUserId(userId: string, platform: SocialPlatform): Promise<string | null> {
+  if (!userId) return null;
+  const row = await prisma.socialConnection.findFirst({
+    where: { userId, platform, status: 'active' },
+    select: { platformUserId: true },
+  });
+  return row?.platformUserId ?? null;
+}
 
 async function markExpired(userId: string, platform: SocialPlatform): Promise<void> {
   const res = await prisma.socialConnection.updateMany({
@@ -89,7 +101,9 @@ export async function loadCredential(userId: string, platform: SocialPlatform): 
   if (!needsRefresh) {
     try {
       return { ok: true, credential: buildCredential(decryptKey(row.accessTokenEnc), row.platformUserId) };
-    } catch {
+    } catch (e) {
+      // A missing server key is a configuration fault, not an expired token: leave the row alone.
+      if (e instanceof EncryptionNotConfiguredError) return { ok: false, reason: 'encryption_not_configured' };
       await markExpired(userId, platform);
       return { ok: false, reason: 'expired' };
     }
@@ -115,15 +129,26 @@ export async function loadCredential(userId: string, platform: SocialPlatform): 
       },
     });
     if (res.count === 1) return { ok: true, credential: buildCredential(tokens.accessToken, row.platformUserId) };
-  } catch {
+  } catch (e) {
+    if (e instanceof EncryptionNotConfiguredError) return { ok: false, reason: 'encryption_not_configured' };
     // Fall through: a concurrent refresh may have rotated the token. Re-read before giving up.
   }
-  const again = await prisma.socialConnection.findFirst({ where: { id: row.id, userId } });
-  if (again && again.status === 'active' && again.refreshTokenEnc !== row.refreshTokenEnc
-      && again.expiresAt !== null && again.expiresAt.getTime() > Date.now() + REFRESH_SKEW_MS) {
-    try {
-      return { ok: true, credential: buildCredential(decryptKey(again.accessTokenEnc), again.platformUserId) };
-    } catch { /* treated as expired below */ }
+  // Brief retry: a racing refresh may still be writing. Up to 3 re-reads, ~150 ms apart.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, REFRESH_REREAD_DELAY_MS));
+    const again = await prisma.socialConnection.findFirst({ where: { id: row.id, userId } });
+    if (!again || again.status === 'revoked') break;
+    const rotated = again.accessTokenEnc !== row.accessTokenEnc || again.refreshTokenEnc !== row.refreshTokenEnc;
+    // A null expiresAt after a refresh is valid (the platform gave no lifetime).
+    const fresh = again.expiresAt === null || again.expiresAt.getTime() > Date.now() + REFRESH_SKEW_MS;
+    if (again.status === 'active' && rotated && fresh) {
+      try {
+        return { ok: true, credential: buildCredential(decryptKey(again.accessTokenEnc), again.platformUserId) };
+      } catch (e) {
+        if (e instanceof EncryptionNotConfiguredError) return { ok: false, reason: 'encryption_not_configured' };
+        break;
+      }
+    }
   }
   await markExpired(userId, platform);
   return { ok: false, reason: 'expired' };
@@ -138,13 +163,22 @@ async function revokeAtPlatform(platform: SocialPlatform, accessToken: string): 
   const secret = process.env[cfg.clientSecretEnv]?.trim();
   if (!cfg.revokeUrl || !id || !secret) return;
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    const body = new URLSearchParams();
+    if (cfg.clientAuth === 'basic') {
+      headers.Authorization = `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}`;
+      body.set('token', accessToken);
+      body.set('token_type_hint', 'access_token');
+    } else {
+      // TikTok: client_key, client_secret and token in the form body.
+      body.set(cfg.clientIdParam, id);
+      body.set('client_secret', secret);
+      body.set('token', accessToken);
+    }
     await fetch(cfg.revokeUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}`,
-      },
-      body: new URLSearchParams({ token: accessToken, token_type_hint: 'access_token' }),
+      headers,
+      body,
       redirect: 'error',
       signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
     });
@@ -153,7 +187,10 @@ async function revokeAtPlatform(platform: SocialPlatform, accessToken: string): 
   }
 }
 
-/** Delete this user's connection (tokens included). Also cancels their scheduled posts for the platform. */
+/**
+ * Delete this user's connection (tokens included) and DELETE their scheduled-post rows for the
+ * platform (not just cancel: the approved post text must not outlive the connection). Ledgered.
+ */
 export async function disconnect(userId: string, platform: SocialPlatform): Promise<{ deleted: boolean }> {
   if (!userId) throw new Error('social: userId is required');
   const row = await prisma.socialConnection.findFirst({ where: { userId, platform } });
@@ -161,10 +198,7 @@ export async function disconnect(userId: string, platform: SocialPlatform): Prom
     try { await revokeAtPlatform(platform, decryptKey(row.accessTokenEnc)); } catch { /* best effort */ }
   }
   const res = await prisma.socialConnection.deleteMany({ where: { userId, platform } });
-  const cancelled = await prisma.scheduledPost.updateMany({
-    where: { userId, platform, status: 'scheduled' },
-    data: { status: 'cancelled', error: 'disconnected' },
-  });
+  const removedScheduled = await deleteScheduledRowsForPlatform(userId, platform);
   await recordActionSafe({
     userId,
     initiator: 'user',
@@ -172,7 +206,7 @@ export async function disconnect(userId: string, platform: SocialPlatform): Prom
     tool: `social:${platform}`,
     permissionClass: 'A',
     status: 'VALIDATED',
-    outputSummary: `disconnected ${platform}; ${res.count} connection(s) removed, ${cancelled.count} scheduled post(s) cancelled`,
+    outputSummary: `disconnected ${platform}; ${res.count} connection(s) removed, ${removedScheduled} scheduled post(s) deleted`,
   });
   return { deleted: res.count > 0 };
 }

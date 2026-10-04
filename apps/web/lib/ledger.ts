@@ -108,3 +108,26 @@ export async function updateActionStatus(
   const res = await prisma.action.updateMany({ where: { id: actionId, userId }, data });
   return res.count === 1;
 }
+
+/**
+ * Count this user's ledger rows for the given tools since a time, optionally until a time.
+ * Read-only and scoped by userId. Used for daily caps; never returns row content.
+ */
+export async function countToolExecutions(
+  userId: string,
+  tools: string[],
+  since: Date,
+  until?: Date,
+): Promise<number> {
+  if (!userId) throw new Error('ledger: userId is required');
+  if (tools.length === 0) return 0;
+  return prisma.action.count({
+    where: {
+      userId,
+      tool: { in: tools },
+      action: { in: tools.map((t) => `tool_executed: ${t}`) },
+      status: { in: ['SUBMITTED', 'VALIDATED'] },
+      createdAt: { gte: since, ...(until ? { lt: until } : {}) },
+    },
+  });
+}

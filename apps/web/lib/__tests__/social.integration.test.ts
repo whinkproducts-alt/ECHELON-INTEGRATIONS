@@ -48,12 +48,18 @@ function need(ctx: TestContext) {
   if (!dbUp) ctx.skip();
 }
 
+/** Controls what the stubbed X identity endpoint answers. */
+const fx = { meId: '777', meStatus: 200 };
+
 function stubFetch() {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     if (String(url).endsWith('/oauth2/token')) {
       return new Response(JSON.stringify({ access_token: ACCESS, refresh_token: REFRESH, expires_in: 7200, scope: 'tweet.read tweet.write' }), { status: 200 });
     }
-    if (String(url).endsWith('/users/me')) return new Response(JSON.stringify({ data: { id: '777', username: 'testhandle' } }), { status: 200 });
+    if (String(url).endsWith('/users/me')) {
+      if (fx.meStatus !== 200) return new Response('{}', { status: fx.meStatus });
+      return new Response(JSON.stringify({ data: { id: fx.meId, username: 'testhandle' } }), { status: 200 });
+    }
     return new Response('{}', { status: 404 });
   }));
 }
@@ -73,7 +79,7 @@ async function callbackAs(userId: string | null, platform: string, qs: Record<st
   const { GET } = await import('@/app/api/social/[platform]/callback/route');
   const q = new URLSearchParams(qs).toString();
   const res = await GET(new NextRequest(`https://app.test/api/social/${platform}/callback?${q}`), { params: Promise.resolve({ platform }) });
-  return new URL(res.headers.get('location') ?? 'https://none.test');
+  return new URL(res.headers.get('location') ?? 'https://none.test', 'https://app.test');
 }
 
 async function connect(userId: string): Promise<void> {
@@ -106,6 +112,7 @@ beforeAll(async () => {
   const b = await prisma.user.create({ data: { email: `social-itest-b-${stamp}@example.test`, name: 'social B' } });
   userA = a.id;
   userB = b.id;
+  process.env.ENCRYPTION_KEY = 'c'.repeat(64);
   process.env.X_CLIENT_ID = 'itest-client';
   process.env.X_CLIENT_SECRET = 'itest-secret';
   process.env.SOCIAL_OAUTH_REDIRECT_BASE = 'https://app.test';
@@ -506,12 +513,133 @@ describe('D8 scheduling', () => {
     expect(await prisma.scheduledPost.count({ where: { userId: userA, approvalId: res.approvalRequired!.id } })).toBe(0);
   }, 20000);
 
-  it('disconnecting cancels the user\'s scheduled posts for that platform', async (ctx) => {
+  it('disconnecting DELETES the user\'s scheduled posts for that platform (C2) and ledgers it', async (ctx) => {
     need(ctx);
-    const row = await scheduleAndApprove('will be cancelled by disconnect');
+    const row = await scheduleAndApprove('will be deleted by disconnect');
     const { disconnect } = await import('@/lib/social/connections');
     await disconnect(userA, 'x');
-    expect((await prisma.scheduledPost.findFirst({ where: { id: row.id } }))?.status).toBe('cancelled');
+    expect(await prisma.scheduledPost.findFirst({ where: { id: row.id } })).toBeNull();
+    const led = await prisma.action.findFirst({ where: { userId: userA, action: 'social_disconnected' }, orderBy: { createdAt: 'desc' } });
+    expect(led?.outputSummary).toMatch(/[1-9]\d* scheduled post\(s\) deleted/);
     await connect(userA); // restore for any later test
   }, 20000);
+
+  describe('2d hardening (L2, L3, L4, L5, caps)', () => {
+    afterEach(() => { fx.meId = '777'; fx.meStatus = 200; delete process.env.SOCIAL_DAILY_CAPS; });
+
+    it('L5: the oauth_states row is deleted right after the claim, and the sweep removes expired and used rows', async (ctx) => {
+      need(ctx);
+      const s = await startAs(userA);
+      const hash = createHash('sha256').update(s.state).digest('hex');
+      expect(await prisma.oAuthState.count({ where: { stateHash: hash } })).toBe(1);
+      const loc = await callbackAs(userA, 'x', { code: 'c', state: s.state });
+      expect(loc.searchParams.get('connected')).toBe('x');
+      expect(await prisma.oAuthState.count({ where: { stateHash: hash } })).toBe(0);
+      expect((await callbackAs(userA, 'x', { code: 'c', state: s.state })).searchParams.get('error')).toBe('invalid_state');
+
+      const mk = (tag: string, over: Record<string, unknown>) => prisma.oAuthState.create({
+        data: { userId: userA, platform: 'x', stateHash: `sweep-${stamp}-${tag}`, codeVerifierEnc: 'v', redirectUri: ALLOWED, expiresAt: new Date(Date.now() + 600_000), ...over },
+      });
+      await mk('expired', { expiresAt: new Date(Date.now() - 1000) });
+      await mk('used', { usedAt: new Date() });
+      await mk('live', {});
+      const { sweepOAuthStates } = await import('@/lib/social/oauth');
+      expect(await sweepOAuthStates()).toBeGreaterThanOrEqual(2);
+      expect(await prisma.oAuthState.count({ where: { stateHash: { startsWith: `sweep-${stamp}-` } } })).toBe(1);
+      await prisma.oAuthState.deleteMany({ where: { stateHash: { startsWith: `sweep-${stamp}-` } } });
+    }, 20000);
+
+    it('L2: X identity lookup failure fails the callback with identity_failed and stores nothing', async (ctx) => {
+      need(ctx);
+      await prisma.socialConnection.deleteMany({ where: { userId: userA } });
+      fx.meStatus = 500;
+      const s = await startAs(userA);
+      const loc = await callbackAs(userA, 'x', { code: 'c', state: s.state });
+      expect(loc.searchParams.get('error')).toBe('identity_failed');
+      expect(await prisma.socialConnection.count({ where: { userId: userA } })).toBe(0);
+      expect(await prisma.action.count({ where: { userId: userA, action: 'social_connect_failed', outputSummary: 'identity_failed' } })).toBeGreaterThanOrEqual(1);
+      fx.meStatus = 200;
+      await connect(userA);
+    }, 20000);
+
+    it('L3: reconnecting as a different X account cancels scheduled posts (ledgered)', async (ctx) => {
+      need(ctx);
+      const row = await scheduleAndApprove('approved for account 777');
+      expect(row.platformUserId).toBe('777');
+      fx.meId = '999';
+      await connect(userA);
+      const after = await prisma.scheduledPost.findFirst({ where: { id: row.id } });
+      expect(after?.status).toBe('cancelled');
+      expect(after?.error).toBe('platform_account_changed');
+      const led = await prisma.action.count({ where: { userId: userA, action: 'scheduled_post_cancelled', outputSummary: 'platform_account_changed' } });
+      expect(led).toBeGreaterThanOrEqual(1);
+      fx.meId = '777';
+      await connect(userA);
+    }, 30000);
+
+    it('L3: the same account reconnecting keeps scheduled posts', async (ctx) => {
+      need(ctx);
+      const row = await scheduleAndApprove('stays scheduled');
+      await connect(userA);
+      expect((await prisma.scheduledPost.findFirst({ where: { id: row.id } }))?.status).toBe('scheduled');
+    }, 30000);
+
+    it('L3: at send time a platformUserId that differs from the connection is refused', async (ctx) => {
+      need(ctx);
+      const { processDueScheduledPosts } = await import('@/lib/social/scheduler');
+      const row = await scheduleAndApprove('account mismatch at send');
+      await prisma.scheduledPost.updateMany({ where: { id: row.id, userId: userA }, data: { platformUserId: 'someone-else', sendAt: new Date(Date.now() - 1000) } });
+      h.calls.length = 0;
+      await processDueScheduledPosts();
+      expect(h.calls).toEqual([]);
+      expect((await prisma.scheduledPost.findFirst({ where: { id: row.id } }))?.status).toBe('failed');
+      expect(await prisma.action.count({ where: { userId: userA, action: 'SECURITY_EVENT: scheduled_post_account_changed' } })).toBeGreaterThanOrEqual(1);
+    }, 20000);
+
+    it('L4: the approval stores the tool definition hash, and a changed live definition blocks the send with a security event', async (ctx) => {
+      need(ctx);
+      const { processDueScheduledPosts } = await import('@/lib/social/scheduler');
+      const row = await scheduleAndApprove('definition binding');
+      const appr = await prisma.approvalRequest.findFirst({ where: { id: row.approvalId, userId: userA } });
+      expect((appr?.params as { defHash?: string } | null)?.defHash).toMatch(/^[0-9a-f]{64}$/);
+
+      const oc = await import('@/lib/openclaw-client');
+      const original = await oc.listOpenClawTools();
+      const changed = original.map((t) => (t.name === 'x__post' ? { ...t, inputSchema: { type: 'object', properties: { text: { type: 'string', maxLength: 280 }, extra: { type: 'string', maxLength: 10 } }, required: ['text'] } } : t));
+      vi.mocked(oc.listOpenClawTools).mockResolvedValueOnce(changed);
+      await makeDue(row.id);
+      h.calls.length = 0;
+      await processDueScheduledPosts();
+      expect(h.calls).toEqual([]);
+      expect((await prisma.scheduledPost.findFirst({ where: { id: row.id } }))?.status).toBe('failed');
+      expect(await prisma.action.count({ where: { userId: userA, action: 'SECURITY_EVENT: tool_definition_changed' } })).toBeGreaterThanOrEqual(1);
+      const { loadGatewayTools } = await import('@/lib/tool-registry');
+      await loadGatewayTools(userA, { fresh: true }); // restore the registry for later tests
+    }, 30000);
+
+    it('caps: enforced again when the worker sends (cap lowered after approval)', async (ctx) => {
+      need(ctx);
+      const { processDueScheduledPosts } = await import('@/lib/social/scheduler');
+      const row = await scheduleAndApprove('cap at execution');
+      process.env.SOCIAL_DAILY_CAPS = '{"posts":0}';
+      await makeDue(row.id);
+      h.calls.length = 0;
+      await processDueScheduledPosts();
+      expect(h.calls).toEqual([]);
+      const after = await prisma.scheduledPost.findFirst({ where: { id: row.id } });
+      expect(after?.status).toBe('failed');
+      expect(after?.error).toBe('daily_cap_reached');
+      expect(await prisma.action.count({ where: { userId: userA, action: 'social_daily_cap_reached' } })).toBeGreaterThanOrEqual(1);
+    }, 20000);
+
+    it('caps: a direct write is refused before an approval row exists', async (ctx) => {
+      need(ctx);
+      process.env.SOCIAL_DAILY_CAPS = '{"dms":0}';
+      const { executeTool } = await import('@/lib/tool-registry');
+      const before = await prisma.approvalRequest.count({ where: { userId: userA } });
+      const res = await executeTool(userA, 'openclaw__x__send_dm', { participant_id: '1', text: 'hi' });
+      expect(res.error).toMatch(/^daily_cap_reached/);
+      expect(await prisma.approvalRequest.count({ where: { userId: userA } })).toBe(before);
+    }, 20000);
+  });
 });
