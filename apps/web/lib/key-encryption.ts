@@ -7,19 +7,26 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const KEY_HEX_LENGTH = 64; // 32 bytes = 64 hex chars
+
+/** Thrown when ENCRYPTION_KEY is unset or is not exactly 64 hex characters. There is no fallback key. */
+export class EncryptionNotConfiguredError extends Error {
+  constructor() {
+    super('encryption_not_configured');
+    this.name = 'EncryptionNotConfiguredError';
+  }
+}
+
+const HEX_KEY_RE = /^[0-9a-fA-F]{64}$/;
+
+/** True when ENCRYPTION_KEY is a valid 64-hex (32 byte) key. Never returns or logs the key. */
+export function isEncryptionConfigured(): boolean {
+  return HEX_KEY_RE.test((process.env.ENCRYPTION_KEY ?? '').trim());
+}
 
 function getEncryptionKey(): Buffer {
-  const raw = process.env.ENCRYPTION_KEY ?? '';
-  if (raw.length < KEY_HEX_LENGTH) {
-    // In development, derive a fixed key from a constant. Warn loudly.
-    if (process.env.NODE_ENV !== 'production') {
-      const devKey = 'deadbeef'.repeat(8); // 64 hex chars
-      return Buffer.from(devKey, 'hex');
-    }
-    throw new Error('ENCRYPTION_KEY must be a 64-char hex string (32 bytes) in production');
-  }
-  return Buffer.from(raw.slice(0, KEY_HEX_LENGTH), 'hex');
+  const raw = (process.env.ENCRYPTION_KEY ?? '').trim();
+  if (!HEX_KEY_RE.test(raw)) throw new EncryptionNotConfiguredError();
+  return Buffer.from(raw, 'hex');
 }
 
 /**

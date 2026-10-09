@@ -21,7 +21,7 @@ function matches(r: Row, w: Where): boolean {
 
 const T0 = new Date('2026-10-03T12:00:00.000Z');
 const at = (ms: number) => () => new Date(T0.getTime() + ms);
-const TOOL = 'openclaw__x__post';
+const TOOL = 'openclaw__itest__post';
 
 describe('approvals', () => {
   let rows: Row[];
@@ -72,7 +72,7 @@ describe('approvals', () => {
     }));
     vi.doMock('@/lib/openclaw-client', () => ({
       isGatewayConfigured: () => true,
-      listOpenClawTools: async () => [{ name: 'x__post', description: 'd', inputSchema: {} }],
+      listOpenClawTools: async () => [{ name: 'itest__post', description: 'd', inputSchema: {} }],
       callOpenClawTool: handler,
     }));
     vi.doMock('@/lib/memory-engine', () => ({ writeMemory: vi.fn(), correctMemory: vi.fn(), searchMemory: vi.fn() }));

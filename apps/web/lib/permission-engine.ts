@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { recordAction, type LedgerStatus } from '@/lib/ledger';
-import { approvalContentHash } from '@/lib/canonical-json';
+import { approvalContentHash, toolArgsHash } from '@/lib/canonical-json';
 
 export type PermissionClass = 'A' | 'B' | 'C';
 
@@ -84,6 +84,47 @@ export async function checkApprovedAction(
     return deny('Approved content hash mismatch');
   }
   if (recomputed !== row.contentHash || contentHash !== row.contentHash) return deny('Approved content hash mismatch');
+  return { allowed: true, method: 'human_approved' };
+}
+
+/**
+ * Permission check for the moment a human-approved scheduled post is sent. The approval
+ * was consumed (EXECUTED) when the schedule was created, so this is a separate, narrower
+ * path: the approval must belong to this user, be a scheduled_post approval that was
+ * executed, still hash to what the human saw, and its approved {tool, args} must hash to
+ * the hash held by the scheduled row, and the approved definition hash must equal the live one. Autonomy and delegations are never consulted.
+ */
+export const SCHEDULED_DEF_CHANGED = 'Tool definition changed since approval; not sent';
+
+export async function checkScheduledSend(
+  userId: string,
+  approvalId: string,
+  scheduled: { tool: string; args: unknown; contentHash: string; liveDefHash: string | null }
+): Promise<PermissionCheckResult> {
+  const deny = (reason: string): PermissionCheckResult => ({ allowed: false, method: 'requires_confirmation', reason });
+  if (!userId || !approvalId) return deny('Approval required');
+  const row = await prisma.approvalRequest.findFirst({ where: { id: approvalId, userId } });
+  if (!row) return deny('Approval not found');
+  if (row.kind !== 'scheduled_post') return deny('Approval does not match this action');
+  if (row.status !== 'EXECUTED') return deny(`Approval is ${row.status}, not approved`);
+  try {
+    if (approvalContentHash({ kind: row.kind, tool: row.tool, params: row.params }) !== row.contentHash) {
+      return deny('Approved content hash mismatch');
+    }
+    const p = row.params as { tool?: unknown; args?: unknown } | null;
+    if (!p || typeof p.tool !== 'string' || p.tool !== scheduled.tool) return deny('Approval does not match this action');
+    const approvedHash = toolArgsHash({ tool: p.tool, args: p.args });
+    if (approvedHash !== scheduled.contentHash || toolArgsHash(scheduled) !== approvedHash) {
+      return deny('Scheduled content does not match the approved content');
+    }
+    // The tool definition the human approved must be the live one. Absent or different: not sent.
+    const approvedDef = (row.params as { defHash?: unknown } | null)?.defHash;
+    if (typeof approvedDef !== 'string' || !scheduled.liveDefHash || approvedDef !== scheduled.liveDefHash) {
+      return deny(SCHEDULED_DEF_CHANGED);
+    }
+  } catch {
+    return deny('Approved content hash mismatch');
+  }
   return { allowed: true, method: 'human_approved' };
 }
 

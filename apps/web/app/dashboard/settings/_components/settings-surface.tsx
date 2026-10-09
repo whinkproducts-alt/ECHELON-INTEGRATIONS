@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, User, Shield, Bell, Gauge, CreditCard, Palette, Key, Eye, EyeOff, Trash2, CheckCircle } from 'lucide-react';
+import { Save, User, Shield, Bell, Gauge, CreditCard, Palette, Key, Eye, EyeOff, Link2, Trash2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import { BillingSurface } from '../billing/_components/billing-surface';
 import { AutonomyApprovalPanel } from './autonomy-approval-panel';
+import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import {
   interpretPatchResponse, pickPendingAutonomy, resolveDecision, type AutonomyApproval,
 } from '@/lib/autonomy-approval';
@@ -178,6 +180,12 @@ export function SettingsSurface() {
             {tab.icon} {tab.label}
           </button>
         ))}
+        <Link
+          href="/dashboard/settings/connected-apps"
+          className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground -mb-px"
+        >
+          <Link2 className="h-3.5 w-3.5" /> Connected apps
+        </Link>
       </div>
 
       {activeTab === 'billing' && <BillingSurface />}
@@ -354,6 +362,7 @@ export function SettingsSurface() {
 }
 
 function ApiKeysSurface() {
+  const { productName } = useTenantConfig();
   const [keys, setKeys] = useState<{ provider: string; keyHint: string; createdAt: string }[]>([]);
   const [anthropicInput, setAnthropicInput] = useState('');
   const [openaiInput, setOpenaiInput] = useState('');
@@ -408,7 +417,7 @@ function ApiKeysSurface() {
     <div className="space-y-4">
       <Section title="Your API Keys (BYOK)" icon={<Key className="h-4 w-4" />}>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Connect your own provider keys. WHINK will use them instead of the server keys for your sessions.
+          Connect your own provider keys. {productName} will use them instead of the server keys for your sessions.
           Keys are encrypted at rest with AES-256-GCM. Your billing stays under your own provider dashboard.
         </p>
 

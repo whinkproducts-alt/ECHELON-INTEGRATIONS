@@ -80,11 +80,10 @@ describe('gateway access (H1)', () => {
     expect(await canUseGateway('')).toBe(false);
   });
 
-  it('user B cannot list: loadGatewayTools makes no gateway call', async () => {
+  it('user B cannot list owner-only tools: loadGatewayTools filters to the social platforms', async () => {
     const { loadGatewayTools } = await load();
     const r = await loadGatewayTools('userB');
     expect(r.tools).toEqual([]);
-    expect(listOpenClawTools).not.toHaveBeenCalled();
   });
 
   it('user B cannot call or get an approval: denied and ledgered before permission check', async () => {

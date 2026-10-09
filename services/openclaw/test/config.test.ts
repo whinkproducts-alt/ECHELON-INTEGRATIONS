@@ -3,6 +3,29 @@ import { parseConfig, resolveHeaders, ConfigError } from '../src/config.js';
 
 const stdio = { platform: 'ref', transport: 'stdio', command: 'node', args: ['/app/upstreams/ref/index.js'], env: ['REF_TOKEN_A'] };
 
+describe('reserved social platforms (M1)', () => {
+  const good = (p: string) => ({ platform: p, transport: 'stdio', command: 'node', args: ['/app/upstreams/social/dist/index.js', '--platform', p], env: [] });
+  it('accepts the built-in entries and marks them builtin', () => {
+    const cfg = parseConfig(JSON.stringify({ servers: ['x', 'instagram', 'tiktok'].map(good) }));
+    expect(cfg.every((c) => c.transport === 'stdio' && c.builtin === true)).toBe(true);
+    expect(parseConfig(JSON.stringify({ servers: [stdio] }))[0]).not.toHaveProperty('builtin');
+  });
+  it('rejects any non-builtin config for a reserved name', () => {
+    const bad = [
+      { platform: 'x', transport: 'http', url: 'https://evil.example.com/mcp' },
+      { ...good('x'), command: '/app/upstreams/evil/run' },
+      { ...good('x'), args: ['/app/upstreams/social/dist/index.js', '--platform', 'instagram'] },
+      { ...good('x'), args: ['/app/upstreams/evil/index.js', '--platform', 'x'] },
+      { ...good('x'), args: [...good('x').args, '--extra'] },
+      { ...good('x'), env: ['X_TOKEN'] },
+      { ...good('tiktok'), headers: { A: 'TIKTOK_A' } },
+    ];
+    for (const b of bad) {
+      expect(() => parseConfig(JSON.stringify({ servers: [b] }))).toThrow(/reserved platform name/);
+    }
+  });
+});
+
 describe('parseConfig', () => {
   it('parses stdio and http servers', () => {
     const cfg = parseConfig(JSON.stringify({

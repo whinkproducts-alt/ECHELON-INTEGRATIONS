@@ -12,6 +12,7 @@ Install with Homebrew on Apple Silicon:
 ```sh
 brew install --cask orbstack        # OrbStack (Docker runtime)
 brew install node                   # Node 20+
+brew install pnpm                   # pnpm 9+ (the workspace package manager)
 brew install ollama                 # Ollama (local models)
 ```
 
@@ -23,15 +24,19 @@ OrbStack must be running before you start Postgres.
 
 ```sh
 git clone <repo-url> whink-ultimate
-cd whink-ultimate/apps/web
-npm install
+cd whink-ultimate
+pnpm install          # installs the whole workspace from pnpm-lock.yaml
 ```
+
+This repo is a pnpm workspace (`pnpm-workspace.yaml`, `pnpm-lock.yaml`). Do not use `npm install`
+or `yarn install` — they ignore the lockfile and fail on the `workspace:*` package.
 
 ---
 
 ## Environment
 
 ```sh
+cd apps/web
 cp .env.example .env
 ```
 
@@ -43,7 +48,11 @@ ANTHROPIC_API_KEY=sk-ant-...
 NEXTAUTH_SECRET=<any random string, e.g. openssl rand -hex 32>
 AUTH_SECRET=<same or different random string>
 DEFAULT_MODEL=claude-sonnet-4-6
+ENCRYPTION_KEY=<64 hex chars: openssl rand -hex 32>   # encrypts stored API keys and social tokens
 ```
+
+The action gateway is optional and off by default (`OPENCLAW_URL` empty). See
+`services/openclaw/README.md` to enable it.
 
 ---
 
@@ -69,16 +78,20 @@ The `pgvector` extension is created automatically on first start via `docker/pos
 
 ```sh
 cd apps/web
-npx prisma migrate dev
+pnpm exec prisma migrate deploy
 ```
 
 ---
 
 ## Start the app
 
+From the repo root:
+
 ```sh
-npm run dev
+pnpm dev
 ```
+
+Tests and build (from `apps/web`): `pnpm exec vitest run`, `pnpm exec next build`.
 
 Open [http://localhost:3000](http://localhost:3000).
 

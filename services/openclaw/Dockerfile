@@ -23,6 +23,15 @@ RUN mkdir -p /out
 
 FROM ref-${INCLUDE_REF_SERVER} AS ref
 
+# Social MCP upstream (x, instagram, tiktok). Our own code, always built into the image.
+FROM node:22.23.3-alpine3.24@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS social
+WORKDIR /out/social
+COPY upstreams/social/package.json upstreams/social/package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY upstreams/social/tsconfig.json upstreams/social/tsconfig.build.json ./
+COPY upstreams/social/src ./src
+RUN npx tsc -p tsconfig.build.json && npm prune --omit=dev --ignore-scripts && rm -rf src tsconfig*.json
+
 FROM node:22.23.3-alpine3.24@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
 # Extra OS packages for upstream servers, set from docker-compose.yml build args.
 # Example for Python MCP servers: EXTRA_APK: "uv"
@@ -35,6 +44,7 @@ RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --from=build /app/dist ./dist
 # Baked stdio upstreams live under /app/upstreams (the only stdio location config accepts besides node_modules).
 COPY --from=ref /out /app/upstreams
+COPY --from=social /out/social /app/upstreams/social
 # Runs as the unprivileged built-in user (uid 1000). The app tree stays root-owned and read-only;
 # runtime writes go to tmpfs mounts declared in docker-compose.yml.
 USER node

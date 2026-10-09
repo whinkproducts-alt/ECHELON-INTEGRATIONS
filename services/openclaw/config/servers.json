@@ -8,6 +8,30 @@
       "args": ["/app/upstreams/ref/node_modules/@modelcontextprotocol/server-everything/dist/index.js", "stdio"],
       "env": [],
       "tools": ["echo", "get-sum"]
+    },
+    {
+      "platform": "x",
+      "description": "Social connector (official API only). Credential arrives per call in request _meta, never in config.",
+      "transport": "stdio",
+      "command": "node",
+      "args": ["/app/upstreams/social/dist/index.js", "--platform", "x"],
+      "env": []
+    },
+    {
+      "platform": "instagram",
+      "description": "Social connector (official API only). Credential arrives per call in request _meta, never in config.",
+      "transport": "stdio",
+      "command": "node",
+      "args": ["/app/upstreams/social/dist/index.js", "--platform", "instagram"],
+      "env": []
+    },
+    {
+      "platform": "tiktok",
+      "description": "Social connector (official API only). Credential arrives per call in request _meta, never in config.",
+      "transport": "stdio",
+      "command": "node",
+      "args": ["/app/upstreams/social/dist/index.js", "--platform", "tiktok"],
+      "env": []
     }
   ]
 }

@@ -10,6 +10,7 @@ const gw = { name: 'openclaw__ref__echo', description: 'e', inputSchema: { type:
 async function load() {
   vi.doMock('@/lib/tool-registry', () => ({ loadGatewayTools }));
   vi.doMock('@/lib/gateway-access', () => ({ canUseGateway }));
+  vi.doMock('@/lib/social/connections', () => ({ hasActiveConnection: vi.fn().mockResolvedValue(false) }));
   vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
   return import('@/lib/gateway-chat');
 }
@@ -22,12 +23,12 @@ describe('resolveChatTools', () => {
     canUseGateway.mockResolvedValue(true);
   });
 
-  it('H1: a user who may not use the gateway gets standard tools and no gateway load', async () => {
+  it('H1: a user who may not use the gateway gets only what loadGatewayTools allows them, and no outage row', async () => {
     canUseGateway.mockResolvedValue(false);
+    loadGatewayTools.mockResolvedValueOnce({ available: false, tools: [] });
     const { resolveChatTools } = await load();
     expect(await resolveChatTools({ ...opts, userId: 'userB' })).toEqual(std);
     expect(canUseGateway).toHaveBeenCalledWith('userB');
-    expect(loadGatewayTools).not.toHaveBeenCalled();
     expect(recordActionSafe).not.toHaveBeenCalled();
   });
 

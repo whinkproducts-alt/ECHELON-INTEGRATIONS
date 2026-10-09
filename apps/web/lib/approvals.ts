@@ -10,7 +10,7 @@
  */
 
 import { prisma } from '@/lib/db';
-import { canUseGateway, isGatewayTool } from '@/lib/gateway-access';
+import { canUseGatewayTool, isGatewayTool } from '@/lib/gateway-access';
 import { logger } from '@/lib/logger';
 import { recordAction, recordActionSafe, type LedgerStatus } from '@/lib/ledger';
 import { checkApprovedAction, logSecurityEvent } from '@/lib/permission-engine';
@@ -23,7 +23,7 @@ export const APPROVAL_TTL_MS = 30_000;
 export const EXECUTING_STUCK_MS = 2 * 60_000;
 const RESULT_CAP = 4000;
 
-export type ApprovalKind = 'tool_call' | 'ear' | 'autonomy_change';
+export type ApprovalKind = 'tool_call' | 'ear' | 'autonomy_change' | 'scheduled_post';
 export type Clock = () => Date;
 
 export interface ApprovalView {
@@ -93,6 +93,10 @@ function summarise(kind: ApprovalKind, tool: string | null, params: unknown): st
     const objective = (params as { objective?: unknown } | null)?.objective;
     return `Authorise team execution: ${typeof objective === 'string' ? objective : 'task'}`.substring(0, 300);
   }
+  if (kind === 'scheduled_post') {
+    const p = (params ?? {}) as { platform?: unknown; send_at?: unknown; args?: { text?: unknown } };
+    return `Schedule ${String(p.platform ?? 'social')} post for ${String(p.send_at ?? '?')}: ${String(p.args?.text ?? '')}`.substring(0, 300);
+  }
   let json = '';
   try { json = JSON.stringify(params ?? {}) ?? ''; } catch { json = ''; }
   return `Run ${tool ?? 'tool'} ${json}`.substring(0, 300);
@@ -140,7 +144,7 @@ export async function createApproval(input: CreateApprovalInput): Promise<Approv
   const tool = kind === 'tool_call' ? (input.tool ?? null) : null;
   if (kind === 'tool_call' && !tool) throw new Error('approvals: tool is required for tool_call');
   // H1: no approval is ever created for a gateway call by a user who may not use the gateway.
-  if (tool && isGatewayTool(tool) && !(await canUseGateway(userId))) throw new Error('approvals: gateway_not_permitted');
+  if (tool && isGatewayTool(tool) && !(await canUseGatewayTool(userId, tool))) throw new Error('approvals: gateway_not_permitted');
 
   if (input.conversationId) {
     const conv = await prisma.conversation.findFirst({ where: { id: input.conversationId, userId }, select: { id: true } });
@@ -414,6 +418,20 @@ export async function decide(
   try {
     if (row.kind === 'autonomy_change') {
       return await applyAutonomyChange(row, clock);
+    }
+    if (row.kind === 'scheduled_post') {
+      // Stores the scheduled row after the permission engine allows it. Sending happens later, in the worker.
+      const { activateScheduledPost } = await import('@/lib/social/scheduler');
+      const res = await activateScheduledPost({
+        id: row.id,
+        userId: row.userId,
+        params: row.params,
+        contentHash: row.contentHash,
+        correlationId: row.correlationId,
+        persona: row.persona,
+      }, clock());
+      return finish(row, 'EXECUTING', res.success ? 'EXECUTED' : 'FAILED',
+        res.success ? { success: true, data: res.data } : { success: false, error: res.error ?? 'Not scheduled' }, clock);
     }
     if (row.kind === 'ear') {
       // B3: the engine decides, even for EARs.

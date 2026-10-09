@@ -62,11 +62,30 @@ describe('key-encryption', () => {
     expect(() => decryptKey(tampered)).toThrow();
   });
 
-  it('uses dev fallback key when ENCRYPTION_KEY is unset (non-production)', async () => {
+  it('throws EncryptionNotConfiguredError when ENCRYPTION_KEY is unset (no dev fallback)', async () => {
     delete process.env.ENCRYPTION_KEY;
-    // Vitest runs as 'test' which is not 'production', so dev fallback applies
-    const { encryptKey, decryptKey } = await import('../key-encryption');
-    const plaintext = 'sk-ant-api03-devtest';
-    expect(decryptKey(encryptKey(plaintext))).toBe(plaintext);
+    const { encryptKey, decryptKey, EncryptionNotConfiguredError, isEncryptionConfigured } = await import('../key-encryption');
+    expect(isEncryptionConfigured()).toBe(false);
+    expect(() => encryptKey('sk-ant-api03-devtest')).toThrow(EncryptionNotConfiguredError);
+    expect(() => decryptKey('00'.repeat(40))).toThrow(EncryptionNotConfiguredError);
+  });
+
+  it('rejects a key that is too short, non-hex, or the old dev constant length mismatch', async () => {
+    const { encryptKey, EncryptionNotConfiguredError } = await import('../key-encryption');
+    for (const bad of ['abc', 'g'.repeat(64), 'a'.repeat(63), 'a'.repeat(65)]) {
+      process.env.ENCRYPTION_KEY = bad;
+      expect(() => encryptKey('x')).toThrow(EncryptionNotConfiguredError);
+    }
+  });
+
+  it('a ciphertext made with the old dev fallback key cannot be decrypted by a real key', async () => {
+    const { decryptKey } = await import('../key-encryption');
+    // Encrypt manually with the former fallback key to prove it is no longer special.
+    const { createCipheriv, randomBytes } = await import('crypto');
+    const iv = randomBytes(12);
+    const c = createCipheriv('aes-256-gcm', Buffer.from('deadbeef'.repeat(8), 'hex'), iv);
+    const enc = Buffer.concat([c.update('secret', 'utf8'), c.final()]);
+    const blob = Buffer.concat([iv, c.getAuthTag(), enc]).toString('hex');
+    expect(() => decryptKey(blob)).toThrow();
   });
 });

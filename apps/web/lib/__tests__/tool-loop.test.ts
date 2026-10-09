@@ -273,8 +273,8 @@ describe('runToolLoop — approvals (L3, L7)', () => {
 
     expect(fetchSpy).toHaveBeenCalledTimes(1); // no further model call after an approval
     expect(executeTool).toHaveBeenCalledTimes(2);
-    expect(executeTool.mock.calls[0][6]).toEqual({ approvalAlreadyPending: false });
-    expect(executeTool.mock.calls[1][6]).toEqual({ approvalAlreadyPending: true });
+    expect(executeTool.mock.calls[0][6]).toEqual({ approvalAlreadyPending: false, tainted: false });
+    expect(executeTool.mock.calls[1][6]).toEqual({ approvalAlreadyPending: true, tainted: false });
     expect(events.filter((e) => e.type === 'approval_required')).toHaveLength(1);
     expect(events.at(-1)?.type).toBe('done');
     expect(raw).not.toContain('should never be requested');

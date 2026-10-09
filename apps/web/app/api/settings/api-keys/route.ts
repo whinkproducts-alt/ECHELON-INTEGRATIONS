@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { encryptKey, keyHint } from '@/lib/key-encryption';
+import { EncryptionNotConfiguredError, encryptKey, isEncryptionConfigured, keyHint } from '@/lib/key-encryption';
 
 const VALID_PROVIDERS = new Set(['anthropic', 'openai']);
 
@@ -42,7 +42,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'OpenAI keys must start with sk-' }, { status: 400 });
   }
 
-  const encryptedKey = encryptKey(plaintextKey);
+  if (!isEncryptionConfigured()) {
+    return NextResponse.json({ error: 'encryption_not_configured' }, { status: 503 });
+  }
+  let encryptedKey: string;
+  try {
+    encryptedKey = encryptKey(plaintextKey);
+  } catch (e) {
+    if (e instanceof EncryptionNotConfiguredError) {
+      return NextResponse.json({ error: 'encryption_not_configured' }, { status: 503 });
+    }
+    throw e;
+  }
   const hint = keyHint(plaintextKey);
 
   await prisma.userApiKey.upsert({

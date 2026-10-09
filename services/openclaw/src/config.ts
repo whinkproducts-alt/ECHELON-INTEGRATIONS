@@ -49,6 +49,8 @@ export interface StdioServerConfig {
   envNames: string[];
   /** Optional allow-list of ORIGINAL upstream tool names. When set, only these are exposed. */
   tools?: string[];
+  /** True only when parseConfig validated this entry as the built-in social connector. Never read from JSON. */
+  builtin?: boolean;
 }
 
 export interface HttpServerConfig {
@@ -153,6 +155,28 @@ function parseTools(v: unknown, where: string): string[] | undefined {
   return v as string[];
 }
 
+/** Platforms that receive per-call user credentials. Only the baked-in social connector may use them. */
+export const RESERVED_SOCIAL_PLATFORMS: ReadonlySet<string> = new Set(['x', 'instagram', 'tiktok']);
+export const SOCIAL_ENTRY = '/app/upstreams/social/dist/index.js';
+const RESERVED_ERROR = 'reserved platform name: x, instagram and tiktok must be the built-in social connector (stdio, node, fixed args, no env, no headers)';
+
+function isBuiltinSocial(raw: Record<string, unknown>, platform: string): boolean {
+  const args = raw.args;
+  const noEnv = raw.env === undefined || (Array.isArray(raw.env) && raw.env.length === 0);
+  return (
+    raw.transport === 'stdio' &&
+    raw.command === 'node' &&
+    Array.isArray(args) &&
+    args.length === 3 &&
+    args[0] === SOCIAL_ENTRY &&
+    args[1] === '--platform' &&
+    args[2] === platform &&
+    noEnv &&
+    raw.headers === undefined &&
+    raw.url === undefined
+  );
+}
+
 function parseOne(raw: unknown, index: number): ServerConfig {
   const where = `servers[${index}]`;
   if (!isRecord(raw)) throw new ConfigError(`${where} must be an object`);
@@ -160,6 +184,9 @@ function parseOne(raw: unknown, index: number): ServerConfig {
   if (typeof platform !== 'string' || !PLATFORM_RE.test(platform)) {
     throw new ConfigError(`${where}.platform must match ${PLATFORM_RE}`);
   }
+
+  const reserved = RESERVED_SOCIAL_PLATFORMS.has(platform);
+  if (reserved && !isBuiltinSocial(raw, platform)) throw new ConfigError(`${where}: ${RESERVED_ERROR}`);
 
   if (raw.transport === 'stdio') {
     if (typeof raw.command !== 'string' || raw.command.length === 0) {
@@ -176,7 +203,7 @@ function parseOne(raw: unknown, index: number): ServerConfig {
     const env = raw.env ?? [];
     if (!Array.isArray(env)) throw new ConfigError(`${where}.env must be an array of environment variable NAMES`);
     const envNames = env.map((e) => checkEnvName(e, platform, `${where}.env`));
-    return { platform, transport: 'stdio', command: raw.command, args: args as string[], envNames, tools: parseTools(raw.tools, where) };
+    return { platform, transport: 'stdio', command: raw.command, args: args as string[], envNames, tools: parseTools(raw.tools, where), ...(reserved ? { builtin: true } : {}) };
   }
 
   if (raw.transport === 'http') {

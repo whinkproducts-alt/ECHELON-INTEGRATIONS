@@ -19,7 +19,7 @@ import { logger } from '@/lib/logger';
 import { streamChat } from '@/lib/model-router';
 
 const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search', 'document_search']);
-const isExternal = (name: string) => EXTERNAL_TOOLS.has(name) || name.startsWith('openclaw__');
+export const isExternalTool = (name: string) => EXTERNAL_TOOLS.has(name) || name.startsWith('openclaw__');
 
 export interface ToolDefinition {
   name: string;
@@ -66,6 +66,9 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
 
         // L7: at most one approval per run.
         let approvalPending = false;
+        // M3: set once any external read result has entered this run. From then on Class B and
+        // outbound/persisting tools need a human (see executeTool).
+        let tainted = false;
 
         for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
           let response;
@@ -139,7 +142,7 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
               opts.persona,
               opts.mambaMode ?? undefined,
               opts.correlationId,
-              { approvalAlreadyPending: approvalPending },
+              { approvalAlreadyPending: approvalPending, tainted },
             );
 
             if (result.approvalRequired) {
@@ -155,6 +158,9 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
               continue;
             }
 
+            // The call ran (or failed after running): its result, error text included, is external content.
+            if (isExternalTool(call.name)) tainted = true;
+
             send({
               type: 'tool_result',
               tool: call.name,
@@ -164,7 +170,7 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
 
             // Wrap external tool results to prevent prompt injection
             let toolContent: string;
-            if (isExternal(call.name) && result.success) {
+            if (isExternalTool(call.name) && result.success) {
               // Correct order: strip fake tags -> normalize/filter -> scan normalized result -> wrap
               const stripped = stripFakeUntrustedTags(JSON.stringify(result.data));
               const filtered = filterToolResult(stripped);
@@ -191,10 +197,10 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
               toolContent = wrapUntrustedContent(contentForModel, call.name, result.source ?? call.name);
             } else if (!result.success) {
               const rawErrorContent = `[Tool error: ${result.error ?? 'unknown'}]`;
-              const errorContent = isExternal(call.name)
+              const errorContent = isExternalTool(call.name)
                 ? filterToolResult(stripFakeUntrustedTags(rawErrorContent))
                 : rawErrorContent;
-              toolContent = isExternal(call.name)
+              toolContent = isExternalTool(call.name)
                 ? wrapUntrustedContent(errorContent, call.name, call.name)
                 : errorContent;
             } else {
@@ -378,3 +384,21 @@ export const STANDARD_TOOLS: ToolDefinition[] = [
     },
   },
 ];
+
+/**
+ * Built-in scheduling tool. Class C: it only ever queues an approval. Not part of STANDARD_TOOLS:
+ * lib/gateway-chat.ts offers it only when the user has an active X connection.
+ */
+export const SOCIAL_SCHEDULE_TOOL: ToolDefinition = {
+  name: 'social_schedule_post',
+  description: 'Schedule a post on X for a future time. The user must approve the exact text and time before it is saved, and the post is sent later only if the content is unchanged.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      platform: { type: 'string', enum: ['x'] },
+      text: { type: 'string', description: 'Post text, up to 280 characters' },
+      send_at: { type: 'string', description: 'ISO 8601 date-time in the future, with a timezone offset' },
+    },
+    required: ['platform', 'text', 'send_at'],
+  },
+};
