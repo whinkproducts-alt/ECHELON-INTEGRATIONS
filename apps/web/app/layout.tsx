@@ -1,14 +1,9 @@
-import { DM_Sans, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
-
-const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-sans' });
-const jakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-display' });
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' });
 
 export const metadata: Metadata = {
   title: 'WHINK — Intelligence Operating System',
@@ -30,7 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head />
-      <body className={`${dmSans.variable} ${jakartaSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+      <body className="font-sans antialiased">
         <Providers nonce={nonce}>{children}</Providers>
       </body>
     </html>

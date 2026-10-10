@@ -16,9 +16,9 @@ The root layout, `app/layout.tsx`, is the single place for app-wide providers an
 
 | Role | Font | Tailwind Class | Default Usage |
 |------|------|---------------|-------|
-| Body | DM Sans | `font-sans` | All body text, labels, descriptions |
-| Display | Plus Jakarta Sans | `font-display` | Page titles, hero headings, section headers |
-| Mono | JetBrains Mono | `font-mono` | Code snippets, numeric data, IDs, timestamps |
+| Body | IBM Plex Sans | `font-sans` | All body text, labels, descriptions |
+| Display | Jost | `font-display` | Page titles, hero headings, section headers |
+| Mono | IBM Plex Mono | `font-mono` | Code snippets, numeric data, IDs, timestamps, system events |
 
 **Size hierarchy:** Use Tailwind's scale. Headings: `text-4xl`→`text-3xl`→`text-2xl`→`text-xl`. Body: `text-base`→`text-sm`. Captions: `text-xs`.
 

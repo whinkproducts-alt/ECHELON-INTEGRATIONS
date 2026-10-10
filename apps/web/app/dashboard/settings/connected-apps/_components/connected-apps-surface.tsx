@@ -116,7 +116,7 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
           role={notice.kind === 'error' ? 'alert' : 'status'}
           className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${
             notice.kind === 'error'
-              ? 'border-destructive text-destructive'
+              ? 'border-[hsl(var(--denial))] text-[hsl(var(--denial))]'
               : 'border-border text-foreground bg-card'
           }`}
         >
@@ -138,8 +138,8 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
       )}
 
       {state === 'error' && (
-        <div role="alert" className="bg-card border border-destructive rounded-lg p-5 space-y-3">
-          <p className="text-sm text-destructive">Error: could not load your connected apps.</p>
+        <div role="alert" className="bg-card border border-[hsl(var(--denial))] rounded-lg p-5 space-y-3">
+          <p className="text-sm text-[hsl(var(--denial))]">Error: could not load your connected apps.</p>
           <button
             onClick={() => {
               setState('loading');
@@ -166,11 +166,11 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
                       <Link2 className="h-4 w-4" /> {PLATFORM_LABELS[row.platform]}
                     </h2>
                     <span
-                      className={`inline-block text-xs font-medium px-2 py-0.5 rounded border ${
+                      className={`inline-block text-xs font-mono font-medium px-2 py-0.5 rounded border ${
                         row.status === 'expired'
-                          ? 'border-[hsl(var(--pending-amber))] text-[hsl(var(--pending-amber))]'
+                          ? 'border-[hsl(var(--denial))] text-[hsl(var(--denial))]'
                           : row.status === 'connected'
-                            ? 'border-primary text-primary'
+                            ? 'border-[var(--tenant-accent,hsl(var(--whink-accent)))] text-[var(--tenant-accent,hsl(var(--whink-accent)))]'
                             : 'border-border text-muted-foreground'
                       }`}
                     >
@@ -246,7 +246,7 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
                 )}
 
                 {connected && confirming === row.platform && (
-                  <div role="alertdialog" aria-label={`Confirm disconnect ${PLATFORM_LABELS[row.platform]}`} className="flex items-center justify-between gap-3 flex-wrap border border-destructive rounded-md p-3">
+                  <div role="alertdialog" aria-label={`Confirm disconnect ${PLATFORM_LABELS[row.platform]}`} className="flex items-center justify-between gap-3 flex-wrap border border-[hsl(var(--denial))] rounded-md p-3">
                     <p className="text-sm">
                       Disconnect {PLATFORM_LABELS[row.platform]}? Stored access is deleted and this is logged.
                     </p>
@@ -254,7 +254,7 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
                       <button
                         onClick={() => disconnect(row.platform)}
                         disabled={busy !== null}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[hsl(var(--denial))] text-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
                       >
                         {isBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                         Confirm disconnect

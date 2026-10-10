@@ -66,7 +66,7 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
       >
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 h-14 border-b border-border">
-          <Zap className={`h-5 w-5 flex-shrink-0 ${isWhink ? 'text-primary' : 'text-amber-400'}`} />
+          <Zap className={`h-5 w-5 flex-shrink-0 ${isWhink ? 'text-primary' : 'text-[hsl(var(--mamba-blood))]'}`} />
           {!collapsed && (
             <span className="font-display font-bold text-foreground tracking-tight">{tenantConfig.productName}</span>
           )}
@@ -118,10 +118,10 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
         <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-card">
           <div className="flex items-center gap-4">
             <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-medium ${
-              isWhink ? 'bg-primary/10 text-primary' : 'bg-amber-400/10 text-amber-400'
+              isWhink ? 'bg-primary/10 text-primary' : 'bg-[hsl(var(--mamba-blood)/0.1)] text-[hsl(var(--mamba-blood))]'
             }`}>
               <span className={`h-2 w-2 rounded-full ${
-                isWhink ? 'bg-primary animate-pulse-subtle' : 'bg-amber-400 animate-pulse-subtle'
+                isWhink ? 'bg-primary animate-pulse-subtle' : 'bg-[hsl(var(--mamba-blood))] animate-pulse-subtle'
               }`} />
               {isWhink ? tenantConfig.productName : `MAMBA • ${personaState.mambaMode ?? 'OBSIDIAN'}`}
             </div>

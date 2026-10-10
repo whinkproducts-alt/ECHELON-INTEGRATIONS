@@ -1,9 +1,17 @@
+/* Google Fonts — loaded at runtime; build-time network is restricted */
+@import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    /* Font family tokens */
+    --font-display: 'Jost', system-ui, sans-serif;
+    --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
     --background: 220 20% 6%;
     --foreground: 210 20% 92%;
 
@@ -60,6 +68,7 @@
     --ember: 14 100% 56%;
     --pending-amber: 37 90% 55%;
     --denial: 356 77% 59%;
+    --tool-result: 160 84% 39%;
   }
 
   .dark {

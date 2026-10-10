@@ -83,6 +83,19 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
           } catch (err) {
             if (err instanceof ToolsUnsupportedError && iter === 0) {
               // Nothing has been emitted yet: fall back to plain streaming, no tools.
+              // A8: record that tools were skipped so the ledger captures the fallback.
+              await recordActionSafe({
+                userId: opts.userId,
+                initiator: 'system',
+                persona: opts.persona ?? 'WHINK',
+                mambaMode: opts.mambaMode ?? undefined,
+                action: 'tools_skipped',
+                permissionClass: 'A',
+                status: 'VALIDATED',
+                correlationId: opts.correlationId ?? 'unknown',
+                outputSummary: `model_does_not_support_tools: ${model}`,
+                latencyMs: 0,
+              });
               const plain = await streamChat({ messages: opts.messages, model, maxTokens: opts.maxTokens, apiKey: opts.apiKey });
               const reader = plain.getReader();
               while (true) {

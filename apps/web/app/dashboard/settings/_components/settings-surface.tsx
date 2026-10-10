@@ -22,7 +22,7 @@ export function SettingsSurface() {
 
   // White label state
   const [wlProductName, setWlProductName] = useState('');
-  const [wlAccentColor, setWlAccentColor] = useState('#38B6FF');
+  const [wlAccentColor, setWlAccentColor] = useState('hsl(var(--whink-accent))');
   const [wlLogoUrl, setWlLogoUrl] = useState('');
   const [wlSaving, setWlSaving] = useState(false);
 
@@ -209,7 +209,7 @@ export function SettingsSurface() {
                 value={wlAccentColor}
                 onChange={(e) => setWlAccentColor(e.target.value)}
                 className="input-field flex-1"
-                placeholder="#38B6FF"
+                placeholder="hsl(var(--whink-accent))"
               />
               <div
                 className="h-9 w-9 rounded-md border border-border flex-shrink-0"

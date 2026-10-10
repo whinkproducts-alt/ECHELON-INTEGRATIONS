@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { X, Zap } from 'lucide-react';
+import { X, Zap, Clock } from 'lucide-react';
 
 export type NeuralEvent = {
   id: string;
@@ -16,13 +16,13 @@ interface NeuralLinkProps {
   onClose: () => void;
 }
 
-const EVENT_META: Record<NeuralEvent['type'], { icon: string; label: string; colorVar: string }> = {
-  tool_call:      { icon: '⚙', label: 'tool call',     colorVar: 'var(--whink-accent-hex, hsl(var(--whink-accent)))' },
-  tool_result:    { icon: '✓', label: 'tool result',   colorVar: 'hsl(160 84% 50%)' },
+const EVENT_META: Record<NeuralEvent['type'], { icon: string; label: string; colorVar: string; useClockIcon?: boolean }> = {
+  tool_call:      { icon: '⚙', label: 'tool call',     colorVar: 'var(--tenant-accent, hsl(var(--whink-accent)))' },
+  tool_result:    { icon: '✓', label: 'tool result',   colorVar: 'hsl(var(--whink-green))' },
   security_event: { icon: '⚠', label: 'security',      colorVar: 'hsl(var(--denial))' },
   memory_write:   { icon: '◈', label: 'memory',        colorVar: 'hsl(var(--whink-accent))' },
   text_chunk:     { icon: '▸', label: 'stream',        colorVar: 'hsl(var(--muted-foreground))' },
-  approval:       { icon: '⏳', label: 'approval pending', colorVar: 'hsl(var(--pending-amber))' },
+  approval:       { icon: '',  label: 'approval pending', colorVar: 'hsl(var(--pending-amber))', useClockIcon: true },
   error:          { icon: '✕', label: 'error',         colorVar: 'hsl(var(--denial))' },
 };
 
@@ -55,7 +55,7 @@ export function NeuralLink({ events, open, onClose }: NeuralLinkProps) {
     >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border flex-shrink-0">
-        <span className="flex items-center gap-1.5 text-xs font-mono font-medium" style={{ color: 'hsl(var(--whink-accent))' }}>
+        <span className="flex items-center gap-1.5 text-xs font-mono font-medium" style={{ color: 'var(--tenant-accent, hsl(var(--whink-accent)))' }}>
           <Zap className="h-3 w-3" />
           Neural Link
         </span>
@@ -75,6 +75,7 @@ export function NeuralLink({ events, open, onClose }: NeuralLinkProps) {
         )}
         {events.slice(-20).map((ev) => {
           const meta = EVENT_META[ev.type];
+          const isSecurity = ev.type === 'security_event';
           return (
             <div key={ev.id} className="flex items-start gap-1.5 text-xs font-mono">
               <span
@@ -82,9 +83,16 @@ export function NeuralLink({ events, open, onClose }: NeuralLinkProps) {
                 style={{ color: meta.colorVar }}
                 aria-label={meta.label}
               >
-                {meta.icon}
+                {meta.useClockIcon ? <Clock size={12} /> : meta.icon}
               </span>
-              <span className="flex-1 text-muted-foreground break-words">{ev.text}</span>
+              <span className="flex-1 text-muted-foreground break-words">
+                {isSecurity && (
+                  <span className="font-mono font-semibold mr-1" style={{ color: 'hsl(var(--denial))' }}>
+                    SECURITY
+                  </span>
+                )}
+                {ev.text}
+              </span>
               <span className="flex-shrink-0 text-muted-foreground/50 tabular-nums">{formatTs(ev.ts)}</span>
             </div>
           );

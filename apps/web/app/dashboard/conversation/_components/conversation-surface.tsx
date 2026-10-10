@@ -573,7 +573,7 @@ export function ConversationSurface() {
                 }`}>
                   <div className={`flex-shrink-0 h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold ${
                     streamPersona === 'MAMBA'
-                      ? 'bg-amber-400/10 text-amber-400'
+                      ? 'bg-[hsl(var(--mamba-blood)/0.1)] text-[hsl(var(--mamba-blood))]'
                       : 'bg-primary/10 text-primary'
                   }`}>
                     {streamPersona === 'MAMBA' ? 'M' : 'W'}
@@ -581,7 +581,7 @@ export function ConversationSurface() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-xs font-mono font-medium ${
-                        streamPersona === 'MAMBA' ? 'text-amber-400' : 'text-primary'
+                        streamPersona === 'MAMBA' ? 'text-[hsl(var(--mamba-blood))]' : 'text-primary'
                       }`}>
                         {streamPersona}{streamMambaMode ? ` • ${streamMambaMode}` : ''}
                       </span>
@@ -735,14 +735,14 @@ function MessageBubble({ message, onSpeak }: { message: Message; onSpeak?: (text
   return (
     <div className={`flex gap-3 ${isMamba ? 'mamba-glow' : ''}`}>
       <div className={`flex-shrink-0 h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold ${
-        isMamba ? 'bg-amber-400/10 text-amber-400' : 'bg-primary/10 text-primary'
+        isMamba ? 'bg-[hsl(var(--mamba-blood)/0.1)] text-[hsl(var(--mamba-blood))]' : 'bg-primary/10 text-primary'
       }`}>
         {isMamba ? 'M' : 'W'}
       </div>
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
           <span className={`text-xs font-mono font-medium ${
-            isMamba ? 'text-amber-400' : 'text-primary'
+            isMamba ? 'text-[hsl(var(--mamba-blood))]' : 'text-primary'
           }`}>
             {message.persona ?? 'WHINK'}{message.mambaMode ? ` • ${message.mambaMode}` : ''}
           </span>
