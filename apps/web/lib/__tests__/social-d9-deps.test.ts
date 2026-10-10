@@ -40,7 +40,7 @@ function parseLock(text: string): Graph {
   const edges = new Map<string, string[]>();
 
   // importers: apps/web -> dependencies + devDependencies (not optionalDependencies)
-  let i = lines.findIndex((l) => l === 'importers:');
+  const i = lines.findIndex((l) => l === 'importers:');
   const end = lines.findIndex((l, idx) => idx > i && /^\S/.test(l) && l !== 'importers:');
   let inWeb = false;
   let section = '';
