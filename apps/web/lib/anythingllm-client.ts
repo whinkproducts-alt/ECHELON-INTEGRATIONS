@@ -3,12 +3,21 @@
  * AnythingLLM document recall service. Keep all other code behind this
  * interface so AnythingLLM can be swapped without touching tool-registry.ts.
  *
- * All responses are treated as untrusted external content and must be passed
- * through wrapUntrustedContent before entering the model context.
+ * All responses are treated as untrusted external content and are wrapped
+ * through wrapUntrustedContent before being returned to the caller.
+ *
+ * NOTE: AnythingLLM 1.7.4 does not expose a pure vector-retrieval endpoint.
+ * We use the /chat endpoint with mode: 'query' but discard the textResponse
+ * (LLM output) and use only the sources array (indexed document chunks).
+ * TODO: upgrade to AnythingLLM 2.x for a pure retrieval endpoint.
  */
+
+import { stripFakeUntrustedTags, wrapUntrustedContent, scanForInjectionPatterns } from '@/lib/content-isolation';
+import { logSecurityEvent } from '@/lib/permission-engine';
 
 const ANYTHINGLLM_URL = (process.env.ANYTHINGLLM_URL ?? 'http://localhost:3001').replace(/\/$/, '');
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
+const MAX_SNIPPET_CHARS = 2000;
 
 function assertApiKeyPresent(): void {
   const hostname = new URL(ANYTHINGLLM_URL).hostname;
@@ -29,6 +38,7 @@ function buildHeaders(): Record<string, string> {
 
 export interface DocumentResult {
   title: string;
+  /** Wrapped untrusted content — safe to pass to model context. */
   content: string;
   source: string;
   score?: number;
@@ -41,17 +51,25 @@ export interface Workspace {
 }
 
 /**
- * Search documents in a workspace using the AnythingLLM chat endpoint.
- * Falls back to an empty array if the service is unavailable.
+ * Search documents in a workspace.
+ * Returns only source document chunks (no LLM-generated text).
+ * Each snippet is injection-scanned, capped, and wrapped as untrusted.
+ * Suspicious snippets are dropped and logged as security events.
+ *
+ * @param query    The search query.
+ * @param userId   Required — scopes the security event log.
+ * @param workspaceSlug  Per-user workspace slug.
+ * @param limit    Maximum number of results to return.
  */
 export async function searchDocuments(
   query: string,
-  workspaceSlug?: string,
+  userId: string,
+  workspaceSlug: string,
   limit: number = 5,
 ): Promise<DocumentResult[]> {
   assertApiKeyPresent();
 
-  const slug = workspaceSlug ?? 'default';
+  const slug = workspaceSlug;
   const url = `${ANYTHINGLLM_URL}/api/v1/workspace/${encodeURIComponent(slug)}/chat`;
 
   let res: Response;
@@ -82,29 +100,44 @@ export async function searchDocuments(
 
   const SCORE_THRESHOLD = 0.3;
 
-  // AnythingLLM chat response includes sources array
+  // Use only the sources array (indexed document chunks).
+  // textResponse (LLM-generated output) is intentionally discarded.
   const sources: any[] = Array.isArray(json?.sources) ? json.sources : [];
-  const allMapped: DocumentResult[] = sources.map((s: any) => ({
-    title: String(s?.title ?? s?.name ?? 'Untitled'),
-    content: String(s?.text ?? s?.content ?? ''),
-    source: String(s?.url ?? s?.file ?? ''),
-    score: typeof s?.score === 'number' ? s.score : undefined,
-  }));
 
-  // Filter out results below the score threshold (only when a score is present)
-  const aboveThreshold = allMapped.filter(
-    (r) => r.score === undefined || r.score >= SCORE_THRESHOLD
-  );
+  const results: DocumentResult[] = [];
+  for (const s of sources) {
+    if (results.length >= limit) break;
 
-  // If all results are below the threshold, return empty array
-  const results: DocumentResult[] = aboveThreshold.slice(0, limit);
+    const score = typeof s?.score === 'number' ? s.score : undefined;
+    if (score !== undefined && score < SCORE_THRESHOLD) continue;
 
-  // If no sources but there is a response text, wrap it as a single result
-  if (results.length === 0 && json?.textResponse) {
+    const rawTitle = String(s?.title ?? s?.name ?? 'Untitled');
+    const rawText = String(s?.text ?? s?.content ?? '');
+    const sourceRef = String(s?.url ?? s?.file ?? slug);
+
+    // Strip fake envelope tags before inspection
+    const cleanText = stripFakeUntrustedTags(rawText);
+
+    // Scan for injection patterns; drop suspicious snippets
+    const { suspicious, patterns } = scanForInjectionPatterns(cleanText);
+    if (suspicious) {
+      await logSecurityEvent(userId, 'anythingllm_injection_detected', {
+        patterns,
+        source: sourceRef,
+        slug,
+      });
+      continue;
+    }
+
+    // Cap and wrap
+    const capped = cleanText.slice(0, MAX_SNIPPET_CHARS);
+    const wrapped = wrapUntrustedContent(capped, 'document', sourceRef);
+
     results.push({
-      title: 'Response',
-      content: String(json.textResponse),
-      source: slug,
+      title: stripFakeUntrustedTags(rawTitle).slice(0, 200),
+      content: wrapped,
+      source: sourceRef,
+      score,
     });
   }
 

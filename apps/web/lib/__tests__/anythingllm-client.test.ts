@@ -31,6 +31,9 @@ describe('searchDocuments', () => {
     vi.restoreAllMocks();
   });
 
+  const TEST_USER = 'user-test-123';
+  const TEST_SLUG = 'test-workspace';
+
   it('returns typed results from a successful mock response', async () => {
     global.fetch = mockFetch(200, makeChatResponse([
       { title: 'Doc A', text: 'Content A', url: 'file://a.txt', score: 0.9 },
@@ -38,10 +41,11 @@ describe('searchDocuments', () => {
     ]));
 
     const { searchDocuments } = await import('@/lib/anythingllm-client');
-    const results = await searchDocuments('test query');
+    const results = await searchDocuments('test query', TEST_USER, TEST_SLUG);
     expect(results).toHaveLength(2);
     expect(results[0].title).toBe('Doc A');
-    expect(results[0].content).toBe('Content A');
+    // content is wrapped as untrusted — check it contains the original text
+    expect(results[0].content).toContain('Content A');
     expect(results[0].source).toBe('file://a.txt');
     expect(results[0].score).toBe(0.9);
   });
@@ -50,7 +54,7 @@ describe('searchDocuments', () => {
     global.fetch = mockFetch(500, {});
 
     const { searchDocuments } = await import('@/lib/anythingllm-client');
-    const results = await searchDocuments('test query');
+    const results = await searchDocuments('test query', TEST_USER, TEST_SLUG);
     expect(results).toEqual([]);
   });
 
@@ -58,7 +62,7 @@ describe('searchDocuments', () => {
     global.fetch = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
 
     const { searchDocuments } = await import('@/lib/anythingllm-client');
-    const results = await searchDocuments('test query');
+    const results = await searchDocuments('test query', TEST_USER, TEST_SLUG);
     expect(results).toEqual([]);
   });
 
@@ -69,7 +73,7 @@ describe('searchDocuments', () => {
     ]));
 
     const { searchDocuments } = await import('@/lib/anythingllm-client');
-    const results = await searchDocuments('test query');
+    const results = await searchDocuments('test query', TEST_USER, TEST_SLUG);
     const titles = results.map((r) => r.title);
     // Score below 0.3 threshold must be excluded
     expect(titles).toContain('High score');
@@ -81,7 +85,7 @@ describe('searchDocuments', () => {
     delete process.env.ANYTHINGLLM_API_KEY;
 
     const { searchDocuments } = await import('@/lib/anythingllm-client');
-    await expect(searchDocuments('query')).rejects.toThrow('ANYTHINGLLM_API_KEY');
+    await expect(searchDocuments('query', TEST_USER, TEST_SLUG)).rejects.toThrow('ANYTHINGLLM_API_KEY');
   });
 
   it('does not throw when URL is non-local and API key is set', async () => {
@@ -90,16 +94,16 @@ describe('searchDocuments', () => {
     global.fetch = mockFetch(200, makeChatResponse([]));
 
     const { searchDocuments } = await import('@/lib/anythingllm-client');
-    await expect(searchDocuments('query')).resolves.toEqual([]);
+    await expect(searchDocuments('query', TEST_USER, TEST_SLUG)).resolves.toEqual([]);
   });
 
-  it('returns textResponse as single result when sources array is empty', async () => {
+  it('does not include textResponse LLM output when sources array is empty (H1 security fix)', async () => {
+    // textResponse is LLM-generated output from AnythingLLM — it must be discarded, not returned.
     global.fetch = mockFetch(200, makeChatResponse([], 'This is the model answer'));
 
     const { searchDocuments } = await import('@/lib/anythingllm-client');
-    const results = await searchDocuments('query');
-    expect(results).toHaveLength(1);
-    expect(results[0].content).toBe('This is the model answer');
-    expect(results[0].title).toBe('Response');
+    const results = await searchDocuments('query', TEST_USER, TEST_SLUG);
+    // Must return empty — no LLM-generated fallback content.
+    expect(results).toHaveLength(0);
   });
 });

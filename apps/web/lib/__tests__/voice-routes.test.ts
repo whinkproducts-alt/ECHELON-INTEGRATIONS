@@ -91,6 +91,41 @@ describe('POST /api/voice/stt', () => {
     expect(body.fallback).toBe('browser');
     expect(body.text).toBe('');
   });
+
+  it('Deepgram path: returns 413 when content-length exceeds 10 MB', async () => {
+    process.env.STT_PROVIDER = 'deepgram';
+    process.env.DEEPGRAM_API_KEY = 'dg-test-key';
+
+    const { POST } = await import('@/app/api/voice/stt/route');
+    const tenMBPlusOne = 10 * 1024 * 1024 + 1;
+    const req = new Request('http://localhost/api/voice/stt', {
+      method: 'POST',
+      headers: { 'content-length': String(tenMBPlusOne) },
+      body: new Uint8Array(1), // tiny body; the header triggers the cap
+    });
+    const res = await POST(req as any);
+    expect(res.status).toBe(413);
+    const body = await res.json();
+    expect(body.error).toMatch(/too large/i);
+  });
+
+  it('generic path: returns 413 when content-length exceeds 10 MB', async () => {
+    delete process.env.STT_PROVIDER;
+    process.env.STT_URL = 'http://localhost:9000';
+
+    const { POST } = await import('@/app/api/voice/stt/route');
+    const tenMBPlusOne = 10 * 1024 * 1024 + 1;
+    const req = new Request('http://localhost/api/voice/stt', {
+      method: 'POST',
+      headers: { 'content-length': String(tenMBPlusOne) },
+      body: new Uint8Array(1),
+    });
+    const res = await POST(req as any);
+    expect(res.status).toBe(413);
+    const body = await res.json();
+    expect(body.error).toMatch(/too large/i);
+    delete process.env.STT_URL;
+  });
 });
 
 // ─── TTS route ───────────────────────────────────────────────────────────────

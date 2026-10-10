@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ShieldAlert, Check, X, Mic } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { ShieldAlert, Check, X, Mic, Volume2 } from 'lucide-react';
 import { useDecisionListener } from '@/lib/hooks/useDecisionListener';
 import {
   type ApprovalView, type CardState, formatParams, isTerminal, secondsRemaining,
@@ -32,9 +32,37 @@ function statusLabel(state: CardState): { text: string; color: string } | null {
   }
 }
 
+async function ttsReadAloud(text: string) {
+  try {
+    const res = await fetch('/api/voice/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (res.status === 501) {
+      // Server has no TTS provider — browser fallback
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+      }
+      return;
+    }
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.addEventListener('ended', () => URL.revokeObjectURL(url));
+    await audio.play();
+  } catch {
+    // Degrade silently
+  }
+}
+
 export function ApprovalCard({ approval, state, onTick, onDecide, code }: ApprovalCardProps) {
   const [now, setNow] = useState(() => Date.now());
   const terminal = isTerminal(state.phase);
+  const handleReadAloud = useCallback(() => {
+    void ttsReadAloud(`${approval.tool ?? 'Action'}: ${approval.summary}`);
+  }, [approval.tool, approval.summary]);
 
   useEffect(() => {
     if (terminal) return;
@@ -69,6 +97,15 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code }: Approv
           {terminal ? 'Approval' : 'Awaiting approval'}
         </span>
         <span className="font-mono text-foreground">{title}</span>
+        <button
+          type="button"
+          aria-label="Read aloud"
+          title="Read action description aloud"
+          onClick={handleReadAloud}
+          className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Volume2 className="h-3.5 w-3.5" aria-hidden />
+        </button>
         {!terminal && (
           <span
             className="ml-auto font-mono tabular-nums"

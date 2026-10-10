@@ -108,6 +108,7 @@ model UserPreference {
   defaultFunctionalMode String?
   executionProfile      String   @default("BALANCED")
   preferredModel        String? // e.g. "claude-sonnet-4-5", "gpt-4o", "llama3.1:8b"
+  anythingllmWorkspace  String? // per-user AnythingLLM workspace slug; null falls back to env
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

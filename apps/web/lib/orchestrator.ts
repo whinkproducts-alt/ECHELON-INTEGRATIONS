@@ -165,7 +165,7 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
   }
 
   // 6. Assemble context
-  const context = await assembleContext(userId, conversationId, projectId, correlationId);
+  const context = await assembleContext(userId, conversationId, projectId, correlationId, message);
   const contextStr = formatContextForPrompt(context);
 
   // 6b. Read agent lessons (CAI) — scoped by accountId for tenant isolation

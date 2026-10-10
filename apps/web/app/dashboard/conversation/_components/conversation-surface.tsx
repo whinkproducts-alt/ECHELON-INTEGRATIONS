@@ -536,7 +536,7 @@ export function ConversationSurface() {
               )}
 
               {(messages ?? []).map((msg: Message) => (
-                <MessageBubble key={msg.id} message={msg} />
+                <MessageBubble key={msg.id} message={msg} onSpeak={msg.role === 'assistant' ? speak : undefined} />
               ))}
 
               {/* Inline tool traces — rendered between messages and the streaming reply */}
@@ -718,7 +718,7 @@ function ModelPicker({
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, onSpeak }: { message: Message; onSpeak?: (text: string) => Promise<void> }) {
   const isUser = message.role === 'user';
   const isMamba = message.persona === 'MAMBA';
 
@@ -750,6 +750,17 @@ function MessageBubble({ message }: { message: Message }) {
             <span className="text-xs font-mono text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
               {message.functionalMode}
             </span>
+          )}
+          {onSpeak && (
+            <button
+              type="button"
+              aria-label="Read aloud"
+              title="Read aloud"
+              onClick={() => { onSpeak(message.content).catch(() => {}); }}
+              className="ml-auto p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Volume2 className="h-3.5 w-3.5" aria-hidden />
+            </button>
           )}
         </div>
         <div className="text-sm text-foreground whitespace-pre-wrap">{message.content}</div>
