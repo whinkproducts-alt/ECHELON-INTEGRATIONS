@@ -38,6 +38,12 @@ export interface ToolLoopOptions {
   correlationId?: string;
   /** Decrypted BYOK API key. Passed to the model router to override the server env key. */
   apiKey?: string;
+  /**
+   * M1: When true, the conversation was flagged by the injection scanner on a previous turn.
+   * Taint is pre-seeded so Class A/B tools that persist or send data outward are upgraded to
+   * Class C for the entire run, matching the within-turn taint behaviour.
+   */
+  conversationTainted?: boolean;
 }
 
 const MAX_TOOL_ITERATIONS = 5;
@@ -66,9 +72,10 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
 
         // L7: at most one approval per run.
         let approvalPending = false;
-        // M3: set once any external read result has entered this run. From then on Class B and
+        // M1/M3: set once any external read result has entered this run, OR when the conversation
+        // was pre-tainted by a prior injection-blocked turn. From then on Class B and
         // outbound/persisting tools need a human (see executeTool).
-        let tainted = false;
+        let tainted = opts.conversationTainted === true;
 
         for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
           let response;

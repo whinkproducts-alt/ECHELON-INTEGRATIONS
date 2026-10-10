@@ -18,6 +18,7 @@ import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
 import { validateTaskInput } from '@/lib/task-input';
 import dns from 'dns';
 import net from 'net';
+import https from 'https';
 
 // ── SSRF protection helpers ──────────────────────────────────────────────────
 
@@ -87,6 +88,92 @@ async function assertSafeUrl(rawUrl: string): Promise<void> {
       throw new Error(`URL resolves to a private/reserved address: ${address}`);
     }
   }
+}
+
+/**
+ * M3: DNS-rebinding-safe HTTPS GET.
+ *
+ * Node's built-in fetch re-resolves DNS independently of assertSafeUrl, so a
+ * short-TTL record could resolve to a public IP on the first check and a private
+ * IP when fetch actually connects (classic TOCTOU rebinding).
+ *
+ * This helper uses https.request with a custom `lookup` callback that intercepts
+ * DNS at connect time, so the IP we validated is the IP we connect to.
+ * TLS SNI is set to the original hostname, so certificates are still verified
+ * against the hostname — not the raw IP.
+ *
+ * Returns raw status, headers (as a plain object) and body buffer.
+ */
+interface GuardedFetchResult {
+  status: number;
+  headers: Record<string, string>;
+  body: Buffer;
+}
+
+function guardedFetch(rawUrl: string, timeoutMs: number): Promise<GuardedFetchResult> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (cb: () => void) => { if (!settled) { settled = true; clearTimeout(timer); cb(); } };
+    const timer = setTimeout(() => done(() => reject(new Error('web_fetch timeout'))), timeoutMs);
+
+    let parsed: URL;
+    try { parsed = new URL(rawUrl); } catch { done(() => reject(new Error('Invalid URL'))); return; }
+
+    const options: https.RequestOptions = {
+      hostname: parsed.hostname,
+      port: parsed.port ? Number(parsed.port) : 443,
+      path: (parsed.pathname || '/') + (parsed.search ?? ''),
+      method: 'GET',
+      servername: parsed.hostname, // TLS SNI — validates cert against hostname, not IP
+      headers: { 'User-Agent': 'WHINK/1.0', 'Host': parsed.hostname },
+      // Inject our rebinding guard at TCP-connect time.
+      // Node.js passes this to net.createConnection, which uses it instead of the default resolver.
+      lookup(hostname: string, _opts: dns.LookupOptions, cb: (err: NodeJS.ErrnoException | null, address: string, family: number) => void) {
+        dns.promises.lookup(hostname, { all: true }).then((addrs) => {
+          for (const { address } of addrs) {
+            if (isPrivateAddress(address)) {
+              // Reject: a private address appeared in the live DNS response.
+              const err = Object.assign(new Error(`URL resolves to a private/reserved address: ${address}`), { code: 'EBADIP' }) as NodeJS.ErrnoException;
+              cb(err, '', 0);
+              return;
+            }
+          }
+          if (addrs.length === 0) {
+            const err = Object.assign(new Error('DNS lookup returned no addresses'), { code: 'ENOTFOUND' }) as NodeJS.ErrnoException;
+            cb(err, '', 0);
+            return;
+          }
+          // Use the first address; all were validated above.
+          cb(null, addrs[0].address, addrs[0].family);
+        }).catch((e: Error) => cb(e as NodeJS.ErrnoException, '', 0));
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      const status = res.statusCode ?? 0;
+      const rawHeaders = res.headers as Record<string, string | string[] | undefined>;
+      const headers: Record<string, string> = {};
+      for (const [k, v] of Object.entries(rawHeaders)) {
+        if (typeof v === 'string') headers[k] = v;
+        else if (Array.isArray(v)) headers[k] = v.join(', ');
+      }
+      const chunks: Buffer[] = [];
+      let total = 0;
+      res.on('data', (chunk: Buffer) => {
+        total += chunk.byteLength;
+        if (total > MAX_WEB_FETCH_BYTES) {
+          req.destroy();
+          done(() => reject(new Error('Response too large')));
+        } else {
+          chunks.push(chunk);
+        }
+      });
+      res.on('end', () => done(() => resolve({ status, headers, body: Buffer.concat(chunks) })));
+      res.on('error', (e: Error) => done(() => reject(e)));
+    });
+    req.on('error', (e: Error) => done(() => reject(e)));
+    req.end();
+  });
 }
 
 const MAX_WEB_FETCH_BYTES = 100 * 1024; // 100 KB
@@ -244,42 +331,29 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
     } catch (e: any) {
       return { success: false, error: e?.message ?? 'URL rejected', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
     }
-    let res: Response;
+    // M3: Use guardedFetch which intercepts DNS at TCP-connect time (https.request + custom lookup).
+    // This closes the DNS-rebinding TOCTOU gap that exists when assertSafeUrl + fetch() resolve
+    // independently: with guardedFetch the same validated lookup is used for the actual connection.
+    let gRes: GuardedFetchResult;
     try {
-      res = await fetch(url, {
-        headers: { 'User-Agent': 'WHINK/1.0' },
-        redirect: 'manual',
-        signal: AbortSignal.timeout(15_000),
-      });
+      gRes = await guardedFetch(url, 15_000);
     } catch (e: any) {
       return { success: false, error: e?.message ?? 'Fetch failed', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
     }
-    // Reject redirects entirely
-    if (res.status >= 300 && res.status < 400) {
-      return { success: false, error: `Redirect rejected (${res.status}) — follow the redirect destination manually`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    // Reject redirects entirely (3xx)
+    if (gRes.status >= 300 && gRes.status < 400) {
+      return { success: false, error: `Redirect rejected (${gRes.status}) — follow the redirect destination manually`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
     }
-    if (!res.ok) return { success: false, error: `HTTP ${res.status}`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
-    // Cap body at 100 KB — check content-length header first, then stream
-    const contentLength = parseInt(res.headers.get('content-length') ?? '0', 10);
+    if (gRes.status < 200 || gRes.status >= 300) {
+      return { success: false, error: `HTTP ${gRes.status}`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+    // Cap body at 100 KB — guardedFetch already enforces this, but check again defensively
+    const contentLength = parseInt(gRes.headers['content-length'] ?? '0', 10);
     if (contentLength > MAX_WEB_FETCH_BYTES) {
       return { success: false, error: 'Response too large', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
     }
-    const reader = res.body?.getReader();
-    if (!reader) return { success: false, error: 'No response body', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
-    const chunks: Uint8Array[] = [];
-    let totalBytes = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      totalBytes += value.byteLength;
-      if (totalBytes > MAX_WEB_FETCH_BYTES) {
-        reader.cancel().catch(() => {});
-        return { success: false, error: 'Response too large', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
-      }
-      chunks.push(value);
-    }
-    const raw = new TextDecoder().decode(Buffer.concat(chunks.map(c => Buffer.from(c))));
-    const contentType = res.headers.get('content-type') ?? '';
+    const raw = gRes.body.toString('utf-8');
+    const contentType = gRes.headers['content-type'] ?? '';
     if (contentType.includes('json')) {
       try {
         return { success: true, data: JSON.parse(raw), source: url, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };

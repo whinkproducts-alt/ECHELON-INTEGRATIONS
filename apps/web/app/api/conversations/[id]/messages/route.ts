@@ -16,6 +16,10 @@ import { recordActionSafe } from '@/lib/ledger';
 import { resolveChatTools } from '@/lib/gateway-chat';
 import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
 import { normaliseMambaMode } from '@/lib/types';
+import { setWorkingMemory, getWorkingMemory } from '@/lib/working-memory';
+
+const TAINT_TTL_SECONDS = 300; // 5 minutes
+function taintKey(conversationId: string) { return `__taint__:${conversationId}`; }
 
 export async function GET(
   req: NextRequest,
@@ -70,6 +74,8 @@ export async function POST(
     // Block injection attempts — do not save user message, do not forward to model.
     // The orchestrator already wrote the DENIED ledger row.
     if (orchResult.injectionBlocked) {
+      // M1: Persist a taint flag so the next turn in this conversation upgrades Class A/B tools to C.
+      void setWorkingMemory(session.user.id, taintKey(conversationId), new Date().toISOString(), TAINT_TTL_SECONDS).catch(() => {});
       const patterns = orchResult.injectionPatterns;
       const refusal = `I didn't act on that message \u2014 it contains instruction patterns I treat as an injection attempt: ${patterns.join(', ')}.`;
       const enc = new TextEncoder();
@@ -267,6 +273,12 @@ export async function POST(
       }
     } catch { /* non-blocking — fall back to server key */ }
 
+    // M1: Check if a prior injection-blocked turn left a taint flag for this conversation.
+    let conversationTainted = false;
+    try {
+      conversationTainted = !!(await getWorkingMemory(session.user.id, taintKey(conversationId)));
+    } catch { /* non-blocking */ }
+
     // Standard tools plus any gateway tools (cached). Gateway down means standard tools only.
     const chatTools = await resolveChatTools({
       userId: session.user.id,
@@ -286,6 +298,7 @@ export async function POST(
         model: resolvedModel,
         apiKey: byokApiKey,
         correlationId,
+        conversationTainted,
       });
     } catch (err: any) {
       logger.error('Model router error', { correlationId, error: err?.message });
