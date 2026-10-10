@@ -73,7 +73,7 @@ describe('openclaw-client (MCP adapter)', () => {
     const tools = await listOpenClawTools();
     expect(tools.map((t) => t.name)).toEqual(['ref__echo', 'gh__create_issue']);
     expect(Object.keys(tools[0]).sort()).toEqual(['description', 'inputSchema', 'name']);
-    expect(close).toHaveBeenCalled();
+    // E5: pool keeps the client alive after a successful operation; close is NOT called immediately.
   });
 
   it('talks to OPENCLAW_URL/mcp with the bearer token', async () => {
@@ -182,9 +182,12 @@ describe('openclaw-client (MCP adapter)', () => {
     callTool.mockResolvedValueOnce({ content: [{ type: 'text', text: 'ok' }] });
     const { listOpenClawTools, callOpenClawTool } = await load();
     await listOpenClawTools();
-    expect(connect).toHaveBeenLastCalledWith(expect.anything(), { timeout: 10_000 });
+    // E5: connection pool — the first connect uses LIST_TIMEOUT_MS (10_000).
+    expect(connect).toHaveBeenCalledWith(expect.anything(), { timeout: 10_000 });
+    // Subsequent calls in the same pool TTL reuse the connection; connect is NOT called again.
     await callOpenClawTool('ref__echo', {});
-    expect(connect).toHaveBeenLastCalledWith(expect.anything(), { timeout: 30_000 });
+    expect(connect).toHaveBeenCalledTimes(1); // pooled — no second connect
+    // callTool itself still uses CALL_TIMEOUT_MS.
     expect(callTool).toHaveBeenCalledWith({ name: 'ref__echo', arguments: {} }, undefined, { timeout: 30_000 });
   });
 

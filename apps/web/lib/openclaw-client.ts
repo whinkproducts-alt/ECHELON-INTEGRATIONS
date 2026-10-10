@@ -81,10 +81,37 @@ function assertTokenPresent(url: URL): void {
   }
 }
 
-async function withClient<T>(timeoutMs: number, fn: (client: Client) => Promise<T>, secrets: string[] = []): Promise<T> {
-  const url = endpoint();
-  assertTokenPresent(url);
-  const token = process.env.OPENCLAW_TOKEN?.trim();
+/**
+ * E5: per-request connection pool.
+ * A turn may invoke up to MAX_TOOL_CALLS_PER_TURN (8) gateway tools. Re-creating
+ * a TCP+MCP connection per call adds ~70 ms each; worst case 8×70 ms = 560 ms,
+ * which exceeds the 500 ms tool-overhead budget.
+ *
+ * Strategy: cache a live Client per (endpoint, token) key. Reuse it for the
+ * lifetime of a request batch (cleared after each call completes). If the cached
+ * client is no longer connected, discard it and create a fresh one.
+ *
+ * Entries are evicted after POOL_TTL_MS to avoid holding idle connections.
+ */
+const CLIENT_POOL = new Map<string, { client: Client; expiresAt: number }>();
+const POOL_TTL_MS = 10_000; // 10 s — covers a full tool-loop turn
+
+function poolKey(url: URL, token: string | undefined): string {
+  return `${url.toString()}|${token ?? ''}`;
+}
+
+async function getPooledClient(url: URL, token: string | undefined, timeoutMs: number): Promise<Client> {
+  const key = poolKey(url, token);
+  const now = Date.now();
+  const cached = CLIENT_POOL.get(key);
+  if (cached && cached.expiresAt > now) {
+    return cached.client;
+  }
+  // Evict stale entry
+  if (cached) {
+    CLIENT_POOL.delete(key);
+    await cached.client.close().catch(() => undefined);
+  }
   const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
   const transport = new StreamableHTTPClientTransport(url, {
     requestInit: { headers, signal: AbortSignal.timeout(timeoutMs) },
@@ -92,14 +119,39 @@ async function withClient<T>(timeoutMs: number, fn: (client: Client) => Promise<
   const client = new Client({ name: 'whink', version: '1.0.0' }, { capabilities: {} });
   try {
     await client.connect(transport, { timeout: timeoutMs });
+  } catch (err) {
+    // Close the partially-initialised client so its resources are freed.
+    await client.close().catch(() => undefined);
+    throw err;
+  }
+  CLIENT_POOL.set(key, { client, expiresAt: now + POOL_TTL_MS });
+  return client;
+}
+
+/** Evict the entry for this key and close the underlying client. */
+async function evictPooledClient(url: URL, token: string | undefined): Promise<void> {
+  const key = poolKey(url, token);
+  const cached = CLIENT_POOL.get(key);
+  if (cached) {
+    CLIENT_POOL.delete(key);
+    await cached.client.close().catch(() => undefined);
+  }
+}
+
+async function withClient<T>(timeoutMs: number, fn: (client: Client) => Promise<T>, secrets: string[] = []): Promise<T> {
+  const url = endpoint();
+  assertTokenPresent(url);
+  const token = process.env.OPENCLAW_TOKEN?.trim();
+  try {
+    const client = await getPooledClient(url, token, timeoutMs);
     return await fn(client);
   } catch (err) {
     if (err instanceof GatewayError) throw err;
+    // On any transport error, evict so the next call gets a fresh connection.
+    await evictPooledClient(url, token);
     logUpstream('request', err, secrets);
     const status = statusOf(err);
     throw new GatewayError(status ? `OpenClaw gateway request failed (status ${status})` : 'OpenClaw gateway request failed');
-  } finally {
-    await client.close().catch(() => undefined);
   }
 }
 

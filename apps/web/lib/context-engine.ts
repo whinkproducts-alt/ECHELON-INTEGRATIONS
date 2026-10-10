@@ -131,7 +131,14 @@ export async function assembleContext(
         // AnythingLLM not configured for this user — skip to avoid shared-workspace isolation risk.
         console.warn('[context-engine] AnythingLLM workspace slug not set — skipping document search');
       } else {
-        const docs = await searchDocuments(query, userId, workspaceSlug, 5);
+        // E5: cap AnythingLLM to 500 ms so a slow instance cannot hold up context assembly
+        const ANYTHINGLLM_TIMEOUT_MS = 500;
+        const docs = await Promise.race([
+          searchDocuments(query, userId, workspaceSlug, 5),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('AnythingLLM timeout')), ANYTHINGLLM_TIMEOUT_MS)
+          ),
+        ]);
         for (const doc of docs) {
           const citation = `[${doc.title}] ${doc.content}`;
           if (budget - citation.length > 0) {
@@ -141,7 +148,7 @@ export async function assembleContext(
         }
       }
     } catch {
-      // AnythingLLM is optional — failure must not break context assembly
+      // AnythingLLM is optional — failure and timeout must not break context assembly
     }
   } else {
     // Recency fallback when no query is available
