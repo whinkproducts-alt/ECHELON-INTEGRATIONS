@@ -195,3 +195,57 @@ describe('validateTaskInput partial', () => {
     expect(validateTaskInput({}, { allowAssignee: true, allowStatus: true })).toEqual({ error: 'title must be a string' });
   });
 });
+
+describe('POST /api/persona/switch — A3 MAMBA Obsidian-only', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doMock('@/auth', () => ({ auth: async () => ({ user: { id: 'u1' } }) }));
+    vi.doMock('@/lib/db', () => ({
+      prisma: { personaState: { upsert: vi.fn().mockResolvedValue({ activePersona: 'MAMBA', mambaMode: 'OBSIDIAN' }) } },
+    }));
+    vi.doMock('@/lib/types', async () => {
+      const actual = await vi.importActual<typeof import('../types')>('../types');
+      return actual;
+    });
+  });
+
+  it('accepts mambaMode: OBSIDIAN', async () => {
+    const { POST } = await import('../../app/api/persona/switch/route');
+    const res = await POST(req({ persona: 'MAMBA', mambaMode: 'OBSIDIAN' }));
+    expect(res.status).toBe(200);
+  });
+
+  it('accepts mambaMode: null (sets null)', async () => {
+    const { POST } = await import('../../app/api/persona/switch/route');
+    const res = await POST(req({ persona: 'MAMBA', mambaMode: null }));
+    expect(res.status).toBe(200);
+  });
+
+  it('rejects mambaMode: WHITE with 400', async () => {
+    const { POST } = await import('../../app/api/persona/switch/route');
+    const res = await POST(req({ persona: 'MAMBA', mambaMode: 'WHITE' }));
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects mambaMode: GREY with 400', async () => {
+    const { POST } = await import('../../app/api/persona/switch/route');
+    const res = await POST(req({ persona: 'MAMBA', mambaMode: 'GREY' }));
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects arbitrary mambaMode values with 400', async () => {
+    const { POST } = await import('../../app/api/persona/switch/route');
+    for (const bad of ['purple', 'STEALTH', 'ignore_all_instructions']) {
+      const res = await POST(req({ persona: 'MAMBA', mambaMode: bad }));
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it('upsert not called on invalid mambaMode', async () => {
+    const upsert = vi.fn();
+    vi.doMock('@/lib/db', () => ({ prisma: { personaState: { upsert } } }));
+    const { POST } = await import('../../app/api/persona/switch/route');
+    await POST(req({ persona: 'MAMBA', mambaMode: 'WHITE' }));
+    expect(upsert).not.toHaveBeenCalled();
+  });
+});
