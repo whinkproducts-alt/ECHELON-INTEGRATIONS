@@ -41,7 +41,12 @@ describe('POST /api/voice/stt', () => {
     const { POST } = await import('@/app/api/voice/stt/route');
     const form = new FormData();
     form.append('audio', new Blob(['audio'], { type: 'audio/webm' }), 'audio.webm');
-    const req = new Request('http://localhost/api/voice/stt', { method: 'POST', body: form });
+    // M2: content-length header is now required
+    const req = new Request('http://localhost/api/voice/stt', {
+      method: 'POST',
+      headers: { 'content-length': '5' },
+      body: form,
+    });
     const res = await POST(req as any);
     const body = await res.json();
 
@@ -71,7 +76,12 @@ describe('POST /api/voice/stt', () => {
 
     const { POST } = await import('@/app/api/voice/stt/route');
     const form = new FormData();
-    const req = new Request('http://localhost/api/voice/stt', { method: 'POST', body: form });
+    // M2: supply a content-length so the check passes and we reach the audio-field validation
+    const req = new Request('http://localhost/api/voice/stt', {
+      method: 'POST',
+      headers: { 'content-length': '1' },
+      body: form,
+    });
     const res = await POST(req as any);
     expect(res.status).toBe(400);
   });
@@ -165,10 +175,12 @@ describe('POST /api/voice/tts', () => {
     process.env.TTS_PROVIDER = 'openai';
     process.env.OPENAI_API_KEY = 'sk-test';
     const fakeAudio = new Uint8Array([1, 2, 3]).buffer;
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      arrayBuffer: async () => fakeAudio,
-    } as any);
+    // Return a proper Response so arrayBuffer() is a real method
+    const fakeResponse = new Response(fakeAudio, {
+      status: 200,
+      headers: { 'Content-Type': 'audio/mpeg' },
+    });
+    mockFetch.mockResolvedValueOnce(fakeResponse);
 
     const { POST } = await import('@/app/api/voice/tts/route');
     const req = new Request('http://localhost/api/voice/tts', {

@@ -19,8 +19,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'DEEPGRAM_API_KEY not set' }, { status: 500 });
     }
 
+    // M2: require content-length to prevent buffering unbounded chunked bodies.
     const contentLength = req.headers.get('content-length');
-    if (contentLength && parseInt(contentLength, 10) > MAX_BYTES) {
+    if (!contentLength) {
+      return NextResponse.json({ error: 'Content-Length header required' }, { status: 411 });
+    }
+    if (parseInt(contentLength, 10) > MAX_BYTES) {
       return NextResponse.json({ error: 'Audio too large (max 10 MB)' }, { status: 413 });
     }
 
@@ -58,11 +62,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (!dgRes.ok) {
-      const body = await dgRes.text().catch(() => '');
-      return NextResponse.json(
-        { error: `Deepgram error ${dgRes.status}`, detail: body },
-        { status: 502 },
-      );
+      // L1: do not leak upstream error body to the client
+      return NextResponse.json({ error: 'STT service error' }, { status: 502 });
     }
 
     const data = await dgRes.json();
@@ -78,8 +79,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ text: '', fallback: 'browser' });
   }
 
+  // M2: require content-length to prevent buffering unbounded chunked bodies.
   const contentLength = req.headers.get('content-length');
-  if (contentLength && parseInt(contentLength, 10) > MAX_BYTES) {
+  if (!contentLength) {
+    return NextResponse.json({ error: 'Content-Length header required' }, { status: 411 });
+  }
+  if (parseInt(contentLength, 10) > MAX_BYTES) {
     return NextResponse.json({ error: 'Audio too large (max 10 MB)' }, { status: 413 });
   }
 
@@ -108,17 +113,14 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       body: upstream,
     });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'STT upstream unreachable';
-    return NextResponse.json({ error: message }, { status: 502 });
+  } catch {
+    // L1: do not leak internal network details to the client
+    return NextResponse.json({ error: 'STT upstream unreachable' }, { status: 502 });
   }
 
   if (!upstreamRes.ok) {
-    const body = await upstreamRes.text().catch(() => '');
-    return NextResponse.json(
-      { error: `STT upstream error ${upstreamRes.status}`, detail: body },
-      { status: 502 },
-    );
+    // L1: do not leak upstream error body to the client
+    return NextResponse.json({ error: 'STT service error' }, { status: 502 });
   }
 
   const data = await upstreamRes.json();

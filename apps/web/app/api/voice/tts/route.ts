@@ -4,6 +4,15 @@ import { auth } from '@/auth';
 
 const MAX_TEXT_LENGTH = 2000;
 
+// L3: only these voice identifiers are forwarded to providers; anything else is rejected.
+const ALLOWED_VOICES_OPENAI = new Set(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']);
+// Deepgram Aura voice models
+const ALLOWED_VOICES_DEEPGRAM = new Set([
+  'aura-asteria-en', 'aura-luna-en', 'aura-stella-en', 'aura-athena-en',
+  'aura-hera-en', 'aura-orion-en', 'aura-arcas-en', 'aura-perseus-en',
+  'aura-angus-en', 'aura-orpheus-en', 'aura-helios-en', 'aura-zeus-en',
+]);
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -25,12 +34,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `text too long (max ${MAX_TEXT_LENGTH} chars)` }, { status: 400 });
   }
 
-  const voice =
+  const provider = (process.env.TTS_PROVIDER ?? '').toLowerCase().trim();
+
+  const rawVoice =
     typeof body.voice === 'string' && body.voice.trim()
       ? body.voice.trim()
-      : (process.env.TTS_VOICE?.trim() ?? 'alloy');
+      : (process.env.TTS_VOICE?.trim() ?? (provider === 'deepgram' ? 'aura-asteria-en' : 'alloy'));
 
-  const provider = (process.env.TTS_PROVIDER ?? '').toLowerCase().trim();
+  // L3: validate voice against provider allow-list before forwarding
+  const allowedVoices = provider === 'deepgram' ? ALLOWED_VOICES_DEEPGRAM : ALLOWED_VOICES_OPENAI;
+  const voice = allowedVoices.has(rawVoice) ? rawVoice : (provider === 'deepgram' ? 'aura-asteria-en' : 'alloy');
 
   // ── OpenAI TTS direct ─────────────────────────────────────────────────────
   if (provider === 'openai') {
@@ -51,17 +64,14 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({ model: ttsModel, input: text, voice }),
       });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'OpenAI TTS unreachable';
-      return NextResponse.json({ error: message }, { status: 502 });
+    } catch {
+      // L1: do not leak internal network details to the client
+      return NextResponse.json({ error: 'TTS service unreachable' }, { status: 502 });
     }
 
     if (!oaiRes.ok) {
-      const detail = await oaiRes.text().catch(() => '');
-      return NextResponse.json(
-        { error: `OpenAI TTS error ${oaiRes.status}`, detail },
-        { status: 502 },
-      );
+      // L1: do not leak upstream error body to the client
+      return NextResponse.json({ error: 'TTS service error' }, { status: 502 });
     }
 
     const audioBuffer = await oaiRes.arrayBuffer();
@@ -83,22 +93,22 @@ export async function POST(req: NextRequest) {
 
   let upstreamRes: Response;
   try {
-    upstreamRes = await fetch(`${ttsUrl}/audio/speech`, {
+    // L4: ADA V2 uses /tts; OpenAI-compatible shims typically use /audio/speech.
+    // Prefer /tts when TTS_URL is set (ADA V2 / local service); the provider
+    // env var is already handled in the openai branch above.
+    upstreamRes = await fetch(`${ttsUrl}/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'tts-1', input: text, voice }),
     });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'TTS upstream unreachable';
-    return NextResponse.json({ error: message }, { status: 502 });
+  } catch {
+    // L1: do not leak internal network details to the client
+    return NextResponse.json({ error: 'TTS service unreachable' }, { status: 502 });
   }
 
   if (!upstreamRes.ok) {
-    const detail = await upstreamRes.text().catch(() => '');
-    return NextResponse.json(
-      { error: `TTS upstream error ${upstreamRes.status}`, detail },
-      { status: 502 },
-    );
+    // L1: do not leak upstream error body to the client
+    return NextResponse.json({ error: 'TTS service error' }, { status: 502 });
   }
 
   const audioBuffer = await upstreamRes.arrayBuffer();
