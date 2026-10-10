@@ -98,7 +98,7 @@ describe('searchMemory — vector path (embedding available)', () => {
     vi.doMock('@/lib/logger', () => ({ logger: { info: vi.fn(), security: vi.fn(), warn: vi.fn() } }));
 
     const { searchMemory } = await import('../memory-engine');
-    const results = await searchMemory('user-a', 'WHINK CEO');
+    await searchMemory('user-a', 'WHINK CEO');
 
     // Prisma raw was called (vector path)
     const { prisma } = await import('@/lib/db');

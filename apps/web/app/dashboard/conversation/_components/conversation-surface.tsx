@@ -173,8 +173,8 @@ export function ConversationSurface() {
   useEffect(() => {
     if (!activeConvId) {
       setMessages([]); // eslint-disable-line react-hooks/set-state-in-effect
-      setNeuralEvents([]); // eslint-disable-line react-hooks/set-state-in-effect
-      setTraceEntries([]); // eslint-disable-line react-hooks/set-state-in-effect
+      setNeuralEvents([]);
+      setTraceEntries([]);
       return;
     }
     fetch(`/api/conversations/${activeConvId}/messages`)
