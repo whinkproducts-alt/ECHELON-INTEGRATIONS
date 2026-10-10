@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { X, Zap, Clock } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { X, Zap, Clock, Pin, PinOff } from 'lucide-react';
 
 export type NeuralEvent = {
   id: string;
@@ -26,6 +26,17 @@ const EVENT_META: Record<NeuralEvent['type'], { icon: string; label: string; col
   error:          { icon: '✕', label: 'error',         colorVar: 'hsl(var(--denial))' },
 };
 
+// Filter groups: 'all' plus logical buckets
+type FilterGroup = 'all' | 'tool' | 'memory' | 'security' | 'stream';
+
+const FILTER_GROUPS: { key: FilterGroup; label: string; types: NeuralEvent['type'][] }[] = [
+  { key: 'all',      label: 'All',      types: [] },
+  { key: 'tool',     label: 'Tool',     types: ['tool_call', 'tool_result', 'approval'] },
+  { key: 'memory',   label: 'Memory',   types: ['memory_write'] },
+  { key: 'security', label: 'Security', types: ['security_event', 'error'] },
+  { key: 'stream',   label: 'Stream',   types: ['text_chunk'] },
+];
+
 function formatTs(ts: number): string {
   const d = new Date(ts);
   const h = String(d.getHours()).padStart(2, '0');
@@ -36,6 +47,17 @@ function formatTs(ts: number): string {
 
 export function NeuralLink({ events, open, onClose }: NeuralLinkProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [filter, setFilter] = useState<FilterGroup>('all');
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
+
+  const togglePin = useCallback((id: string) => {
+    setPinnedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -44,6 +66,17 @@ export function NeuralLink({ events, open, onClose }: NeuralLinkProps) {
   }, [events, open]);
 
   if (!open) return null;
+
+  const activeTypes = FILTER_GROUPS.find((g) => g.key === filter)?.types ?? [];
+
+  // Pinned events always shown regardless of filter; recent events filtered + limited to 20
+  const pinnedEvents = events.filter((e) => pinnedIds.has(e.id));
+  const recentEvents = events
+    .filter((e) => !pinnedIds.has(e.id))
+    .filter((e) => activeTypes.length === 0 || activeTypes.includes(e.type))
+    .slice(-20);
+
+  const visibleEvents = [...pinnedEvents, ...recentEvents];
 
   return (
     <div
@@ -68,16 +101,45 @@ export function NeuralLink({ events, open, onClose }: NeuralLinkProps) {
         </button>
       </div>
 
+      {/* Filter chips */}
+      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border flex-shrink-0 overflow-x-auto">
+        {FILTER_GROUPS.map((g) => (
+          <button
+            key={g.key}
+            onClick={() => setFilter(g.key)}
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0 transition-colors ${
+              filter === g.key
+                ? 'text-foreground bg-accent'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+            }`}
+            aria-pressed={filter === g.key}
+          >
+            {g.label}
+          </button>
+        ))}
+        {pinnedIds.size > 0 && (
+          <span className="text-[10px] font-mono text-muted-foreground/60 ml-auto flex-shrink-0">
+            {pinnedIds.size} pinned
+          </span>
+        )}
+      </div>
+
       {/* Events */}
       <div className="flex-1 overflow-auto px-2 py-2 space-y-1 min-h-0">
-        {events.length === 0 && (
+        {visibleEvents.length === 0 && (
           <p className="text-xs text-muted-foreground font-mono px-1 py-2">No activity yet.</p>
         )}
-        {events.slice(-20).map((ev) => {
+        {visibleEvents.map((ev) => {
           const meta = EVENT_META[ev.type];
           const isSecurity = ev.type === 'security_event';
+          const isPinned = pinnedIds.has(ev.id);
           return (
-            <div key={ev.id} className="flex items-start gap-1.5 text-xs font-mono">
+            <div
+              key={ev.id}
+              className={`group flex items-start gap-1.5 text-xs font-mono rounded px-1 -mx-1 ${
+                isPinned ? 'bg-accent/30' : 'hover:bg-accent/10'
+              }`}
+            >
               <span
                 className="flex-shrink-0 mt-px"
                 style={{ color: meta.colorVar }}
@@ -85,7 +147,7 @@ export function NeuralLink({ events, open, onClose }: NeuralLinkProps) {
               >
                 {meta.useClockIcon ? <Clock size={12} /> : meta.icon}
               </span>
-              <span className="flex-1 text-muted-foreground break-words">
+              <span className="flex-1 text-muted-foreground break-words py-0.5">
                 {isSecurity && (
                   <span className="font-mono font-semibold mr-1" style={{ color: 'hsl(var(--denial))' }}>
                     SECURITY
@@ -93,7 +155,19 @@ export function NeuralLink({ events, open, onClose }: NeuralLinkProps) {
                 )}
                 {ev.text}
               </span>
-              <span className="flex-shrink-0 text-muted-foreground/50 tabular-nums">{formatTs(ev.ts)}</span>
+              <span className="flex-shrink-0 text-muted-foreground/50 tabular-nums py-0.5">{formatTs(ev.ts)}</span>
+              {/* Pin button — visible on hover or when already pinned */}
+              <button
+                onClick={() => togglePin(ev.id)}
+                aria-label={isPinned ? 'Unpin event' : 'Pin event'}
+                className={`flex-shrink-0 mt-px transition-colors ${
+                  isPinned
+                    ? 'text-primary'
+                    : 'opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {isPinned ? <PinOff size={10} /> : <Pin size={10} />}
+              </button>
             </div>
           );
         })}

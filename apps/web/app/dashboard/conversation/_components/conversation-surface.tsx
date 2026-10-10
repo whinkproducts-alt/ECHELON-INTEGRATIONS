@@ -8,6 +8,7 @@ import {
 import { useVoice } from '@/lib/hooks/useVoice';
 import { speakApprovalRequest, generateConfirmationCode } from '@/lib/spoken-approval';
 import { AvatarRenderer } from './avatar-renderer';
+import { VoiceWaveform } from './voice-waveform';
 import { ObsidianOverlay } from './obsidian-overlay';
 import { NeuralLink, NeuralEvent } from '@/app/dashboard/_components/neural-link';
 import { ToolTrace } from './tool-trace';
@@ -86,7 +87,7 @@ export function ConversationSurface() {
   const [traceEntries, setTraceEntries] = useState<TraceEntry[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { startListening, stopListening, speak, isListening, isSpeaking, supported } = useVoice();
+  const { startListening, stopListening, speak, isListening, isSpeaking, supported, lipSyncAmplitude } = useVoice();
 
   // Approvals: cards live in the stream; state per id via a pure reducer.
   const [approvals, setApprovals] = useState<ApprovalView[]>([]);
@@ -403,6 +404,7 @@ export function ConversationSurface() {
                 mambaMode={avatarMambaMode}
                 isSpeaking={avatarIsSpeaking}
                 isListening={isListening}
+                lipSyncAmplitude={avatarIsSpeaking ? lipSyncAmplitude : 0}
                 size="sm"
               />
               <span
@@ -430,11 +432,17 @@ export function ConversationSurface() {
             )}
             {isSpeaking && (
               <span
-                className="flex items-center gap-1 text-xs font-mono animate-pulse"
+                className="flex items-center gap-1.5 text-xs font-mono"
                 style={{ color: 'hsl(var(--whink-accent))' }}
               >
                 <Volume2 className="h-3 w-3" />
                 Speaking
+                <VoiceWaveform
+                  amplitude={lipSyncAmplitude}
+                  active={isSpeaking}
+                  bars={10}
+                  colorVar="var(--whink-accent)"
+                />
               </span>
             )}
 
