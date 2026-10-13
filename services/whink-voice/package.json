@@ -1,0 +1,15 @@
+{
+  "name": "whink-voice",
+  "version": "1.0.0",
+  "description": "WHINK Voice Service — outbound AI calling via Bland.ai",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}
