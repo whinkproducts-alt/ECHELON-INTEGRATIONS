@@ -131,3 +131,20 @@ export async function countToolExecutions(
     },
   });
 }
+
+/**
+ * Count this user's ledger rows for one tool and correlation id, by status. Read-only and
+ * scoped by userId. Used by scheduled jobs to stay once-per-day without extra tables.
+ */
+export async function countByCorrelation(
+  userId: string,
+  tool: string,
+  correlationId: string,
+  statuses: LedgerStatus[],
+): Promise<number> {
+  if (!userId) throw new Error('ledger: userId is required');
+  if (statuses.length === 0) return 0;
+  return prisma.action.count({
+    where: { userId, tool, correlationId, status: { in: statuses } },
+  });
+}

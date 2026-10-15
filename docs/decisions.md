@@ -77,3 +77,8 @@ Lawful hardest adversary. White and Grey modes to be removed.
 
 ## 2026-09-23  WHINK accent is brand azure #38B6FF
 Chosen over emerald to match The WHINK Group. Avatar HUD currently cyan #4FF3EE; decision pending.
+
+## 2026-10-15  Daily SMS briefing via Twilio
+Added lib/twilio-adapter.ts (plain fetch, no SDK, no new dependency) and lib/sms-briefing.ts, started from instrumentation.ts next to the scheduled post worker. Outbound only, off by default, recipient from env only. It is not a model tool, so injected text cannot trigger it. Capability sms_briefing_send is Class B: it needs a delegation row or autonomy 2 or higher, otherwise it is DENIED and ledgered once per day. Once per day is enforced from the ledger (correlation id sms-briefing:YYYY-MM-DD), so no new table.
+Reason: the directive asked for an org-kit scheduler job. org-kit has no scheduler, so the job lives where WHINK's existing worker runs. Replace the adapter file to change SMS provider.
+Open: send time zone is ambiguous in the request (4:15pm CST and 14:15 CST disagree). Defaults to 16:15 America/Edmonton, configurable. Report source is a folder of JSON files because no directorate report store exists yet.
