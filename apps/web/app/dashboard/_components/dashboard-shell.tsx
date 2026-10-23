@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import {
   Zap, MessageSquare, FolderKanban, Brain, CheckSquare,
-  Settings, LogOut, Command, ChevronLeft, ChevronRight,
+  Settings, LogOut, Command, ChevronLeft, ChevronRight, Orbit,
 } from 'lucide-react';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 
@@ -22,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Projects', href: '/dashboard/projects', icon: <FolderKanban className="h-4 w-4" /> },
   { label: 'Memory', href: '/dashboard/memory', icon: <Brain className="h-4 w-4" /> },
   { label: 'Tasks', href: '/dashboard/tasks', icon: <CheckSquare className="h-4 w-4" /> },
+  { label: 'HOLO', href: '/dashboard/holo', icon: <Orbit className="h-4 w-4" /> },
   { label: 'Settings', href: '/dashboard/settings', icon: <Settings className="h-4 w-4" /> },
 ];
 

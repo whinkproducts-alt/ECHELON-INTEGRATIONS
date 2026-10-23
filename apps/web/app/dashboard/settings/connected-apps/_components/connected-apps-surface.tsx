@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Link2, ShieldCheck, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Link2, ShieldCheck, AlertTriangle, CheckCircle, Loader2, Clock } from 'lucide-react';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import {
   PLATFORM_LABELS, PLATFORM_NOTES, SOCIAL_PLATFORMS, parseConnections, statusLabel,
@@ -30,6 +30,18 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
   // Consent is UX-only and held in memory. TODO: store consent server-side (who, when, text version) before connect.
   const [consenting, setConsenting] = useState<SocialPlatform | null>(null);
   const [agreed, setAgreed] = useState(false);
+
+  // Awaiting approval state: pending social actions (post, reply, DM, schedule, delete, follow).
+  const [pendingSocial, setPendingSocial] = useState(0);
+  useEffect(() => {
+    fetch('/api/approvals?status=pending')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { approvals?: Array<{ tool?: unknown }> } | null) => {
+        const list = Array.isArray(d?.approvals) ? d.approvals : [];
+        setPendingSocial(list.filter((a) => typeof a.tool === 'string' && /^openclaw__(x|instagram|tiktok)__/.test(a.tool)).length);
+      })
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(() => {
     return fetch('/api/social/connections')
@@ -127,6 +139,24 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
           )}
           <span>{notice.kind === 'error' ? `Error: ${notice.text}` : notice.text}</span>
         </div>
+      )}
+
+      {pendingSocial > 0 && (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-lg border bg-card p-3 text-sm"
+          style={{ borderColor: 'hsl(var(--pending-amber))' }}
+        >
+          <Clock className="h-4 w-4 shrink-0" aria-hidden style={{ color: 'hsl(var(--pending-amber))' }} />
+          <span className="font-medium" style={{ color: 'hsl(var(--pending-amber))' }}>Awaiting approval:</span>
+          <span>{pendingSocial} social {pendingSocial === 1 ? 'action is' : 'actions are'} waiting for your decision.</span>
+        </div>
+      )}
+
+      {state === 'ready' && rows.every((r) => r.status === 'not_connected') && (
+        <p className="text-sm text-muted-foreground" data-testid="connected-apps-empty">
+          No apps connected yet. Connect one below. Nothing posts without your approval.
+        </p>
       )}
 
       {state === 'loading' && (

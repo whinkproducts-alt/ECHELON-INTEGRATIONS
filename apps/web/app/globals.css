@@ -69,6 +69,11 @@
     --pending-amber: 37 90% 55%;
     --denial: 356 77% 59%;
     --tool-result: 160 84% 39%;
+
+    /* HUD tokens. Aliases only, so the pending cyan decision (#4FF3EE vs accent)
+       is a one line change here. --hud-mamba follows ember until Victor approves a value. */
+    --hud-whink: var(--whink-accent);
+    --hud-mamba: var(--ember);
   }
 
   .dark {

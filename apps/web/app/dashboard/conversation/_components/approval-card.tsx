@@ -15,6 +15,10 @@ interface ApprovalCardProps {
   onDecide: (decision: 'approve' | 'deny') => void;
   /** 4-digit confirmation code, generated client-side. Never sent to the server or the model. */
   code: string;
+  /** Layout override. Defaults to the inline conversation layout. */
+  className?: string;
+  /** Dock mode: the voice controls start collapsed. The exact content is always shown. */
+  compact?: boolean;
 }
 
 const AMBER = 'hsl(var(--pending-amber))';
@@ -57,8 +61,9 @@ async function ttsReadAloud(text: string) {
   }
 }
 
-export function ApprovalCard({ approval, state, onTick, onDecide, code }: ApprovalCardProps) {
-  const [now, setNow] = useState(() => Date.now());
+export function ApprovalCard({ approval, state, onTick, onDecide, code, className, compact = false }: ApprovalCardProps) {
+  // null until the first tick: Date.now() in a state initializer breaks SSR hydration (eslint.ssr.config.mjs).
+  const [now, setNow] = useState<number | null>(null);
   const terminal = isTerminal(state.phase);
   const handleReadAloud = useCallback(() => {
     void ttsReadAloud(`${approval.tool ?? 'Action'}: ${approval.summary}`);
@@ -76,7 +81,7 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code }: Approv
     return () => { clearTimeout(first); clearInterval(timer); };
   }, [terminal, approval.expiresAt, onTick]);
 
-  const secondsLeft = secondsRemaining(approval.expiresAt, now);
+  const secondsLeft = now === null ? 30 : secondsRemaining(approval.expiresAt, now);
   const expired = state.phase === 'expired';
   const busy = state.phase === 'submitting';
   const disabled = busy || terminal;
@@ -88,7 +93,7 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code }: Approv
     <div
       role="group"
       aria-label={`Approval request: ${title}`}
-      className={`ml-10 max-w-2xl rounded-lg border bg-card p-3 space-y-2 ${expired ? 'opacity-50' : ''}`}
+      className={`${className ?? 'ml-10 max-w-2xl'} rounded-lg border bg-card p-3 space-y-2 ${expired ? 'opacity-50' : ''}`}
       style={{ borderColor: expired ? undefined : (state.phase === 'pending' || busy ? AMBER : undefined) }}
     >
       <div className="flex items-center gap-2 text-xs">
@@ -118,6 +123,23 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code }: Approv
         )}
       </div>
 
+      {!terminal && (
+        <div
+          role="progressbar"
+          aria-label="Time left to decide"
+          aria-valuemin={0}
+          aria-valuemax={30}
+          aria-valuenow={Math.min(30, secondsLeft)}
+          aria-valuetext={`${secondsLeft} seconds left`}
+          className="h-1 w-full overflow-hidden rounded-full bg-secondary"
+        >
+          <div
+            className="h-full"
+            style={{ width: `${Math.min(100, (secondsLeft / 30) * 100)}%`, background: AMBER, transition: 'width 1s linear' }}
+          />
+        </div>
+      )}
+
       <p className="text-sm text-foreground whitespace-pre-wrap break-words">{approval.summary}</p>
 
       <div>
@@ -143,7 +165,8 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code }: Approv
       )}
 
       {!terminal && (
-        <div className="space-y-1.5 rounded-md border border-border p-2">
+        <details open={!compact} className="space-y-1.5 rounded-md border border-border p-2">
+          <summary className={compact ? 'cursor-pointer text-xs text-muted-foreground' : 'hidden'}>Voice approval</summary>
           <p className="text-xs text-muted-foreground">
             Voice: hold the button and say &quot;approve&quot; followed by this code, or say &quot;deny&quot;.
           </p>
@@ -186,7 +209,7 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code }: Approv
           {voice.message && !voice.listening && (
             <p className="text-xs font-mono text-muted-foreground" role="status">{voice.message}</p>
           )}
-        </div>
+        </details>
       )}
 
       <div className="flex gap-2">
