@@ -10,7 +10,8 @@ const https = require("https");
 const PORT = process.env.PORT || 3000;
 const BLAND_API_KEY = process.env.BLAND_API_KEY;
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
-const DEFAULT_PHONE = process.env.DEFAULT_PHONE || "+15878999629";
+// No hardcoded fallback number. Set DEFAULT_PHONE in the environment if wanted.
+const DEFAULT_PHONE = process.env.DEFAULT_PHONE || null;
 
 if (!BLAND_API_KEY) {
   console.error("FATAL: BLAND_API_KEY environment variable is not set.");
@@ -63,6 +64,20 @@ function parseBody(req) {
   });
 }
 
+// Returns a response and false if the request is not authorised, true if it is.
+function authorise(req, res) {
+  if (!WEBHOOK_SECRET) {
+    send(res, 500, { error: "WEBHOOK_SECRET not set" });
+    return false;
+  }
+  const token = req.headers["x-whink-secret"] || req.headers["authorization"];
+  if (token !== WEBHOOK_SECRET && token !== `Bearer ${WEBHOOK_SECRET}`) {
+    send(res, 401, { error: "Unauthorized" });
+    return false;
+  }
+  return true;
+}
+
 function send(res, status, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(status, {
@@ -84,12 +99,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && url.pathname === "/call") {
 
     // Auth check
-    if (WEBHOOK_SECRET) {
-      const token = req.headers["x-whink-secret"] || req.headers["authorization"];
-      if (token !== WEBHOOK_SECRET && token !== `Bearer ${WEBHOOK_SECRET}`) {
-        return send(res, 401, { error: "Unauthorized" });
-      }
-    }
+    if (!authorise(req, res)) return;
 
     let body;
     try {
@@ -99,6 +109,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     const phone = body.phone_number || DEFAULT_PHONE;
+    if (!phone) {
+      return send(res, 400, { error: "phone_number required" });
+    }
     const task = body.task || "You are WHINK, the AI Chief of Staff for Victor Igboekwe. You are calling Victor with an important update from the WHINK organization. Be brief, direct, and professional. State your message clearly and ask if he needs anything from you.";
     const message = body.message || null;
 
@@ -142,8 +155,11 @@ const server = http.createServer(async (req, res) => {
 
   // Get call status
   if (req.method === "GET" && url.pathname.startsWith("/call/")) {
+    if (!authorise(req, res)) return;
     const callId = url.pathname.split("/call/")[1];
-    if (!callId) return send(res, 400, { error: "Missing call ID" });
+    if (!callId || !/^[A-Za-z0-9_-]{1,128}$/.test(callId)) {
+      return send(res, 400, { error: "Missing or invalid call ID" });
+    }
 
     const options = {
       hostname: "api.bland.ai",
@@ -172,6 +188,6 @@ const server = http.createServer(async (req, res) => {
   return send(res, 404, { error: "Not found" });
 });
 
-server.listen(PORT, () => {
-  console.log(`[WHINK Voice] Service running on port ${PORT}`);
+server.listen(PORT, "127.0.0.1", () => {
+  console.log(`[WHINK Voice] Service running on 127.0.0.1:${PORT}`);
 });
