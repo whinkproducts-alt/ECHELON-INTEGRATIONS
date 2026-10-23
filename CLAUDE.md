@@ -24,10 +24,11 @@ docs/decisions.md  Every architectural decision, dated, with the reason.
 ## Commands
 Run from `apps/web`:
 ```
-yarn install
-yarn dev          # local server
-yarn build        # must pass before any merge
-yarn lint
+pnpm install      # repo root; pnpm workspace (org-kit uses workspace:*)
+pnpm dev          # local server (root script, filters to apps/web)
+pnpm build        # must pass before any merge
+pnpm lint
+pnpm test
 npx prisma migrate dev
 ```
 
@@ -138,7 +139,7 @@ Builder: backend-engineer (table, OAuth), integrations-engineer (connectors), fr
 
 ### 2e Assurance
 - E1. security-reviewer runs an independent pass on 2a to 2d (auth, permissions, raw SQL, OAuth, token storage, gateway exposure). No open high or critical findings.
-- E2. test-engineer: `yarn build`, `yarn lint` and the full test suite pass. The tests cover every acceptance item above that names a test.
+- E2. test-engineer: `pnpm build`, `pnpm lint` and the full test suite pass. The tests cover every acceptance item above that names a test.
 - E3. ai-evaluator: WHINK and MAMBA behaviour suite passes on Claude and Ollama, including tool use, refusal of injected instructions inside tool results, and MAMBA staying Obsidian and lawful.
 - E4. qa-engineer runs 2a to 2d against the running app.
 - E5. performance-benchmarker records the latency a tool round-trip adds on Claude and Ollama, and the gateway's memory use, against budget.
