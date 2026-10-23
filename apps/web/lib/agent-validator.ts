@@ -151,3 +151,13 @@ export function routableAgents(kit: Parameters<typeof validateAll>[0]): OrgAgent
   const ctx = buildRuleContext(kit);
   return kit.agents.filter((a) => !validateAgent(a, ctx).some((v) => v.severity === 'error'));
 }
+
+/**
+ * Runtime gate for routing. Builds the rule context once and returns a predicate that is
+ * true only for agents with no error-severity violation. Fails closed: a throwing check
+ * counts as a violation (see validateAgent).
+ */
+export function makeRoutable(kit: Parameters<typeof validateAll>[0]): (a: OrgAgent) => boolean {
+  const ctx = buildRuleContext(kit);
+  return (a) => !validateAgent(a, ctx).some((v) => v.severity === 'error');
+}

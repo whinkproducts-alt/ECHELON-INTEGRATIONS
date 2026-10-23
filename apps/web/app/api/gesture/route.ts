@@ -5,7 +5,7 @@ import { generateCorrelationId } from '@/lib/logger';
 import { claimNonce, isGestureHmacConfigured, verify } from '@/lib/gesture/hmac';
 import { gestureLimiter } from '@/lib/gesture/rate-limit';
 import { recognize } from '@/lib/gesture/recognize';
-import { dispatchGesture } from '@/lib/gesture/dispatch';
+import { dispatchGesture, LedgerUnavailableError } from '@/lib/gesture/dispatch';
 import { gestureSecurityEvent } from '@/lib/gesture/security-events';
 import { MAX_BODY_BYTES, validateGestureRequest } from '@/lib/gesture/validate';
 
@@ -72,7 +72,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const result = await dispatchGesture(userId, rec, valid.value, correlationId);
+  let result;
+  try {
+    result = await dispatchGesture(userId, rec, valid.value, correlationId);
+  } catch (e) {
+    const unavailable = e instanceof LedgerUnavailableError;
+    return NextResponse.json(
+      { error: unavailable ? 'Ledger unavailable. Gesture not applied.' : 'Internal error', correlationId },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
   const tDone = performance.now();
   return NextResponse.json(
     {

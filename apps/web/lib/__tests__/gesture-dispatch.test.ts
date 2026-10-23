@@ -4,13 +4,13 @@ import { INTENTS } from '@/lib/gesture/intents';
 import { HoloBridge } from '@/lib/gesture/holo-bridge';
 
 const checkPermission = vi.fn();
-const recordActionSafe = vi.fn();
+const recordAction = vi.fn();
 const createApproval = vi.fn();
 const taskFind = vi.fn();
 const personaFind = vi.fn();
 
 vi.mock('@/lib/permission-engine', () => ({ checkPermission: (...a: unknown[]) => checkPermission(...a) }));
-vi.mock('@/lib/ledger', () => ({ recordActionSafe: (...a: unknown[]) => recordActionSafe(...a) }));
+vi.mock('@/lib/ledger', () => ({ recordAction: (...a: unknown[]) => recordAction(...a) }));
 vi.mock('@/lib/approvals', () => ({ createApproval: (...a: unknown[]) => createApproval(...a) }));
 vi.mock('@/lib/db', () => ({
   prisma: { projectTask: { findFirst: (...a: unknown[]) => taskFind(...a) }, personaState: { findUnique: (...a: unknown[]) => personaFind(...a) } },
@@ -38,7 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   bridge = new HoloBridge();
   checkPermission.mockResolvedValue({ allowed: true, method: 'auto' });
-  recordActionSafe.mockResolvedValue({ id: 'l1' });
+  recordAction.mockResolvedValue({ id: 'l1' });
   personaFind.mockResolvedValue({ activePersona: 'WHINK', mambaMode: null });
   taskFind.mockResolvedValue({ id: 't1', title: 'Plan social launch', description: null });
   createApproval.mockResolvedValue({ id: 'ap1' });
@@ -62,11 +62,27 @@ describe('intent table', () => {
 });
 
 describe('dispatch', () => {
-  it('below the threshold does nothing and writes nothing', async () => {
+  it('below the threshold does nothing but is ledgered', async () => {
     const r = await dispatchGesture('u1', rec('pinch', 150), {}, 'c1', deps());
     expect(r.status).toBe('below_threshold');
     expect(checkPermission).not.toHaveBeenCalled();
-    expect(recordActionSafe).not.toHaveBeenCalled();
+    expect(recordAction.mock.calls[0][0]).toMatchObject({ userId: 'u1', status: 'DENIED', correlationId: 'c1' });
+  });
+
+  it('ledger failure prevents the gesture from being applied', async () => {
+    recordAction.mockRejectedValue(new Error('db down'));
+    const before = bridge.getState('u1').version;
+    await expect(dispatchGesture('u1', rec('palm'), {}, 'c1', deps())).rejects.toThrow('ledger unavailable');
+    expect(bridge.getState('u1').mode).not.toBe('paused');
+    expect(bridge.getState('u1').version).toBe(before);
+  });
+
+  it('ledger row is written before the gesture applies', async () => {
+    let modeAtWrite = '';
+    recordAction.mockImplementation(async () => { modeAtWrite = bridge.getState('u1').mode; return { id: 'l1' }; });
+    await dispatchGesture('u1', rec('palm'), {}, 'c1', deps());
+    expect(modeAtWrite).not.toBe('paused');
+    expect(bridge.getState('u1').mode).toBe('paused');
   });
 
   it('asks the permission engine before acting and ledgers the run', async () => {
@@ -74,7 +90,7 @@ describe('dispatch', () => {
     expect(checkPermission).toHaveBeenCalledWith('u1', 'gesture_pause', 'A', 'c1');
     expect(r.status).toBe('executed');
     expect(bridge.getState('u1').mode).toBe('paused');
-    const row = recordActionSafe.mock.calls[0][0];
+    const row = recordAction.mock.calls[0][0];
     expect(row).toMatchObject({ userId: 'u1', status: 'VALIDATED', permissionClass: 'A', correlationId: 'c1', initiator: 'user' });
     expect(JSON.stringify(row)).not.toMatch(/landmark/i);
   });
@@ -84,7 +100,7 @@ describe('dispatch', () => {
     const r = await dispatchGesture('u1', rec('crush'), {}, 'c1', deps());
     expect(r.status).toBe('denied');
     expect(bridge.getState('u1').briefRequestedAt).toBeNull();
-    expect(recordActionSafe.mock.calls[0][0]).toMatchObject({ status: 'DENIED', permissionClass: 'B' });
+    expect(recordAction.mock.calls[0][0]).toMatchObject({ status: 'DENIED', permissionClass: 'B' });
   });
 
   it('crush is Class B and sets the brief request when permitted', async () => {
@@ -112,6 +128,7 @@ describe('dispatch', () => {
     await dispatchGesture('u1', rec('pinch'), { target: { taskId: 't1' } }, 'c1', deps());
     expect((await dispatchGesture('u1', rec('point'), {}, 'c2', deps())).status).toBe('needs_context');
     expect(createApproval).not.toHaveBeenCalled();
+    expect(recordAction.mock.calls.filter((c) => /needs_context/.test(c[0].outputSummary))).toHaveLength(2);
   });
 
   it('point creates an EAR approval and never runs the work', async () => {
@@ -141,12 +158,14 @@ describe('dispatch', () => {
     const r = await dispatchGesture('u1', rec('point'), { target: { agentId: 'a1' } }, 'c2', deps());
     expect(r.status).toBe('failed');
     expect(bridge.getState('u1').version).toBe(v);
-    expect(recordActionSafe.mock.calls.at(-1)![0]).toMatchObject({ status: 'FAILED' });
+    expect(recordAction.mock.calls.at(-1)![0]).toMatchObject({ status: 'FAILED' });
   });
 
   it('while paused only wave is accepted', async () => {
     await dispatchGesture('u1', rec('palm'), {}, 'c1', deps());
+    recordAction.mockClear();
     expect((await dispatchGesture('u1', rec('peace'), {}, 'c2', deps())).status).toBe('ignored_paused');
+    expect(recordAction).toHaveBeenCalledTimes(1);
     expect((await dispatchGesture('u1', rec('wave'), {}, 'c3', deps())).status).toBe('executed');
     expect(bridge.getState('u1').mode).toBe('active');
   });

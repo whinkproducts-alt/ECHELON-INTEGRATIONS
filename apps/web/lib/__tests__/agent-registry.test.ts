@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { loadOrgKit, type OrgKit, type OrgAgent } from '../agent-loader';
-import { validateAll, validateAgent, buildRuleContext, RULES, routableAgents } from '../agent-validator';
+import { validateAll, validateAgent, buildRuleContext, RULES, routableAgents, makeRoutable } from '../agent-validator';
 import { SkillRegistry } from '../skill-registry';
 import { Router } from '../routing-algorithm';
 import { LoadBalancer } from '../load-balancer';
@@ -47,7 +47,7 @@ describe('validator', () => {
 
 describe('routing', () => {
   const skills = ['product_strategy', 'brand_strategy', 'demand_generation', 'project_decomposition'];
-  const mk = () => { const lb = new LoadBalancer(); return { lb, router: new Router(registry, lb, () => lb.epoch) }; };
+  const mk = () => { const lb = new LoadBalancer(); return { lb, router: new Router(registry, lb, makeRoutable(kit), () => lb.epoch) }; };
 
   it('uses 40/30/30 weights', () => {
     const { router } = mk();

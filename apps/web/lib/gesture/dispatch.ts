@@ -12,7 +12,7 @@
 
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import { recordActionSafe, type LedgerStatus } from '@/lib/ledger';
+import { recordAction, type LedgerStatus } from '@/lib/ledger';
 import { checkPermission } from '@/lib/permission-engine';
 import { createApproval } from '@/lib/approvals';
 import { extractRequiredSkills } from '@/lib/task-gate';
@@ -94,6 +94,14 @@ async function ownedTask(userId: string, taskId: string) {
   });
 }
 
+/** Thrown when a strict ledger write fails. The gesture must not run. */
+export class LedgerUnavailableError extends Error {
+  constructor() {
+    super('ledger unavailable');
+    this.name = 'LedgerUnavailableError';
+  }
+}
+
 export async function dispatchGesture(
   userId: string,
   rec: Recognition,
@@ -105,19 +113,10 @@ export async function dispatchGesture(
   const base = { intent: def.intent, permissionClass: def.permissionClass } as const;
   const total = rec.confidence.total;
 
-  if (total < def.minConfidence) {
-    return { ...base, status: 'below_threshold', reason: `confidence ${total} below ${def.minConfidence}` };
-  }
-
-  const current = deps.bridge.getState(userId);
-  if (current.mode === 'paused' && def.intent !== 'wake') {
-    return { ...base, status: 'ignored_paused', state: current };
-  }
-
-  const [perm, persona] = await Promise.all([
-    checkPermission(userId, def.capability, def.permissionClass, correlationId),
-    prisma.personaState.findUnique({ where: { userId }, select: { activePersona: true, mambaMode: true } }),
-  ]);
+  const persona = await prisma.personaState.findUnique({
+    where: { userId },
+    select: { activePersona: true, mambaMode: true },
+  });
   const ledgerBase = {
     userId,
     initiator: 'user' as const,
@@ -129,18 +128,38 @@ export async function dispatchGesture(
     inputSummary: `gesture=${rec.gesture} confidence=${total}/300`,
     correlationId,
   };
-  const note = (status: LedgerStatus, out: string, confirmationMethod?: string) =>
-    recordActionSafe({ ...ledgerBase, status, outputSummary: out, confirmationMethod });
+  // Strict: a failed ledger write throws, so the caller fails and nothing runs.
+  const note = async (status: LedgerStatus, out: string, confirmationMethod?: string) => {
+    try {
+      await recordAction({ ...ledgerBase, status, outputSummary: out, confirmationMethod });
+    } catch (e) {
+      logger.error('gesture ledger write failed', { userId, correlationId, gesture: rec.gesture, error: (e as Error)?.message });
+      throw new LedgerUnavailableError();
+    }
+  };
+
+  if (total < def.minConfidence) {
+    const reason = `confidence ${total} below ${def.minConfidence}`;
+    await note('DENIED', `below_threshold: ${reason}`);
+    return { ...base, status: 'below_threshold', reason };
+  }
+
+  const current = deps.bridge.getState(userId);
+  if (current.mode === 'paused' && def.intent !== 'wake') {
+    await note('DENIED', 'ignored_paused');
+    return { ...base, status: 'ignored_paused', state: current };
+  }
+
+  const perm = await checkPermission(userId, def.capability, def.permissionClass, correlationId);
 
   if (!perm.allowed) {
     await note('DENIED', perm.reason ?? 'permission denied');
     return { ...base, status: 'denied', reason: perm.reason ?? 'permission denied' };
   }
 
+  let action: HoloAction;
+  let extra: Partial<DispatchResult> = {};
   try {
-    let action: HoloAction;
-    let extra: Partial<DispatchResult> = {};
-
     switch (def.intent) {
       case 'open_thread': {
         const taskId = req.target?.taskId;
@@ -159,7 +178,9 @@ export async function dispatchGesture(
       case 'propose_task': {
         const agentId = req.target?.agentId;
         if (!current.openTaskId || !agentId) {
-          return { ...base, status: 'needs_context', reason: !current.openTaskId ? 'open a task thread first (pinch)' : 'no agent targeted' };
+          const reason = !current.openTaskId ? 'open a task thread first (pinch)' : 'no agent targeted';
+          await note('DENIED', `needs_context: ${reason}`);
+          return { ...base, status: 'needs_context', reason };
         }
         const task = await ownedTask(userId, current.openTaskId);
         const agent = deps.agents.get(agentId);
@@ -201,17 +222,26 @@ export async function dispatchGesture(
       case 'wake': action = { intent: 'wake' }; break;
       case 'refresh': action = { intent: 'refresh' }; break;
     }
+  } catch (e) {
+    if (e instanceof LedgerUnavailableError) throw e;
+    logger.error('gesture dispatch failed', { userId, correlationId, gesture: rec.gesture, error: (e as Error)?.message });
+    await note('FAILED', 'dispatch error');
+    return { ...base, status: 'failed', reason: 'dispatch error' };
+  }
 
+  // Ledger first. If this throws, the gesture is not applied.
+  await note('VALIDATED', extra.approvalId ? `proposal ${extra.approvalId}` : 'applied', perm.method);
+
+  try {
     const state = deps.bridge.apply(userId, action, rec.gesture, deps.now());
     deps.bridge.publish(userId, {
       type: 'gesture', gesture: rec.gesture, intent: def.intent, status: 'executed',
       confidence: total, correlationId, at: deps.now(),
     });
-    await note('VALIDATED', extra.approvalId ? `proposal ${extra.approvalId}` : 'applied', perm.method);
     return { ...base, status: 'executed', state, ...extra };
   } catch (e) {
-    logger.error('gesture dispatch failed', { userId, correlationId, gesture: rec.gesture, error: (e as Error)?.message });
-    await note('FAILED', 'dispatch error');
+    logger.error('gesture apply failed', { userId, correlationId, gesture: rec.gesture, error: (e as Error)?.message });
+    await note('FAILED', 'apply error');
     return { ...base, status: 'failed', reason: 'dispatch error' };
   }
 }

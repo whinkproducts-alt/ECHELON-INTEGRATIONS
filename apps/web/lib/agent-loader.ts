@@ -3,6 +3,7 @@
 // instruction: do not splice agent missions or skill text into prompts without
 // wrapUntrustedContent. Loading never activates or executes anything.
 import { readFile } from 'fs/promises';
+import { readFileSync } from 'fs';
 import path from 'path';
 
 export type AgentState =
@@ -102,6 +103,22 @@ export async function loadOrgKit(root: string = defaultOrgKitRoot()): Promise<Or
   if (s.length !== manifest.skill_count) countMismatches.push(`skills ${s.length} != manifest ${manifest.skill_count}`);
   if (t.length !== manifest.team_count) countMismatches.push(`teams ${t.length} != manifest ${manifest.team_count}`);
 
+  return { root, manifest, agents: a, skills: s, teams: t, toolCapabilities,
+    governanceStates: DEFAULT_STATES, countMismatches };
+}
+
+/** Sync twin of loadOrgKit for call sites that cannot await (the gesture agent directory). */
+export function loadOrgKitSync(root: string = defaultOrgKitRoot()): OrgKit {
+  const rd = <T>(rel: string): T => JSON.parse(readFileSync(path.join(root, rel), 'utf-8')) as T;
+  const manifest = rd<OrgManifest>('manifest.json');
+  const a = requireArray(rd<unknown>('organization/workforce_registry.json'), 'workforce_registry') as OrgAgent[];
+  const s = requireArray(rd<unknown>('skills/skill_registry.json'), 'skill_registry') as OrgSkill[];
+  const t = requireArray(rd<unknown>('organization/team_registry.json'), 'team_registry') as OrgTeam[];
+  const toolCapabilities = rd<OrgKit['toolCapabilities']>('tools/tool_capabilities.json');
+  const countMismatches: string[] = [];
+  if (a.length !== manifest.agent_count) countMismatches.push(`agents ${a.length} != manifest ${manifest.agent_count}`);
+  if (s.length !== manifest.skill_count) countMismatches.push(`skills ${s.length} != manifest ${manifest.skill_count}`);
+  if (t.length !== manifest.team_count) countMismatches.push(`teams ${t.length} != manifest ${manifest.team_count}`);
   return { root, manifest, agents: a, skills: s, teams: t, toolCapabilities,
     governanceStates: DEFAULT_STATES, countMismatches };
 }

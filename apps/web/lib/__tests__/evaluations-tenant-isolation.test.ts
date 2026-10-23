@@ -115,6 +115,19 @@ describe('evaluations tenant isolation (real Postgres)', () => {
     expect(seenByAAgain!.runs.map((r) => r.id)).toEqual([runA.id]);
   }, 30000);
 
+  // Always runs (no database needed): pins the query shape so the scope cannot silently regress.
+  it('GET scopes the runs include by the session user (mocked prisma)', async () => {
+    vi.resetModules();
+    const findMany = vi.fn().mockResolvedValue([]);
+    vi.doMock('@/lib/db', () => ({ prisma: { evaluationScenario: { findMany } } }));
+    const mod = await import('@/app/api/evaluations/run/route');
+    currentUserId = 'user-x';
+    const res = await mod.GET();
+    expect(res.status).toBe(200);
+    expect(findMany.mock.calls[0][0].include.runs.where).toEqual({ userId: 'user-x' });
+    vi.doUnmock('@/lib/db');
+  });
+
   it('unauthenticated GET is rejected', async (ctx) => {
     need(ctx);
     currentUserId = '';

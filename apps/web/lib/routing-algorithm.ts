@@ -35,13 +35,22 @@ export function scoreComponents(skillMatch: number, availability: number, succes
 
 export class Router {
   private cache: RoutingCache<Omit<RoutingDecision, 'cached' | 'elapsedMs'>>;
+  /**
+   * `routable` is required and has no default. Build it with makeRoutable(kit) from
+   * agent-validator so agents with registry errors can never be proposed.
+   */
   constructor(
     private registry: SkillRegistry,
     private stats: AgentStatsProvider,
+    private routable: (a: OrgAgent) => boolean,
     private epoch: () => number = () => 0,
     cache?: RoutingCache<Omit<RoutingDecision, 'cached' | 'elapsedMs'>>,
-    private routable: (a: OrgAgent) => boolean = () => true,
-  ) { this.cache = cache ?? new RoutingCache(); }
+  ) {
+    if (typeof routable !== 'function') {
+      throw new Error('Router: a validated routable predicate is required (use makeRoutable from agent-validator)');
+    }
+    this.cache = cache ?? new RoutingCache();
+  }
 
   route(req: RouteRequest): RoutingDecision {
     const t0 = performance.now();
