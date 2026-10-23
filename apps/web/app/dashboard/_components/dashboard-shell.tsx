@@ -52,13 +52,13 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
   }, [pathname]);
 
   const isWhink = personaState.activePersona === 'WHINK';
-  const accentColor = tenantConfig.accentColor;
+  // Consumers (neural-link, connected-apps) read --tenant-accent with a token fallback.
+  const accentStyle = tenantConfig.accentColor
+    ? ({ '--tenant-accent': tenantConfig.accentColor } as React.CSSProperties)
+    : undefined;
 
   return (
-    <div
-      className="flex h-screen bg-background overflow-hidden"
-      style={{ '--accent-color': accentColor } as React.CSSProperties}
-    >
+    <div className="flex h-screen bg-background overflow-hidden" style={accentStyle}>
       {/* Sidebar */}
       <aside
         className={`flex flex-col border-r border-border bg-card transition-all duration-200 ${

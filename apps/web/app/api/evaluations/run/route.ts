@@ -7,7 +7,13 @@ export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const scenarios = await prisma.evaluationScenario.findMany({
-    include: { runs: { orderBy: { executedAt: 'desc' }, take: 1 } },
+    include: {
+      runs: {
+        where: { userId: session.user.id },
+        orderBy: { executedAt: 'desc' },
+        take: 1,
+      },
+    },
   });
   return NextResponse.json(scenarios);
 }

@@ -11,10 +11,9 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // ESLint errors also skipped in CI for the same reason (some errors are in generated/test files).
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Next 16 builds with Turbopack by default. An explicit (empty) turbopack key tells Next the
+  // custom webpack hook below is known, so the build does not abort on the conflict.
+  turbopack: {},
   distDir: process.env.NEXT_DIST_DIR || '.next',
   output: process.env.NEXT_OUTPUT_MODE,
   poweredByHeader: false,

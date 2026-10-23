@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react';
 export interface TenantConfig {
   productName: string;
   logoUrl: string | null;
-  accentColor: string;
+  /** Tenant-supplied accent. Null means "use the design token"; no colour lives in code. */
+  accentColor: string | null;
   supportUrl: string | null;
   privacyUrl: string | null;
   termsUrl: string | null;
@@ -15,7 +16,7 @@ export interface TenantConfig {
 const DEFAULT_CONFIG: TenantConfig = {
   productName: 'WHINK',
   logoUrl: null,
-  accentColor: '#38B6FF',
+  accentColor: null,
   supportUrl: null,
   privacyUrl: null,
   termsUrl: null,
@@ -32,7 +33,7 @@ export function useTenantConfig(): TenantConfig {
         setConfig({
           productName: data.productName ?? 'WHINK',
           logoUrl: data.logoUrl ?? null,
-          accentColor: data.accentColor ?? '#38B6FF',
+          accentColor: data.accentColor ?? null,
           supportUrl: data.supportUrl ?? null,
           privacyUrl: data.privacyUrl ?? null,
           termsUrl: data.termsUrl ?? null,
