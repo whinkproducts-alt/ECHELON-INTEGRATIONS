@@ -65,10 +65,20 @@ export function OnboardingStep({ step }: { step: number }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profile: { displayName: displayName.trim(), timezone, roleTitle } }),
       });
-      if (!r.ok) throw new Error();
+      if (!r.ok) {
+        const response = await r.json().catch(() => null) as { error?: string } | null;
+        const detail = response?.error;
+        throw new Error(
+          r.status === 401
+            ? 'Your session has expired. Please sign in again.'
+            : detail
+              ? `Unable to save profile (HTTP ${r.status}): ${detail}`
+              : `Unable to save profile (HTTP ${r.status}). Check the server logs.`
+        );
+      }
       router.push('/onboarding/step/2');
-    } catch {
-      toast.error('Failed to save. Try again.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to save profile. Check your connection.');
     } finally {
       setSaving(false);
     }
