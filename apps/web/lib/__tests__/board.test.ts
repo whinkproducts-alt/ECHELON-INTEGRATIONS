@@ -22,14 +22,20 @@ describe('board.json', () => {
       expect(members.find((m) => m.id === id)).toMatchObject({ kind: 'ai', email: null, needsDetails: false, imageUrl: `/board/${id}.webp` });
     }
   });
-  it('Victor and Marcus are complete; the four others are flagged pending with null email and seat', () => {
-    expect(members.find((m) => m.id === 'victor-igboekwe')).toMatchObject({ seat: 'Founder & Chairman', email: 'victor.igboekwe@whinkgroup.com', needsDetails: false });
-    for (const id of ['anthony-igboekwe', 'dr-tinaye', 'barrister-genevieve', 'juliet-igboekwe']) {
-      const m = members.find((x) => x.id === id)!;
-      expect(m).toMatchObject({ email: null, seat: null, needsDetails: true, bio: '' });
+  it('every human seat matches the Group website leadership data and the staff email format', () => {
+    const want: Record<string, [string, string]> = {
+      'victor-igboekwe': ['Founder & Executive Director, Whink Consult', 'victor.igboekwe@whinkgroup.com'],
+      'anthony-igboekwe': ['Executive Director, Whink Apps', 'anthony.igboekwe@whinkgroup.com'],
+      'juliet-igboekwe': ['Executive Director, Whink Trades & Investments', 'juliet.igboekwe@whinkgroup.com'],
+      'dr-tinaye': ['Executive Director & Head of People Operations, Whink Frontliners', 'tinaye.muzenyi@whinkgroup.com'],
+      'barrister-genevieve': ['Chief Legal Counsel, The Whink Group', 'genevieve.igboekwe@whinkgroup.com'],
+      'marcus-vale': ['Chief Executive Assistant, Office of the Founder', 'marcus.vale@whinkgroup.com'],
+    };
+    for (const [id, [seat, email]] of Object.entries(want)) {
+      expect(members.find((m) => m.id === id), id).toMatchObject({ seat, email, needsDetails: false });
     }
-    expect(members.find((m) => m.id === 'dr-tinaye')).toMatchObject({ honorific: 'Dr', lastName: null });
-    expect(members.find((m) => m.id === 'barrister-genevieve')).toMatchObject({ honorific: 'Barrister', lastName: null });
+    expect(members.find((m) => m.id === 'dr-tinaye')).toMatchObject({ honorific: 'Dr', lastName: 'Muzenyi' });
+    expect(members.find((m) => m.id === 'barrister-genevieve')).toMatchObject({ honorific: 'Barrister', lastName: 'Igboekwe' });
   });
   it('rejects remote image URLs and bad emails', () => {
     const base = { id: 'a-b', name: 'A B', seat: 'x', bio: '', joined: null, committees: [] };

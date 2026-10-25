@@ -53,7 +53,7 @@ describe('route behaviour with a session', () => {
     expect((await (await GET()).json()).members).toEqual([]);
     delete process.env.WHINK_OWNER_EMAILS;
   });
-  it('GET /api/board returns members including pending ones with null email, to an owner', async () => {
+  it('GET /api/board returns the full roster, including the two AI seats, to an owner', async () => {
     vi.resetModules();
     vi.doMock('@/auth', () => ({ auth: async () => ({ user: { id: 'u1', email: 'Victor@Example.com' } }) }));
     process.env.WHINK_OWNER_EMAILS = ' other@x.com, victor@example.com ';
@@ -61,7 +61,7 @@ describe('route behaviour with a session', () => {
     const body = await (await GET()).json();
     delete process.env.WHINK_OWNER_EMAILS;
     expect(body.members.length).toBe(8);
-    expect(body.members.find((m: { id: string }) => m.id === 'dr-tinaye')).toMatchObject({ email: null, needsDetails: true });
+    expect(body.members.find((m: { id: string }) => m.id === 'dr-tinaye')).toMatchObject({ email: 'tinaye.muzenyi@whinkgroup.com', needsDetails: false });
   });
   it('manifest validate: 200 valid, 422 invalid licence, never executes anything', async () => {
     const { POST } = await import('../../app/api/connectors/manifest/validate/route');
