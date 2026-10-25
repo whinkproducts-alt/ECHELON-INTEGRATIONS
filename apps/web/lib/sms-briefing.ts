@@ -20,7 +20,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { logger } from '@/lib/logger';
 import { recordActionSafe, countByCorrelation } from '@/lib/ledger';
-import { checkPermission } from '@/lib/permission-engine';
+import { checkPermission, logSecurityEvent } from '@/lib/permission-engine';
 import { sendSms, maskNumber, isE164, twilioConfigured, type SmsResult } from '@/lib/twilio-adapter';
 
 export const SMS_TOOL = 'sms_briefing_send';
@@ -250,7 +250,18 @@ export async function runBriefingTick(now: Date = new Date(), deps: TickDeps = {
 
   const perm = await checkPermission(c.userId, SMS_TOOL, 'B', correlationId);
   if (!perm.allowed) {
-    await recordActionSafe({ ...base, status: 'DENIED', validationResult: perm.method, outputSummary: `Not sent: ${perm.reason ?? 'permission denied'}. Grant a delegation for ${SMS_TOOL} to enable.` });
+    // A protected action (sending account data out) cannot be unlocked by a delegation: it needs the owner's approval.
+    const message = perm.protected
+      ? `Not sent: protected ${perm.category ?? 'proprietary'} action. A delegation cannot unlock it; it needs the owner's approval.`
+      : `Not sent: ${perm.reason ?? 'permission denied'}. Grant a delegation for ${SMS_TOOL} to enable.`;
+    await recordActionSafe({ ...base, status: 'DENIED', validationResult: perm.method, outputSummary: message, ...(perm.category ? { protectedCategory: perm.category } : {}) });
+    if (perm.protected) {
+      try {
+        await logSecurityEvent(c.userId, 'protected_action_blocked', `${SMS_TOOL} blocked (${perm.category ?? 'proprietary'}): the briefing needs the owner's approval and cannot be sent by automation`, correlationId, 'DENIED');
+      } catch (e) {
+        logger.error('security event write failed', { error: (e as Error)?.message });
+      }
+    }
     logger.warn('sms briefing denied by permission engine', { correlationId });
     return 'denied';
   }

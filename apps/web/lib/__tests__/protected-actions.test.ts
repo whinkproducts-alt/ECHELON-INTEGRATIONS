@@ -50,7 +50,7 @@ describe('classifyProtected: tool name table', () => {
   });
 
   it.each([
-    'calendar_list', 'memory_read', 'memory_write', 'web_search', 'web_fetch', 'note_write', 'task_create', 'entity_create',
+    'calendar_list', 'memory_read', 'memory_write', 'web_search', 'note_write', 'task_create', 'entity_create',
     'document_search', 'document_upload', 'document_delete', 'project_create', 'contact_create',
     'memory_auto_write_sensitive', 'connector_manage', 'gesture_request_brief', 'usage_budget_set',
     'openclaw__ref__echo', 'openclaw__x__read_home_timeline', 'openclaw__x__read_mentions', 'openclaw__x__read_dms',

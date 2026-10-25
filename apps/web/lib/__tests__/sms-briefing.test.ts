@@ -93,13 +93,15 @@ describe('runBriefingTick', () => {
   const recordActionSafe = vi.fn();
   const countByCorrelation = vi.fn();
   const checkPermission = vi.fn();
+  const logSecurityEvent = vi.fn();
   beforeEach(() => {
     vi.resetModules();
     recordActionSafe.mockReset().mockResolvedValue({ id: 'a' });
     countByCorrelation.mockReset().mockResolvedValue(0);
     checkPermission.mockReset().mockResolvedValue({ allowed: true, method: 'delegated' });
+    logSecurityEvent.mockReset().mockResolvedValue(undefined);
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe, countByCorrelation }));
-    vi.doMock('@/lib/permission-engine', () => ({ checkPermission }));
+    vi.doMock('@/lib/permission-engine', () => ({ checkPermission, logSecurityEvent }));
   });
   const deps = (send: any) => ({ env, send, loadReports: async () => [] });
 
@@ -138,6 +140,20 @@ describe('runBriefingTick', () => {
     expect(await runBriefingTick(DUE, deps(send))).toBe('denied');
     expect(send).not.toHaveBeenCalled();
     expect(recordActionSafe.mock.calls[0][0].status).toBe('DENIED');
+  });
+
+  it('a protected denial says a delegation cannot unlock it, carries the category, and raises a security event', async () => {
+    const { runBriefingTick } = await import('../sms-briefing');
+    checkPermission.mockResolvedValue({ allowed: false, method: 'requires_confirmation', reason: 'x', protected: true, category: 'proprietary' });
+    const send = vi.fn();
+    expect(await runBriefingTick(DUE, deps(send))).toBe('denied');
+    expect(send).not.toHaveBeenCalled();
+    const row = recordActionSafe.mock.calls[0][0];
+    expect(row.status).toBe('DENIED');
+    expect(row.protectedCategory).toBe('proprietary');
+    expect(row.outputSummary).toMatch(/delegation cannot unlock/i);
+    expect(row.outputSummary).not.toMatch(/Grant a delegation/);
+    expect(logSecurityEvent).toHaveBeenCalledWith('u1', 'protected_action_blocked', expect.any(String), expect.any(String), 'DENIED');
   });
 
   it('survives a Twilio outage: no throw, FAILED ledger row, spaced retry', async () => {

@@ -297,6 +297,7 @@ export async function POST(
         apiKey: byokApiKey,
         correlationId,
         conversationTainted,
+        initialTaint: orchResult.externalContentThisTurn === true,
       });
     } catch (err: any) {
       logger.error('Model router error', { correlationId, error: err?.message });
@@ -310,7 +311,7 @@ export async function POST(
     let memoryWriteCalledInLoop = false;
     let toolRanThisTurn = false;
     // M3: any external read this turn (web, documents, any gateway tool incl. social DMs and feeds).
-    let externalContentThisTurn = false;
+    let externalContentThisTurn = orchResult.externalContentThisTurn === true;
 
     const stream = new ReadableStream({
       async start(controller) {

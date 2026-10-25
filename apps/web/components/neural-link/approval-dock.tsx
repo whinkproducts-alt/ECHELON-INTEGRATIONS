@@ -7,7 +7,6 @@ import {
   approvalReducer, initialCardState, isTerminal, normalizeApproval, postDecision, secondsRemaining,
   type ApprovalView, type CardAction, type CardState,
 } from '@/lib/hooks/approval-state';
-import { generateConfirmationCode } from '@/lib/spoken-approval';
 
 type Load = 'loading' | 'ready' | 'error';
 type Action = { id: string; action: CardAction } | { id: string; init: true };
@@ -22,7 +21,6 @@ const POLL_MS = 5000;
 export function ApprovalDock() {
   const [load, setLoad] = useState<Load>('loading');
   const [approvals, setApprovals] = useState<ApprovalView[]>([]);
-  const [codes, setCodes] = useState<Record<string, string>>({});
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [cards, dispatch] = useReducer((m: Record<string, CardState>, a: Action) => {
     if ('init' in a) return m[a.id] ? m : { ...m, [a.id]: initialCardState };
@@ -35,7 +33,6 @@ export function ApprovalDock() {
 
   const add = useCallback((a: ApprovalView) => {
     setApprovals((prev) => (prev.some((p) => p.id === a.id) ? prev : [...prev, a]));
-    setCodes((prev) => (prev[a.id] ? prev : { ...prev, [a.id]: generateConfirmationCode() }));
     dispatch({ id: a.id, init: true });
   }, []);
 
@@ -59,10 +56,10 @@ export function ApprovalDock() {
     return () => { clearTimeout(first); clearInterval(timer); };
   }, [poll]);
 
-  const decide = useCallback((id: string, decision: 'approve' | 'deny') => {
+  const decide = useCallback((id: string, decision: 'approve' | 'deny', voice?: { code: string }) => {
     if ((cardsRef.current[id] ?? initialCardState).phase !== 'pending') return;
     dispatch({ id, action: { type: 'submit' } });
-    postDecision(id, decision)
+    postDecision(id, decision, voice)
       .then((response) => dispatch({ id, action: { type: 'response', response } }))
       .catch((e: unknown) => dispatch({ id, action: { type: 'request_failed', message: e instanceof Error ? e.message : 'Request failed' } }));
   }, []);
@@ -86,10 +83,9 @@ export function ApprovalDock() {
                   className="w-full"
                   compact
                   approval={a}
-                  code={codes[a.id] ?? ''}
                   state={st}
                   onTick={(secondsLeft) => dispatch({ id: a.id, action: { type: 'tick', secondsLeft } })}
-                  onDecide={(d) => decide(a.id, d)}
+                  onDecide={(d, v) => decide(a.id, d, v)}
                 />
                 {isTerminal(st.phase) && (
                   <button

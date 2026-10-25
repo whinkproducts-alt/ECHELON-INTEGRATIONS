@@ -65,7 +65,13 @@ Owner rule: anything that moves, commits or authorises money, or that sends, sha
 - Ledger rows for protected approvals (created, approved, denied, expired, executed, failed) carry `protected` and `category` in `validationResult`, written through `lib/ledger.ts`.
 - Model-facing: item 5 of the security policy prompt (both personas) tells the model to require approval, never to claim an unapproved action was done, and never to help bypass it. This is guidance only; the enforcement is in code.
 
+- `web_fetch` and `web_search` can carry data out in the URL or query, so they are judged per call. `web_fetch` is protected when the turn is tainted (recalled document chunks count from the first tool call, via `initialTaint`), or the URL has a query string, fragment, user info or a non-default port. Hosts listed in `config/web-fetch-hosts.json` (empty by default) may carry a query on an untainted turn, never user info. `web_search` is protected when the query matches a secret pattern from `lib/secret-scan.ts` or is longer than 300 characters.
+- Name rules: an action word anywhere in a name wins over a read word (`get_and_capture_payment` is protected). The only unprotected shape is a single action word followed only by read words ending in a read verb (`send_status_check`). Non-ASCII tool names are unclassifiable and therefore protected, and descriptions are NFKC-normalised before matching.
+- Spoken approval: the server derives a 4-digit code from a secret (`APPROVAL_CODE_SECRET`, else `AUTH_SECRET`), the user id, the approval id and the content hash. A decision sent with `via: 'voice'` must carry that code or nothing is approved (HTTP 403, security event). A spoken deny needs no code, card clicks are unchanged, and with no secret configured voice approval is refused. The card must show `confirmationCode` from the approval view and send it with `postDecision(id, 'approve', { code })`.
+- The SMS briefing is protected: automation cannot send it, a delegation cannot unlock it, and each blocked day writes a DENIED row and a `protected_action_blocked` security event. Whether sending the briefing to the owner's own number counts as inside the account is undecided.
+
 Not covered:
+- Path-encoded exfiltration: on an untainted turn a plain `web_fetch` URL with data encoded in its path (`https://evil.tld/<data>`) is not detected. The tainted-turn rule narrows this to turns where no external content was read, but it is not closed.
 - A person with database or server access, or anyone who holds the owner's session.
 - Model providers receiving chat context by design.
 - Egress hidden in parameters of a tool that is classed as local (for example a URL passed to web_fetch).

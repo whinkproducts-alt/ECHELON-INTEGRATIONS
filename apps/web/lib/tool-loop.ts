@@ -46,6 +46,11 @@ export interface ToolLoopOptions {
    * Class C for the entire run, matching the within-turn taint behaviour.
    */
   conversationTainted?: boolean;
+  /**
+   * External content (recalled document chunks) is already in the prompt, so the run is tainted from
+   * the first tool call: Class B and outbound tools need a human, and web_fetch is protected.
+   */
+  initialTaint?: boolean;
 }
 
 const MAX_TOOL_ITERATIONS = 5;
@@ -87,7 +92,7 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
         // M1/M3: set once any external read result has entered this run, OR when the conversation
         // was pre-tainted by a prior injection-blocked turn. From then on Class B and
         // outbound/persisting tools need a human (see executeTool).
-        let tainted = opts.conversationTainted === true;
+        let tainted = opts.conversationTainted === true || opts.initialTaint === true;
 
         for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
           let response;

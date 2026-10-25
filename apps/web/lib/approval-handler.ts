@@ -24,7 +24,8 @@ const APPROVAL_PATTERNS: RegExp[] = [
 
 /** "Approve all", "always approve", "approve everything": blanket or standing approvals do not exist. */
 const BULK_APPROVAL_PATTERNS: RegExp[] = [
-  /^(please\s+)?(approve|approved|authori[sz]e|authori[sz]ed)\s+(all|everything|every request|them all|all of them|all requests|all pending)\b/i,
+  /^(please\s+)?(approve|approved|authori[sz]e|authori[sz]ed)\s+(all|both|everything|every request|them all|all of them|all requests|all pending)\b/i,
+  /^(yes|yep|yeah|ok|okay|sure)[\s,]+(to\s+)?(all|both|everything|them all)\s*[.!]?$/i,
   /^(always|auto|automatically)[\s-]+(approve|authori[sz]e)\b/i,
   /^(approve|authori[sz]e)\b.{0,20}\b(from now on|going forward|in future|every time)\b/i,
 ];

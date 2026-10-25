@@ -187,7 +187,7 @@ export function answer(method: string, url: URL, body: unknown, ctx: MockCtx): M
       id: `apr_fixture_${created}`, kind: 'tool_call', tool: m[2] === 'call' ? 'contact_call' : 'contact_message',
       summary: `${m[2] === 'call' ? 'Call' : `Send ${channel} to`} ${c?.name ?? 'contact'}${text ? `: ${text}` : ''}`.slice(0, 300),
       params: { contactId: m[1], contactName: c?.name, channel, to: c?.phone ?? c?.email, [m[2] === 'call' ? 'script' : 'body']: text },
-      contentHash: 'fixture', permissionClass: 'C', createdAt: iso(created), expiresAt: iso(created + 30_000),
+      contentHash: 'fixture', permissionClass: 'C', confirmationCode: '4821', createdAt: iso(created), expiresAt: iso(created + 30_000),
     };
     return { status: 202, body: { approvalId: approval.id, approval, casl: m[1] === 'c1' ? 'review_consent' : 'prior_relationship', status: 'AWAITING_APPROVAL' } };
   }
@@ -202,7 +202,7 @@ export function answer(method: string, url: URL, body: unknown, ctx: MockCtx): M
     const t = ctx.now();
     return { status: 200, body: { approvals: empty ? [] : [{
       id: 'apr_fixture_today', kind: 'tool_call', tool: 'contact_message', summary: 'Send SMS to Avery Fixture: See you at 3.',
-      params: { to: '+14035550101', body: 'See you at 3.' }, contentHash: 'fixture', permissionClass: 'C', protected: true, category: 'money', createdAt: iso(t), expiresAt: iso(t + 30_000),
+      params: { to: '+14035550101', body: 'See you at 3.' }, contentHash: 'fixture', permissionClass: 'C', protected: true, category: 'money', confirmationCode: '4821', createdAt: iso(t), expiresAt: iso(t + 30_000),
     }] } };
   }
   if (p === '/api/security/status') {

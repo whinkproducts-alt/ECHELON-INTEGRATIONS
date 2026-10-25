@@ -44,11 +44,13 @@ export async function checkPermission(
   userId: string,
   capability: string,
   permissionClass: PermissionClass,
-  _correlationId?: string
+  _correlationId?: string,
+  /** What the call carries: its parameters, and whether external content has entered the turn. */
+  ctx: { params?: unknown; tainted?: boolean; description?: string } = {}
 ): Promise<PermissionCheckResult> {
   // Protected actions (money, proprietary egress) are decided first and cannot be lowered by
   // anything below: not the requested class, autonomy, a delegation row, persona or allow-list.
-  const prot = classifyProtected({ toolName: capability, capability });
+  const prot = classifyProtected({ toolName: capability, capability, params: ctx.params, tainted: ctx.tainted, description: ctx.description });
   if (prot.protected) {
     const downgrade = permissionClass !== 'C';
     if (downgrade) {

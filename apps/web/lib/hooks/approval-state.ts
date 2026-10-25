@@ -11,6 +11,8 @@ export interface ApprovalView {
   /** True for money movement and disclosure of proprietary information. */
   protected?: boolean;
   category?: 'money' | 'proprietary';
+  /** Server code a spoken approval must repeat (post it with postDecision's voice option). */
+  confirmationCode?: string | null;
   createdAt: string;
   expiresAt: string;
 }
@@ -133,6 +135,7 @@ export function normalizeApproval(v: unknown): ApprovalView | null {
     permissionClass: typeof o.permissionClass === 'string' ? o.permissionClass : 'C',
     protected: o.protected === true || o.category === 'money' || o.category === 'proprietary',
     category: o.category === 'money' || o.category === 'proprietary' ? o.category : undefined,
+    confirmationCode: typeof o.confirmationCode === 'string' && o.confirmationCode ? o.confirmationCode : null,
     createdAt: v.createdAt,
     expiresAt: v.expiresAt,
   };
@@ -156,13 +159,15 @@ export function mostRecent(approvals: readonly ApprovalView[]): ApprovalView | n
 export async function postDecision(
   id: string,
   decision: 'approve' | 'deny',
+  voice?: { code: string },
 ): Promise<DecisionResponse> {
   const res = await fetch(`/api/approvals/${encodeURIComponent(id)}/decision`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ decision }),
+    body: JSON.stringify(voice ? { decision, via: 'voice', code: voice.code } : { decision }),
   });
   if (res.status === 404) throw new Error('Approval not found');
+  if (res.status === 403) throw new Error('Confirmation code rejected');
   if (!res.ok) throw new Error(`Decision failed (${res.status})`);
   const data: unknown = await res.json();
   const o = data as Partial<DecisionResponse> | null;

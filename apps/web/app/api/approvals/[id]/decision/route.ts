@@ -20,16 +20,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
-  // Strict: exactly { decision: 'approve' | 'deny' }. Tool and params are never read from the request.
+  // Strict: { decision }, or { decision, via: 'voice', code }. Tool and params are never read from the request.
   if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   const keys = Object.keys(body);
-  const decision = (body as { decision?: unknown }).decision;
-  if (keys.length !== 1 || keys[0] !== 'decision' || (decision !== 'approve' && decision !== 'deny')) {
-    return NextResponse.json({ error: "Body must be {decision: 'approve' | 'deny'}" }, { status: 400 });
+  const { decision, via, code } = body as { decision?: unknown; via?: unknown; code?: unknown };
+  const voice = via === 'voice';
+  const shapeOk = keys.every((k) => k === 'decision' || (voice && (k === 'via' || k === 'code'))) && (via === undefined || voice);
+  if (!shapeOk || (decision !== 'approve' && decision !== 'deny')) {
+    return NextResponse.json({ error: "Body must be {decision: 'approve' | 'deny'} or {decision, via: 'voice', code}" }, { status: 400 });
   }
   if (!id || id.length > 100) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
 
-  const outcome = await decide(session.user.id, id, decision);
+  // A spoken approval must repeat the server's confirmation code. A spoken deny needs none.
+  const outcome = voice && decision === 'approve'
+    ? await decide(session.user.id, id, decision, { voice: { code } })
+    : await decide(session.user.id, id, decision);
   if (outcome.status === 'NOT_FOUND') return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (outcome.status === 'CODE_REJECTED') return NextResponse.json({ error: 'Confirmation code required', status: 'CODE_REJECTED' }, { status: 403 });
   return NextResponse.json({ id: outcome.id, status: outcome.status, result: outcome.result });
 }

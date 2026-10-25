@@ -8,6 +8,7 @@
 
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { classifyProtected, type ProtectedCategory } from '@/lib/protected-actions';
 
 export const SUMMARY_CAP = 2000;
 
@@ -35,6 +36,8 @@ export interface LedgerEntry {
   latencyMs?: number | null;
   confirmationMethod?: string | null;
   validationResult?: string | null;
+  /** Category of a protected action (money or proprietary) judged by the caller, who may know the parameters. */
+  protectedCategory?: ProtectedCategory;
 }
 
 /** Convenience alias used in API routes. metadata is serialised to inputSummary. */
@@ -58,6 +61,30 @@ function cap(v: string | null | undefined): string | null | undefined {
 }
 
 /** Awaitable write. Throws on failure. Returns the new row id. */
+/**
+ * Every row for a protected action carries `protected` and `category` in validationResult, whoever
+ * writes it. The caller may pass the category (it knows the parameters); otherwise it is judged on
+ * the tool name. Existing validationResult text is kept.
+ */
+function withProtectedMeta(entry: LedgerEntry): string | undefined {
+  let category = entry.protectedCategory;
+  if (!category && entry.tool) {
+    const c = classifyProtected({ toolName: entry.tool, capability: entry.tool });
+    if (c.protected) category = c.category;
+  }
+  if (!category) return entry.validationResult ?? undefined;
+  let base: Record<string, unknown> = {};
+  if (entry.validationResult) {
+    try {
+      const parsed: unknown = JSON.parse(entry.validationResult);
+      base = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : { detail: entry.validationResult };
+    } catch {
+      base = { detail: entry.validationResult };
+    }
+  }
+  return JSON.stringify({ ...base, protected: true, category });
+}
+
 export async function recordAction(entry: LedgerEntry): Promise<{ id: string }> {
   if (!entry.userId) throw new Error('ledger: userId is required');
   const row = await prisma.action.create({
@@ -73,7 +100,7 @@ export async function recordAction(entry: LedgerEntry): Promise<{ id: string }> 
       status: entry.status,
       inputSummary: cap(entry.inputSummary) ?? undefined,
       outputSummary: cap(entry.outputSummary) ?? undefined,
-      validationResult: entry.validationResult ?? undefined,
+      validationResult: withProtectedMeta(entry),
       correlationId: entry.correlationId ?? undefined,
       latencyMs: entry.latencyMs ?? undefined,
     },

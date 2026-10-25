@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/db';
 import { generateCorrelationId, logger } from '@/lib/logger';
-import { recordAction, recordActionSafe, updateActionStatus } from '@/lib/ledger';
+import { recordAction, recordActionSafe, updateActionStatus, type LedgerEntry } from '@/lib/ledger';
+
+const recordActionBase = recordAction;
+const recordActionSafeBase = recordActionSafe;
 import { checkPermission, checkApprovedAction, logSecurityEvent, type PermissionClass } from '@/lib/permission-engine';
 import { createApproval, type ApprovalView } from '@/lib/approvals';
 import { stripFakeUntrustedTags, scanForInjectionPatterns, filterToolResult } from '@/lib/content-isolation';
@@ -941,6 +944,10 @@ export async function executeTool(
   opts: { approvalAlreadyPending?: boolean; tainted?: boolean; initiator?: string } = {}
 ): Promise<ToolExecutionResult> {
   const cid = correlationId ?? generateCorrelationId();
+  // Every ledger row for a protected call carries its category (judged on name, params and taint).
+  const pa = classifyProtected({ toolName, capability: toolName, params, tainted: opts.tainted === true });
+  const recordActionSafe = (e: LedgerEntry) => recordActionSafeBase({ ...e, protectedCategory: pa.protected ? pa.category : undefined });
+  const recordAction = (e: LedgerEntry) => recordActionBase({ ...e, protectedCategory: pa.protected ? pa.category : undefined });
   const initiator = opts.initiator ?? 'system';
   const startTime = Date.now();
 
@@ -985,8 +992,7 @@ export async function executeTool(
   }
 
   // Check permission. A registered tool with no explicit risk entry is treated as Class C.
-  const protectedAction = classifyProtected({ toolName, capability: toolName, params });
-  const baseClass: PermissionClass = protectedAction.protected ? 'C' : (TOOL_RISK_MAP[toolName] ?? 'C');
+  const baseClass: PermissionClass = pa.protected ? 'C' : (TOOL_RISK_MAP[toolName] ?? 'C');
   // M3: once external content was read this run, Class B and outbound/persisting tools need a human.
   const riskClass = effectiveClassForTaint(toolName, baseClass, opts.tainted === true);
   if (riskClass !== baseClass) {
@@ -1005,7 +1011,7 @@ export async function executeTool(
       latencyMs: Date.now() - startTime,
     });
   }
-  const permCheck = await checkPermission(userId, toolName, riskClass, cid);
+  const permCheck = await checkPermission(userId, toolName, riskClass, cid, { params, tainted: opts.tainted === true });
 
   if (!permCheck.allowed) {
     // Class C: queue a full-fidelity approval request (the ledger row is written by createApproval).
@@ -1244,8 +1250,10 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
   }
 
   const handler = TOOL_HANDLERS[approval.tool];
-  const riskClass: PermissionClass = classifyProtected({ toolName: approval.tool, capability: approval.tool }).protected ? 'C' : (TOOL_RISK_MAP[approval.tool] ?? 'C');
+  const approvedPa = classifyProtected({ toolName: approval.tool, capability: approval.tool, params: approval.params });
+  const riskClass: PermissionClass = approvedPa.protected ? 'C' : (TOOL_RISK_MAP[approval.tool] ?? 'C');
   const base = {
+    protectedCategory: approvedPa.protected ? approvedPa.category : undefined,
     userId,
     initiator: 'user' as const,
     persona: approval.persona,

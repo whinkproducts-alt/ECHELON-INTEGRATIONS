@@ -54,6 +54,9 @@ export interface OrchestratorResult {
   /** True when the message tried to grant itself authorisation; must not reach the model. */
   metaAuthBlocked: boolean;
   injectionPatterns: string[];
+  /** Recalled document chunks entered the prompt: the turn is tainted from the first tool call. */
+  externalContentThisTurn?: boolean;
+  blendedItems?: BlendedItem[];
 }
 
 export async function processInput(input: OrchestratorInput): Promise<OrchestratorResult> {
@@ -219,6 +222,7 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
     injectionPatterns: [],
     /** Blended recall items — document entries carry citation metadata (C10). */
     blendedItems: context.blendedItems as BlendedItem[],
+    externalContentThisTurn: context.externalContentThisTurn === true,
   };
 }
 

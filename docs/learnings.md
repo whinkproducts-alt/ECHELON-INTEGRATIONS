@@ -74,3 +74,12 @@ Long-term project memory. Read this with `CLAUDE.md`, `docs/decisions.md` and th
 - Add provider credentials for sending, run the migrations, and run the Phase 2 checklist on his Mac. A phase is not done until it passes for him.
 - Not built: editing product websites from the app, pushing news-driven updates to the company website, Google Contacts sync, video-room link for Quick Meeting with Marcus Vale.
 - Phase 3 (Recall) is planned and untouched.
+
+## 9. Protected actions: how it works and what we learnt (2026-10-26)
+
+- Rule: money movement and sharing proprietary information always need Victor's approval (`CLAUDE.md` non-negotiable 10). Code: `lib/protected-actions.ts` classifies; `checkPermission` in `lib/permission-engine.ts` asks it first and forces Class C. Delegation, autonomy level, persona, allow-lists and plugin manifests cannot lower it, and an attempt to ask for a lower class is refused and ledgered as a security event.
+- Classification is deterministic: an explicit registry plus keyword rules for unknown tools. Action words win over read words, names are NFKC-normalised, and non-ASCII tool names are treated as protected. Plain reads and local tools (memory, tasks, notes, documents, calendar read) are not protected.
+- `web_fetch` and `web_search` are judged per call. A fetch is protected when the turn is tainted by external content (including recalled documents), or the URL has a query, fragment, credentials or a non-default port. A search is protected on a secret pattern or a query over 300 characters. Known gap: data encoded in a URL path is not caught.
+- Review lessons: the first version put `web_fetch` on the safe list, which let a planted document exfiltrate data on the first call of a turn. A tainted turn must be passed into the tool loop from the start. Any new tool that can send data out must be added to the registry or named so the keywords catch it, and gets a test.
+- Approvals: the card shows "Protected: money" or "Protected: proprietary information". Voice approval needs a server-derived confirmation code (`lib/approval-code.ts`, from `APPROVAL_CODE_SECRET` or `AUTH_SECRET`, 16+ characters); without a secret the voice control is hidden and the Approve button is used. Phrases such as "approve all" approve nothing.
+- The automated SMS briefing is blocked by this rule (no human present). Victor has not decided whether a message to his own number counts as inside his account.

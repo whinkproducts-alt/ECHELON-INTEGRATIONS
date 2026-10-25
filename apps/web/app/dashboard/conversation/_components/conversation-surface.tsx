@@ -6,7 +6,7 @@ import {
   FolderKanban, Mic, MicOff, Volume2, VolumeX, Cpu
 } from 'lucide-react';
 import { useVoice } from '@/lib/hooks/useVoice';
-import { speakApprovalRequest, generateConfirmationCode } from '@/lib/spoken-approval';
+import { speakApprovalRequest } from '@/lib/spoken-approval';
 import { AvatarRenderer } from './avatar-renderer';
 import { CitationChip, type CitationChipProps } from './citation-chip';
 import { VoiceWaveform } from './voice-waveform';
@@ -104,8 +104,6 @@ export function ConversationSurface() {
     },
     {} as Record<string, CardState>,
   );
-  // Per-approval confirmation codes: client-only, never sent anywhere, never spoken.
-  const [codes, setCodes] = useState<Record<string, string>>({});
   const cardStatesRef = useRef(cardStates);
   useEffect(() => { cardStatesRef.current = cardStates; }, [cardStates]);
 
@@ -116,12 +114,12 @@ export function ConversationSurface() {
     ]);
   }, []);
 
-  const submitDecision = useCallback(async (id: string, decision: 'approve' | 'deny') => {
+  const submitDecision = useCallback(async (id: string, decision: 'approve' | 'deny', voice?: { code: string }) => {
     const cur = cardStatesRef.current[id] ?? initialCardState;
     if (cur.phase !== 'pending') return;
     dispatchCard({ id, action: { type: 'submit' } });
     try {
-      const response = await postDecision(id, decision);
+      const response = await postDecision(id, decision, voice);
       dispatchCard({ id, action: { type: 'response', response } });
       pushNeuralEvent('approval', `${decision === 'approve' ? 'approve' : 'deny'} → ${response.status}`);
     } catch (e) {
@@ -131,7 +129,6 @@ export function ConversationSurface() {
 
   const addApproval = useCallback((a: ApprovalView) => {
     setApprovals(prev => (prev.some(p => p.id === a.id) ? prev : [...prev, a]));
-    setCodes(prev => (prev[a.id] ? prev : { ...prev, [a.id]: generateConfirmationCode() }));
     dispatchCard({ id: a.id, init: true });
   }, []);
 
@@ -590,10 +587,9 @@ export function ConversationSurface() {
                 <ApprovalCard
                   key={a.id}
                   approval={a}
-                  code={codes[a.id] ?? ''}
                   state={cardStates[a.id] ?? initialCardState}
                   onTick={(secondsLeft) => dispatchCard({ id: a.id, action: { type: 'tick', secondsLeft } })}
-                  onDecide={(d) => { void submitDecision(a.id, d); }}
+                  onDecide={(d, v) => { void submitDecision(a.id, d, v); }}
                 />
               ))}
 

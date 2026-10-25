@@ -6,26 +6,25 @@ import {
   approvalReducer, initialCardState, normalizeApproval, postDecision, secondsRemaining,
   type ApprovalView,
 } from '@/lib/hooks/approval-state';
-import { generateConfirmationCode } from '@/lib/spoken-approval';
 import { HoloBadge, HoloButton, HoloEmpty } from '@/components/ui/holo';
 
 type Load = 'loading' | 'ready' | 'error';
-interface Item { approval: ApprovalView; code: string }
+interface Item { approval: ApprovalView }
 
 function Row({ item }: { item: Item }) {
   const [state, dispatch] = React.useReducer(approvalReducer, initialCardState);
   const ref = React.useRef(state);
   React.useEffect(() => { ref.current = state; }, [state]);
-  const decide = (decision: 'approve' | 'deny') => {
+  const decide = (decision: 'approve' | 'deny', voice?: { code: string }) => {
     if (ref.current.phase !== 'pending') return;
     dispatch({ type: 'submit' });
-    postDecision(item.approval.id, decision)
+    postDecision(item.approval.id, decision, voice)
       .then((response) => dispatch({ type: 'response', response }))
       .catch((e: unknown) => dispatch({ type: 'request_failed', message: e instanceof Error ? e.message : 'Request failed' }));
   };
   return (
     <ApprovalCard
-      className="w-full" approval={item.approval} code={item.code} state={state}
+      className="w-full" approval={item.approval} state={state}
       onTick={(secondsLeft) => dispatch({ type: 'tick', secondsLeft })} onDecide={decide}
     />
   );
@@ -51,7 +50,7 @@ export function PendingApprovals({ onCount }: { onCount?: (n: number | null) => 
         setItems((prev) => {
           const known = new Map(prev.map((p) => [p.approval.id, p]));
           // Keep cards the user is mid-decision on (they hold their own state); add new ones.
-          for (const a of fresh) if (!known.has(a.id)) known.set(a.id, { approval: a, code: generateConfirmationCode() });
+          for (const a of fresh) if (!known.has(a.id)) known.set(a.id, { approval: a });
           return [...known.values()];
         });
         setLoad('ready');

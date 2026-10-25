@@ -11,7 +11,6 @@ import {
   approvalReducer, initialCardState, isTerminal, normalizeApproval, postDecision,
   type ApprovalView,
 } from '@/lib/hooks/approval-state';
-import { generateConfirmationCode } from '@/lib/spoken-approval';
 import { HoloBadge, HoloButton, HoloPanel } from '@/components/ui/holo';
 import { cn } from '@/lib/utils';
 import {
@@ -38,7 +37,6 @@ export function ContactComposer({ contact, initialChannel, onClose }: { contact:
   const [error, setError] = React.useState<string | null>(null);
   const [approval, setApproval] = React.useState<ApprovalView | null>(null);
   const [casl, setCasl] = React.useState<Casl>(null);
-  const [code, setCode] = React.useState('');
   const [card, dispatch] = React.useReducer(approvalReducer, initialCardState);
   const cardRef = React.useRef(card);
   React.useEffect(() => { cardRef.current = card; }, [card]);
@@ -61,17 +59,16 @@ export function ContactComposer({ contact, initialChannel, onClose }: { contact:
         const a = normalizeApproval(d.approval);
         if (!a) throw new Error('The server did not return an approval request. Nothing was sent.');
         setCasl(d.casl === 'review_consent' || d.casl === 'prior_relationship' ? d.casl : null);
-        setCode(generateConfirmationCode());
         setApproval(a);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Request failed'))
       .finally(() => setBusy(false));
   };
 
-  const decide = (decision: 'approve' | 'deny') => {
+  const decide = (decision: 'approve' | 'deny', voice?: { code: string }) => {
     if (!approval || cardRef.current.phase !== 'pending') return;
     dispatch({ type: 'submit' });
-    postDecision(approval.id, decision)
+    postDecision(approval.id, decision, voice)
       .then((response) => dispatch({ type: 'response', response }))
       .catch((e: unknown) => dispatch({ type: 'request_failed', message: e instanceof Error ? e.message : 'Request failed' }));
   };
@@ -97,7 +94,6 @@ export function ContactComposer({ contact, initialChannel, onClose }: { contact:
         <ApprovalCard
           className="w-full"
           approval={approval}
-          code={code}
           state={card}
           onTick={(secondsLeft) => dispatch({ type: 'tick', secondsLeft })}
           onDecide={decide}
