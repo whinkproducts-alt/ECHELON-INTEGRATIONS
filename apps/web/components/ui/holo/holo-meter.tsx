@@ -45,9 +45,9 @@ export function HoloMeter({ value, max = 100, label, variant = 'linear', limit =
 
   return (
     <div {...aria} className={cn('w-full', toneClass(t), className)}>
-      <div className="mb-1.5 flex items-baseline justify-between gap-2 text-xs">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-mono tabular-nums text-foreground">
+        <span className="whitespace-nowrap font-mono tabular-nums text-foreground">
           {reading}
           {limit && <span className="ml-2 uppercase tracking-widest" style={{ color: 'hsl(var(--holo-c))' }}>Limit</span>}
         </span>

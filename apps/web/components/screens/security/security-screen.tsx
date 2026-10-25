@@ -68,7 +68,7 @@ function Hero({ status, onRetry }: { status: SecurityStatus; onRetry: () => void
         </HoloPanel>
       </div>
 
-      <HoloGrid min="12rem">
+      <HoloGrid fit min="12rem">
         <HoloStat label="Events, 24 hours" value={ev24?.total ?? 0} tone={evTone(ev24?.total)} delta={ev24 ? undefined : 'not reported'} />
         <HoloStat label="Events, 7 days" value={ev7?.total ?? 0} tone={evTone(ev7?.total)} delta={ev7 ? undefined : 'not reported'} />
         <HoloStat label="Injections blocked, 7d" value={ev7?.injectionBlocks ?? 0} tone={evTone(ev7?.injectionBlocks)} />

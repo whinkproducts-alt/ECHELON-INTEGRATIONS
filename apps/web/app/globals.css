@@ -275,6 +275,7 @@
 .holo-reveal { animation: holo-boot-line 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 
 .holo-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(var(--holo-grid-min, 16rem), 1fr)); }
+.holo-grid[data-fit='true'] { grid-template-columns: repeat(auto-fit, minmax(var(--holo-grid-min, 16rem), 1fr)); }
 .holo-grid > * { animation: holo-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 .holo-grid > *:nth-child(2) { animation-delay: 50ms; }
 .holo-grid > *:nth-child(3) { animation-delay: 100ms; }
@@ -305,6 +306,7 @@
 
 .holo-dot { position: relative; display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: hsl(var(--holo-c, var(--whink-accent))); flex-shrink: 0; }
 .holo-dot[data-pulse='true']::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: hsl(var(--holo-c, var(--whink-accent))); animation: holo-pulse-ring 1.8s ease-out infinite; }
+.holo-badge.holo-tone-deep { color: hsl(var(--foreground) / 0.88); background: hsl(var(--deep) / 0.5); border-color: hsl(var(--whink-accent) / 0.4); }
 .holo-badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.125rem 0.6rem; border-radius: 9999px; font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: hsl(var(--holo-c, var(--whink-accent))); background: hsl(var(--holo-c, var(--whink-accent)) / 0.1); border: 1px solid hsl(var(--holo-c, var(--whink-accent)) / 0.35); }
 
 .holo-tab { position: relative; padding: 0.5rem 1rem; font-family: var(--font-display); font-size: 0.875rem; letter-spacing: 0.05em; color: hsl(var(--muted-foreground)); transition: color var(--duration-fast) ease; }

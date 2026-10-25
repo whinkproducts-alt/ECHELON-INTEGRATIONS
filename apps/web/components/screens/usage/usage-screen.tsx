@@ -130,7 +130,7 @@ export function UsageScreen() {
           </HoloPanel>
         </div>
 
-        <HoloGrid min="12rem">
+        <HoloGrid fit min="12rem">
           <HoloStat label={`Tokens, ${range}`} value={periodTokens} format={(n) => fmtCompact(n)} tone="accent" />
           <HoloStat label="Tokens this month" value={b.used} format={(n) => fmtCompact(n)} tone="deep" />
           <HoloPanel tone="neutral">

@@ -4,21 +4,33 @@
 export type PreviewState = 'ready' | 'loading' | 'error' | 'empty';
 export interface Mocked { status: number; body: unknown; delayMs?: number }
 
+import catalog from '@/config/connectors.catalog.json';
+
 const iso = (ms: number) => new Date(ms).toISOString();
 
 const CONTACTS = [
-  { id: 'c1', name: 'Avery Fixture', email: 'avery@example.test', phone: '+14035550101', company: 'Fixture Labs', tags: ['client', 'calgary'], source: 'manual', notes: null, createdAt: '2026-10-01T10:00:00.000Z' },
-  { id: 'c2', name: 'Jordan Placeholder', email: 'jordan@example.test', phone: '+14035550102', company: null, tags: ['vendor', 'telegram:123456'], source: 'vcard', notes: null, createdAt: '2026-10-02T10:00:00.000Z' },
-  { id: 'c3', name: 'Sam Sample', email: null, phone: '+14035550103', company: 'Sample & Co', tags: [], source: 'vcard', notes: null, createdAt: '2026-10-03T10:00:00.000Z' },
-  { id: 'c4', name: 'Riley Mock', email: 'riley@example.test', phone: null, company: 'Mock Industries', tags: ['advisor'], source: 'manual', notes: null, createdAt: '2026-10-04T10:00:00.000Z' },
+  { id: 'c1', name: 'Avery Fixture', email: 'avery.fixture@example.test', phone: '+14035550101', company: 'Fixture Labs', tags: ['client', 'calgary', 'telegram:123456'], source: 'manual', notes: null, createdAt: '2026-10-01T10:00:00.000Z' },
+  { id: 'c2', name: 'Jordan Placeholder', email: 'jordan@example.test', phone: '+14035550102', company: 'Placeholder Freight', tags: ['vendor'], source: 'vcard', notes: null, createdAt: '2026-10-02T10:00:00.000Z' },
+  { id: 'c3', name: 'Sam Sample', email: null, phone: '+14035550103', company: 'Sample & Co', tags: ['investor'], source: 'vcard', notes: null, createdAt: '2026-10-03T10:00:00.000Z' },
+  { id: 'c4', name: 'Riley Mock', email: 'riley@example.test', phone: null, company: 'Mock Industries', tags: ['advisor', 'legal'], source: 'manual', notes: null, createdAt: '2026-10-04T10:00:00.000Z' },
+  { id: 'c5', name: 'Morgan Dummy', email: 'morgan.dummy@example.test', phone: '+14035550105', company: 'Dummy Capital', tags: ['investor', 'edmonton'], source: 'manual', notes: null, createdAt: '2026-10-05T10:00:00.000Z' },
+  { id: 'c6', name: 'Casey Notional', email: 'casey@example.test', phone: '+14035550106', company: null, tags: ['family'], source: 'manual', notes: null, createdAt: '2026-10-06T10:00:00.000Z' },
+  { id: 'c7', name: 'Taylor Imaginary', email: 'taylor@example.test', phone: '+14035550107', company: 'Imaginary Works', tags: ['client'], source: 'vcard', notes: null, createdAt: '2026-10-07T10:00:00.000Z' },
+  { id: 'c8', name: 'Quinn Faux', email: 'quinn.faux@example.test', phone: null, company: 'Faux Media', tags: ['press'], source: 'vcard', notes: null, createdAt: '2026-10-08T10:00:00.000Z' },
 ];
 
-const CONNECTORS = [
-  { id: 'gmail', name: 'Mail', version: '1.0.0', publisher: 'fixture', kind: 'oauth', capabilities: ['mail_read'], permissionClass: 'C', description: 'Fixture connector', iconUrl: null, status: 'available', installed: false, enabled: false },
-  { id: 'google_calendar', name: 'Calendar', version: '1.0.0', publisher: 'fixture', kind: 'oauth', capabilities: ['calendar_list'], permissionClass: 'A', description: 'Fixture connector', iconUrl: null, status: 'needs_config', installed: false, enabled: false },
-  { id: 'ollama', name: 'Local models', version: '1.0.0', publisher: 'fixture', kind: 'native', capabilities: ['chat'], permissionClass: 'A', description: 'Fixture connector', iconUrl: null, status: 'connected', installed: true, enabled: true },
-  { id: 'openclaw', name: 'Gateway', version: '1.0.0', publisher: 'fixture', kind: 'mcp', capabilities: ['tools'], permissionClass: 'C', description: 'Fixture connector', iconUrl: null, status: 'connected', installed: true, enabled: true },
-];
+// Statuses mimic what the registry computes from evidence; the entries themselves come from the real catalog.
+const STATUS_BY_ID: Record<string, string> = {
+  ollama: 'connected', openclaw: 'connected', anythingllm: 'connected', twilio: 'connected', telegram: 'connected', whatsapp: 'needs_config',
+  x: 'connected', instagram: 'available', tiktok: 'available', slack: 'available', github: 'connected', figma: 'available', notion: 'available', linear: 'available',
+  stripe_readonly: 'needs_config',
+};
+const CONNECTORS = (catalog.connectors as Array<Record<string, unknown>>).map((e) => {
+  const { evidence: _evidence, ...manifest } = e;
+  void _evidence;
+  const status = STATUS_BY_ID[String(e.id)] ?? 'unavailable';
+  return { iconUrl: null, ...manifest, status, installed: status === 'connected', enabled: status === 'connected' };
+});
 
 function usage(range: string) {
   const days = range === '30d' ? 30 : 7;
@@ -49,11 +61,21 @@ const NEWS = {
   ].map((title, i) => ({ title, link: i === 2 ? 'javascript:alert(1)' : `https://example.test/story-${i + 1}`, pubDate: '2026-10-25T09:00:00.000Z', source: 'Fixture Wire', excerpt: '' })),
 };
 
-const LEDGER = [
-  { id: 'l1', action: 'injection_blocked', status: 'DENIED', inputSummary: 'user message', outputSummary: 'blocked before model', createdAt: '2026-10-25T08:00:00.000Z' },
-  { id: 'l2', action: 'tool_executed', status: 'EXECUTED', inputSummary: 'calendar_list', outputSummary: '', createdAt: '2026-10-25T08:05:00.000Z' },
-  { id: 'l3', action: 'approval_hash_mismatch', status: 'DENIED', inputSummary: '', outputSummary: 'hash lock', createdAt: '2026-10-25T08:10:00.000Z' },
+const LEDGER_ROWS: Array<[string, string, string, string, number]> = [
+  ['injection_blocked', 'DENIED', 'user message', 'blocked before model: planted instruction', 5],
+  ['tool_executed', 'EXECUTED', 'calendar_list', 'ok', 12],
+  ['approval_hash_mismatch', 'DENIED', 'contact_message', 'hash lock: parameters changed after approval', 38],
+  ['memory_auto_written', 'EXECUTED', 'semantic', 'prefers morning meetings', 70],
+  ['tool_executed', 'EXECUTED', 'document_search', '3 chunks', 95],
+  ['action_blocked', 'DENIED', 'social_post', 'Class C needs approval at every level', 140],
+  ['tool_executed', 'EXECUTED', 'gateway_github_list_issues', 'ok', 190],
+  ['memory_auto_skipped', 'EXECUTED', 'external content', 'turn read external content', 240],
 ];
+const ledger = (now: number) => LEDGER_ROWS.map(([action, status, inputSummary, outputSummary, min], i) => ({
+  id: `l${i + 1}`, action, status, inputSummary, outputSummary, createdAt: iso(now - min * 60_000),
+}));
+
+const BOARD: unknown[] = [];
 
 export interface MockCtx { state: PreviewState; now: () => number; counters: { casl: boolean } }
 
@@ -68,6 +90,7 @@ export function answer(method: string, url: URL, body: unknown, ctx: MockCtx): M
   }
   const empty = state === 'empty';
 
+  if (p === '/api/auth/session') return { status: 200, body: {} };
   if (p === '/api/tenant/config') return { status: 200, body: {} };
   if (p === '/api/persona/state') return { status: 200, body: { activePersona: 'WHINK', mambaMode: null, functionalMode: null } };
   if (p === '/api/settings') return { status: 200, body: { profile: { displayName: 'Dev' } } };
@@ -106,12 +129,26 @@ export function answer(method: string, url: URL, body: unknown, ctx: MockCtx): M
       params: { to: '+14035550101', body: 'See you at 3.' }, contentHash: 'fixture', permissionClass: 'C', createdAt: iso(t), expiresAt: iso(t + 30_000),
     }] } };
   }
-  if (p === '/api/security/status') return { status: 200, body: { securityEvents: { last24h: { total: empty ? 0 : 2 }, last7d: { total: empty ? 0 : 3 } } } };
+  if (p === '/api/security/status') {
+    const now = ctx.now();
+    return { status: 200, body: {
+      generatedAt: iso(now),
+      headers: { enforcedByProxy: ['Content-Security-Policy', 'Strict-Transport-Security', 'X-Content-Type-Options', 'Referrer-Policy', 'Permissions-Policy'], hstsActive: false, csp: { nonceBasedScripts: true, frameAncestorsNone: true, objectSrcNone: true } },
+      pendingClassCApprovals: empty ? 0 : 1,
+      securityEvents: {
+        last24h: { total: empty ? 0 : 3, injectionBlocks: empty ? 0 : 1, hashLockFailures: empty ? 0 : 1, crossTenantAttempts: 0, other: empty ? 0 : 1 },
+        last7d: { total: empty ? 0 : 7, injectionBlocks: empty ? 0 : 3, hashLockFailures: empty ? 0 : 1, crossTenantAttempts: 0, other: empty ? 0 : 3 },
+      },
+      dependencyAudit: { status: 'ok', ranAt: iso(now - 86_400_000), vulnerabilities: { critical: 0, high: 0, moderate: 2, low: 5 } },
+      secretsScan: { status: 'clean', ranAt: iso(now - 86_400_000), findings: 0, envFiles: 1, envFilesIgnoredByGit: true },
+      githubSettings: 'not_verifiable_from_code',
+    } };
+  }
   if (p === '/api/news') return { status: 200, body: empty ? { items: [], fetchedAt: iso(ctx.now()) } : NEWS };
   if (p === '/api/usage') return { status: 200, body: usage(url.searchParams.get('range') ?? '7d') };
   if (p === '/api/connectors') return { status: 200, body: { connectors: empty ? [] : CONNECTORS } };
-  if (p === '/api/ledger') return { status: 200, body: empty ? [] : LEDGER };
-  if (p === '/api/memory') return { status: 200, body: { type: 'semantic', items: empty ? [] : Array.from({ length: 37 }, (_, i) => ({ id: `m${i}` })), nextCursor: null } };
-  if (p === '/api/board') return { status: 200, body: { members: [] } };
+  if (p === '/api/ledger') return { status: 200, body: empty ? [] : ledger(ctx.now()) };
+  if (p === '/api/memory') return { status: 200, body: { type: 'semantic', items: empty ? [] : Array.from({ length: 142 }, (_, i) => ({ id: `m${i}` })), nextCursor: empty ? null : 'next' } };
+  if (p === '/api/board') return { status: 200, body: { members: BOARD } };
   return null;
 }

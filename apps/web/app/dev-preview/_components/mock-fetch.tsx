@@ -4,6 +4,8 @@
 import * as React from 'react';
 import { answer, type PreviewState } from './fixtures';
 
+const pendingRestore = new Map<typeof fetch, ReturnType<typeof setTimeout>>();
+
 export function MockFetch({ state, children }: { state: PreviewState; children: React.ReactNode }) {
   const [{ original, mock }] = React.useState<{ original: typeof fetch | null; mock: typeof fetch | null }>(() => {
     if (typeof window === 'undefined') return { original: null, mock: null };
@@ -29,7 +31,9 @@ export function MockFetch({ state, children }: { state: PreviewState; children: 
   React.useEffect(() => {
     if (!original || !mock) return;
     window.fetch = mock;
-    return () => { setTimeout(() => { if (window.fetch === mock) window.fetch = original; }, 50); };
+    const t = pendingRestore.get(mock);
+    if (t) { clearTimeout(t); pendingRestore.delete(mock); }
+    return () => { pendingRestore.set(mock, setTimeout(() => { if (window.fetch === mock) window.fetch = original; }, 50)); };
   }, [original, mock]);
   return <>{children}</>;
 }

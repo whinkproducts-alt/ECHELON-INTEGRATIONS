@@ -69,8 +69,6 @@ export function ContactsScreen() {
         </p>
       </HoloPanel>
 
-      <VCardDropzone onImported={reload} />
-
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <input
@@ -113,10 +111,10 @@ export function ContactsScreen() {
                     <div className="min-w-0 flex-1">
                       <h2 className="truncate font-display text-lg font-semibold text-foreground">{c.name}</h2>
                       {c.company && <p className="truncate text-xs text-muted-foreground">{c.company}</p>}
-                      <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{c.email ?? 'no email'}</p>
-                      <p className="font-mono text-xs text-muted-foreground">{c.phone ?? 'no phone'}</p>
+                      <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={c.email ?? undefined}>{c.email ?? 'no email'}</p>
+                      <p className="truncate font-mono text-xs text-muted-foreground">{c.phone ?? 'no phone'}</p>
                     </div>
-                    <HoloBadge tone={c.source === 'vcard' ? 'deep' : 'neutral'}>{c.source === 'vcard' ? 'vCard' : c.source}</HoloBadge>
+                    <HoloBadge tone={c.source === 'vcard' ? 'deep' : 'neutral'} className="shrink-0">{c.source === 'vcard' ? 'vCard' : c.source}</HoloBadge>
                   </div>
                   {c.tags.length > 0 && (
                     <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Tags">
@@ -142,6 +140,8 @@ export function ContactsScreen() {
           </HoloGrid>
         </>
       )}
+
+      <VCardDropzone onImported={reload} />
 
       <HoloModal
         open={dialog?.kind === 'form'} onOpenChange={(o) => { if (!o) setDialog(null); }}

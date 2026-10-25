@@ -1,5 +1,5 @@
 'use client';
-// BrandMark props: company: 'group'|'apps'|'ultimate', size?: number (rendered height in px, default 40), showName?: boolean, glow?: boolean (default true), className
+// BrandMark props: company: 'group'|'apps'|'ultimate', size?: number (rendered height in px, default 40), showName?: boolean, glow?: boolean (default true), crop?: 'glyph' (square logos only: zooms to the monogram), className
 // Logo and name come from config/companies.json. If the company url is null a subtle "link not set" tooltip shows and nothing is clickable;
 // if set it is a real external link (target=_blank, rel=noopener noreferrer). Logos have black backgrounds, blended with screen mode.
 import * as React from 'react';
@@ -12,16 +12,30 @@ export interface BrandMarkProps {
   size?: number;
   showName?: boolean;
   glow?: boolean;
+  /** 'glyph' crops a square logo to its monogram so it stays recognisable at small sizes. */
+  crop?: 'glyph';
   className?: string;
 }
 
-export function BrandMark({ company, size = 40, showName = false, glow = true, className }: BrandMarkProps) {
+export function BrandMark({ company, size = 40, showName = false, glow = true, crop, className }: BrandMarkProps) {
   const c = getCompany(company);
-  const w = Math.round(size * c.aspect);
+  const cropped = crop === 'glyph' && c.aspect === 1;
+  const w = cropped ? size : Math.round(size * c.aspect);
+  // Monogram window inside the square master (fractions of its side), measured from the artwork.
+  const GLYPH = { x: 0.148, y: 0.032, side: 0.686 };
+  const zoom = 1 / GLYPH.side;
   const content = (
     <>
       <span className={cn('relative inline-flex shrink-0 overflow-hidden rounded-md transition-[filter,transform] duration-normal group-hover:scale-105', glow && 'group-hover:[filter:drop-shadow(0_0_10px_hsl(var(--whink-accent)/0.7))]')} style={{ width: w, height: size }}>
-        <Image src={c.logo} alt={showName ? '' : c.name} width={w * 2} height={size * 2} sizes={`${w}px`} className="holo-brand-img h-full w-full object-contain" />
+        {cropped ? (
+          <Image
+            src={c.logo} alt={showName ? '' : c.name} width={1254} height={1254} sizes={`${Math.round(size * zoom)}px`} quality={90} priority
+            className="holo-brand-img absolute max-w-none object-cover"
+            style={{ width: size * zoom, height: size * zoom, left: -GLYPH.x * size * zoom, top: -GLYPH.y * size * zoom }}
+          />
+        ) : (
+          <Image src={c.logo} alt={showName ? '' : c.name} width={w * 2} height={size * 2} sizes={`${w}px`} className="holo-brand-img h-full w-full object-contain" />
+        )}
       </span>
       {showName && <span className="font-display text-sm font-semibold tracking-wide text-foreground">{c.name}</span>}
     </>

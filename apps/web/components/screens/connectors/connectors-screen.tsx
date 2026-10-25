@@ -191,7 +191,7 @@ export function ConnectorsScreen() {
           <HoloEmpty icon={<Plug className="h-6 w-6" aria-hidden />} title="No connectors in the catalog" description="The catalog is empty. You can still check a plugin manifest below." />
         ) : (
           <>
-            <HoloGrid min="11rem">
+            <HoloGrid fit min="11rem">
               <HoloStat label="Connected" value={counts.connected} tone="accent" />
               <HoloStat label="Needs setup" value={counts.needs} tone="ember" />
               <HoloStat label="Installed" value={counts.installed} tone="deep" />

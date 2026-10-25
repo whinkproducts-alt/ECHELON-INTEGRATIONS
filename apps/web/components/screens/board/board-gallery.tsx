@@ -26,7 +26,7 @@ export function BoardGallery({ members }: { members: BoardMember[] }) {
                 )}
                 <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[hsl(var(--base))] via-[hsl(var(--base)/0.6)] to-transparent" aria-hidden />
                 {m.needsDetails && (
-                  <div className="absolute right-3 top-3"><HoloBadge tone="amber" dot>Details pending</HoloBadge></div>
+                  <div className="absolute right-3 top-3"><HoloBadge tone="accent" dot className="bg-[hsl(var(--base)/0.78)] backdrop-blur-sm">Details pending</HoloBadge></div>
                 )}
                 <div className="absolute inset-x-0 bottom-0 p-4">
                   <h3 className="font-display text-2xl font-semibold leading-tight tracking-tight text-foreground holo-text-glow">{displayName(m)}</h3>

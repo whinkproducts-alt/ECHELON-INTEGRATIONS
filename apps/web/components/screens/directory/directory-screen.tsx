@@ -18,16 +18,20 @@ const STATUS: Record<StaffMember['status'], { tone: HoloTone; label: string }> =
 };
 
 const css = `
-.dir-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: dir-draw 1.1s cubic-bezier(0.2,0.7,0.2,1) 0.2s forwards; }
-@keyframes dir-draw { to { stroke-dashoffset: 0; } }
-@media (prefers-reduced-motion: reduce) { .dir-line { animation: none; stroke-dashoffset: 0; } }
+.dir-grow-y { transform-origin: top; transform: scaleY(0); animation: dir-y 0.7s cubic-bezier(0.2,0.7,0.2,1) 0.15s forwards; }
+.dir-grow-x { transform-origin: center; transform: scaleX(0); animation: dir-x 0.8s cubic-bezier(0.2,0.7,0.2,1) 0.5s forwards; }
+.dir-drop { transform-origin: top; transform: scaleY(0); animation: dir-y 0.6s cubic-bezier(0.2,0.7,0.2,1) 1s forwards; }
+@keyframes dir-y { to { transform: scaleY(1); } }
+@keyframes dir-x { to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .dir-grow-y, .dir-grow-x, .dir-drop { animation: none; transform: none; } }
 `;
+const LINE = 'bg-[hsl(var(--whink-accent)/0.75)] shadow-[0_0_8px_hsl(var(--whink-accent)/0.6)]';
 
 function Card({ s, depth = 0, onOpen }: { s: StaffMember; depth?: number; onOpen: (s: StaffMember) => void }) {
   const st = STATUS[s.status];
   return (
     <HoloPanel as="div" interactive tone={s.kind === 'agent' ? 'deep' : 'accent'} glow={depth === 0 && s.reportsTo === null ? 'strong' : 'none'}
-      data-dir-card className={cn('w-full text-left', depth > 0 && 'ml-4 w-[calc(100%-1rem)]')} role="button" aria-label={`${s.firstName} ${s.lastName}, ${s.role}. Open details`}
+      data-dir-card className="w-full text-left" role="button" aria-label={`${s.firstName} ${s.lastName}, ${s.role}. Open details`}
       onClick={() => onOpen(s)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(s); } }}>
       <div className="flex items-start gap-3">
         <PersonaAvatar name={`${s.firstName} ${s.lastName}`} imageUrl={s.imageUrl} size="lg" role={s.role} />
@@ -110,12 +114,17 @@ export function DirectoryScreen({ staff }: { staff: StaffMember[] }) {
               <div className="mx-auto w-full max-w-sm"><Card s={root} onOpen={setOpen} /></div>
             )}
             {branches.length > 0 && (
-              <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="hidden h-10 w-full text-primary md:block" aria-hidden>
-                <path pathLength={1} className="dir-line" d={`M50 0 V16 M${xs[0]} 16 H${xs[xs.length - 1]}`} fill="none" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-                {xs.map((x, i) => <path key={branches[i]} pathLength={1} className="dir-line" d={`M${x} 16 V40`} fill="none" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />)}
-              </svg>
+              <div className="relative hidden h-14 w-full lg:block" aria-hidden>
+                <span className={cn('dir-grow-y absolute left-1/2 top-0 h-1/2 w-px -translate-x-1/2', LINE)} />
+                {branches.length > 1 && <span className={cn('dir-grow-x absolute top-1/2 h-px', LINE)} style={{ left: `${xs[0]}%`, width: `${xs[xs.length - 1] - xs[0]}%` }} />}
+                {xs.map((x, i) => (
+                  <span key={branches[i]} className={cn('dir-drop absolute top-1/2 bottom-0 w-px -translate-x-1/2', LINE)} style={{ left: `${x}%` }}>
+                    <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-[hsl(var(--whink-accent))] shadow-[0_0_10px_hsl(var(--whink-accent))]" />
+                  </span>
+                ))}
+              </div>
             )}
-            <div className="mt-4 grid gap-6 md:mt-0" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, 18rem), 1fr))` }}>
+            <div className="mt-4 grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr))] lg:mt-0 lg:[grid-template-columns:repeat(var(--n),minmax(0,1fr))]" style={{ '--n': n } as React.CSSProperties}>
               {branches.map((d) => {
                 const people = visible.filter((s) => s.directorate === d && s.id !== root?.id);
                 const ids = new Set(people.map((p) => p.id));
@@ -123,8 +132,15 @@ export function DirectoryScreen({ staff }: { staff: StaffMember[] }) {
                 const ordered = top.flatMap((t) => [{ s: t, depth: 0 }, ...people.filter((p) => p.reportsTo === t.id).map((s) => ({ s, depth: 1 }))]);
                 return (
                   <section key={d} aria-label={d} className="space-y-3">
-                    <h2 className="text-center font-mono text-[0.6875rem] uppercase tracking-[0.22em]" style={{ color: 'hsl(var(--whink-accent))' }}>{d}</h2>
-                    {ordered.map(({ s, depth }) => <Card key={s.id} s={s} depth={depth} onOpen={setOpen} />)}
+                    <h2 className="mx-auto w-fit max-w-full rounded-full border border-[hsl(var(--whink-accent)/0.4)] bg-[hsl(var(--whink-accent)/0.08)] px-4 py-1 text-center font-mono text-[0.6875rem] uppercase tracking-[0.22em] shadow-[0_0_24px_-6px_hsl(var(--whink-accent)/0.6)]" style={{ color: 'hsl(var(--whink-accent))' }}>{d} <span className="text-muted-foreground">{people.length}</span></h2>
+                    {ordered.map(({ s, depth }) => depth === 0
+                      ? <Card key={s.id} s={s} depth={0} onOpen={setOpen} />
+                      : (
+                        <div key={s.id} className="relative ml-6">
+                          <span aria-hidden className="absolute -left-4 -top-3 h-[calc(50%+0.75rem)] w-4 rounded-bl-xl border-b border-l border-[hsl(var(--whink-accent)/0.45)]" />
+                          <Card s={s} depth={1} onOpen={setOpen} />
+                        </div>
+                      ))}
                   </section>
                 );
               })}

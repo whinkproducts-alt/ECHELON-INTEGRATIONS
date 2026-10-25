@@ -19,6 +19,8 @@ interface Layer {
   reverse: boolean;
   dash: string;
   nodes: number;
+  /** Where the ring's label sits, in degrees (0 = right, 90 = down). Each ring gets its own angle. */
+  labelAngle: number;
   facts: Fact[];
 }
 
@@ -55,19 +57,19 @@ export function KernelScreen() {
   const ledgerN = countOf(ledger, (d) => asArray(d).length);
 
   const layers: Layer[] = [
-    { id: 'world', radius: 330, tone: 'accent', seconds: 140, reverse: false, dash: '2 14', nodes: 5, facts: [
+    { id: 'world', radius: 330, tone: 'accent', seconds: 140, reverse: false, dash: '2 14', nodes: 5, labelAngle: -38, facts: [
       { label: 'Connectors connected', value: connected && connList ? `${connected.length} of ${connList.length}` : null },
       { label: 'Contacts on file', value: countOf(contacts, (d) => asArray(asRecord(d).contacts).length) },
     ] },
-    { id: 'human', radius: 262, tone: 'deep', seconds: 110, reverse: true, dash: '40 10 4 10', nodes: 4, facts: [
+    { id: 'human', radius: 262, tone: 'deep', seconds: 110, reverse: true, dash: '40 10 4 10', nodes: 4, labelAngle: -142, facts: [
       { label: 'Semantic memories (latest page)', value: memText },
       { label: 'Approvals pending', value: pending },
     ] },
-    { id: 'neural', radius: 194, tone: 'accent', seconds: 80, reverse: false, dash: '6 6', nodes: 3, facts: [
+    { id: 'neural', radius: 194, tone: 'accent', seconds: 80, reverse: false, dash: '6 6', nodes: 3, labelAngle: 32, facts: [
       { label: 'Models used, last 7 days', value: models ? fmtInt(models.length) : null },
       { label: 'Tokens, last 7 days', value: tokens === null ? null : fmtInt(tokens) },
     ] },
-    { id: 'kernel', radius: 126, tone: 'deep', seconds: 56, reverse: true, dash: '1 0', nodes: 2, facts: [
+    { id: 'kernel', radius: 126, tone: 'deep', seconds: 56, reverse: true, dash: '1 0', nodes: 2, labelAngle: 90, facts: [
       { label: 'Ledger entries (latest 200)', value: ledgerN },
       { label: 'Monthly token budget', value: budget && typeof budget.state === 'string' ? (budget.limit === null ? 'unlimited' : `${String(budget.state)}, ${fmtInt(Number(budget.used ?? 0))} of ${fmtInt(Number(budget.limit ?? 0))} used`) : null },
     ] },
@@ -128,10 +130,18 @@ export function KernelScreen() {
                   </g>
                   <circle r={l.radius} fill="none" stroke="transparent" strokeWidth="44" style={{ pointerEvents: 'stroke' }}
                     onPointerEnter={() => setActive(l.id)} onPointerDown={() => setActive(l.id)} />
-                  <g transform={`translate(0 ${-l.radius})`} aria-hidden>
-                    <rect x="-84" y="-15" width="168" height="30" rx="15" fill="hsl(var(--base))" fillOpacity="0.85" stroke="hsl(var(--holo-c))" strokeOpacity={on ? 0.9 : 0.35} />
-                    <text textAnchor="middle" dominantBaseline="central" fill="hsl(var(--foreground))" fontSize="16" letterSpacing="2.5" className="font-mono" style={{ textTransform: 'uppercase' }}>{word(l.id).word}</text>
-                  </g>
+                  {(() => {
+                    const text = word(l.id).word;
+                    const w = 34 + text.length * 14;
+                    const p = POINT(l.radius, l.labelAngle);
+                    return (
+                      <g transform={`translate(${p.x} ${p.y})`} aria-hidden>
+                        <rect x={-w / 2} y="-17" width={w} height="34" rx="17" fill="hsl(var(--base))" fillOpacity="0.92" stroke="hsl(var(--holo-c))" strokeOpacity={on ? 1 : 0.5} strokeWidth={on ? 2 : 1} />
+                        <circle cx={-w / 2 + 14} cy="0" r="3.5" fill="hsl(var(--holo-c))" />
+                        <text x="6" textAnchor="middle" dominantBaseline="central" fill="hsl(var(--foreground))" fontSize="17" letterSpacing="2" className="font-mono" style={{ textTransform: 'uppercase' }}>{text}</text>
+                      </g>
+                    );
+                  })()}
                 </g>
               );
             })}
