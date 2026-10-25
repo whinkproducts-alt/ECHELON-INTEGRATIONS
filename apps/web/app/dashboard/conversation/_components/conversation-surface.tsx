@@ -8,6 +8,7 @@ import {
 import { useVoice } from '@/lib/hooks/useVoice';
 import { speakApprovalRequest, generateConfirmationCode } from '@/lib/spoken-approval';
 import { AvatarRenderer } from './avatar-renderer';
+import { CitationChip, type CitationChipProps } from './citation-chip';
 import { VoiceWaveform } from './voice-waveform';
 import { ObsidianOverlay } from './obsidian-overlay';
 import { NeuralLink, NeuralEvent } from '@/app/dashboard/_components/neural-link';
@@ -26,6 +27,7 @@ interface Message {
   mambaMode: string | null;
   functionalMode: string | null;
   createdAt: string;
+  citations?: CitationChipProps[];
 }
 
 interface TraceEntry {
@@ -85,6 +87,8 @@ export function ConversationSurface() {
   const [neuralOpen, setNeuralOpen] = useState(false);
   const [neuralEvents, setNeuralEvents] = useState<NeuralEvent[]>([]);
   const [traceEntries, setTraceEntries] = useState<TraceEntry[]>([]);
+  const [streamCitations, setStreamCitations] = useState<CitationChipProps[]>([]);
+  const streamCitationsRef = useRef<CitationChipProps[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { startListening, stopListening, speak, isListening, isSpeaking, supported, lipSyncAmplitude } = useVoice();
@@ -230,6 +234,8 @@ export function ConversationSurface() {
     };
     setMessages(prev => [...(prev ?? []), userMsg]);
     setTraceEntries([]);
+    setStreamCitations([]);
+    streamCitationsRef.current = [];
     const messageText = input;
     setInput('');
     setStreaming(true);
@@ -310,6 +316,18 @@ export function ConversationSurface() {
                     void speakApproval(a);
                   }
                 }
+              } else if (data.type === 'citation') {
+                const newCitation: CitationChipProps = {
+                  documentName: data.documentName ?? '',
+                  page: data.page ?? null,
+                  chunkId: data.chunkId ?? undefined,
+                  score: data.score ?? null,
+                };
+                const already = streamCitationsRef.current.some(c => c.documentName === newCitation.documentName && c.page === newCitation.page);
+                if (!already) {
+                  streamCitationsRef.current = [...streamCitationsRef.current, newCitation];
+                  setStreamCitations([...streamCitationsRef.current]);
+                }
               } else if (data.type === 'error') {
                 pushNeuralEvent('error', data.message ?? 'error');
               } else if (data.type === 'done') {
@@ -325,7 +343,8 @@ export function ConversationSurface() {
       setActivePersona(persona);
       setActiveMambaMode(mambaMode);
 
-      // Add completed message
+      // Add completed message (capture current streamCitations via ref)
+      const capturedCitations = streamCitationsRef.current.length > 0 ? [...streamCitationsRef.current] : undefined;
       const assistantMsg: Message = {
         id: `msg-${Date.now()}`,
         role: 'assistant',
@@ -334,9 +353,12 @@ export function ConversationSurface() {
         mambaMode,
         functionalMode: null,
         createdAt: new Date().toISOString(),
+        citations: capturedCitations,
       };
       setMessages(prev => [...(prev ?? []), assistantMsg]);
       setStreamText('');
+      setStreamCitations([]);
+      streamCitationsRef.current = [];
 
       // Read response aloud if voice mode is on
       // Suppressed while an approval is pending so the reply can never be heard as a decision.
@@ -547,6 +569,7 @@ export function ConversationSurface() {
                 <MessageBubble key={msg.id} message={msg} onSpeak={msg.role === 'assistant' ? speak : undefined} />
               ))}
 
+
               {/* Inline tool traces — rendered between messages and the streaming reply */}
               {traceEntries.length > 0 && (
                 <div className="space-y-0.5 pl-10">
@@ -598,6 +621,14 @@ export function ConversationSurface() {
                       {streamText}
                       <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5" />
                     </div>
+                    {/* Show citations as they arrive during streaming */}
+                    {streamCitations.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {streamCitations.map((c, i) => (
+                          <CitationChip key={`stream-cit-${i}`} {...c} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -729,6 +760,7 @@ function ModelPicker({
 function MessageBubble({ message, onSpeak }: { message: Message; onSpeak?: (text: string) => Promise<void> }) {
   const isUser = message.role === 'user';
   const isMamba = message.persona === 'MAMBA';
+  const hasCitations = !isUser && Array.isArray(message.citations) && message.citations.length > 0;
 
   if (isUser) {
     return (
@@ -772,6 +804,14 @@ function MessageBubble({ message, onSpeak }: { message: Message; onSpeak?: (text
           )}
         </div>
         <div className="text-sm text-foreground whitespace-pre-wrap">{message.content}</div>
+        {/* Citation chips (C10) */}
+        {hasCitations && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {(message.citations ?? []).map((c, i) => (
+              <CitationChip key={`cit-${message.id}-${i}`} {...c} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

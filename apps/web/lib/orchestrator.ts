@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { generateCorrelationId } from '@/lib/logger';
-import { assembleContext, formatContextForPrompt } from '@/lib/context-engine';
+import { assembleContext, formatContextForPrompt, type BlendedItem } from '@/lib/context-engine';
 import { buildSystemPrompt } from '@/prompts/build-prompt';
 import { checkMetaAuthorization, logSecurityEvent } from '@/lib/permission-engine';
 import { scanUserInput, scanForInjectionPatterns } from '@/lib/content-isolation';
@@ -217,6 +217,8 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
     injectionBlocked: false,
     metaAuthBlocked: false,
     injectionPatterns: [],
+    /** Blended recall items — document entries carry citation metadata (C10). */
+    blendedItems: context.blendedItems as BlendedItem[],
   };
 }
 

@@ -322,6 +322,12 @@ export async function POST(
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', content: switchAnnouncement + '\n\n', persona: activePersona, mambaMode: activeMambaMode })}\n\n`));
           }
 
+          // Emit citation events for document blended items (C10)
+          const docItems = (orchResult.blendedItems ?? []).filter((it: any) => it.type === 'document' && it.documentName);
+          for (const item of docItems) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'citation', documentName: item.documentName, page: item.page ?? null, chunkId: item.id ?? null, score: item.score ?? null })}\n\n`));
+          }
+
           const reader = routerStream.getReader();
 
           let partialRead = '';
