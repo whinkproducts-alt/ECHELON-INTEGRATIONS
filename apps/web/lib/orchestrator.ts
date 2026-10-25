@@ -6,6 +6,7 @@ import { checkMetaAuthorization, logSecurityEvent } from '@/lib/permission-engin
 import { scanUserInput, scanForInjectionPatterns } from '@/lib/content-isolation';
 import { normaliseMambaMode } from '@/lib/types';
 import { readContext, writeDebrief } from '@/lib/agent-memory';
+import { recordActionSafe } from '@/lib/ledger';
 
 const PERSONA_SWITCH_PATTERNS: Array<{ regex: RegExp; persona: string; mode?: string }> = [
   { regex: /^\/?mamba\b/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
@@ -132,6 +133,16 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
           mambaMode: newMambaMode,
           activationSource: 'user',
         },
+      });
+      await recordActionSafe({
+        userId,
+        action: 'persona_switch',
+        persona: newPersona,
+        mambaMode: newMambaMode ?? undefined,
+        status: 'SUBMITTED',
+        permissionClass: 'A',
+        initiator: 'system',
+        correlationId,
       });
       break;
     }

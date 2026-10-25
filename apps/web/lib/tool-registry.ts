@@ -211,7 +211,8 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
   },
 
   memory_read: async (userId: string, params: any) => {
-    const result = await searchMemory(userId, params.query, params.projectId, params.limit);
+    const limit = Math.min(Math.max(1, Math.floor(Number(params.limit) || 10)), 20);
+    const result = await searchMemory(userId, params.query, params.projectId, limit);
     return { success: true, data: result, source: 'memory_engine', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
@@ -418,7 +419,8 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
     });
     if (!ws) return { success: false, error: 'No document workspace configured for this account.', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
     const { searchDocuments } = await import('@/lib/anythingllm-client');
-    const results = await searchDocuments(params.query, ws.workspaceSlug, params.limit ?? 5);
+    const limit = Math.min(Math.max(1, Math.floor(Number(params.limit) || 10)), 20);
+    const results = await searchDocuments(params.query, ws.workspaceSlug, limit);
     return { success: true, data: results, source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
@@ -744,9 +746,10 @@ export async function executeTool(
   persona?: string,
   mambaMode?: string,
   correlationId?: string,
-  opts: { approvalAlreadyPending?: boolean; tainted?: boolean } = {}
+  opts: { approvalAlreadyPending?: boolean; tainted?: boolean; initiator?: string } = {}
 ): Promise<ToolExecutionResult> {
   const cid = correlationId ?? generateCorrelationId();
+  const initiator = opts.initiator ?? 'system';
   const startTime = Date.now();
 
   // H1: gateway tools are owner-only, except the social platforms (per-user credentials).
@@ -754,7 +757,7 @@ export async function executeTool(
   if (isGatewayTool(toolName) && !(await canUseGatewayTool(userId, toolName))) {
     await recordActionSafe({
       userId,
-      initiator: 'system',
+      initiator,
       persona,
       mambaMode,
       tool: toolName,
@@ -774,7 +777,7 @@ export async function executeTool(
   if (!handler) {
     await recordActionSafe({
       userId,
-      initiator: 'system',
+      initiator,
       persona,
       mambaMode,
       tool: toolName,
@@ -796,7 +799,7 @@ export async function executeTool(
   if (riskClass !== baseClass) {
     await recordActionSafe({
       userId,
-      initiator: 'system',
+      initiator,
       persona,
       mambaMode,
       tool: toolName,
@@ -817,7 +820,7 @@ export async function executeTool(
       // L7: one approval per tool-loop run. Further Class C calls in the same run are denied, not queued.
       await recordActionSafe({
         userId,
-        initiator: 'system',
+        initiator,
         persona,
         mambaMode,
         tool: toolName,
