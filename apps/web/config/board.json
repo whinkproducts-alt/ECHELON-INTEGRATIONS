@@ -1,0 +1,89 @@
+{
+  "_comment": "Board of Directors. Only members whose details Victor has confirmed are listed. More members are added by scripts/import-board.ts from Victor's own folder, never invented.",
+  "members": [
+    {
+      "id": "victor-igboekwe",
+      "name": "Victor Igboekwe",
+      "email": "victor.igboekwe@whinkgroup.com",
+      "seat": "Founder & Chairman",
+      "bio": "",
+      "imageUrl": "/board/victor-igboekwe.webp",
+      "joined": null,
+      "committees": [],
+      "firstName": "Victor",
+      "lastName": "Igboekwe",
+      "honorific": null,
+      "needsDetails": false
+    },
+    {
+      "id": "marcus-vale",
+      "name": "Marcus Vale",
+      "email": "marcus.vale@whinkgroup.com",
+      "seat": "Executive Assistant",
+      "bio": "",
+      "imageUrl": "/board/marcus-vale.webp",
+      "joined": null,
+      "committees": [],
+      "firstName": "Marcus",
+      "lastName": "Vale",
+      "honorific": null,
+      "needsDetails": false
+    },
+    {
+      "id": "anthony-igboekwe",
+      "name": "Anthony Igboekwe",
+      "firstName": "Anthony",
+      "lastName": "Igboekwe",
+      "honorific": null,
+      "email": null,
+      "seat": null,
+      "needsDetails": true,
+      "bio": "",
+      "imageUrl": "/board/anthony-igboekwe.webp",
+      "joined": null,
+      "committees": []
+    },
+    {
+      "id": "dr-tinaye",
+      "name": "Dr Tinaye",
+      "firstName": "Tinaye",
+      "lastName": null,
+      "honorific": "Dr",
+      "email": null,
+      "seat": null,
+      "needsDetails": true,
+      "bio": "",
+      "imageUrl": "/board/dr-tinaye.webp",
+      "joined": null,
+      "committees": []
+    },
+    {
+      "id": "barrister-genevieve",
+      "name": "Barrister Genevieve",
+      "firstName": "Genevieve",
+      "lastName": null,
+      "honorific": "Barrister",
+      "email": null,
+      "seat": null,
+      "needsDetails": true,
+      "bio": "",
+      "imageUrl": "/board/barrister-genevieve.webp",
+      "joined": null,
+      "committees": []
+    },
+    {
+      "id": "juliet-igboekwe",
+      "name": "Juliet Igboekwe",
+      "firstName": "Juliet",
+      "lastName": "Igboekwe",
+      "honorific": null,
+      "email": null,
+      "seat": null,
+      "needsDetails": true,
+      "bio": "",
+      "imageUrl": "/board/juliet-igboekwe.webp",
+      "joined": null,
+      "committees": []
+    }
+  ]
+}

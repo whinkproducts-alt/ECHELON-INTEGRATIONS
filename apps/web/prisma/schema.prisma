@@ -44,6 +44,11 @@ model User {
   documentWorkspaces       DocumentWorkspace[]
   documents                Document[]
   notificationPreferences  NotificationPreference[]
+  boardMeetings            BoardMeeting[]
+  connectorInstalls        ConnectorInstall[]
+  usageEvents              UsageEvent[]
+  contacts                 Contact[]
+  commsRequests            CommsRequest[]
 
   @@map("users")
 }
@@ -112,6 +117,9 @@ model UserPreference {
   defaultFunctionalMode String?
   executionProfile      String   @default("BALANCED")
   preferredModel        String? // e.g. "claude-sonnet-4-5", "gpt-4o", "llama3.1:8b"
+  monthlyTokenBudget    Int? // null = use tenant/env default; 0 = unlimited
+  budgetSoftPct         Int? // null = default 80
+  budgetHardPct         Int? // null = default 100
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -792,7 +800,8 @@ model ApprovalRequest {
   executedAt      DateTime?
   result          Json?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commsRequest CommsRequest?
 
   @@index([userId, status, expiresAt])
   @@map("approval_requests")
@@ -879,4 +888,103 @@ model NotificationPreference {
   @@unique([userId, channel])
   @@index([userId])
   @@map("notification_preferences")
+}
+
+// ── Board meetings ───────────────────────────────────────────────
+// Per-user. Minutes are free text and are untrusted data on read.
+
+model BoardMeeting {
+  id           String    @id @default(cuid())
+  userId       String
+  title        String
+  scheduledFor DateTime
+  agenda       String[]
+  attendees    String[]
+  status       String    @default("SCHEDULED") // SCHEDULED | HELD | CANCELLED
+  minutes      String?
+  minutesAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, scheduledFor])
+  @@map("board_meetings")
+}
+
+// ── Connectors ───────────────────────────────────────────────────
+// config holds non-secret settings only. Tokens live in their own encrypted tables.
+
+model ConnectorInstall {
+  id          String   @id @default(cuid())
+  userId      String
+  connectorId String
+  enabled     Boolean  @default(true)
+  config      Json?
+  installedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, connectorId])
+  @@index([userId])
+  @@map("connector_installs")
+}
+
+// ── Usage ────────────────────────────────────────────────────────
+
+model UsageEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  provider   String
+  model      String
+  tokensIn   Int      @default(0)
+  tokensOut  Int      @default(0)
+  costMicros Int      @default(0)
+  kind       String   @default("chat") // chat | tool_loop | embed | other
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("usage_events")
+}
+
+// ── Contacts and outbound comms ──────────────────────────────────
+
+model Contact {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  email     String?
+  phone     String? // E.164
+  company   String?
+  tags      String[]
+  source    String   @default("manual") // manual | vcard | google
+  notes     String?
+  createdAt DateTime @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commsRequests CommsRequest[]
+
+  @@index([userId])
+  @@index([userId, phone])
+  @@index([userId, email])
+  @@map("contacts")
+}
+
+// Links one outbound message or call to its approval request. Content lives on the approval row.
+model CommsRequest {
+  id         String   @id @default(cuid())
+  userId     String
+  contactId  String
+  approvalId String   @unique
+  kind       String // message | call
+  channel    String // SMS | WHATSAPP | TELEGRAM | EMAIL | PHONE_CALL
+  createdAt  DateTime @default(now())
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contact  Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  approval ApprovalRequest @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  @@index([userId, contactId])
+  @@map("comms_requests")
 }

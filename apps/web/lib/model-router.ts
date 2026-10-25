@@ -546,3 +546,32 @@ async function streamOpenAICompatible(
     },
   });
 }
+
+// ── Probe targets (used by lib/offline.ts) ───────────────────────────────────
+
+/**
+ * Base URL a connectivity probe should hit for a model's provider. Read from the same
+ * env the router uses to call the provider, so nothing is hardcoded outside this file.
+ */
+export function providerProbeUrl(model: string): string {
+  if (model.startsWith('claude')) return (process.env.ANTHROPIC_BASE_URL ?? 'https://api.anthropic.com').replace(/\/$/, '');
+  if (model.startsWith('gemini')) return (process.env.GEMINI_BASE_URL ?? 'https://generativelanguage.googleapis.com').replace(/\/$/, '');
+  return (process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
+}
+
+/** Cloud providers this deployment has credentials for, as a representative model name each. */
+export function configuredCloudModels(): string[] {
+  const out: string[] = [];
+  if (process.env.ANTHROPIC_API_KEY) out.push('claude');
+  if (process.env.GEMINI_API_KEY) out.push('gemini');
+  return out;
+}
+
+export function ollamaProbeUrl(): string {
+  return (process.env.OLLAMA_URL ?? 'http://localhost:11434').replace(/\/$/, '') + '/api/tags';
+}
+
+/** True for models served by a cloud provider (claude*, gemini*). Everything else is treated as local/self-hosted. */
+export function isCloudModel(model: string): boolean {
+  return model.startsWith('claude') || model.startsWith('gemini');
+}

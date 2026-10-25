@@ -166,3 +166,19 @@ export async function countByCorrelation(
     where: { userId, tool, correlationId, status: { in: statuses } },
   });
 }
+
+/**
+ * Count this user's security-event ledger rows since a time, grouped by event name.
+ * Read-only, scoped by userId, returns names and counts only (never row content).
+ */
+export async function countSecurityEvents(userId: string, since: Date): Promise<Record<string, number>> {
+  if (!userId) throw new Error('ledger: userId is required');
+  const rows = await prisma.action.groupBy({
+    by: ['action'],
+    where: { userId, action: { startsWith: 'SECURITY_EVENT:' }, createdAt: { gte: since } },
+    _count: { _all: true },
+  });
+  const out: Record<string, number> = {};
+  for (const r of rows) out[r.action.replace(/^SECURITY_EVENT:\s*/, '')] = r._count._all;
+  return out;
+}

@@ -8,7 +8,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "memory:reembed": "tsx scripts/backfill-embeddings.ts"
+    "memory:reembed": "tsx scripts/backfill-embeddings.ts",
+    "security:scan": "tsx scripts/scan-secrets.ts",
+    "board:import": "tsx scripts/import-board.ts"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/safe-seed.ts"

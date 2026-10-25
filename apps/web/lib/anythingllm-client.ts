@@ -392,3 +392,8 @@ export async function listDocuments(
     createdAt: d?.createdAt ?? d?.created_at ?? undefined,
   })).filter((d) => d.id && d.name !== 'Untitled');
 }
+
+/** True when a recall service URL is configured. No network call. */
+export function isAnythingLlmConfigured(): boolean {
+  return resolveBaseUrl() !== null;
+}

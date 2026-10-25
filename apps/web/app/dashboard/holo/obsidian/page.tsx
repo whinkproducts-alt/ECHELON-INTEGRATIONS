@@ -9,11 +9,11 @@ export default async function ObsidianPage() {
 
   // Display guard: only show Obsidian if the active persona is MAMBA/Obsidian.
   // This is a display guard only — permissions are still enforced by the permission engine.
-  const pref = await prisma.userPreference.findUnique({
+  const state = await prisma.personaState.findUnique({
     where: { userId: session.user.id },
     select: { activePersona: true, mambaMode: true },
   });
-  if (pref?.activePersona !== 'MAMBA' || pref?.mambaMode !== 'OBSIDIAN') {
+  if (state?.activePersona !== 'MAMBA' || state?.mambaMode !== 'OBSIDIAN') {
     redirect('/dashboard/holo');
   }
 

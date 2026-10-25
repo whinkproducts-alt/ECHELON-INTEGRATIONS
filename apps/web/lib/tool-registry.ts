@@ -16,6 +16,8 @@ import toolClassesConfig from '@/config/tool-classes.json';
 import type { ToolDefinition } from '@/lib/tool-loop';
 import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
 import { validateTaskInput } from '@/lib/task-input';
+import { sendToContact, placeCall } from '@/lib/comms/delivery';
+import { resolveDestination } from '@/lib/contacts/comms';
 import dns from 'dns';
 import net from 'net';
 import https from 'https';
@@ -580,6 +582,35 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
     toolVersion: '1.0.0',
   }),
 
+  // Never offered to the model; Class C. Runs only from an approved request created by
+  // lib/contacts/comms.ts. The recipient is re-read here and must still match what was approved.
+  contact_message: async (userId: string, params: any) => {
+    const ts = () => new Date().toISOString();
+    const contact = typeof params?.contactId === 'string'
+      ? await prisma.contact.findFirst({ where: { id: params.contactId, userId } })
+      : null;
+    if (!contact) return { success: false, error: 'Contact not found', timestamp: ts(), toolVersion: '1.0.0' };
+    const channel = params.channel;
+    if (!['SMS', 'WHATSAPP', 'TELEGRAM', 'EMAIL'].includes(channel) || resolveDestination(contact, channel) !== params.to) {
+      return { success: false, error: 'Contact details changed since approval; not sent', timestamp: ts(), toolVersion: '1.0.0' };
+    }
+    const r = await sendToContact({ userId, channel, to: params.to, body: String(params.body ?? '') });
+    return { success: r.sent, data: { sent: r.sent, channel: r.channel }, error: r.sent ? undefined : `not sent: ${r.reason ?? 'unknown'}`, source: 'comms', timestamp: ts(), toolVersion: '1.0.0' };
+  },
+
+  contact_call: async (userId: string, params: any) => {
+    const ts = () => new Date().toISOString();
+    const contact = typeof params?.contactId === 'string'
+      ? await prisma.contact.findFirst({ where: { id: params.contactId, userId } })
+      : null;
+    if (!contact) return { success: false, error: 'Contact not found', timestamp: ts(), toolVersion: '1.0.0' };
+    if (resolveDestination(contact, 'PHONE_CALL') !== params.to) {
+      return { success: false, error: 'Contact details changed since approval; not called', timestamp: ts(), toolVersion: '1.0.0' };
+    }
+    const r = await placeCall({ userId, to: params.to, script: typeof params.script === 'string' ? params.script : undefined });
+    return { success: r.sent, data: { sent: r.sent, channel: r.channel }, error: r.sent ? undefined : `not placed: ${r.reason ?? 'unknown'}`, source: 'comms', timestamp: ts(), toolVersion: '1.0.0' };
+  },
+
   task_create: async (userId: string, params: any) => {
     if (typeof params?.projectId !== 'string' || params.projectId.length === 0) {
       return { success: false, error: 'projectId required', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
@@ -608,6 +639,8 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
 const TOOL_RISK_MAP: Record<string, PermissionClass> = Object.assign(Object.create(null), {
   // Class C always: runs only through an approval of kind 'scheduled_post' (never as a direct call).
   [SCHEDULE_TOOL_NAME]: 'C',
+  contact_message: 'C',
+  contact_call: 'C',
   memory_write: 'A',
   memory_read: 'A',
   memory_correct: 'B',

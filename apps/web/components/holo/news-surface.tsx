@@ -166,7 +166,6 @@ export function NewsSurface() {
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
 
   const fetchNews = useCallback((cat: Category) => {
-    setLoadState('loading');
     fetch(`/api/news?category=${cat}`)
       .then((r) => {
         if (!r.ok) throw new Error('fetch_failed');
@@ -289,7 +288,7 @@ export function NewsSurface() {
               type="button"
               role="tab"
               aria-selected={category === cat.id}
-              onClick={() => setCategory(cat.id)}
+              onClick={() => { setLoadState('loading'); setCategory(cat.id); }}
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontWeight: 700,
@@ -359,7 +358,7 @@ export function NewsSurface() {
             </p>
             <button
               type="button"
-              onClick={() => fetchNews(category)}
+              onClick={() => { setLoadState('loading'); fetchNews(category); }}
               style={{
                 fontFamily: 'var(--font-sans)',
                 fontSize: '12px',

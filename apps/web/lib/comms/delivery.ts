@@ -66,3 +66,30 @@ export async function deliver(payload: DeliveryPayload): Promise<DeliveryResult>
       return { sent: false, channel: payload.channel, reason: 'unknown_channel' };
   }
 }
+
+// ── Outbound to a contact ────────────────────────────────────────────────────
+// These run ONLY after a human approved the exact content (Class C approval flow in
+// lib/approvals.ts -> tool handlers contact_message / contact_call). They never decide
+// permission themselves. Stubs: they return { sent: false, reason: 'not_configured' } unless
+// the channel's env is set, and even then the provider call is not built yet.
+
+export type ContactChannel = 'SMS' | 'WHATSAPP' | 'TELEGRAM' | 'EMAIL';
+
+export interface ContactSend {
+  userId: string;
+  channel: ContactChannel;
+  /** Destination resolved from the contact: E.164 phone, email, or Telegram chat id. */
+  to: string;
+  body: string;
+  subject?: string;
+}
+
+export async function sendToContact(msg: ContactSend): Promise<DeliveryResult> {
+  if (!msg.userId) throw new Error('delivery: userId is required');
+  return deliver({ userId: msg.userId, to: msg.to, body: msg.body, subject: msg.subject, channel: msg.channel });
+}
+
+export async function placeCall(call: { userId: string; to: string; script?: string }): Promise<DeliveryResult> {
+  if (!call.userId) throw new Error('delivery: userId is required');
+  return deliver({ userId: call.userId, to: call.to, body: call.script ?? '', channel: 'PHONE_CALL' });
+}

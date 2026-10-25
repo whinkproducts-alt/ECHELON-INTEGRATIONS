@@ -253,3 +253,40 @@ Reason: the green had no basis in the WHINK design token palette and conflicted 
 Decision: social write tools (post, reply, DM, schedule, delete, follow, unfollow) stay Class C at all autonomy levels. CASL compliance (consent and unsubscribe for commercial messages) is required before white-labelling. Victor's personal use proceeds now. Canadian counsel to be engaged before Phase 6 (billing).
 Alternatives: build consent and unsubscribe handling now, before any personal use.
 Reason: with one user approving every send by hand, nothing goes out as unsolicited commercial messaging on WHINK's initiative. Paying customers change that, so the work is tied to the product shell phase.
+
+## 2026-10-25  Human names for every role
+Decision: the five Innovation & Opportunity seats now have invented human first and last names (Amara Okafor, Mateo Restrepo, Priya Raghunathan, Soren O'Connell, Mei-Ling Tan). `StaffMember.kind` is `'human'` for Victor and Marcus and `'agent'` for the five personas. Emails come from one function, `staffEmail()`: lowercase ascii, accents folded, apostrophes dropped, hyphens kept. Role and title stay as job description fields. Only the directorate table in CLAUDE.md changed.
+Alternatives: keep role-based addresses such as innovation.lead@; leave names out of the table.
+Reason: Victor wants every role to read as a person. Marking agents as `agent` keeps it honest that they are personas, not staff.
+
+## 2026-10-25  Board data comes only from Victor
+Decision: `apps/web/config/board.json` is the board roster. Only people Victor named are in it: Victor, Marcus, Anthony Igboekwe, Dr Tinaye, Barrister Genevieve, Juliet Igboekwe. Where he gave no surname, seat or email, those fields are null and `needsDetails` is true so the UI can show "details pending". The honorific is its own field. Nothing is guessed, including the emails of Anthony and Juliet (surnames known, seat and confirmation not). `scripts/import-board.ts` loads the rest from a folder on Victor's Mac: dry run by default, `--write` to apply, photos checked by magic bytes and capped at 5 MB, image URLs limited to same-origin `/board/*`. The roster is tenant-level config; board meetings are per user in `board_meetings`. Minutes are untrusted on read.
+Alternatives: seed plausible directors; store the roster in the database.
+Reason: inventing board members would put false people in a governance screen. A file is easy for Victor to review.
+
+## 2026-10-25  Connector licence gate and honest status
+Decision: plugin manifests are validated by a zod schema. Licence must be MIT, Apache-2.0, BSD-*, ISC or 0BSD (CLAUDE.md rule 7); anything else, including "MIT OR AGPL", is rejected. Manifest `permissionClass` is advisory: third-party connectors are always Class C. Endpoints must be https (or loopback http), with no credentials and no stdio commands. Tool descriptions are stripped, injection-scanned, rejected if suspicious, and capped at 300 characters. Validation never executes code or contacts an endpoint. Status (`available | connected | needs_config | unavailable`) is computed from evidence only (env vars, a database row, a service that answers), never from the catalog. Install and uninstall are the Class B capability `connector_manage`. `CAPABILITY_CLASSES` in the permission engine is the registry; an unregistered capability is Class C and a caller asking for a lower class than registered is refused.
+Alternatives: trust the manifest class; mark catalog entries connected by default.
+Reason: a plugin must not grant itself power, and the connectors screen must not claim a connection that does not exist.
+
+## 2026-10-25  Offline fallback is off by default
+Decision: `WHINK_OFFLINE_FALLBACK=true` turns on local-model routing in the tool loop. Default is off, so current behaviour is unchanged. When on, an unreachable cloud provider (probe of the host the router is configured for, cached 10 s) or a hit hard budget switches the call to `WHINK_LOCAL_MODEL` (default llama3.1:8b) if Ollama answers, writes a `model_fallback_local` ledger row with the reason, and drops any per-user cloud API key so it is never sent to the local endpoint. Usage is recorded fire-and-forget into `usage_events` from the tool loop. Monthly budget lives on `user_preferences`, with `WHINK_MONTHLY_TOKEN_BUDGET`, `WHINK_BUDGET_SOFT_PCT` and `WHINK_BUDGET_HARD_PCT` as tenant defaults. Cost is 0 unless `WHINK_MODEL_PRICES` is set; prices are not guessed.
+Gap: plain `streamChat` and `chatOnce` calls are not yet usage-recorded (they do not carry a userId).
+Alternatives: switch on by default; hardcode provider URLs for the probe.
+Reason: silently changing which model answers is a behaviour change Victor should choose.
+
+## 2026-10-25  Contact messages and calls reuse the Class C approval flow
+Decision: `POST /api/contacts/[id]/message` and `/call` call `createApproval` (kind `tool_call`, tools `contact_message` and `contact_call`, Class C). They return the approval id. On approval, the existing `decide` and `executeApprovedTool` run the handler, which re-reads the contact (scoped by user), checks the destination still matches the approved one, then calls `lib/comms/delivery.ts`. `comms_requests` only links a contact to its approval. No parallel approval code exists. If WHINK has no earlier comms record for the contact, the approval payload carries `casl: 'review_consent'`. Telegram needs a chat id, kept as a contact tag `telegram:<id>`.
+Alternatives: a separate comms approval table.
+Reason: one approval path means one set of guarantees (30 s expiry, id-bound, hash lock, atomic, ledgered).
+
+## 2026-10-25  What is stubbed
+- Sending: `sendToContact` and `placeCall` return `{sent:false, reason:'not_configured'}` without provider env, and even with env the Twilio, SMTP and Telegram sends are not built. An approved send therefore ends FAILED with "not sent: ...", which is the truth.
+- Connectors: Gmail, Google Calendar and Google Drive have no WHINK adapter and show `unavailable`. Slack, GitHub, Figma, Notion, Linear and Stripe appear only as gateway platforms and show `connected` only when the gateway exposes their tools.
+- Rate limiter is in memory (per process); the store interface is ready for Redis.
+- GitHub settings (branch protection, push protection, 2FA, signed commits) cannot be set from code. See docs/security.md.
+
+## 2026-10-25  middleware.ts renamed to proxy.ts
+Decision: Next 16 deprecates the `middleware` file name. The file is now `apps/web/proxy.ts` with the same default export. It adds the full security header set (HSTS only for https deployments, COOP/CORP same-origin, camera and microphone for self only) and rate-limits sign-in and sign-up by client address.
+Alternatives: keep the deprecated name.
+Reason: avoids a deprecation warning and a future break.

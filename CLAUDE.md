@@ -69,11 +69,11 @@ Reports directly to Victor. Mandate: constantly identify and evaluate new busine
 
 | Role | Email | Focus |
 |---|---|---|
-| Chief Innovation & Opportunity Officer | innovation.lead@whinkgroup.com | Leads the directorate; owns the opportunity pipeline |
-| Senior Opportunity Scout | opportunity.scout@whinkgroup.com | Scans markets, news, and trends for untapped opportunities |
-| Strategic Market Analyst | market.analyst@whinkgroup.com | Deep-dives on specific sectors and competitive landscapes |
-| Growth Strategist | growth.strategist@whinkgroup.com | Finds scale levers for existing WHINK Group products and ventures |
-| Venture Scout | venture.scout@whinkgroup.com | Identifies early-stage investments, acquisition targets, and partnerships |
+| Chief Innovation & Opportunity Officer (Amara Okafor) | amara.okafor@whinkgroup.com | Leads the directorate; owns the opportunity pipeline |
+| Senior Opportunity Scout (Mateo Restrepo) | mateo.restrepo@whinkgroup.com | Scans markets, news, and trends for untapped opportunities |
+| Strategic Market Analyst (Priya Raghunathan) | priya.raghunathan@whinkgroup.com | Deep-dives on specific sectors and competitive landscapes |
+| Growth Strategist (Soren O'Connell) | soren.oconnell@whinkgroup.com | Finds scale levers for existing WHINK Group products and ventures |
+| Venture Scout (Mei-Ling Tan) | mei-ling.tan@whinkgroup.com | Identifies early-stage investments, acquisition targets, and partnerships |
 
 The directorate delivers a weekly intelligence brief to Victor. It reads the Intelligence Feed news screen and the ledger to spot patterns. Its output feeds directly into WHINK's memory as strategic hypotheses (MAMBA confidence-capped at 0.4).
 

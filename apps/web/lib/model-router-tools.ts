@@ -46,6 +46,8 @@ export interface ChatWithToolsResult {
   text: string;
   toolCalls: ToolCall[];
   stopReason: StopReason;
+  /** Token counts reported by the provider, when it reports them. */
+  usage?: { tokensIn: number; tokensOut: number };
 }
 
 /** Thrown when the provider/model rejects the tools parameter. Callers fall back to plain chat. */
@@ -153,7 +155,12 @@ async function anthropicWithTools(opts: ChatWithToolsOptions): Promise<ChatWithT
     : response.stop_reason === 'max_tokens' ? 'max_tokens'
     : response.stop_reason === 'end_turn' || response.stop_reason === 'stop_sequence' ? 'end'
     : toolCalls.length > 0 ? 'other' : 'end';
-  return { text, toolCalls: stopReason === 'tool_use' ? toolCalls : [], stopReason };
+  return {
+    text,
+    toolCalls: stopReason === 'tool_use' ? toolCalls : [],
+    stopReason,
+    usage: { tokensIn: Number(response.usage?.input_tokens) || 0, tokensOut: Number(response.usage?.output_tokens) || 0 },
+  };
 }
 
 // ── OpenAI-compatible (Ollama /v1, vLLM, OpenAI, ...) ────────────────────────
@@ -232,7 +239,12 @@ async function openAICompatibleWithTools(opts: ChatWithToolsOptions): Promise<Ch
     toolCalls.length > 0 ? 'tool_use'
     : choice?.finish_reason === 'length' ? 'max_tokens'
     : 'end';
-  return { text, toolCalls, stopReason };
+  return {
+    text,
+    toolCalls,
+    stopReason,
+    usage: { tokensIn: Number(json?.usage?.prompt_tokens) || 0, tokensOut: Number(json?.usage?.completion_tokens) || 0 },
+  };
 }
 
 // ── Google Gemini (REST) ─────────────────────────────────────────────────────
@@ -317,5 +329,10 @@ async function geminiWithTools(opts: ChatWithToolsOptions): Promise<ChatWithTool
     }));
   const stopReason: StopReason =
     toolCalls.length > 0 ? 'tool_use' : cand?.finishReason === 'MAX_TOKENS' ? 'max_tokens' : 'end';
-  return { text, toolCalls, stopReason };
+  return {
+    text,
+    toolCalls,
+    stopReason,
+    usage: { tokensIn: Number(json?.usageMetadata?.promptTokenCount) || 0, tokensOut: Number(json?.usageMetadata?.candidatesTokenCount) || 0 },
+  };
 }

@@ -5,6 +5,28 @@ import { approvalContentHash, toolArgsHash } from '@/lib/canonical-json';
 
 export type PermissionClass = 'A' | 'B' | 'C';
 
+/**
+ * Registered capabilities for server-side (non tool-call) actions. The class here is the
+ * truth: a caller that asks for a lower class than registered is refused, and an unregistered
+ * capability is Class C (never runs without a human). Tool-call classes live in tool-registry.
+ */
+export const CAPABILITY_CLASSES: Readonly<Record<string, PermissionClass>> = Object.freeze({
+  board_meeting_create: 'A',
+  board_minutes_write: 'A',
+  connector_manage: 'B',
+  usage_budget_set: 'A',
+  contact_create: 'A',
+  contact_update: 'A',
+  contact_delete: 'A',
+  contact_import: 'A',
+  contact_message: 'C',
+  contact_call: 'C',
+});
+
+export function capabilityClass(capability: string): PermissionClass {
+  return Object.prototype.hasOwnProperty.call(CAPABILITY_CLASSES, capability) ? CAPABILITY_CLASSES[capability] : 'C';
+}
+
 interface PermissionCheckResult {
   allowed: boolean;
   method: 'auto' | 'delegated' | 'requires_confirmation' | 'human_approved';

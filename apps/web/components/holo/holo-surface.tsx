@@ -71,7 +71,7 @@ function Greeting() {
   return <>{hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'}</>;
 }
 
-// WHINK wordmark SVG — never hardcoded product name in markup; name from tenant config
+// Primary persona wordmark SVG: no product name in markup; the name comes from tenant config
 function WhinkLogoMark() {
   return (
     <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden>
@@ -198,7 +198,7 @@ export function HoloSurface() {
     <div
       className="relative min-h-screen"
       style={{
-        background: '#070B12',
+        background: 'hsl(var(--base))',
       }}
     >
       {/* Radial background gradient */}

@@ -44,3 +44,5 @@ whink-repo-setup/
 # loose assets at root
 WHINK\ ULTIMATE\ LOGO.png
 "WHINK Ultimate Architecture.html"
+apps/web/scripts/audit.json
+apps/web/scripts/secrets-scan.json

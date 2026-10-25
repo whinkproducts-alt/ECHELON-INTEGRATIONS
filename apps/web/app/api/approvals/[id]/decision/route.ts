@@ -2,10 +2,13 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { decide } from '@/lib/approvals';
+import { limitOr429 } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const limited = await limitOr429('approvals', session.user.id);
+  if (limited) return limited as NextResponse;
   const { id } = await params;
 
   // JSON only: text/plain and form bodies are the classic cross-site POST vehicles.

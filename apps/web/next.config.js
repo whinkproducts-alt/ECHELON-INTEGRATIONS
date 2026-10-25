@@ -73,7 +73,7 @@ const nextConfig = {
   },
 
   // Static security headers. The Content-Security-Policy itself is per-request (nonce) and is
-  // set in middleware.ts via lib/csp.ts.
+  // set in proxy.ts via lib/csp.ts.
   async headers() {
     return [
       {
@@ -82,7 +82,9 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'Permissions-Policy', value: 'microphone=(self), camera=(), geolocation=(), payment=(), usb=()' },
+          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=(), payment=(), usb=()' },
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
         ],
       },
     ];
