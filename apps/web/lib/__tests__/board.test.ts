@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { getBoardMembers, parseBoard } from '../board';
-import { csvToMembers, mergeBoard, parsePhotoName, sniffImage } from '../board-import';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { readPhotoSafely, csvToMembers, mergeBoard, parsePhotoName, sniffImage } from '../board-import';
 
 const JPG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0]);
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]);
@@ -70,5 +73,28 @@ describe('board import helpers', () => {
     const big = new Uint8Array(5 * 1024 * 1024 + 1); big.set(PNG);
     const r = mergeBoard([], [], [{ file: 'big-one.png', bytes: big }]);
     expect(r.photos).toHaveLength(0);
+  });
+});
+
+describe('readPhotoSafely', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'board-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'outside-'));
+  it('reads a regular file and returns its exact bytes', () => {
+    fs.writeFileSync(path.join(dir, 'a-b.png'), PNG);
+    const r = readPhotoSafely(dir, 'a-b.png');
+    expect('bytes' in r && Array.from(r.bytes)).toEqual(Array.from(PNG));
+  });
+  it('rejects symlinks (even to a valid image outside the folder)', () => {
+    fs.writeFileSync(path.join(outside, 'secret.png'), PNG);
+    fs.symlinkSync(path.join(outside, 'secret.png'), path.join(dir, 'c-d.png'));
+    const r = readPhotoSafely(dir, 'c-d.png');
+    expect(r).toEqual({ skipped: expect.stringContaining('symbolic') });
+  });
+  it('rejects oversize files before reading them, and path separators', () => {
+    const fd = fs.openSync(path.join(dir, 'big-one.png'), 'w');
+    fs.ftruncateSync(fd, 6 * 1024 * 1024);
+    fs.closeSync(fd);
+    expect(readPhotoSafely(dir, 'big-one.png')).toEqual({ skipped: expect.stringContaining('not read') });
+    expect(readPhotoSafely(dir, '../x.png')).toEqual({ skipped: expect.stringContaining('separators') });
   });
 });

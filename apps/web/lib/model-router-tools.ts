@@ -37,6 +37,8 @@ export interface ChatWithToolsOptions {
   model: string;
   tools: ToolSpec[];
   apiKey?: string;
+  /** Explicit OpenAI-compatible base URL (local fallback). When set, no env or user key is sent. */
+  baseUrl?: string;
   maxTokens?: number;
 }
 
@@ -177,8 +179,8 @@ function parseArgs(raw: unknown): Record<string, unknown> {
 }
 
 async function openAICompatibleWithTools(opts: ChatWithToolsOptions): Promise<ChatWithToolsResult> {
-  const baseUrl = (process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
-  const apiKey = opts.apiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama';
+  const baseUrl = (opts.baseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
+  const apiKey = opts.baseUrl ? 'ollama' : (opts.apiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
 
   const messages = opts.messages.map((m) => {
     if (m.role === 'assistant') {

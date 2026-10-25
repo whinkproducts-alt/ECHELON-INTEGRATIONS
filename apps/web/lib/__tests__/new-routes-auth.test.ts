@@ -45,9 +45,21 @@ describe('route behaviour with a session', () => {
     vi.resetModules();
     vi.doMock('@/auth', () => ({ auth: async () => ({ user: { id: 'u1' } }) }));
   });
-  it('GET /api/board returns members including pending ones with null email', async () => {
+  it('GET /api/board gives a non-owner an empty roster, and unset WHINK_OWNER_EMAILS means nobody is owner', async () => {
+    const { GET } = await import('../../app/api/board/route');
+    delete process.env.WHINK_OWNER_EMAILS;
+    expect((await (await GET()).json()).members).toEqual([]);
+    process.env.WHINK_OWNER_EMAILS = 'someone.else@example.com';
+    expect((await (await GET()).json()).members).toEqual([]);
+    delete process.env.WHINK_OWNER_EMAILS;
+  });
+  it('GET /api/board returns members including pending ones with null email, to an owner', async () => {
+    vi.resetModules();
+    vi.doMock('@/auth', () => ({ auth: async () => ({ user: { id: 'u1', email: 'Victor@Example.com' } }) }));
+    process.env.WHINK_OWNER_EMAILS = ' other@x.com, victor@example.com ';
     const { GET } = await import('../../app/api/board/route');
     const body = await (await GET()).json();
+    delete process.env.WHINK_OWNER_EMAILS;
     expect(body.members.length).toBe(6);
     expect(body.members.find((m: { id: string }) => m.id === 'dr-tinaye')).toMatchObject({ email: null, needsDetails: true });
   });
@@ -66,5 +78,41 @@ describe('route behaviour with a session', () => {
     const { POST } = await import('../../app/api/contacts/route');
     const res = await POST(new Request('http://localhost/api/contacts', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' }));
     expect(res.status).toBe(415);
+  });
+});
+
+describe('body size is enforced while streaming', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doMock('@/auth', () => ({ auth: async () => ({ user: { id: 'u1' } }) }));
+  });
+  function endless(chunk: Uint8Array, state: { pulled: number }) {
+    return new ReadableStream<Uint8Array>({ pull(c) { state.pulled++; c.enqueue(chunk); } });
+  }
+  it('readBodyCapped aborts an endless body without buffering it (no content-length)', async () => {
+    const { readBodyCapped, BodyTooLargeError } = await import('../api-helpers');
+    const state = { pulled: 0 };
+    const req = new Request('http://localhost/x', { method: 'POST', body: endless(new Uint8Array(1024), state), duplex: 'half' } as RequestInit);
+    await expect(readBodyCapped(req, 10 * 1024)).rejects.toBeInstanceOf(BodyTooLargeError);
+    expect(state.pulled).toBeLessThan(40);
+  });
+  it('a lying content-length cannot bypass the cap, and a big declared length is refused up front', async () => {
+    const { readBodyCapped } = await import('../api-helpers');
+    const big = new Uint8Array(20_000);
+    await expect(readBodyCapped(new Request('http://localhost/x', { method: 'POST', body: big, headers: { 'content-length': '5' } }), 10_000)).rejects.toThrow();
+    await expect(readBodyCapped(new Request('http://localhost/x', { method: 'POST', body: 'a', headers: { 'content-length': '999999' } }), 10)).rejects.toThrow();
+  });
+  it('JSON route returns 413 for an oversized streamed body', async () => {
+    const { POST } = await import('../../app/api/contacts/route');
+    const state = { pulled: 0 };
+    const res = await POST(new Request('http://localhost/api/contacts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: endless(new Uint8Array(4096), state), duplex: 'half' } as RequestInit));
+    expect(res.status).toBe(413);
+  });
+  it('vCard import returns 413 for an endless streamed body', async () => {
+    const { POST } = await import('../../app/api/contacts/import/route');
+    const state = { pulled: 0 };
+    const res = await POST(new Request('http://localhost/api/contacts/import', { method: 'POST', headers: { 'content-type': 'text/vcard' }, body: endless(new Uint8Array(65536), state), duplex: 'half' } as RequestInit));
+    expect(res.status).toBe(413);
+    expect(state.pulled).toBeLessThan(80);
   });
 });

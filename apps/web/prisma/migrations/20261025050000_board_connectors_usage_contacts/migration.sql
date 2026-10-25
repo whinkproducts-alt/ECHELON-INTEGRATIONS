@@ -119,6 +119,6 @@ ALTER TABLE "comms_requests" ADD CONSTRAINT "comms_requests_contactId_fkey" FORE
 ALTER TABLE "comms_requests" ADD CONSTRAINT "comms_requests_approvalId_fkey" FOREIGN KEY ("approvalId") REFERENCES "approval_requests"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AlterTable
-ALTER TABLE "user_preferences" ADD COLUMN "monthlyTokenBudget" INTEGER,
+ALTER TABLE "user_preferences" ADD COLUMN "monthlyTokenBudget" BIGINT,
 ADD COLUMN "budgetSoftPct" INTEGER,
 ADD COLUMN "budgetHardPct" INTEGER;

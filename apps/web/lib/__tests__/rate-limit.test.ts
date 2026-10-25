@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryRateLimitStore, checkRateLimit, limitOr429, setRateLimitStore, RATE_RULES, clientKey } from '../rate-limit';
+import { InMemoryRateLimitStore, checkRateLimit, limitOr429, limitAuthRequest, setRateLimitStore, RATE_RULES, clientKey, trustedHops } from '../rate-limit';
 
 describe('sliding window rate limiter', () => {
   const rule = { limit: 3, windowMs: 1000 };
@@ -45,8 +45,31 @@ describe('named buckets', () => {
   it('refuses an empty subject', async () => {
     await expect(checkRateLimit('auth', '')).rejects.toThrow();
   });
-  it('clientKey never returns empty', () => {
-    expect(clientKey(new Headers({ 'x-forwarded-for': '1.2.3.4, 5.6.7.8' }))).toBe('1.2.3.4');
-    expect(clientKey(new Headers())).toBe('unknown-client');
+  it('X-Forwarded-For is ignored unless TRUSTED_PROXY_HOPS is set (spoofing cannot dodge the limit)', () => {
+    const h = new Headers({ 'x-forwarded-for': '6.6.6.6, 1.2.3.4' });
+    expect(clientKey(h, 0)).toBeNull();
+    expect(trustedHops({})).toBe(0);
+    expect(trustedHops({ TRUSTED_PROXY_HOPS: 'abc' })).toBe(0);
+    expect(trustedHops({ TRUSTED_PROXY_HOPS: '1' })).toBe(1);
+  });
+  it('with trusted hops the Nth address from the right is used, not the client-supplied left one', () => {
+    const h = new Headers({ 'x-forwarded-for': '6.6.6.6, 1.2.3.4' });
+    expect(clientKey(h, 1)).toBe('1.2.3.4');
+    expect(clientKey(h, 2)).toBe('6.6.6.6');
+    expect(clientKey(h, 3)).toBeNull();
+    expect(clientKey(new Headers({ 'x-forwarded-for': 'not an ip' }), 1)).toBeNull();
+  });
+  it('rotating spoofed XFF values does not reset the bucket when untrusted', async () => {
+    let last: Response | null = null;
+    for (let i = 0; i < RATE_RULES.auth_route.limit + 1; i++) {
+      last = await limitAuthRequest('auth', new Headers({ 'x-forwarded-for': `10.0.0.${i % 250}` }));
+    }
+    expect(last?.status).toBe(429);
+  });
+  it('per-account bucket limits one email across addresses; other accounts unaffected', async () => {
+    let r: Response | null = null;
+    for (let i = 0; i < RATE_RULES.auth_account.limit + 1; i++) r = await limitAuthRequest('auth', new Headers(), 'Victor@Example.com');
+    expect(r?.status).toBe(429);
+    expect(await limitAuthRequest('auth', new Headers(), 'someone.else@example.com')).toBeNull();
   });
 });

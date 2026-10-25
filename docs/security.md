@@ -21,9 +21,13 @@ Last updated 2026-10-25. This file separates what the code enforces from what Vi
 ## Enforced in code
 
 - Security headers on every response through `proxy.ts` (Next 16 name for middleware): CSP with a per-request nonce, HSTS when the public URL is https, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` (camera and microphone only for our own origin), `X-Frame-Options`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`. `next.config.js` repeats the static ones for assets the proxy skips.
-- Rate limits (per user, or per client address before sign-in): sign-in 10 per minute, sign-up 5, approvals 30, comms 10, imports 5. The store is in memory, so it is per process. A Redis store can replace it behind the same interface.
+- Rate limits: approvals 30, comms 10, imports 5 per minute per user. Before sign-in there is no trustworthy client address (a Next proxy file cannot see the socket, and `X-Forwarded-For` is client-controlled), so `X-Forwarded-For` is ignored unless `TRUSTED_PROXY_HOPS` is set, and then the Nth address from the right is used. Without it, sign-in and sign-up share a looser per-route bucket (120 and 60 per minute) so one flood cannot lock the owner out quickly, and credentials sign-in also has a per-account (email) bucket of 8 per minute. The store is in memory, so it is per process. A Redis store can replace it behind the same interface.
+- Request bodies are capped while streaming (running byte count, stream cancelled when exceeded), not after a full read.
+- Operator-only facts: the board roster and which operator credentials (SMTP, Twilio, gateway, Ollama) are configured are shown only to accounts listed in `WHINK_OWNER_EMAILS` (exact, case-insensitive). If it is unset nobody is an owner (there is no first-user rule in this codebase, and `User.role` is not trusted for this). Other accounts get an empty roster and connector status `needs_config` or `available` with no environment signal.
+- Budgets: the tenant cap (`WHINK_MONTHLY_TOKEN_BUDGET`) is a ceiling. A user may lower their own limit and thresholds, never raise or remove them past the cap.
+- Local fallback: when `WHINK_OFFLINE_FALLBACK=true`, calls go explicitly to `OLLAMA_URL` (the host that was probed). A non-local `OLLAMA_URL` is refused, an OpenAI-style model on a remote `OPENAI_COMPATIBLE_BASE_URL` counts as cloud, and no env or per-user key is sent to the local endpoint.
 - `GET /api/security/status` reports computed facts only: header and CSP configuration, pending Class C approvals, security events in the last 24 hours and 7 days, the last dependency audit and secrets scan if their report files exist.
-- `pnpm security:scan` scans staged files for key formats and refuses `.env` files. `-- --all` scans every tracked file. To run it before each commit: `echo 'cd apps/web && pnpm security:scan' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit`.
+- `pnpm security:scan` scans the staged blob (what will be committed, not the working file) for key formats and refuses `.env` files. The scanner's own fixtures and the paths in `apps/web/.secret-scan-ignore` are skipped. `-- --all` scans every tracked file. To run it before each commit: `echo 'cd apps/web && pnpm security:scan' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit`.
 - `.github/workflows/security.yml`, `.github/dependabot.yml` and `.github/CODEOWNERS` are in the repo. They do nothing until GitHub is set up as below.
 
 ## Victor must switch on in GitHub (not done, cannot be done from code)
@@ -36,6 +40,14 @@ Last updated 2026-10-25. This file separates what the code enforces from what Vi
 6. Signed commits: require signed commits in branch protection, and set up commit signing (SSH or GPG) on each machine.
 7. If the repository is owned by a GitHub organisation, add a `GITLEAKS_LICENSE` secret (gitleaks-action needs one for organisations). Personal accounts do not.
 8. CODEOWNERS names `@whinkproducts-alt`. Confirm that is the right account and that it has write access.
+
+## Run the dev server on loopback only
+
+`next dev` listens on all interfaces by default. The `dev` script now passes `-H 127.0.0.1` (apps/web and, through it, the root `pnpm dev`). If you start it by hand, use `npx next dev -H 127.0.0.1`. Never expose the dev server to a network.
+
+## GitHub Actions pinning
+
+All actions in `security.yml` are pinned to full commit SHAs, each checked against the upstream repository's tags with `git ls-remote` on 2026-10-25 (checkout v4.4.0, setup-node v4.4.0, pnpm/action-setup v4.4.0, gitleaks-action v2.3.9, codeql-action v3.39.1). Dependabot (github-actions ecosystem) will propose updates.
 
 ## Run before relying on it
 

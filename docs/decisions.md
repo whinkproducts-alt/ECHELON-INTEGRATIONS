@@ -290,3 +290,8 @@ Reason: one approval path means one set of guarantees (30 s expiry, id-bound, ha
 Decision: Next 16 deprecates the `middleware` file name. The file is now `apps/web/proxy.ts` with the same default export. It adds the full security header set (HSTS only for https deployments, COOP/CORP same-origin, camera and microphone for self only) and rate-limits sign-in and sign-up by client address.
 Alternatives: keep the deprecated name.
 Reason: avoids a deprecation warning and a future break.
+
+## 2026-10-25  Security review fixes (rate limits, owner-only facts, budget cap, local fallback)
+Decision: `X-Forwarded-For` is trusted only when `TRUSTED_PROXY_HOPS` is set (Nth address from the right); otherwise sign-in and sign-up use a looser per-route bucket plus a per-account bucket. Body caps are enforced while streaming. The tenant token cap is a ceiling users cannot remove (`monthlyTokenBudget` is now BIGINT). The local fallback targets `OLLAMA_URL` explicitly, refuses a non-local URL, and never forwards a cloud key. The board roster and operator-credential status are visible only to `WHINK_OWNER_EMAILS` accounts; unset means nobody.
+Alternatives: trust XFF always; one shared "unknown" bucket; first-user-is-owner.
+Reason: client-controlled headers must not set a security key, one global bucket lets an attacker lock the owner out, and a new signup must not see operator data.

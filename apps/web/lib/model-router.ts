@@ -103,6 +103,11 @@ export interface StreamChatOptions {
   /** Per-user BYOK API key, decrypted. If provided, overrides the server env key. */
   apiKey?: string;
   /**
+   * Explicit OpenAI-compatible base URL, used by the local fallback to target Ollama. When set,
+   * no env or per-user key is sent (a placeholder is used), so a cloud key can never reach it.
+   */
+  baseUrl?: string;
+  /**
    * When model is omitted, these hints drive automatic model selection
    * via selectModel(). If both model and hints are provided, model wins.
    */
@@ -134,7 +139,7 @@ export async function streamChat(opts: StreamChatOptions): Promise<ReadableStrea
   if (model.startsWith('gemini')) {
     return streamGemini(opts.messages, model, maxTokens, temperature);
   }
-  return streamOpenAICompatible(opts.messages, model, maxTokens, temperature, opts.apiKey);
+  return streamOpenAICompatible(opts.messages, model, maxTokens, temperature, opts.apiKey, opts.baseUrl);
 }
 
 /**
@@ -157,7 +162,7 @@ export async function chatOnce(opts: StreamChatOptions): Promise<string> {
   if (model.startsWith('gemini')) {
     return chatOnceGemini(opts.messages, model, maxTokens, temperature);
   }
-  return chatOnceOpenAICompatible(opts.messages, model, maxTokens, temperature, opts.apiKey);
+  return chatOnceOpenAICompatible(opts.messages, model, maxTokens, temperature, opts.apiKey, opts.baseUrl);
 }
 
 async function chatOnceAnthropic(
@@ -218,10 +223,10 @@ async function chatOnceOpenAICompatible(
   maxTokens: number,
   temperature: number,
   userApiKey?: string,
+  explicitBaseUrl?: string,
 ): Promise<string> {
-  const baseUrl =
-    (process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
-  const apiKey = userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama';
+  const baseUrl = (explicitBaseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
+  const apiKey = explicitBaseUrl ? 'ollama' : (userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
@@ -469,10 +474,10 @@ async function streamOpenAICompatible(
   maxTokens: number,
   temperature: number,
   userApiKey?: string,
+  explicitBaseUrl?: string,
 ): Promise<ReadableStream<Uint8Array>> {
-  const baseUrl =
-    (process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
-  const apiKey = userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama';
+  const baseUrl = (explicitBaseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
+  const apiKey = explicitBaseUrl ? 'ollama' : (userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
@@ -559,19 +564,46 @@ export function providerProbeUrl(model: string): string {
   return (process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
 }
 
+/** Loopback, private-range and *.local / docker host names count as local. Anything else is remote. */
+export function isLocalUrl(raw: string): boolean {
+  let host: string;
+  try { host = new URL(raw).hostname.toLowerCase().replace(/^\[|\]$/g, ''); } catch { return false; }
+  if (host === 'localhost' || host === '::1' || host === 'host.docker.internal' || host.endsWith('.local')) return true;
+  const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+}
+
+function openAiCompatibleBase(): string {
+  return (process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
+}
+
 /** Cloud providers this deployment has credentials for, as a representative model name each. */
 export function configuredCloudModels(): string[] {
   const out: string[] = [];
   if (process.env.ANTHROPIC_API_KEY) out.push('claude');
   if (process.env.GEMINI_API_KEY) out.push('gemini');
+  // An OpenAI-style endpoint on a remote host is a cloud provider too.
+  if (!isLocalUrl(openAiCompatibleBase())) out.push('openai-compatible');
   return out;
 }
 
-export function ollamaProbeUrl(): string {
-  return (process.env.OLLAMA_URL ?? 'http://localhost:11434').replace(/\/$/, '') + '/api/tags';
+/** The Ollama base URL (no path). */
+export function ollamaBaseUrl(): string {
+  return (process.env.OLLAMA_URL ?? 'http://localhost:11434').replace(/\/$/, '');
 }
 
-/** True for models served by a cloud provider (claude*, gemini*). Everything else is treated as local/self-hosted. */
+export function ollamaProbeUrl(): string {
+  return ollamaBaseUrl() + '/api/tags';
+}
+
+/**
+ * True for models served from a remote provider: claude*, gemini*, and any other model name
+ * while OPENAI_COMPATIBLE_BASE_URL points off-machine. Only a local base URL makes the
+ * OpenAI-style path local.
+ */
 export function isCloudModel(model: string): boolean {
-  return model.startsWith('claude') || model.startsWith('gemini');
+  if (model.startsWith('claude') || model.startsWith('gemini')) return true;
+  return !isLocalUrl(openAiCompatibleBase());
 }

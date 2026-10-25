@@ -24,6 +24,12 @@ describe('vCard parser', () => {
     expect(jane).toEqual({ name: 'Jane Doe', email: 'jane@example.com', phone: '+14035550123', company: 'Acme, Inc.', notes: 'Line one\nLine two', tags: ['VIP', 'Calgary'] });
     expect(bob).toMatchObject({ name: 'Bob Lee', email: 'bob@example.com', phone: '+442079460958' });
   });
+  it('drops telegram: tags from imported CATEGORIES and rejects over-long emails cheaply', () => {
+    const long = 'a'.repeat(300) + '@x.com';
+    const [c] = parseVCard(`BEGIN:VCARD\nFN:T\nCATEGORIES:VIP,telegram:999,TELEGRAM:5\nEMAIL:${long}\nEND:VCARD\n`);
+    expect(c.tags).toEqual(['VIP']);
+    expect(c.email).toBeUndefined();
+  });
   it('E.164 rules', () => {
     expect(toE164('403-555-0123')).toBe('+14035550123');
     expect(toE164('1 (403) 555 0123')).toBe('+14035550123');

@@ -52,3 +52,33 @@ describe('secret scanner', () => {
     expect(isForbiddenEnvFile('apps/web/.env.example')).toBe(false);
   });
 });
+
+import { isExempt, parseIgnoreFile } from '../secret-scan';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+describe('exemptions and staged-blob scanning', () => {
+  it('own fixture files and listed paths are exempt; others are not', () => {
+    expect(isExempt('apps/web/lib/secret-scan.ts')).toBe(true);
+    expect(isExempt('apps/web/lib/__tests__/secret-scan.test.ts')).toBe(true);
+    expect(isExempt('apps/web/lib/other.ts')).toBe(false);
+    expect(isExempt('a/b.ts', ['a/b.ts'])).toBe(true);
+    expect(parseIgnoreFile('# c\nfoo.ts # x\n\n bar.ts ')).toEqual(['foo.ts', 'bar.ts']);
+  });
+  it('scans the staged blob, not the working file (script run in a temp git repo)', () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'scan-'));
+    const git = (...a: string[]) => execFileSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
+    git('init', '-q');
+    const secret = 'sk-ant-' + 'q'.repeat(30);
+    fs.writeFileSync(path.join(repo, 'a.ts'), `const k = "${secret}";\n`);
+    git('add', 'a.ts');
+    fs.writeFileSync(path.join(repo, 'a.ts'), 'const k = "clean";\n'); // working file cleaned after staging
+    const script = path.resolve(__dirname, '..', '..', 'scripts', 'scan-secrets.ts');
+    const tsx = path.resolve(__dirname, '..', '..', 'node_modules', '.bin', 'tsx');
+    let code = 0;
+    try { execFileSync(tsx, [script], { cwd: repo, encoding: 'utf8', stdio: 'pipe' }); } catch (e) { code = (e as { status: number }).status; }
+    expect(code).toBe(1);
+  });
+});

@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 import { checkCsrf } from '@/lib/csrf';
 import { buildCsp, generateNonce, isHttpsDeployment } from '@/lib/csp';
 import { applySecurityHeaders } from '@/lib/security-headers';
-import { clientKey, limitOr429 } from '@/lib/rate-limit';
+import { limitAuthRequest } from '@/lib/rate-limit';
 
 export default auth(async function middleware(req: NextRequest & { auth: any }) {
   const nonce = generateNonce();
@@ -47,7 +47,14 @@ async function handle(req: NextRequest & { auth: any }, nonce: string, csp: stri
 
   // Rate limit credential endpoints by client address before any other work.
   if (req.method === 'POST' && (pathname.startsWith('/api/auth') || pathname === '/api/signup')) {
-    const limited = await limitOr429(pathname === '/api/signup' ? 'signup' : 'auth', clientKey(req.headers));
+    let account: string | null = null;
+    if (pathname.startsWith('/api/auth/callback/credentials')) {
+      try {
+        const v = (await req.clone().formData()).get('email');
+        if (typeof v === 'string') account = v;
+      } catch { /* not a form post: address bucket still applies */ }
+    }
+    const limited = await limitAuthRequest(pathname === '/api/signup' ? 'signup' : 'auth', req.headers, account);
     if (limited) return new NextResponse(limited.body, { status: 429, headers: limited.headers });
   }
 

@@ -68,3 +68,19 @@ export function isForbiddenEnvFile(p: string): boolean {
   const base = p.replace(/\\/g, '/').split('/').pop() ?? '';
   return /^\.env(\..+)?$/.test(base) && base !== '.env.example';
 }
+
+/** The scanner and its own fixtures contain key-shaped strings by design. Paths are relative to the repo root. */
+export const BUILTIN_EXEMPT = new Set([
+  'apps/web/lib/secret-scan.ts',
+  'apps/web/lib/__tests__/secret-scan.test.ts',
+]);
+
+export function isExempt(repoRelativePath: string, extra: Iterable<string> = []): boolean {
+  const p = repoRelativePath.replace(/\\/g, '/');
+  return BUILTIN_EXEMPT.has(p) || new Set(extra).has(p);
+}
+
+/** Parse the ignore file: one repo-relative path per line, # comments allowed. */
+export function parseIgnoreFile(text: string): string[] {
+  return text.split('\n').map((l) => l.replace(/#.*/, '').trim()).filter(Boolean);
+}

@@ -62,6 +62,7 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
   });
   const model = fallback.model;
   const apiKey = fallback.apiKey;
+  const baseUrl = fallback.baseUrl;
   const encoder = new TextEncoder();
 
   // Fail fast (before streaming starts) when the Anthropic key is missing, as before.
@@ -95,7 +96,8 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
               messages: history,
               model,
               tools: opts.tools,
-              apiKey: apiKey,
+              apiKey,
+              baseUrl,
               maxTokens: opts.maxTokens,
             });
           } catch (err) {
@@ -114,7 +116,7 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
                 outputSummary: `model_does_not_support_tools: ${model}`,
                 latencyMs: 0,
               });
-              const plain = await streamChat({ messages: opts.messages, model, maxTokens: opts.maxTokens, apiKey: apiKey });
+              const plain = await streamChat({ messages: opts.messages, model, maxTokens: opts.maxTokens, apiKey, baseUrl });
               const reader = plain.getReader();
               while (true) {
                 const { done, value } = await reader.read();

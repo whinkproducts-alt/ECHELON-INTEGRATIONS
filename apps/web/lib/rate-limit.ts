@@ -55,7 +55,12 @@ export class InMemoryRateLimitStore implements RateLimitStore {
 /** Named rules. Numbers are per user (or per client address for unauthenticated routes). */
 export const RATE_RULES = {
   auth: { limit: 10, windowMs: 60_000 },
+  /** Per sign-in account (email), whatever address the attempts come from. */
+  auth_account: { limit: 8, windowMs: 60_000 },
+  /** Shared per-route bucket used only when no trustworthy client address exists. Looser, so one flood cannot lock the owner out as quickly. */
+  auth_route: { limit: 120, windowMs: 60_000 },
   signup: { limit: 5, windowMs: 60_000 },
+  signup_route: { limit: 60, windowMs: 60_000 },
   approvals: { limit: 30, windowMs: 60_000 },
   comms: { limit: 10, windowMs: 60_000 },
   import: { limit: 5, windowMs: 60_000 },
@@ -91,8 +96,41 @@ export async function limitOr429(bucket: RateBucket, subject: string): Promise<R
   });
 }
 
-/** Client address from proxy headers; falls back to a shared bucket so absence never means unlimited. */
-export function clientKey(headers: Headers): string {
-  const fwd = headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  return fwd || headers.get('x-real-ip') || 'unknown-client';
+/**
+ * Client key for unauthenticated routes. X-Forwarded-For is attacker-controlled unless a
+ * trusted reverse proxy appends to it, so it is used ONLY when TRUSTED_PROXY_HOPS (a positive
+ * integer: how many trusted proxies sit in front of us) is set, and then the Nth address from
+ * the right is taken (the one the nearest trusted proxy saw). Otherwise there is no
+ * trustworthy address in a Next proxy file, so the caller gets null and must use the looser
+ * per-route bucket plus the per-account bucket. Never one global shared key for all routes.
+ */
+export function clientKey(headers: Headers, hops: number = trustedHops()): string | null {
+  if (!hops) return null;
+  const parts = (headers.get('x-forwarded-for') ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length < hops) return null;
+  const addr = parts[parts.length - hops];
+  return /^[0-9a-fA-F:.]{2,45}$/.test(addr) ? addr : null;
+}
+
+export function trustedHops(env: Record<string, string | undefined> = process.env): number {
+  const n = Number.parseInt(env.TRUSTED_PROXY_HOPS ?? '', 10);
+  return Number.isInteger(n) && n > 0 && n <= 5 ? n : 0;
+}
+
+/**
+ * Limit a credentials-style route: per client address when trustworthy, else the shared
+ * per-route bucket; plus a per-account bucket when an account name is known.
+ */
+export async function limitAuthRequest(
+  route: 'auth' | 'signup',
+  headers: Headers,
+  account?: string | null,
+): Promise<Response | null> {
+  const addr = clientKey(headers);
+  const first = addr
+    ? await limitOr429(route, addr)
+    : await limitOr429(route === 'auth' ? 'auth_route' : 'signup_route', route);
+  if (first) return first;
+  if (route === 'auth' && account) return limitOr429('auth_account', account.trim().toLowerCase().substring(0, 254));
+  return null;
 }

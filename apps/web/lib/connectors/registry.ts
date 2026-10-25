@@ -50,6 +50,8 @@ export function loadCatalog(raw?: unknown): CatalogEntry[] {
 }
 
 export interface EvidenceContext {
+  /** Operator account. Non-owners never learn which operator credentials or services are configured. */
+  isOwner: boolean;
   env: Record<string, string | undefined>;
   userId: string;
   hasSocial: (platform: 'x' | 'instagram' | 'tiktok') => Promise<boolean>;
@@ -62,6 +64,20 @@ export interface EvidenceContext {
 
 export async function computeStatus(entry: CatalogEntry, ctx: EvidenceContext): Promise<ConnectorStatus> {
   const ev = entry.evidence;
+  if (!ctx.isOwner) {
+    // Operator-wide evidence (env credentials, the gateway, Ollama, recall config) is not
+    // visible to ordinary accounts: no presence signal at all.
+    switch (ev.type) {
+      case 'none': return 'unavailable';
+      case 'env':
+      case 'gateway':
+      case 'gateway_platform':
+      case 'ollama':
+        return 'needs_config';
+      case 'social': return (await ctx.hasSocial(ev.platform)) ? 'connected' : 'available';
+      case 'anythingllm': return (await ctx.hasWorkspace()) ? 'connected' : 'available';
+    }
+  }
   switch (ev.type) {
     case 'none':
       return 'unavailable';
@@ -87,9 +103,10 @@ export async function computeStatus(entry: CatalogEntry, ctx: EvidenceContext): 
   }
 }
 
-function liveContext(userId: string): EvidenceContext {
+function liveContext(userId: string, owner: boolean): EvidenceContext {
   let toolNames: Promise<string[] | null> | null = null;
   return {
+    isOwner: owner,
     env: process.env,
     userId,
     hasSocial: (p) => hasActiveConnection(userId, p),
@@ -119,7 +136,11 @@ export interface ConnectorView {
   enabled: boolean;
 }
 
-export async function listConnectors(userId: string, ctx: EvidenceContext = liveContext(userId)): Promise<ConnectorView[]> {
+export async function listConnectors(
+  userId: string,
+  opts: { owner?: boolean; ctx?: EvidenceContext } = {},
+): Promise<ConnectorView[]> {
+  const ctx = opts.ctx ?? liveContext(userId, opts.owner === true);
   if (!userId) throw new Error('connectors: userId is required');
   const catalog = loadCatalog();
   const installs = await prisma.connectorInstall.findMany({ where: { userId }, select: { connectorId: true, enabled: true } });

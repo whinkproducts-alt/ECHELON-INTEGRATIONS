@@ -1,10 +1,11 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { requireUserWithOwner } from '@/lib/api-helpers';
 import { getBoardMembers } from '@/lib/board';
 
+/** The roster is operator configuration: only owner accounts (WHINK_OWNER_EMAILS) see it. Everyone else gets an empty list. */
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  return NextResponse.json({ members: getBoardMembers() });
+  const a = await requireUserWithOwner();
+  if ('response' in a) return a.response;
+  return NextResponse.json({ members: a.owner ? getBoardMembers() : [] });
 }

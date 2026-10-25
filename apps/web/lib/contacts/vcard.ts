@@ -37,7 +37,7 @@ function unfold(text: string): string[] {
   return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n[ \t]/g, '').split('\n');
 }
 
-const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/;
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@.]{1,63}(?:\.[^\s@.]{1,63})*\.[^\s@.]{2,}$/;
 
 export function parseVCard(input: string | Uint8Array): ParsedContact[] {
   const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : input;
@@ -78,7 +78,7 @@ export function parseVCard(input: string | Uint8Array): ParsedContact[] {
       }
       case 'EMAIL': {
         const e = unescapeValue(value).trim().toLowerCase();
-        if (!cur.email && EMAIL_RE.test(e) && e.length <= 254) cur.email = e;
+        if (!cur.email && e.length <= 254 && EMAIL_RE.test(e)) cur.email = e;
         break;
       }
       case 'TEL': {
@@ -89,7 +89,11 @@ export function parseVCard(input: string | Uint8Array): ParsedContact[] {
       case 'ORG': cur.company = unescapeValue(value.split(';')[0]).substring(0, 200) || undefined; break;
       case 'NOTE': cur.notes = unescapeValue(value).substring(0, 2000) || undefined; break;
       case 'CATEGORIES':
-        for (const t of value.split(',').map((x) => unescapeValue(x).trim()).filter(Boolean)) cur.tags.push(t.substring(0, 40));
+        for (const t of value.split(',').map((x) => unescapeValue(x).trim()).filter(Boolean)) {
+          // `telegram:<chatId>` tags are WHINK's own routing data: an imported file must not set a message destination.
+          if (/^telegram:/i.test(t)) continue;
+          cur.tags.push(t.substring(0, 40));
+        }
         break;
       default: break; // PHOTO, URL, ADR, etc. are ignored.
     }

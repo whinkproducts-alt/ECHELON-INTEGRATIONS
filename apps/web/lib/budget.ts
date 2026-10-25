@@ -31,6 +31,18 @@ export function monthWindow(now: Date): { start: Date; resetsAt: Date } {
   };
 }
 
+/**
+ * Effective monthly limit. The operator cap (tenant/env) is a ceiling a user cannot remove:
+ * with a cap set, the limit is min(user value, cap), and a user value of 0 or null means "the cap",
+ * never unlimited. With no cap, the user value applies and 0 or null is unlimited (returns null).
+ */
+export function effectiveLimit(userValue: number | null, cap: number): number | null {
+  const hasCap = cap > 0;
+  const hasUser = userValue !== null && userValue > 0;
+  if (hasCap) return hasUser ? Math.min(userValue as number, cap) : cap;
+  return hasUser ? (userValue as number) : null;
+}
+
 /** Pure decision, exported for tests. */
 export function decideBudget(used: number, limit: number | null, softPct: number, hardPct: number): BudgetStateName {
   if (!limit || limit <= 0) return 'ok';
@@ -45,10 +57,11 @@ export async function budgetState(userId: string, now = new Date()): Promise<Bud
     where: { userId },
     select: { monthlyTokenBudget: true, budgetSoftPct: true, budgetHardPct: true },
   });
-  const limitRaw = pref?.monthlyTokenBudget ?? envInt('WHINK_MONTHLY_TOKEN_BUDGET', 0);
-  const limit = limitRaw > 0 ? limitRaw : null;
-  const softPct = pref?.budgetSoftPct ?? envInt('WHINK_BUDGET_SOFT_PCT', 80);
-  const hardPct = pref?.budgetHardPct ?? envInt('WHINK_BUDGET_HARD_PCT', 100);
+  const limit = effectiveLimit(pref?.monthlyTokenBudget == null ? null : Number(pref.monthlyTokenBudget), envInt('WHINK_MONTHLY_TOKEN_BUDGET', 0));
+  // A user may tighten the thresholds but never loosen past the tenant ceiling.
+  const hardCeiling = envInt('WHINK_BUDGET_HARD_PCT', 100);
+  const hardPct = Math.min(pref?.budgetHardPct ?? hardCeiling, hardCeiling);
+  const softPct = Math.min(pref?.budgetSoftPct ?? envInt('WHINK_BUDGET_SOFT_PCT', 80), hardPct);
   const { start, resetsAt } = monthWindow(now);
   const agg = await prisma.usageEvent.aggregate({
     where: { userId, createdAt: { gte: start } },
@@ -69,7 +82,7 @@ export async function setBudget(userId: string, input: z.infer<typeof BudgetInpu
   return runGuarded(
     { userId, capability: 'usage_budget_set', permissionClass: 'A', action: 'usage_budget_updated', summary: `limit=${input.monthlyTokenBudget} soft=${input.softPct ?? 'default'} hard=${input.hardPct ?? 'default'}` },
     async () => {
-      const data = { monthlyTokenBudget: input.monthlyTokenBudget, budgetSoftPct: input.softPct ?? null, budgetHardPct: input.hardPct ?? null };
+      const data = { monthlyTokenBudget: BigInt(input.monthlyTokenBudget), budgetSoftPct: input.softPct ?? null, budgetHardPct: input.hardPct ?? null };
       await prisma.userPreference.upsert({ where: { userId }, create: { userId, ...data }, update: data });
       return budgetState(userId);
     },

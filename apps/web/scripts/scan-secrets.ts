@@ -11,7 +11,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isForbiddenEnvFile, scanText, shouldScanPath, type SecretFinding } from '../lib/secret-scan';
+import { isExempt, isForbiddenEnvFile, parseIgnoreFile, scanText, shouldScanPath, type SecretFinding } from '../lib/secret-scan';
 
 const args = process.argv.slice(2);
 const all = args.includes('--all');
@@ -23,20 +23,26 @@ const root = git(['rev-parse', '--show-toplevel']).trim();
 const files = (all ? git(['-C', root, 'ls-files', '-z']) : git(['-C', root, 'diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']))
   .split('\0').filter(Boolean);
 
+const ignoreFile = path.join(root, 'apps', 'web', '.secret-scan-ignore');
+const extraExempt = fs.existsSync(ignoreFile) ? parseIgnoreFile(fs.readFileSync(ignoreFile, 'utf8')) : [];
 const findings: SecretFinding[] = [];
 const envFiles = files.filter(isForbiddenEnvFile);
 for (const rel of files) {
-  if (!shouldScanPath(rel)) continue;
-  const full = path.join(root, rel);
-  let text: string;
+  if (!shouldScanPath(rel) || isExempt(rel, extraExempt)) continue;
+  let buf: Buffer;
   try {
-    const st = fs.statSync(full);
-    if (!st.isFile() || st.size > 2 * 1024 * 1024) continue;
-    const buf = fs.readFileSync(full);
-    if (buf.includes(0)) continue; // binary
-    text = buf.toString('utf8');
+    if (all) {
+      const full = path.join(root, rel);
+      const st = fs.statSync(full);
+      if (!st.isFile() || st.size > 2 * 1024 * 1024) continue;
+      buf = fs.readFileSync(full);
+    } else {
+      // Staged mode scans the staged blob (what will actually be committed), not the working file.
+      buf = execFileSync('git', ['-C', root, 'show', `:${rel}`], { maxBuffer: 4 * 1024 * 1024 });
+    }
   } catch { continue; }
-  findings.push(...scanText(rel, text));
+  if (buf.length > 2 * 1024 * 1024 || buf.includes(0)) continue; // too large or binary
+  findings.push(...scanText(rel, buf.toString('utf8')));
 }
 
 for (const f of envFiles) console.error(`BLOCKED: ${f} is an env file and must not be committed`);

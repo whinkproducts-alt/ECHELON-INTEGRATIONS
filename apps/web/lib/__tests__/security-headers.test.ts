@@ -33,13 +33,16 @@ describe('proxy.ts applies headers and rate limits', () => {
     expect(res.headers.get('cross-origin-opener-policy')).toBe('same-origin');
     expect(res.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
   });
-  it('rate limits repeated sign-in POSTs from one client address', async () => {
+  it('rate limits repeated sign-in POSTs for one account even with rotating spoofed XFF', async () => {
     const { mw, NextRequest } = await load();
-    const mk = () => new NextRequest('http://localhost:3000/api/auth/callback/credentials', {
-      method: 'POST', headers: { origin: 'http://localhost:3000', 'x-forwarded-for': '9.9.9.9' },
-    });
     let last = 200;
-    for (let i = 0; i < 12; i++) last = (await mw(mk())).status;
+    for (let i = 0; i < 10; i++) {
+      const body = new URLSearchParams({ email: 'victim@example.com', password: 'x' });
+      last = (await mw(new NextRequest('http://localhost:3000/api/auth/callback/credentials', {
+        method: 'POST', body,
+        headers: { origin: 'http://localhost:3000', 'x-forwarded-for': `9.9.9.${i}`, 'content-type': 'application/x-www-form-urlencoded' },
+      }))).status;
+    }
     expect(last).toBe(429);
   });
 });

@@ -63,7 +63,7 @@ describe('catalog', () => {
 
 describe('status is computed from evidence', () => {
   const ctx = (o: Partial<EvidenceContext> = {}): EvidenceContext => ({
-    env: {}, userId: 'uA', hasSocial: async () => false, hasWorkspace: async () => false, gatewayToolNames: async () => null,
+    isOwner: true, env: {}, userId: 'uA', hasSocial: async () => false, hasWorkspace: async () => false, gatewayToolNames: async () => null,
     ollamaUp: async () => false, anythingLlmConfigured: () => false, gatewayConfigured: () => false, ...o,
   });
   it('twilio: needs_config without env, connected with env', async () => {
@@ -95,6 +95,27 @@ describe('status is computed from evidence', () => {
     expect(await computeStatus(a, ctx())).toBe('needs_config');
     expect(await computeStatus(a, ctx({ anythingLlmConfigured: () => true }))).toBe('available');
     expect(await computeStatus(a, ctx({ anythingLlmConfigured: () => true, hasWorkspace: async () => true }))).toBe('connected');
+  });
+});
+
+describe('non-owner accounts get no operator facts', () => {
+  const full = (o: Partial<EvidenceContext> = {}): EvidenceContext => ({
+    isOwner: false, env: { TWILIO_ACCOUNT_SID: 'AC1', TWILIO_AUTH_TOKEN: 't', TWILIO_FROM_NUMBER: '+1', TELEGRAM_BOT_TOKEN: 'x' }, userId: 'uB',
+    hasSocial: async () => false, hasWorkspace: async () => false, gatewayToolNames: async () => ['github__x'],
+    ollamaUp: async () => true, anythingLlmConfigured: () => true, gatewayConfigured: () => true, ...o,
+  });
+  it('configured SMTP/Twilio/gateway/ollama look exactly like unconfigured to a non-owner', async () => {
+    for (const id of ['twilio', 'telegram', 'whatsapp', 'openclaw', 'github', 'ollama']) {
+      expect(await computeStatus(findCatalogEntry(id)!, full())).toBe('needs_config');
+    }
+    expect(await computeStatus(findCatalogEntry('anythingllm')!, full())).toBe('available');
+  });
+  it("a non-owner's own rows still show: workspace and social connection", async () => {
+    expect(await computeStatus(findCatalogEntry('anythingllm')!, full({ hasWorkspace: async () => true }))).toBe('connected');
+    expect(await computeStatus(findCatalogEntry('x')!, full({ hasSocial: async () => true }))).toBe('connected');
+  });
+  it('the owner still sees real status', async () => {
+    expect(await computeStatus(findCatalogEntry('twilio')!, full({ isOwner: true }))).toBe('connected');
   });
 });
 
@@ -132,7 +153,7 @@ describe('install and uninstall', () => {
   it('listing reads installs for this user only', async () => {
     db.connectorInstall.findMany.mockResolvedValue([{ connectorId: 'twilio', enabled: true }]);
     db.documentWorkspace.findFirst.mockResolvedValue(null);
-    const list = await listConnectors('uA', { env: {}, userId: 'uA', hasSocial: async () => false, hasWorkspace: async () => false, gatewayToolNames: async () => null, ollamaUp: async () => false, anythingLlmConfigured: () => false, gatewayConfigured: () => false });
+    const list = await listConnectors('uA', { owner: true, ctx: { isOwner: true, env: {}, userId: 'uA', hasSocial: async () => false, hasWorkspace: async () => false, gatewayToolNames: async () => null, ollamaUp: async () => false, anythingLlmConfigured: () => false, gatewayConfigured: () => false } });
     expect(db.connectorInstall.findMany.mock.calls[0][0].where).toEqual({ userId: 'uA' });
     expect(list.find((c) => c.id === 'twilio')).toMatchObject({ installed: true, status: 'needs_config' });
   });

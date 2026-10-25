@@ -6,7 +6,8 @@ const recordActionSafe = vi.fn().mockResolvedValue({ id: 'l1' });
 vi.mock('@/lib/ledger', () => ({ recordActionSafe: (e: unknown) => recordActionSafe(e), recordAction: vi.fn() }));
 
 import { recordUsage, estimateCostMicros, usageSummary } from '../usage';
-import { budgetState, decideBudget, setBudget, BudgetInputSchema, monthWindow } from '../budget';
+import { budgetState, decideBudget, effectiveLimit, setBudget, BudgetInputSchema, monthWindow } from '../budget';
+import { isCloudModel, isLocalUrl } from '../model-router';
 import { applyOfflineFallback, connectivityMode, routeHint, __setProbeFetch, ollamaReachable } from '../offline';
 
 const ENV = { ...process.env };
@@ -86,6 +87,34 @@ describe('budget', () => {
   });
 });
 
+describe('operator cap cannot be removed by a user', () => {
+  it('effectiveLimit', () => {
+    expect(effectiveLimit(0, 1000)).toBe(1000);
+    expect(effectiveLimit(null, 1000)).toBe(1000);
+    expect(effectiveLimit(5000, 1000)).toBe(1000);
+    expect(effectiveLimit(300, 1000)).toBe(300);
+    expect(effectiveLimit(0, 0)).toBeNull();
+    expect(effectiveLimit(null, 0)).toBeNull();
+    expect(effectiveLimit(77, 0)).toBe(77);
+  });
+  it('budgetState: user sets 0 or a huge value while the env cap is set -> still capped (BigInt column handled)', async () => {
+    process.env.WHINK_MONTHLY_TOKEN_BUDGET = '1000';
+    db.usageEvent.aggregate.mockResolvedValue({ _sum: { tokensIn: 1000, tokensOut: 0 } });
+    db.userPreference.findUnique.mockResolvedValue({ monthlyTokenBudget: BigInt(0), budgetSoftPct: null, budgetHardPct: null });
+    expect(await budgetState('uA')).toMatchObject({ limit: 1000, state: 'hard' });
+    db.userPreference.findUnique.mockResolvedValue({ monthlyTokenBudget: BigInt(9_000_000_000), budgetSoftPct: null, budgetHardPct: null });
+    expect((await budgetState('uA')).limit).toBe(1000);
+  });
+});
+
+describe('threshold ceiling', () => {
+  it('a user hardPct above the tenant ceiling is clamped', async () => {
+    db.userPreference.findUnique.mockResolvedValue({ monthlyTokenBudget: BigInt(1000), budgetSoftPct: null, budgetHardPct: 200 });
+    db.usageEvent.aggregate.mockResolvedValue({ _sum: { tokensIn: 1000, tokensOut: 0 } });
+    expect(await budgetState('uA')).toMatchObject({ hardPct: 100, state: 'hard' });
+  });
+});
+
 describe('offline routing', () => {
   it('routeHint prefers local when offline or over the hard limit, and says why', () => {
     expect(routeHint({ state: 'ok' }, 'online')).toEqual({ useLocal: false, reason: null });
@@ -121,13 +150,13 @@ describe('offline routing', () => {
   });
   it('flag on + offline + ollama up: switches to local, drops the cloud key, ledgers the reason', async () => {
     process.env.WHINK_OFFLINE_FALLBACK = 'true'; process.env.ANTHROPIC_API_KEY = 'k'; delete process.env.GEMINI_API_KEY;
-    process.env.ANTHROPIC_BASE_URL = 'https://cloud.test'; process.env.OLLAMA_URL = 'http://ollama.test:11434';
+    process.env.ANTHROPIC_BASE_URL = 'https://cloud.test'; process.env.OLLAMA_URL = 'http://127.0.0.1:11434';
     process.env.WHINK_LOCAL_MODEL = 'qwen2.5:7b';
     db.userPreference.findUnique.mockResolvedValue(null);
     db.usageEvent.aggregate.mockResolvedValue({ _sum: {} });
     __setProbeFetch(async (url) => { if (url.startsWith('https://cloud.test')) throw new Error('offline'); return { status: 200 }; });
     const r = await applyOfflineFallback({ userId: 'uA', model: 'claude-x', apiKey: 'byok', correlationId: 'c1' });
-    expect(r).toEqual({ model: 'qwen2.5:7b', apiKey: undefined, fellBack: true, reason: 'offline' });
+    expect(r).toEqual({ model: 'qwen2.5:7b', apiKey: undefined, baseUrl: 'http://127.0.0.1:11434/v1', fellBack: true, reason: 'offline' });
     expect(recordActionSafe).toHaveBeenCalledWith(expect.objectContaining({ userId: 'uA', action: 'model_fallback_local', correlationId: 'c1' }));
     expect(recordActionSafe.mock.calls[0][0].inputSummary).toContain('reason=offline');
   });
@@ -143,6 +172,29 @@ describe('offline routing', () => {
     expect(r.fellBack).toBe(false);
     expect(recordActionSafe).not.toHaveBeenCalled();
     expect(await ollamaReachable(Date.now() + 60_000)).toBe(false);
+  });
+  it('isLocalUrl and isCloudModel: an OpenAI-style model on a remote base URL is cloud, on a local one is local', () => {
+    expect(isLocalUrl('http://localhost:11434/v1')).toBe(true);
+    expect(isLocalUrl('http://192.168.1.20:11434')).toBe(true);
+    expect(isLocalUrl('https://api.openai.com/v1')).toBe(false);
+    expect(isLocalUrl('http://172.32.0.1')).toBe(false);
+    process.env.OPENAI_COMPATIBLE_BASE_URL = 'https://api.cloudllm.example/v1';
+    expect(isCloudModel('gpt-4o')).toBe(true);
+    process.env.OPENAI_COMPATIBLE_BASE_URL = 'http://localhost:11434/v1';
+    expect(isCloudModel('llama3.1:8b')).toBe(false);
+    expect(isCloudModel('claude-x')).toBe(true);
+  });
+  it('fallback returns an explicit OLLAMA_URL-based baseUrl and refuses a remote OLLAMA_URL', async () => {
+    process.env.WHINK_OFFLINE_FALLBACK = 'true'; process.env.ANTHROPIC_API_KEY = 'k'; delete process.env.GEMINI_API_KEY;
+    process.env.ANTHROPIC_BASE_URL = 'https://cloud.test'; process.env.OLLAMA_URL = 'http://127.0.0.1:11434';
+    db.userPreference.findUnique.mockResolvedValue(null);
+    db.usageEvent.aggregate.mockResolvedValue({ _sum: {} });
+    __setProbeFetch(async (url) => { if (url.startsWith('https://cloud.test')) throw new Error('offline'); return { status: 200 }; });
+    expect((await applyOfflineFallback({ userId: 'uA', model: 'claude-x' })).baseUrl).toBe('http://127.0.0.1:11434/v1');
+    process.env.OLLAMA_URL = 'https://ollama.attacker.example';
+    __setProbeFetch(async (url) => { if (url.startsWith('https://cloud.test')) throw new Error('offline'); return { status: 200 }; });
+    const r = await applyOfflineFallback({ userId: 'uA', model: 'claude-x', apiKey: 'byok' });
+    expect(r).toMatchObject({ fellBack: false, model: 'claude-x' });
   });
   it('local models are never rerouted', async () => {
     process.env.WHINK_OFFLINE_FALLBACK = 'true';

@@ -1,7 +1,9 @@
 /**
- * Pure helpers for scripts/import-board.ts: file-name parsing, magic-byte image checks, CSV parsing
+ * Helpers for scripts/import-board.ts: file-name parsing, magic-byte image checks, CSV parsing
  * and roster merging. No filesystem access here, so it is unit-testable.
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import { BoardFileSchema, type BoardMember } from '@/lib/board';
 import { staffEmail } from '@/lib/staff-directory';
 
@@ -135,4 +137,27 @@ export function mergeBoard(existing: BoardMember[], csv: CsvMember[], photos: Ph
   const members = [...byId.values()];
   BoardFileSchema.parse({ members });
   return { members, photos: photoOut, warnings };
+}
+
+/**
+ * Read one photo from the import folder safely: lstat (so a symlink is never followed), regular
+ * files only, size checked BEFORE reading, then one read. The returned bytes are the exact bytes
+ * that mergeBoard magic-byte checks and that the script writes (no second read, no TOCTOU swap).
+ */
+export function readPhotoSafely(dir: string, file: string): { bytes: Uint8Array } | { skipped: string } {
+  if (file !== path.basename(file)) return { skipped: `${file}: path separators are not allowed` };
+  const full = path.join(dir, file);
+  let st: fs.Stats;
+  try { st = fs.lstatSync(full); } catch { return { skipped: `${file}: cannot stat` }; }
+  if (st.isSymbolicLink()) return { skipped: `${file}: symbolic links are not followed` };
+  if (!st.isFile()) return { skipped: `${file}: not a regular file` };
+  if (st.size > MAX_PHOTO_BYTES) return { skipped: `${file}: larger than ${MAX_PHOTO_BYTES} bytes, not read` };
+  const fd = fs.openSync(full, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+  try {
+    const buf = Buffer.alloc(Math.min(st.size, MAX_PHOTO_BYTES));
+    const n = fs.readSync(fd, buf, 0, buf.length, 0);
+    return { bytes: new Uint8Array(buf.subarray(0, n)) };
+  } finally {
+    fs.closeSync(fd);
+  }
 }

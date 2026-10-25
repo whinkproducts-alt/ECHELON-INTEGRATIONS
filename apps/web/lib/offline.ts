@@ -12,7 +12,7 @@
  * local model it writes a 'model_fallback_local' ledger row with the reason, and drops any
  * per-user cloud API key so a cloud key is never sent to a local endpoint.
  */
-import { configuredCloudModels, isCloudModel, ollamaProbeUrl, providerProbeUrl } from '@/lib/model-router';
+import { configuredCloudModels, isCloudModel, isLocalUrl, ollamaBaseUrl, ollamaProbeUrl, providerProbeUrl } from '@/lib/model-router';
 import { budgetState, type BudgetState } from '@/lib/budget';
 import { recordActionSafe } from '@/lib/ledger';
 import { logger } from '@/lib/logger';
@@ -89,7 +89,14 @@ export interface FallbackInput {
   persona?: string;
   correlationId?: string;
 }
-export interface FallbackOutput { model: string; apiKey?: string; fellBack: boolean; reason: FallbackReason | null }
+export interface FallbackOutput {
+  model: string;
+  apiKey?: string;
+  /** Set only when falling back: the explicit OpenAI-compatible base URL (OLLAMA_URL + /v1) to call. */
+  baseUrl?: string;
+  fellBack: boolean;
+  reason: FallbackReason | null;
+}
 
 export async function applyOfflineFallback(input: FallbackInput): Promise<FallbackOutput> {
   const unchanged: FallbackOutput = { model: input.model, apiKey: input.apiKey, fellBack: false, reason: null };
@@ -100,6 +107,12 @@ export async function applyOfflineFallback(input: FallbackInput): Promise<Fallba
     if (!hint.useLocal || !hint.reason) return unchanged;
     if (!(await ollamaReachable())) {
       logger.warn('local fallback wanted but local model unreachable', { reason: hint.reason });
+      return unchanged;
+    }
+    // The fallback target is OLLAMA_URL, the host we just probed, never OPENAI_COMPATIBLE_BASE_URL,
+    // and only if it is really local. A remote OLLAMA_URL is refused.
+    if (!isLocalUrl(ollamaBaseUrl())) {
+      logger.warn('local fallback refused: OLLAMA_URL is not a local address');
       return unchanged;
     }
     const local = localModelName();
@@ -114,7 +127,7 @@ export async function applyOfflineFallback(input: FallbackInput): Promise<Fallba
       outputSummary: hint.reason === 'offline' ? 'Cloud provider unreachable; using local model' : 'Monthly token budget reached; using local model',
       correlationId: input.correlationId ?? 'unknown',
     });
-    return { model: local, apiKey: undefined, fellBack: true, reason: hint.reason };
+    return { model: local, apiKey: undefined, baseUrl: `${ollamaBaseUrl()}/v1`, fellBack: true, reason: hint.reason };
   } catch (e) {
     logger.warn('offline fallback check failed; keeping configured model', { error: (e as Error)?.message });
     return unchanged;
