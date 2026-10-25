@@ -6,6 +6,11 @@ import {
   FolderKanban, CheckSquare, Bot, Plug, Gauge, ShieldAlert, Settings, Link2, CreditCard,
 } from 'lucide-react';
 
+import { getSubsidiaryList } from '@/components/subsidiaries/subsidiary-map';
+
+// Subsidiary names come from config so the palette finds the hub by each name, with no names hardcoded here.
+const SUBSIDIARY_KEYWORDS = ['projects', 'portfolio', ...getSubsidiaryList().flatMap((s) => [s.id, s.id.replace(/-/g, ' '), s.name.toLowerCase()])];
+
 export type NavGroupId = 'command' | 'intelligence' | 'people' | 'operations' | 'security' | 'settings';
 
 export interface NavGroup {
@@ -53,6 +58,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'companies', label: 'Companies', href: '/dashboard/companies', icon: Building2, group: 'people', description: 'The group and its companies', keywords: ['group', 'apps', 'subsidiary'], status: 'soon' },
 
   { id: 'projects', label: 'Projects', href: '/dashboard/projects', icon: FolderKanban, group: 'operations', description: 'Projects and their status', keywords: ['work'], status: 'live' },
+  { id: 'subsidiaries', label: 'Subsidiaries', href: '/dashboard/subsidiaries', icon: Building2, group: 'operations', description: 'The five subsidiaries and their projects', keywords: SUBSIDIARY_KEYWORDS, status: 'live' },
   { id: 'tasks', label: 'Tasks', href: '/dashboard/tasks', icon: CheckSquare, group: 'operations', description: 'Task board', keywords: ['todo'], status: 'live' },
   { id: 'workforce', label: 'Workforce', href: '/dashboard/workforce', icon: Bot, group: 'operations', description: 'Agents and what they are doing', keywords: ['agents', 'staff'], status: 'soon' },
   { id: 'connectors', label: 'Connectors', href: '/dashboard/connectors', icon: Plug, group: 'operations', description: 'Connected tools and gateways', keywords: ['mcp', 'integrations', 'gateway'], status: 'soon' },

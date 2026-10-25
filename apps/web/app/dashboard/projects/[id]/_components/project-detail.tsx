@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, Target, CheckSquare, AlertTriangle, HelpCircle,
-  Milestone, Plus
+  Milestone, Plus, ArrowRight
 } from 'lucide-react';
+import { SubsidiaryChip } from '@/components/subsidiaries/subsidiary-chip';
+import { getSubsidiaryList, projectReportHref } from '@/components/subsidiaries/subsidiary-map';
 
 
 export function ProjectDetail({ projectId }: { projectId: string }) {
@@ -13,6 +16,26 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [subError, setSubError] = useState<string | null>(null);
+  const [subSaving, setSubSaving] = useState(false);
+
+  const assignSubsidiary = async (value: string) => {
+    setSubSaving(true);
+    setSubError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subsidiary: value || null }),
+      });
+      if (!res.ok) throw new Error('failed');
+      setProject((prev: any) => ({ ...prev, subsidiary: value || null }));
+    } catch {
+      setSubError('Could not update the subsidiary.');
+    } finally {
+      setSubSaving(false);
+    }
+  };
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}`)
@@ -37,6 +60,9 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   if (loading) return <div className="p-6"><div className="h-40 bg-card animate-pulse rounded-lg" /></div>;
   if (!project) return <div className="p-6 text-muted-foreground">Project not found.</div>;
 
+  const rawSub = project?.subsidiary;
+  const subsidiaryId: string | null = typeof rawSub === 'string' ? rawSub : (rawSub?.id ?? null);
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <button onClick={() => router.push('/dashboard/projects')} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
@@ -47,6 +73,27 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         <h1 className="text-2xl font-display font-bold tracking-tight">{project?.name ?? 'Untitled'}</h1>
         {project?.goal && <p className="text-sm text-muted-foreground mt-1"><Target className="inline h-3 w-3 mr-1" />{project.goal}</p>}
         {project?.description && <p className="text-sm text-muted-foreground mt-2">{project.description}</p>}
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <SubsidiaryChip id={subsidiaryId} />
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            Subsidiary
+            <select
+              value={subsidiaryId ?? ''}
+              disabled={subSaving}
+              onChange={(e) => assignSubsidiary(e.target.value)}
+              className="px-2 py-1 bg-secondary rounded-md border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">Unassigned</option>
+              {getSubsidiaryList().map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </label>
+          {subsidiaryId && (
+            <Link href={projectReportHref(projectId, subsidiaryId)} className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+              Full report <ArrowRight className="h-3 w-3" />
+            </Link>
+          )}
+          {subError && <span role="alert" className="text-xs text-foreground">{subError}</span>}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

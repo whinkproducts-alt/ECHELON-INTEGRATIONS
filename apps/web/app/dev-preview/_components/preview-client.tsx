@@ -17,21 +17,28 @@ const LOADERS: Record<string, Loader> = {
   contacts: () => import('@/components/screens/contacts/contacts-screen'),
   anatomy: () => import('@/components/screens/anatomy/kernel-screen'),
   today: () => import('@/components/screens/today/today-screen'),
+  command: () => import('@/app/dashboard/_components/command-surface').then((m) => ({ default: m.CommandSurface })),
+  // Owned by another agent; export and prop names are not final. A missing module shows "Screen failed to load".
+  subsidiaries: () => import('@/components/screens/subsidiaries/subsidiaries-screen'),
+  subsidiary: () => import('@/components/screens/subsidiaries/subsidiary-screen'),
+  'project-report': () => import('@/components/screens/subsidiaries/project-report-screen'),
 };
 export const SERVER_SCREENS = ['board', 'directory', 'workforce', 'companies'] as const;
 export const ALL_SCREENS = [...SERVER_SCREENS, ...Object.keys(LOADERS)];
 
 const STATES: PreviewState[] = ['ready', 'loading', 'error', 'empty'];
 
-function pickComponent(mod: Record<string, unknown>): React.ComponentType | null {
+type ScreenProps = Record<string, unknown>;
+
+function pickComponent(mod: Record<string, unknown>): React.ComponentType<Record<string, unknown>> | null {
   const named = Object.keys(mod).find((k) => /Screen$/.test(k) && typeof mod[k] === 'function');
   const c = named ? mod[named] : mod.default;
-  return typeof c === 'function' ? (c as React.ComponentType) : null;
+  return typeof c === 'function' ? (c as React.ComponentType<Record<string, unknown>>) : null;
 }
 
-function Loaded({ id }: { id: string }) {
+function Loaded({ id, ids, extra }: { id: string; ids: ScreenProps; extra?: Record<string, unknown> }) {
   const load = LOADERS[id];
-  const [phase, setPhase] = React.useState<{ kind: 'loading' } | { kind: 'missing'; why: string } | { kind: 'ready'; C: React.ComponentType }>({ kind: 'loading' });
+  const [phase, setPhase] = React.useState<{ kind: 'loading' } | { kind: 'missing'; why: string } | { kind: 'ready'; C: React.ComponentType<Record<string, unknown>> }>({ kind: 'loading' });
   React.useEffect(() => {
     let live = true;
     if (!load) return;
@@ -47,10 +54,15 @@ function Loaded({ id }: { id: string }) {
   if (phase.kind === 'loading') return <div className="p-8"><HoloEmpty state="loading" title="Loading screen" /></div>;
   if (phase.kind === 'missing') return <div className="p-8"><HoloEmpty state="error" title="Screen failed to load" description={`${id}: ${phase.why}`} /></div>;
   const C = phase.C;
-  return <C />;
+  return <C {...ids} {...extra} />;
 }
 
-export function PreviewClient({ screen, state, children }: { screen: string; state: PreviewState; children?: React.ReactNode }) {
+export function PreviewClient({ screen, state, entityId, extraProps, children }: { screen: string; state: PreviewState; entityId?: string; extraProps?: Record<string, unknown>; children?: React.ReactNode }) {
+  // Fixture ids for the subsidiaries screens. Prop names are passed under every likely name so the screens can pick theirs.
+  const ids: ScreenProps = screen === 'project-report'
+    ? { id: entityId ?? 'prj_consult_1', projectId: entityId ?? 'prj_consult_1', subsidiaryId: 'consult' }
+    : { id: entityId ?? 'consult', subsidiaryId: entityId ?? 'consult' };
+  const q = entityId ? `&id=${encodeURIComponent(entityId)}` : '';
   // Remount (and re-install the mock) whenever the state changes.
   return (
     <MockFetch key={state} state={state}>
@@ -59,12 +71,12 @@ export function PreviewClient({ screen, state, children }: { screen: string; sta
           <p className="mb-1 font-mono text-[0.625rem] uppercase tracking-[0.25em] text-muted-foreground">Dev preview, fixtures only</p>
           <nav aria-label="Preview state" className="flex flex-wrap gap-2">
             {STATES.map((s) => (
-              <a key={s} href={`/dev-preview/${screen}?state=${s}`} aria-current={s === state ? 'page' : undefined}
+              <a key={s} href={`/dev-preview/${screen}?state=${s}${q}`} aria-current={s === state ? 'page' : undefined}
                 className="rounded-full border border-border px-3 py-0.5 font-mono text-xs text-muted-foreground aria-[current=page]:border-primary aria-[current=page]:text-foreground">{s}</a>
             ))}
           </nav>
         </div>
-        {children ?? <Loaded id={screen} />}
+        {children ?? <Loaded id={screen} ids={ids} extra={extraProps} />}
       </DashboardShell>
     </MockFetch>
   );

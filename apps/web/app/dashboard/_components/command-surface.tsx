@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle, CheckCircle2, Clock, FolderKanban,
@@ -8,6 +10,8 @@ import {
 } from 'lucide-react';
 import { SafeDate } from '@/components/safe-format';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
+import { SubsidiaryChip } from '@/components/subsidiaries/subsidiary-chip';
+import { getSubsidiaryList, projectReportHref } from '@/components/subsidiaries/subsidiary-map';
 
 interface ProjectSummary {
   id: string;
@@ -15,6 +19,18 @@ interface ProjectSummary {
   status: string;
   openTaskCount: number;
   updatedAt: string;
+  subsidiary?: string | null;
+  progress?: { tasksTotal: number; tasksDone: number; percent: number };
+  nextMilestone?: { title: string; dueDate: string | null } | null;
+  openRisks?: number;
+  openQuestions?: number;
+}
+
+/** Tolerates the API returning either a bare id or an object with an id. */
+function subsidiaryIdOf(p: ProjectSummary): string | null {
+  const s = p?.subsidiary as unknown;
+  if (!s) return null;
+  return typeof s === 'string' ? s : ((s as { id?: string }).id ?? null);
 }
 
 interface TaskSummary {
@@ -41,6 +57,7 @@ export function CommandSurface() {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [actions, setActions] = useState<ActionSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [counts, setCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     Promise.all([
@@ -53,6 +70,23 @@ export function CommandSurface() {
       setActions(Array.isArray(a) ? a : []);
       setLoading(false);
     });
+  }, []);
+
+  // Subsidiary counts are a nicety: any failure leaves the tiles without numbers.
+  useEffect(() => {
+    fetch('/api/subsidiaries')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const list: unknown = Array.isArray(d) ? d : d?.subsidiaries;
+        if (!Array.isArray(list)) return;
+        const next: Record<string, number> = {};
+        for (const row of list as Array<{ id?: string; counts?: { active?: number }; activeProjects?: number }>) {
+          const n = row?.counts?.active ?? row?.activeProjects;
+          if (row?.id && typeof n === 'number') next[row.id] = n;
+        }
+        setCounts(next);
+      })
+      .catch(() => {});
   }, []);
 
   const openTasks = (tasks ?? []).filter((t: TaskSummary) => t?.status !== 'DONE');
@@ -74,6 +108,25 @@ export function CommandSurface() {
         <StatusCard icon={<AlertTriangle className="h-5 w-5" />} label="High Priority" value={highPriority.length} color="amber" />
         <StatusCard icon={<Activity className="h-5 w-5" />} label="Recent Actions" value={(actions ?? []).length} color="purple" />
       </div>
+
+      {/* Subsidiaries strip */}
+      <nav aria-label="Subsidiaries" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {getSubsidiaryList().map((sub) => (
+          <Link
+            key={sub.id}
+            href={`/dashboard/subsidiaries/${sub.id}`}
+            className="bg-card rounded-lg border border-border p-3 flex items-center gap-3 hover:border-primary/40 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <Image src={sub.logo} alt="" width={40} height={40} className="h-10 w-10 shrink-0 rounded-md object-cover" />
+            <span className="min-w-0">
+              <span className="block text-sm text-foreground truncate">{sub.name}</span>
+              {typeof counts[sub.id] === 'number' && (
+                <span className="block text-xs text-muted-foreground font-mono">{counts[sub.id]} active</span>
+              )}
+            </span>
+          </Link>
+        ))}
+      </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Priority Tasks */}
@@ -138,18 +191,46 @@ export function CommandSurface() {
               </button>
             </div>
           ) : (
-            <div className="space-y-2">
-              {activeProjects.slice(0, 5).map((p: ProjectSummary) => (
-                <button
-                  key={p?.id}
-                  onClick={() => router.push(`/dashboard/projects/${p?.id}`)}
-                  className="flex items-center justify-between py-2 px-3 bg-secondary/50 rounded-md hover:bg-secondary transition-colors w-full text-left"
-                >
-                  <span className="text-sm text-foreground">{p?.name ?? 'Untitled'}</span>
-                  <span className="text-xs text-muted-foreground font-mono">{p?.openTaskCount ?? 0} tasks</span>
-                </button>
-              ))}
-            </div>
+            <ul className="space-y-2">
+              {activeProjects.slice(0, 5).map((p: ProjectSummary) => {
+                const sid = subsidiaryIdOf(p);
+                const pr = p?.progress;
+                const pct = Math.max(0, Math.min(100, pr?.percent ?? 0));
+                return (
+                  <li key={p?.id}>
+                    <Link
+                      href={projectReportHref(p?.id, sid)}
+                      className="block py-2.5 px-3 bg-secondary/50 rounded-md hover:bg-secondary transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-sm text-foreground truncate">{p?.name ?? 'Untitled'}</span>
+                        <span className="text-[0.6875rem] text-muted-foreground font-mono shrink-0">{p?.status}</span>
+                      </span>
+                      <span className="mt-1.5 flex"><SubsidiaryChip id={sid} /></span>
+                      {pr ? (
+                        <span className="mt-2 flex items-center gap-2">
+                          <span className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={`${p?.name} progress`}>
+                            <span className="block h-full bg-primary" style={{ width: `${pct}%` }} />
+                          </span>
+                          <span className="text-xs font-mono text-foreground">{pct}%</span>
+                          <span className="text-xs font-mono text-muted-foreground">{pr.tasksDone}/{pr.tasksTotal} tasks</span>
+                        </span>
+                      ) : (
+                        <span className="mt-2 block text-xs font-mono text-muted-foreground">{p?.openTaskCount ?? 0} tasks</span>
+                      )}
+                      <span className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span className="truncate">
+                          {p?.nextMilestone
+                            ? <>Next: {p.nextMilestone.title}{p.nextMilestone.dueDate && <> · <SafeDate date={p.nextMilestone.dueDate} options={{ dateStyle: 'medium' }} /></>}</>
+                            : 'No upcoming milestone'}
+                        </span>
+                        <span className="font-mono shrink-0">{p?.openRisks ?? 0} {(p?.openRisks ?? 0) === 1 ? 'risk' : 'risks'} · {p?.openQuestions ?? 0} {(p?.openQuestions ?? 0) === 1 ? 'question' : 'questions'}</span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       </div>

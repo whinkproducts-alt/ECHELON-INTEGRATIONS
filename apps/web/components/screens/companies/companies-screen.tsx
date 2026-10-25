@@ -4,7 +4,9 @@
 // Brand-asset gallery files live in public/brand/. Logos have black backgrounds, so they are blended with the same class BrandMark uses.
 import * as React from 'react';
 import Image from 'next/image';
-import { ArrowDown, ExternalLink, Link2Off } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowDown, ArrowRight, ExternalLink, Link2Off } from 'lucide-react';
+import { getSubsidiaryList } from '@/components/subsidiaries/subsidiary-map';
 import { BrandMark, getCompany, getCompanies, getProductSites, type Company } from '@/components/brand';
 import { HoloBadge, HoloEmpty, HoloHeading, HoloOrbBackdrop, HoloPanel } from '@/components/ui/holo';
 import { TiltCard } from '@/components/screens/board/tilt-card';
@@ -72,6 +74,27 @@ export function CompaniesScreen() {
             <CompanyCard c={ultimate} size={110} relation={`${ultimate.name} is built by ${apps.name}`} />
           </section>
         )}
+
+        <section aria-labelledby="subs-title" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="subs-title" className="font-display text-xl font-semibold text-foreground">Subsidiaries</h2>
+            <Link href="/dashboard/subsidiaries" className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+              Open the Subsidiaries hub <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+          </div>
+          <ul className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,12rem),1fr))]">
+            {getSubsidiaryList().map((sub) => (
+              <li key={sub.id}>
+                <HoloPanel interactive className="h-full">
+                  <Link href={`/dashboard/subsidiaries/${sub.id}`} className="flex items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
+                    <Image src={sub.logo} alt="" width={48} height={48} className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                    <span className="min-w-0 font-display text-base font-semibold text-foreground">{sub.name}</span>
+                  </Link>
+                </HoloPanel>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <section aria-labelledby="sites-title" className="space-y-4">
           <h2 id="sites-title" className="font-display text-xl font-semibold text-foreground">Product websites</h2>

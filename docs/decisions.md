@@ -295,3 +295,11 @@ Reason: avoids a deprecation warning and a future break.
 Decision: `X-Forwarded-For` is trusted only when `TRUSTED_PROXY_HOPS` is set (Nth address from the right); otherwise sign-in and sign-up use a looser per-route bucket plus a per-account bucket. Body caps are enforced while streaming. The tenant token cap is a ceiling users cannot remove (`monthlyTokenBudget` is now BIGINT). The local fallback targets `OLLAMA_URL` explicitly, refuses a non-local URL, and never forwards a cloud key. The board roster and operator-credential status are visible only to `WHINK_OWNER_EMAILS` accounts; unset means nobody.
 Alternatives: trust XFF always; one shared "unknown" bucket; first-user-is-owner.
 Reason: client-controlled headers must not set a security key, one global bucket lets an attacker lock the owner out, and a new signup must not see operator data.
+
+## 2026-10-26 Subsidiaries and project assignment
+
+- The WHINK Group has five subsidiaries: consult, real-estate, trades, apps, frontliners. Their static facts (intro, about, services, directors) live in `apps/web/config/subsidiaries.json`, read through `lib/subsidiaries.ts` and validated by zod. Facts come from Victor's own Group website, read 2026-10-25. Nothing beyond those facts is added.
+- `projects.subsidiary` is a nullable string with an index on (ownerId, subsidiary). Null means unassigned, which covers every legacy project. There is no database enum: the five ids are validated against the config in code, so adding a subsidiary is a config change, not a migration.
+- Reassigning is its own action. A change through PATCH or PUT on a project is ledgered as `project_subsidiary_set` with the before and after ids, written through `lib/ledger.ts`.
+- API: `GET /api/projects` is additively enriched to ProjectCard, `GET /api/subsidiaries`, `GET /api/subsidiaries/[id]/projects` (id `unassigned` allowed) and `GET /api/projects/[id]/report`. All are Class A reads, scoped to projects the user owns or is a member of, with aggregates done by groupBy so the query count does not grow with the number of projects.
+- Contracts are not modelled. No Contract model exists in the schema, and Victor has not said what a contract is (its fields, its life cycle, how it relates to a project). Until he does, only projects carry a subsidiary. Nothing is invented.

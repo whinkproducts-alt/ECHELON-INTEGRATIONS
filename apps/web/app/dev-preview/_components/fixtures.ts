@@ -75,6 +75,82 @@ const ledger = (now: number) => LEDGER_ROWS.map(([action, status, inputSummary, 
   id: `l${i + 1}`, action, status, inputSummary, outputSummary, createdAt: iso(now - min * 60_000),
 }));
 
+
+// ---- Subsidiaries and project reports. Fake, dev-only. Shapes follow the ProjectCard contract; the report shape is a best guess. ----
+const SUB_IDS = ['consult', 'real-estate', 'trades', 'apps', 'frontliners'] as const;
+const SUB_NAMES: Record<string, string> = { consult: 'Whink Consult', 'real-estate': 'Whink Real Estate', trades: 'Whink Trades & Investments', apps: 'Whink Apps', frontliners: 'Whink Frontliners' };
+
+interface FxProject { id: string; name: string; goal: string | null; status: string; subsidiary: string | null; done: number; total: number; milestone: [string, string | null] | null; risks: number; questions: number }
+const FX_PROJECTS: FxProject[] = [
+  { id: 'prj_consult_1', name: 'Fixture ERP rollout', goal: 'Move the fake client onto the fake ERP', status: 'ACTIVE', subsidiary: 'consult', done: 4, total: 10, milestone: ['Pilot go-live', '2026-11-14T00:00:00.000Z'], risks: 2, questions: 1 },
+  { id: 'prj_consult_2', name: 'Placeholder security review', goal: null, status: 'ACTIVE', subsidiary: 'consult', done: 1, total: 6, milestone: ['Draft findings', '2026-11-03T00:00:00.000Z'], risks: 0, questions: 2 },
+  { id: 'prj_re_1', name: 'Sample duplex flip', goal: 'Resell the imaginary duplex', status: 'ACTIVE', subsidiary: 'real-estate', done: 7, total: 12, milestone: ['Final inspection', '2026-11-20T00:00:00.000Z'], risks: 1, questions: 0 },
+  { id: 'prj_trades_1', name: 'Notional equipment lease', goal: 'Lease two pretend excavators', status: 'ACTIVE', subsidiary: 'trades', done: 2, total: 5, milestone: null, risks: 0, questions: 3 },
+  { id: 'prj_apps_1', name: 'Mock mobile release', goal: 'Ship version 2 of the demo app', status: 'ACTIVE', subsidiary: 'apps', done: 9, total: 9, milestone: null, risks: 0, questions: 0 },
+  { id: 'prj_front_1', name: 'Dummy volunteer rota', goal: 'Cover every fake shift', status: 'ACTIVE', subsidiary: 'frontliners', done: 3, total: 8, milestone: ['Rota published', '2026-11-08T00:00:00.000Z'], risks: 1, questions: 1 },
+  { id: 'prj_none_1', name: 'Unassigned scratch idea', goal: null, status: 'ACTIVE', subsidiary: null, done: 0, total: 0, milestone: null, risks: 0, questions: 0 },
+  { id: 'prj_apps_2', name: 'Paused fixture portal', goal: null, status: 'PAUSED', subsidiary: 'apps', done: 2, total: 7, milestone: null, risks: 0, questions: 0 },
+];
+const card = (p: FxProject) => ({
+  id: p.id, name: p.name, goal: p.goal, status: p.status, subsidiary: p.subsidiary, updatedAt: '2026-10-24T15:00:00.000Z',
+  description: null, openTaskCount: p.total - p.done, createdAt: '2026-09-01T10:00:00.000Z',
+  progress: { tasksTotal: p.total, tasksDone: p.done, percent: p.total ? Math.round((p.done / p.total) * 100) : 0 },
+  nextMilestone: p.milestone ? { title: p.milestone[0], dueDate: p.milestone[1] } : null,
+  openRisks: p.risks, openQuestions: p.questions,
+});
+const subsidiaryRows = (empty: boolean) => ({
+  subsidiaries: SUB_IDS.map((id) => {
+    const mine = empty ? [] : FX_PROJECTS.filter((p) => p.subsidiary === id);
+    const active = mine.filter((p) => p.status === 'ACTIVE');
+    const next = mine.find((p) => p.milestone?.[1]);
+    return {
+      id, name: SUB_NAMES[id], logo: `/brand/subsidiaries/${id}.webp`, counts: { total: mine.length, active: active.length },
+      openTasks: mine.reduce((n, p) => n + p.total - p.done, 0), openRisks: mine.reduce((n, p) => n + p.risks, 0),
+      nextMilestone: next?.milestone ? { title: next.milestone[0], dueDate: next.milestone[1], projectId: next.id, projectName: next.name } : null,
+    };
+  }),
+  unassigned: empty ? { total: 0, active: 0 } : { total: 1, active: 1 },
+});
+const TASK_STATUSES = ['DONE', 'IN_PROGRESS', 'TODO', 'BLOCKED'];
+function report(id: string) {
+  const p = FX_PROJECTS.find((x) => x.id === id) ?? FX_PROJECTS[0];
+  const c = card(p);
+  const tasks = Array.from({ length: Math.max(p.total, 6) }, (_, i) => ({
+    id: `${p.id}_t${i + 1}`, title: `Fixture task ${i + 1}: ${['scope', 'draft', 'review', 'sign-off', 'handover', 'follow-up'][i % 6]}`,
+    status: i < p.done ? 'DONE' : TASK_STATUSES[1 + (i % 3)], priority: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'][i % 4],
+    dueDate: i % 2 ? `2026-11-0${(i % 8) + 1}T00:00:00.000Z` : null, assignee: i % 3 === 0 ? 'Avery Fixture' : null,
+  }));
+  return {
+    project: { id: p.id, name: p.name, goal: p.goal, description: 'Fake project used to preview the report layout. Nothing here is real.', status: p.status, subsidiary: p.subsidiary, createdAt: '2026-09-01T10:00:00.000Z', updatedAt: c.updatedAt },
+    subsidiary: p.subsidiary ? { id: p.subsidiary, name: SUB_NAMES[p.subsidiary], logo: `/brand/subsidiaries/${p.subsidiary}.webp` } : null,
+    progress: c.progress,
+    tasks,
+    milestones: [
+      { id: 'ms1', title: 'Kick-off', status: 'DONE', targetDate: '2026-09-15T00:00:00.000Z', completedAt: '2026-09-15T00:00:00.000Z' },
+      { id: 'ms2', title: p.milestone?.[0] ?? 'Mid-point review', status: 'IN_PROGRESS', targetDate: p.milestone?.[1] ?? '2026-11-01T00:00:00.000Z', completedAt: null },
+      { id: 'ms3', title: 'Close-out', status: 'PENDING', targetDate: '2026-12-15T00:00:00.000Z', completedAt: null },
+    ],
+    decisions: [
+      { id: 'd1', title: 'Use the fixture vendor', rationale: 'Cheapest of three imaginary quotes.', decidedBy: 'Avery Fixture', decidedAt: '2026-09-20T00:00:00.000Z' },
+      { id: 'd2', title: 'Defer phase two', rationale: 'Budget is a placeholder number.', decidedBy: null, decidedAt: '2026-10-05T00:00:00.000Z' },
+    ],
+    risks: [
+      { id: 'r1', title: 'Vendor delay (fictional)', severity: 'HIGH', likelihood: 'MEDIUM', status: 'OPEN', mitigation: 'Hold a spare vendor.' },
+      { id: 'r2', title: 'Scope creep (fictional)', severity: 'MEDIUM', likelihood: 'HIGH', status: 'OPEN', mitigation: null },
+      { id: 'r3', title: 'Old closed risk', severity: 'LOW', likelihood: 'LOW', status: 'CLOSED', mitigation: null },
+    ],
+    openQuestions: [
+      { id: 'q1', question: 'Who signs off the fake budget?', status: 'OPEN', assignedTo: 'Jordan Placeholder' },
+      { id: 'q2', question: 'Is the pretend deadline fixed?', status: 'OPEN', assignedTo: null },
+    ],
+    members: [
+      { userId: 'u1', name: 'Avery Fixture', role: 'OWNER' },
+      { userId: 'u2', name: 'Jordan Placeholder', role: 'MEMBER' },
+      { userId: 'u3', name: null, role: 'VIEWER' },
+    ],
+  };
+}
+
 const BOARD: unknown[] = [];
 
 export interface MockCtx { state: PreviewState; now: () => number; counters: { casl: boolean } }
@@ -83,7 +159,7 @@ export interface MockCtx { state: PreviewState; now: () => number; counters: { c
 export function answer(method: string, url: URL, body: unknown, ctx: MockCtx): Mocked | null {
   const p = url.pathname;
   const { state } = ctx;
-  const isData = p === '/api/contacts' || p === '/api/usage' || p === '/api/connectors' || p === '/api/news' || p === '/api/ledger' || p === '/api/approvals' || p === '/api/memory' || p === '/api/security/status' || p === '/api/board';
+  const isData = p === '/api/contacts' || p === '/api/usage' || p === '/api/connectors' || p === '/api/news' || p === '/api/ledger' || p === '/api/approvals' || p === '/api/memory' || p === '/api/security/status' || p === '/api/board' || p === '/api/subsidiaries' || p === '/api/projects' || /^\/api\/(subsidiaries\/[^/]+\/projects|projects\/[^/]+(\/report)?)$/.test(p);
   if (isData && method === 'GET') {
     if (state === 'error') return { status: 500, body: { error: 'Fixture error' } };
     if (state === 'loading') return { status: 200, body: {}, delayMs: 600_000 };
@@ -143,6 +219,23 @@ export function answer(method: string, url: URL, body: unknown, ctx: MockCtx): M
       secretsScan: { status: 'clean', ranAt: iso(now - 86_400_000), findings: 0, envFiles: 1, envFilesIgnoredByGit: true },
       githubSettings: 'not_verifiable_from_code',
     } };
+  }
+  if (p === '/api/subsidiaries') return { status: 200, body: subsidiaryRows(empty) };
+  const sp = p.match(/^\/api\/subsidiaries\/([^/]+)\/projects$/);
+  if (sp) return { status: 200, body: { subsidiary: { id: sp[1], name: SUB_NAMES[sp[1]] ?? sp[1] }, projects: empty ? [] : FX_PROJECTS.filter((x) => x.subsidiary === sp[1]).map(card) } };
+  if (p === '/api/projects') {
+    if (method === 'GET') return { status: 200, body: empty ? [] : FX_PROJECTS.map(card) };
+    const b = (body ?? {}) as { name?: string; goal?: string | null; subsidiary?: string };
+    if (!b.subsidiary || !(SUB_IDS as readonly string[]).includes(b.subsidiary)) return { status: 400, body: { error: 'Invalid subsidiary' } };
+    return { status: 201, body: { id: 'prj_new', name: b.name ?? 'New', goal: b.goal ?? null, status: 'ACTIVE', subsidiary: b.subsidiary, updatedAt: iso(ctx.now()) } };
+  }
+  const pr = p.match(/^\/api\/projects\/([^/]+)\/report$/);
+  if (pr) return { status: 200, body: empty ? { ...report(pr[1]), tasks: [], milestones: [], decisions: [], risks: [], openQuestions: [], members: [] } : report(pr[1]) };
+  const pd = p.match(/^\/api\/projects\/([^/]+)$/);
+  if (pd) {
+    if (method === 'PATCH') return { status: 200, body: { id: pd[1], ...(body as object) } };
+    const r = report(pd[1]);
+    return { status: 200, body: { ...r.project, tasks: r.tasks.map((t) => ({ id: t.id, title: t.title, status: t.status })), risks: r.risks, openQuestions: r.openQuestions, decisions: r.decisions } };
   }
   if (p === '/api/news') return { status: 200, body: empty ? { items: [], fetchedAt: iso(ctx.now()) } : NEWS };
   if (p === '/api/usage') return { status: 200, body: usage(url.searchParams.get('range') ?? '7d') };
