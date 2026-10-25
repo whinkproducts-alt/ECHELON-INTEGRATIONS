@@ -5,7 +5,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import { ArrowDown, ExternalLink, Link2Off } from 'lucide-react';
-import { BrandMark, getCompany, getCompanies, type Company } from '@/components/brand';
+import { BrandMark, getCompany, getCompanies, getProductSites, type Company } from '@/components/brand';
 import { HoloBadge, HoloEmpty, HoloHeading, HoloOrbBackdrop, HoloPanel } from '@/components/ui/holo';
 import { TiltCard } from '@/components/screens/board/tilt-card';
 
@@ -55,6 +55,7 @@ export function CompaniesScreen() {
   const group = list.find((c) => c.id === 'group');
   const apps = list.find((c) => c.id === 'apps');
   const ultimate = list.find((c) => c.id === 'ultimate');
+  const products = getProductSites();
 
   return (
     <div className="relative isolate min-h-full overflow-hidden">
@@ -71,6 +72,31 @@ export function CompaniesScreen() {
             <CompanyCard c={ultimate} size={110} relation={`${ultimate.name} is built by ${apps.name}`} />
           </section>
         )}
+
+        <section aria-labelledby="sites-title" className="space-y-4">
+          <h2 id="sites-title" className="font-display text-xl font-semibold text-foreground">Product websites</h2>
+          <ul className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,18rem),1fr))]">
+            {products.map((p) => (
+              <li key={p.id}>
+                <HoloPanel interactive className="h-full">
+                  <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${p.name} website in a new tab`} className="flex items-center gap-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
+                    {p.logo ? (
+                      <Image src={p.logo} alt="" width={56} height={56} className="holo-brand-img h-14 w-14 rounded-md object-contain" />
+                    ) : (
+                      <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-border bg-[hsl(var(--base))] font-display text-xl font-semibold text-primary">{p.name.slice(0, 1)}</span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-display text-lg font-semibold text-foreground">{p.name}</span>
+                      <span className="block truncate font-mono text-xs text-muted-foreground">{p.url.replace(/^https?:\/\//, '')}</span>
+                      {!p.logo && <span className="mt-1 block text-xs text-muted-foreground">Logo not provided yet</span>}
+                    </span>
+                    <ExternalLink className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                  </a>
+                </HoloPanel>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <section aria-labelledby="assets-title" className="space-y-4">
           <h2 id="assets-title" className="font-display text-xl font-semibold text-foreground">Brand assets</h2>
