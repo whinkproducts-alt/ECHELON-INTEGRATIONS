@@ -42,6 +42,24 @@ npx prisma migrate dev
 7. **Licences.** Only MIT, Apache 2.0, BSD or ISC dependencies. No AGPL, no source available, no unlicensed code. Ask Victor before adding anything else.
 8. **No vendor lock.** Models go through the model router. Never call a provider directly from a route.
 9. **Builders never grade their own work.** Code written by a builder agent is checked by a separate assurance agent.
+10. **Money and proprietary information always need Victor's approval.** No money transfer and no sharing of proprietary secrets or information happens without an approval from Victor, by request id. See "Protected actions" below. This rule outranks every other rule in this file.
+
+## Protected actions (strict rule, set by Victor 2026-10-26)
+Victor's instruction: there must be an approval from him for anything that has to do with money transfers or sharing of proprietary secrets and information.
+
+What is protected:
+- **Money.** Anything that moves, commits or authorises money: transfers, payments, payouts, refunds, withdrawals, wires, purchases, subscriptions, paying an invoice, changing payment or bank details, crypto, placing or executing a trade or order (Whink Trades), adding spend on a connected account.
+- **Proprietary secrets and information.** Anything that sends, shares, publishes, exports, uploads or forwards secrets or proprietary information to a destination outside the user's own account: source code, credentials, API keys and tokens, internal strategy, client, contract and financial data, board materials, memory contents, documents, project reports, ledger data. The destination can be a person, a channel, a connector, a public post, an email, a message or a link share. Sending the user's data to the configured model providers as part of normal chat is not covered; any other destination is.
+
+How it is enforced:
+- Always Class C, at every autonomy level, with or without a delegation, under every persona (WHINK or MAMBA). A gateway, a plugin manifest or a WHINK-side allow-list can never lower it.
+- Approval comes from the account owner (Victor), by request id, inside the 30 second window, hash-locked and exactly once. A bare "approved" approves nothing.
+- No standing approval, no "approve all", no blanket delegation. A scheduled action needs approval of its exact content.
+- No agent or subagent can approve on Victor's behalf, and no builder may add a shortcut, a test bypass or a "just for testing" path.
+- When in doubt whether an action is protected, treat it as protected. Fail closed.
+- Models must never claim a protected action was done before it is approved.
+- Every state change is ledgered with the category (`money` or `proprietary`).
+- The code lives in `lib/protected-actions.ts` and is enforced inside `checkPermission` in `lib/permission-engine.ts`.
 
 ## Staff email standard
 All WHINK Group staff use `firstname.lastname@whinkgroup.com`. This applies to real people and to agent personas that have a named role. When displaying a staff member or board member anywhere in the UI, always show their email in this format.
@@ -291,6 +309,7 @@ This repo is paired with the **W.H.I.N.K ULTIMATE** Cowork project on claude.ai 
 At the start of every Claude Code session:
 - Read `docs/daily-syncs/` — the most recent file is the current project state
 - Read `docs/decisions.md` — the dated decision log
+- Read `docs/learnings.md` — everything learnt building the app: Victor's preferences, the organisation, what exists, gotchas, open items
 - Read `/areas/whink-ai-assistant.md` from memory — long-term stated facts about this build
 
 The end-of-day-memory-sync scheduled task keeps all three in sync automatically.

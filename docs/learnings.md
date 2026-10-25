@@ -1,0 +1,76 @@
+# What we have learnt building W.H.I.N.K. Ultimate
+
+Long-term project memory. Read this with `CLAUDE.md`, `docs/decisions.md` and the latest file in `docs/daily-syncs/` at the start of every session. Facts here were stated by Victor, read from his Group website on 2026-10-25, or verified in the code. Anything uncertain is marked "unverified". Last updated 2026-10-26.
+
+## 1. Victor and how he wants to work
+
+- Victor Igboekwe is the founder and final approver. He is a hands-on owner who sends short directives and expects the team to act: "do whatever you think is best" means full authority to decide, not to skip checks.
+- His standing wishes: all agents autonomous and self-improving, agent swarms for accuracy and speed, no double work, maximum accuracy, and never hallucinate. When a fact is missing, ask for it or mark it "pending"; never invent it.
+- The UI target is "stunning": a Jarvis-class interface that would impress a tech billionaire in 2088. Holo glass, depth, light, purposeful motion. The Holo, Presence and Obsidian screens are key features and are only touched if the change makes them look better.
+- He sends images and links in chat. Photos arrive as files under the session scratchpad `images/` folder and must be copied into the repo by hand. The built-in WebFetch could not resolve his Render sites; `curl` through the session proxy worked once the network policy allowed it.
+- Strict rule (2026-10-26): anything to do with money transfers or sharing proprietary secrets or information needs his approval. See `CLAUDE.md` "Protected actions".
+- Product naming: the repo is called KAMSI-PRIME, but in the build and the website the product is "Whink Ultimate". W.H.I.N.K. = World-Aware Human-Integrated Neural Kernel, always written with "Ultimate". World-Aware: understands projects, people, files, communications and wider context. Human-Integrated: built around preferences, authority and memory. Neural: the intelligence and reasoning layer routing across multiple AI models. Kernel: the core layer coordinating memory, models, tools, permissions, automation and execution.
+
+## 2. The organisation
+
+- The WHINK Group is a group of companies (Calgary). WHINK Apps is a subsidiary of the Group that builds innovative apps. Whink Ultimate is the app built by WHINK Apps.
+- Five subsidiaries (from the Group website): Whink Consult (IT services, implementation, delivery), Whink Real Estate (flipping, development, commercial rentals), Whink Trades & Investments (trading arm; no longer accepting investors; trading bot planned), Whink Apps (application development, AI, robotics, technology), Whink Frontliners (construction and procurement, based in Nigeria).
+- Executive directors as published on the site: Consult, Victor Igboekwe; Apps, Anthony Igboekwe; Trades & Investments, Juliet Igboekwe; Frontliners, Dr Tinaye Lydia Muzenyi; Real Estate, Whitney Brown (she is not on the board list).
+- Board (from the site's leadership data): Victor Igboekwe, Founder & Executive Director, Whink Consult; Anthony Igboekwe; Juliet Igboekwe; Dr Tinaye Lydia Muzenyi, Executive Director & Head of People Operations; Genevieve Igboekwe, Chief Legal Counsel (Victor calls her Barrister Genevieve); Marcus Vale, Chief Executive Assistant, Office of the Founder. WHINK (Chief of Staff / Managing Director) and MAMBA (Chief Executive Operating Officer / Consigliere) are AI board members.
+- Staff email standard: `firstname.lastname@whinkgroup.com`. Board emails other than Victor's and Marcus's were generated from this rule; the mailboxes are unverified.
+- Innovation & Opportunity Directorate (AI personas with human names, report to Victor): Amara Okafor, Mateo Restrepo, Priya Raghunathan, Soren O'Connell, Mei-Ling Tan. The 326-agent, 15-directorate roster lives in `packages/org-kit` and every agent is dormant.
+- Websites (given by Victor): Group https://whink-group.onrender.com, Pro Assist https://wpma.onrender.com, Whink Predict https://whinkpredict.onrender.com. WHINK Apps and Whink Ultimate URLs are not supplied. The Group site is a single-page app with its data in `leadership.js`, `app.js` and `upgrade.js`.
+
+## 3. Brand and assets
+
+- Tokens: base #070B12, surface #0E1520, accent #38B6FF, deep #0B4E7A, MAMBA blood #C41E1E, ember #FF4A1C, amber #F5A623 (pending approvals and limits only), denial #E5484D (security events only). Fonts: Jost, IBM Plex Sans, IBM Plex Mono. Google Fonts are blocked in the container, so screenshots show fallback fonts.
+- Logos live in `apps/web/public/brand/` (Group, Apps v1 and v2, Ultimate emerald and violet, Pro Assist) and `public/brand/subsidiaries/` (consult, real-estate, trades, apps, frontliners). Board photos in `public/board/`. Photos arrive mode 600 and must be `chmod 644`.
+- Avatars: the animated WHINK and MAMBA avatars use `public/avatar/whink-portrait.webp` and `mamba-portrait.webp`. Their lip-sync mouth coordinates are hard-coded for those files, so swapping the image misaligns the mouth. Victor approved those as they are. The white-background WHINK and MAMBA portraits (`public/board/whink.webp`, `mamba.webp`) are for the Board Room only.
+
+## 4. What exists in the app (as of 2026-10-26)
+
+- Design system: `components/ui/holo/*` (HoloPanel, HoloHeading, HoloStat, HoloMeter, HoloBadge, HoloButton, HoloTabs, HoloGrid, HoloEmpty, HoloOrbBackdrop, HoloModal). CSS only, because framer-motion's layout feature breaks the build with the installed motion-dom.
+- Shell: `components/shell/*`, navigation in `components/shell/nav-config.ts` (one entry plus one page adds a screen), Ctrl/Cmd+K command palette, boot sequence, install prompt, PWA manifest (`app/manifest.ts`) and icons.
+- Screens: Command Center, Holo, Presence, Obsidian, News, Today, Board Room, Directory, Workforce, Companies, Subsidiaries (hub, per-subsidiary page, full project report), Connectors & Plugins, Usage & Offline, Security Center, Contacts & Calls, The Kernel.
+- APIs added: board, board meetings and minutes, connectors, usage and budget, contacts (vCard import, message, call), security status, subsidiaries, project cards and report.
+- Project flow: each project has an optional `subsidiary`. The Command Center shows a brief status and links to `/dashboard/subsidiaries/<id>/projects/<projectId>`, the full report. Unassigned projects link to `/dashboard/projects/<id>`. Owners can change a project; members can read it. There is no contract object yet.
+- Security: headers and CSP in `proxy.ts` (the Next 16 name for middleware), rate limits, capped request bodies, owner-only board roster and operator credential status, secret scan script, GitHub workflow, Dependabot, CODEOWNERS.
+- Stubs: sending SMS, WhatsApp, Telegram, email and phone calls returns "not configured" until credentials exist. Gmail, Google Calendar and Google Drive have no adapter. Google Contacts sync is not built; vCard import is the only route.
+
+## 5. Running it
+
+- From `apps/web`: `pnpm dev` (binds 127.0.0.1), `pnpm build`, `pnpm lint`, `pnpm test`, `npx prisma migrate dev`, `pnpm board:import <folder>` (dry run by default), `pnpm security:scan`, `pnpm memory:reembed`.
+- Two migrations are hand-written and have never run against Postgres: `20261025050000_board_connectors_usage_contacts` and `20261026000000_project_subsidiary`. Run `npx prisma migrate dev` first.
+- Set `WHINK_OWNER_EMAILS` to Victor's sign-in email or the Board Room shows an owner-only message. Other new env vars: `TRUSTED_PROXY_HOPS`, `WHINK_OFFLINE_FALLBACK`, `WHINK_LOCAL_MODEL`, `WHINK_MONTHLY_TOKEN_BUDGET`, `WHINK_BUDGET_SOFT_PCT`, `WHINK_BUDGET_HARD_PCT`, `WHINK_MODEL_PRICES`, plus Twilio, Telegram and SMTP credentials. Never commit values.
+- No Postgres runs in the cloud container, so nothing has been exercised against a real database or signed-in session.
+
+## 6. Technical lessons
+
+- This Next.js (16.3.x) has breaking changes: read `node_modules/next/dist/docs/` before routing code. `middleware.ts` is now `proxy.ts`.
+- Next allows one build at a time. Do not run `pnpm build` while another agent builds or a dev server shares `.next`.
+- `typecheck` has known errors that predate this work and do not stop the build: memory routes, `tool-registry.ts` initiator types, `auto-memory` tests, orchestrator `blendedItems`. New code must add none.
+- Persona is stored in `PersonaState`, not `userPreference`. An earlier guard read the wrong table and would have crashed at runtime; types caught it, tests did not.
+- Source-rule tests are strict: `lib/__tests__/holo-rendering.test.ts` fails on a raw hex colour or the words WHINK and MAMBA anywhere in the listed component files, even in a comment. `gateway-acceptance.test.ts` fails if non-test source contains a literal `openclaw__` tool name.
+- A dev-only preview harness (`/dev-preview/<screen>`) renders screens with fake data so they can be screenshotted without a database. It returns 404 unless `NODE_ENV` is exactly `development`, and the proxy only allows it in development. Screenshots use Playwright (preinstalled). Hide the Next dev overlay and set a session-storage key to skip the boot sequence.
+- Preview mock fetch was once restored by React strict-mode cleanup, so screens hit the real API and got redirects; fixtures must match real response shapes.
+- Rate limiting cannot see the socket address inside the Next proxy, so `X-Forwarded-For` is trusted only when `TRUSTED_PROXY_HOPS` is set; otherwise per-route and per-account buckets apply.
+- Progress is derived from status strings the schema does not constrain: tasks done at `DONE`, risks closed at `CLOSED`, `MITIGATED` or `RESOLVED`. If real data uses other values the counts are wrong.
+
+## 7. Process lessons
+
+- Builders never grade their own work. Every batch got an independent security review. The reviews found real issues each time (spoofable rate-limit key, removable budget cap, offline fallback that could reach a cloud URL, operator data visible to every signup, project writes outside the permission engine). Always run one.
+- Agent reports are claims, not evidence. Screenshots exposed a broken preview harness and empty states that the agents had called done. Rendering the UI is part of done.
+- Commit checkpoints often; the container is ephemeral. Commit only finished files while agents are still editing, and never commit half-built work to the branch.
+- When editing a test file, apply a narrow change and diff the test names afterwards. One edit once deleted five unrelated tests.
+- The stop hook demands a clean tree. Hold in-progress agent files rather than committing a broken state, then commit when gates pass.
+- Do not invent facts about people: seats, surnames, bios, emails and URLs come from Victor or his site, or stay "pending".
+
+## 8. Open items
+
+- Contracts: Victor must say what a contract holds (counterparty, value, dates, status, relation to projects) before it is modelled and assigned to a subsidiary.
+- Supply URLs for WHINK Apps and Whink Ultimate; logos for Whink Predict.
+- Confirm the generated board emails exist; supply bios and committees.
+- Set GitHub protections only he can set: branch protection with required reviews, secret-scanning push protection, 2FA, signed commits.
+- Add provider credentials for sending, run the migrations, and run the Phase 2 checklist on his Mac. A phase is not done until it passes for him.
+- Not built: editing product websites from the app, pushing news-driven updates to the company website, Google Contacts sync, video-room link for Quick Meeting with Marcus Vale.
+- Phase 3 (Recall) is planned and untouched.

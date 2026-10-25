@@ -303,3 +303,14 @@ Reason: client-controlled headers must not set a security key, one global bucket
 - Reassigning is its own action. A change through PATCH or PUT on a project is ledgered as `project_subsidiary_set` with the before and after ids, written through `lib/ledger.ts`.
 - API: `GET /api/projects` is additively enriched to ProjectCard, `GET /api/subsidiaries`, `GET /api/subsidiaries/[id]/projects` (id `unassigned` allowed) and `GET /api/projects/[id]/report`. All are Class A reads, scoped to projects the user owns or is a member of, with aggregates done by groupBy so the query count does not grow with the number of projects.
 - Contracts are not modelled. No Contract model exists in the schema, and Victor has not said what a contract is (its fields, its life cycle, how it relates to a project). Until he does, only projects carry a subsidiary. Nothing is invented.
+
+## 2026-10-26 Strict rule: money and proprietary information always need Victor's approval
+Decision: Victor set a strict rule. No money transfer and no sharing of proprietary secrets or information happens without an approval from him. It is non-negotiable 10 and the "Protected actions" section in `CLAUDE.md`. Protected actions are always Class C at every autonomy level, with or without a delegation, under every persona, and a gateway, plugin manifest or allow-list cannot lower them. Approval is by request id from the account owner, inside the 30 second window, hash-locked and exactly once. No standing approval, no approve-all, no agent approves for him. Unclear cases are treated as protected. Sending the user's data to the configured model providers in normal chat is not covered.
+Alternatives: leave it to per-tool Class C choices; allow delegation for small amounts.
+Reason: money and secrets cannot be recalled once they leave, and a rule that depends on each builder remembering it will eventually fail.
+
+## 2026-10-26 Project memory lives in the repo
+Decision: long-term project knowledge is written to `docs/learnings.md`, `docs/decisions.md` and `docs/daily-syncs/`. The account-level memory file named in `CLAUDE.md` cannot be reached from a cloud session, so the end-of-day sync should copy from these files.
+Alternatives: keep knowledge only in chat history.
+Reason: sessions end and containers are ephemeral; the repo is the only store every session reads.
+
