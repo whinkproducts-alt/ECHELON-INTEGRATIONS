@@ -2,6 +2,30 @@
 
 Newest first. Each entry: date, decision, alternatives, reason.
 
+<!-- Phase 3 entries below: lead-architect plan, 2026-10-25. Proposed, not yet confirmed by Victor. Phase 3 starts after Victor passes the Phase 2 checklist. -->
+
+## 2026-10-25  Phase 3: AnythingLLM in its own hardened compose, retrieval only
+Decision: AnythingLLM stays in `services/anythingllm/docker-compose.yml`, separate from the gateway's compose. It gets the same hardening as `services/openclaw`: pinned image, 127.0.0.1 only, memory limit, token required. WHINK uses it for retrieval only. It never runs AnythingLLM's own LLM on the recall path, and its embedder is local. `lib/anythingllm-client.ts` is the only code that knows the transport. `document_workspaces` is the only source of a user's workspace. The shared env slug fallback is removed.
+Alternatives: add AnythingLLM as a second service in the OpenClaw compose file; add it to the root compose with Postgres; keep the `/chat` query-mode endpoint and discard its text.
+Reason: one compose per swappable service means a recall swap does not touch the gateway, which matches the 2026-10-03 gateway decision. The `/chat` endpoint runs a model outside the model router (non-negotiable 8) and may call a paid provider configured inside AnythingLLM without WHINK knowing. A shared env workspace lets two tenants read one document store (non-negotiable 2).
+Open for Victor: if the pinned 1.7.4 image has no retrieval-only endpoint, the builder bumps the pinned version. That is a version change, not a vendor change, but it will be logged.
+
+## 2026-10-25  Phase 3: document citations are untrusted, every field
+Decision: every recall result from AnythingLLM carries a citation (document name, chunk id or index, page when available, score). The chunk text and every citation field are stripped of fake envelope tags, injection-scanned, capped and wrapped as untrusted before model context. A flagged chunk is dropped and ledgered. Reading documents marks the turn as having external content, so auto memory skips that turn.
+Alternatives: wrap only the chunk text and trust the metadata; treat user-uploaded documents as trusted because the user chose them.
+Reason: a document the user uploads can still be written by someone else (a contract from the other side, a forwarded PDF). File names and page labels are attacker-controllable too. Non-negotiable 6 makes no exception for content the user carried in. Skipping auto memory on those turns stops a planted document from becoming a "fact" WHINK repeats later.
+
+## 2026-10-25  Phase 3: auto memory is Class A routine, Class B sensitive, secrets never
+Decision: every auto-extracted memory goes through `checkPermission` before it is written. Routine facts use capability `memory_auto_write` (Class A). Sensitive facts use `memory_auto_write_sensitive` (Class B), which needs a delegation or the autonomy level. Sensitive covers health, money and account numbers, legal, family and relationships, location, identity documents and third-party personal facts. WHINK classifies them, not the extractor's own label alone. Credentials and secrets are dropped before the permission check at any class. Every candidate, written or not, is one ledger row, and denied rows hold the category only, never the text. MAMBA turns produce hypotheses only (confidence at most 0.4). Auto memories are INFERRED with confidence capped at 0.8 until the user confirms them.
+Alternatives: write everything as Class A (the inherited behaviour, with no permission check at all); make all auto memory Class C; queue sensitive facts for review instead of dropping them.
+Reason: remembering is an action, so it goes through the engine and the ledger like any other (non-negotiables 4 and 5). Class C on every turn would bury Victor in approval cards and kill the feature. Class B lets Victor grant sensitive memory once, by delegation. Secrets have no safe class. A review queue is more scope than Phase 3 needs, so it is left for later if Victor asks.
+
+## 2026-10-25  Phase 3: embeddings go through the model router, model stamped per row
+Decision: the model router gets an `embed()` function, and it is the only code that calls an embeddings endpoint. The embedding model is config. There is no hardcoded fallback to a paid provider. Each row records the model that embedded it. Search only compares rows from the current model, and a resumable, per-user backfill re-embeds the rest. The vector column size matches the configured model, and vectors of the wrong size are rejected, not written. HNSW cosine indexes replace sequential scans. Semantic dedup on write uses cosine similarity (default threshold 0.92) and updates the existing row instead of inserting a duplicate.
+Alternatives: keep `lib/embedding-service.ts` calling providers directly (the inherited behaviour); pad or truncate vectors to one fixed size; store one column per model.
+Reason: non-negotiable 8 covers every model call, embeddings included. The inherited silent OpenAI fallback sends memory text to a paid vendor because a key happens to be set. Padding vectors gives wrong similarity scores. One column per model adds schema churn every time a model changes. Stamping the model on each row plus a backfill keeps the swap a config change.
+Open for Victor: which embedding model is the default, which sets the column size. The plan recommends local Ollama `nomic-embed-text` (768, Apache 2.0, free, nothing leaves the Mac). The alternative is OpenAI `text-embedding-3-small` (1536, paid service). Choosing a paid default needs his approval.
+
 ## 2026-10-25  --destructive is a separate token from --denial
 Decision: `--destructive` (`0 72% 51%`) remains a distinct CSS token for generic UI errors (form validation, destructive button variants). It is not aliased to `--denial` (`356 77% 59%`).
 Alternatives: alias `--destructive` to `--denial` so one colour covers all error states.
