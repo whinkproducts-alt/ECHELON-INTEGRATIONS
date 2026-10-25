@@ -260,17 +260,19 @@ export async function completeCallback(
     }
   } catch {
     logger.error('social connection store failed', { userId, platform });
-    return fail(userId, platform, 'storage_failed');
+    return fail(userId, platform, 'storage_failed', correlationId);
   }
 
   await recordActionSafe({
     userId,
     initiator: 'user',
+    persona: 'WHINK',
     action: 'social_connected',
     tool: `social:${platform}`,
     permissionClass: 'A',
     status: 'VALIDATED',
     outputSummary: `connected ${platform}${identity.handle ? ` as @${identity.handle}` : ''}`,
+    correlationId,
   });
   return { ok: true };
 }

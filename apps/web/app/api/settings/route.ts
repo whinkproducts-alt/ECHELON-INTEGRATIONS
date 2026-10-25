@@ -182,8 +182,10 @@ export async function PATCH(req: NextRequest) {
       permissionClass: 'B',
       status: 'VALIDATED',
       initiator: 'user',
+      persona: 'WHINK',
       inputSummary: JSON.stringify({ from: lowerFrom, to: lowerTo }),
       outputSummary: 'Autonomy lowered',
+      correlationId: randomUUID(),
     });
   }
   if (raise) {
