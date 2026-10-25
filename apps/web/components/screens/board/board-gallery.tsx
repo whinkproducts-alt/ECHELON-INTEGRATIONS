@@ -47,7 +47,7 @@ export function BoardGallery({ members }: { members: BoardMember[] }) {
                 <div>
                   <dt className="font-mono text-[0.625rem] uppercase tracking-[0.2em] text-muted-foreground">Email</dt>
                   <dd className="mt-1 break-all font-mono text-xs text-foreground">
-                    {m.email ? <a href={`mailto:${m.email}`} className="hover:underline focus-visible:underline">{m.email}</a> : <span className="text-muted-foreground">Pending surname</span>}
+                    {m.email ? <a href={`mailto:${m.email}`} className="hover:underline focus-visible:underline">{m.email}</a> : <span className="text-muted-foreground">{m.kind === 'ai' ? 'AI board member' : 'Pending surname'}</span>}
                   </dd>
                 </div>
                 {m.bio && <p className="text-xs text-muted-foreground">{m.bio}</p>}

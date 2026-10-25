@@ -14,6 +14,8 @@ export const BoardMemberSchema = z.object({
   firstName: z.string().min(1).max(60).nullable().default(null),
   /** Null until Victor supplies it. Never guessed. */
   lastName: z.string().min(1).max(60).nullable().default(null),
+  /** 'ai' for the WHINK and MAMBA seats: they have no surname or email by design. */
+  kind: z.enum(['human', 'ai']).default('human'),
   /** For example 'Dr' or 'Barrister'. Separate from the name fields. */
   honorific: z.string().min(1).max(30).nullable().default(null),
   /** Null until the surname is known: firstname.lastname@whinkgroup.com needs one. */

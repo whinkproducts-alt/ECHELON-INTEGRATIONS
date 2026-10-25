@@ -30,6 +30,36 @@
       "needsDetails": false
     },
     {
+      "id": "whink",
+      "name": "WHINK",
+      "firstName": null,
+      "lastName": null,
+      "honorific": null,
+      "kind": "ai",
+      "email": null,
+      "seat": "AI Chief of Staff",
+      "needsDetails": false,
+      "bio": "Primary mind. Chief of staff voice: direct, brief, pushes back, never flatters.",
+      "imageUrl": "/board/whink.webp",
+      "joined": null,
+      "committees": []
+    },
+    {
+      "id": "mamba",
+      "name": "MAMBA",
+      "firstName": null,
+      "lastName": null,
+      "honorific": null,
+      "kind": "ai",
+      "email": null,
+      "seat": "Adversarial Strategist (Obsidian)",
+      "needsDetails": false,
+      "bio": "Adversarial strategist, Obsidian mode only. Plays the opponent's hardest lawful moves so Victor sees them coming. Never gives illegal help.",
+      "imageUrl": "/board/mamba.webp",
+      "joined": null,
+      "committees": []
+    },
+    {
       "id": "anthony-igboekwe",
       "name": "Anthony Igboekwe",
       "firstName": "Anthony",

@@ -98,6 +98,7 @@ export function mergeBoard(existing: BoardMember[], csv: CsvMember[], photos: Ph
     const seat = c.seat ?? cur?.seat ?? null;
     byId.set(id, {
       id,
+      kind: cur?.kind ?? 'human',
       name: c.name.trim(),
       firstName: cur?.firstName ?? parts[0] ?? null,
       lastName: cur?.lastName ?? (parts.length > 1 ? parts.slice(1).join(' ') : null),
@@ -126,7 +127,7 @@ export function mergeBoard(existing: BoardMember[], csv: CsvMember[], photos: Ph
     if (!m) {
       const first = titleCase(parsed.first);
       const last = titleCase(parsed.last);
-      m = { id: parsed.id, name: `${first} ${last}`, firstName: first, lastName: last, honorific: null, email: null, seat: null, needsDetails: true, bio: '', imageUrl: null, joined: null, committees: [] };
+      m = { id: parsed.id, kind: 'human', name: `${first} ${last}`, firstName: first, lastName: last, honorific: null, email: null, seat: null, needsDetails: true, bio: '', imageUrl: null, joined: null, committees: [] };
       warnings.push(`${p.file}: no CSV row; member created from the file name only, seat and email left empty (needsDetails).`);
     }
     m.imageUrl = `/board/${target}`;

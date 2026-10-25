@@ -14,8 +14,13 @@ describe('board.json', () => {
   it('parses, ids unique, only confirmed people', () => {
     expect(new Set(members.map((m) => m.id)).size).toBe(members.length);
     expect(members.map((m) => m.id).sort()).toEqual(
-      ['anthony-igboekwe', 'barrister-genevieve', 'dr-tinaye', 'juliet-igboekwe', 'marcus-vale', 'victor-igboekwe'],
+      ['anthony-igboekwe', 'barrister-genevieve', 'dr-tinaye', 'juliet-igboekwe', 'mamba', 'marcus-vale', 'victor-igboekwe', 'whink'],
     );
+  });
+  it('WHINK and MAMBA sit on the board as AI members with no email, using the white-background portraits', () => {
+    for (const id of ['whink', 'mamba']) {
+      expect(members.find((m) => m.id === id)).toMatchObject({ kind: 'ai', email: null, needsDetails: false, imageUrl: `/board/${id}.webp` });
+    }
   });
   it('Victor and Marcus are complete; the four others are flagged pending with null email and seat', () => {
     expect(members.find((m) => m.id === 'victor-igboekwe')).toMatchObject({ seat: 'Founder & Chairman', email: 'victor.igboekwe@whinkgroup.com', needsDetails: false });

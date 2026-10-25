@@ -60,7 +60,7 @@ describe('route behaviour with a session', () => {
     const { GET } = await import('../../app/api/board/route');
     const body = await (await GET()).json();
     delete process.env.WHINK_OWNER_EMAILS;
-    expect(body.members.length).toBe(6);
+    expect(body.members.length).toBe(8);
     expect(body.members.find((m: { id: string }) => m.id === 'dr-tinaye')).toMatchObject({ email: null, needsDetails: true });
   });
   it('manifest validate: 200 valid, 422 invalid licence, never executes anything', async () => {
