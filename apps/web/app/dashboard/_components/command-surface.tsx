@@ -7,6 +7,7 @@ import {
   MessageSquare, Brain, Activity, ArrowRight, Plus
 } from 'lucide-react';
 import { SafeDate } from '@/components/safe-format';
+import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 
 interface ProjectSummary {
   id: string;
@@ -35,6 +36,7 @@ interface ActionSummary {
 
 export function CommandSurface() {
   const router = useRouter();
+  const { productName } = useTenantConfig();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [actions, setActions] = useState<ActionSummary[]>([]);
@@ -62,7 +64,7 @@ export function CommandSurface() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">What requires your attention</h1>
-        <p className="text-sm text-muted-foreground mt-1">WHINK command overview</p>
+        <p className="text-sm text-muted-foreground mt-1">{`${productName} command overview`}</p>
       </div>
 
       {/* Status Cards */}
@@ -199,7 +201,7 @@ function StatusCard({ icon, label, value, color }: { icon: React.ReactNode; labe
   const colorMap: Record<string, string> = {
     primary: 'text-primary bg-primary/10',
     blue: 'text-blue-400 bg-blue-400/10',
-    amber: 'text-amber-400 bg-amber-400/10',
+    amber: 'text-muted-foreground bg-muted/50',
     purple: 'text-purple-400 bg-purple-400/10',
   };
   const cls = colorMap[color] ?? colorMap.primary;

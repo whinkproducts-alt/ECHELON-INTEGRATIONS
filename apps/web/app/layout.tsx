@@ -6,15 +6,15 @@ import { headers } from 'next/headers';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'WHINK — Intelligence Operating System',
-  description: 'World-Aware Human-Integrated Neural Kernel',
+  title: 'WHINK Ultimate',
+  description: 'Your AI operating system',
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
   },
   openGraph: {
-    title: 'WHINK — Intelligence Operating System',
-    description: 'World-Aware Human-Integrated Neural Kernel',
+    title: 'WHINK Ultimate',
+    description: 'Your AI operating system',
     images: ['/og-image.png'],
   },
   metadataBase: new URL(process.env.NEXTAUTH_URL ?? 'http://localhost:3000'),

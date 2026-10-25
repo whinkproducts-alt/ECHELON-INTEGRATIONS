@@ -92,7 +92,7 @@ export function MemorySurface() {
               <div className="flex items-center gap-2 mb-1">
                 <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${
                   m.epistemicStatus === 'KNOWN' ? 'bg-primary/10 text-primary' :
-                  m.epistemicStatus === 'HYPOTHESIS' ? 'bg-amber-400/10 text-amber-400' :
+                  m.epistemicStatus === 'HYPOTHESIS' ? 'bg-muted/50 text-muted-foreground' :
                   'bg-secondary text-muted-foreground'
                 }`}>{m.epistemicStatus}</span>
                 <span className="text-xs text-muted-foreground font-mono">conf: {m.confidence}</span>
@@ -135,10 +135,10 @@ export function MemorySurface() {
           ))}
 
           {tab === 'hypotheses' && (results?.hypotheses ?? []).map((h: any) => (
-            <div key={h.id} className="bg-card rounded-lg border border-amber-400/20 p-4">
+            <div key={h.id} className="bg-card rounded-lg border border-border p-4">
               <div className="flex items-center gap-2 mb-1">
-                <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
-                <span className="text-xs bg-amber-400/10 text-amber-400 px-1.5 py-0.5 rounded font-mono">HYPOTHESIS</span>
+                <Lightbulb className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs bg-muted/50 text-muted-foreground px-1.5 py-0.5 rounded font-mono">HYPOTHESIS</span>
                 <span className="text-xs text-muted-foreground font-mono">conf: {h.confidence}</span>
                 {h.mambaMode && <span className="text-xs text-muted-foreground font-mono">MAMBA {h.mambaMode}</span>}
               </div>

@@ -427,7 +427,7 @@ function ApiKeysSurface() {
             <label className="text-sm font-medium text-muted-foreground">Anthropic (Claude)</label>
             {storedKey('anthropic') && (
               <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 text-xs text-green-500 font-mono">
+                <span className="flex items-center gap-1 text-xs text-[hsl(var(--whink-accent))] font-mono">
                   <CheckCircle className="h-3 w-3" />
                   ····{storedKey('anthropic')!.keyHint}
                 </span>
@@ -474,7 +474,7 @@ function ApiKeysSurface() {
             <label className="text-sm font-medium text-muted-foreground">OpenAI (GPT / o-series)</label>
             {storedKey('openai') && (
               <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 text-xs text-green-500 font-mono">
+                <span className="flex items-center gap-1 text-xs text-[hsl(var(--whink-accent))] font-mono">
                   <CheckCircle className="h-3 w-3" />
                   ····{storedKey('openai')!.keyHint}
                 </span>

@@ -53,13 +53,11 @@
     --duration-normal: 250ms;
     --duration-slow: 350ms;
 
-    --chart-1: 160 84% 39%;
-    --chart-2: 35 92% 60%;
-    --chart-3: 0 72% 51%;
+    --chart-1: 204 100% 61%;
+    --chart-2: 210 60% 40%;
+    --chart-3: 14 100% 56%;
     --chart-4: 210 60% 50%;
     --chart-5: 280 65% 55%;
-
-    --mamba-amber: 35 92% 60%;
 
     /* Phase 5 brand tokens — WHINK accent, MAMBA blood, ember, amber */
     --whink-accent: 204 100% 61%;
@@ -67,7 +65,9 @@
     --ember: 14 100% 56%;
     --pending-amber: 37 90% 55%;
     --denial: 356 77% 59%;
-    --tool-result: 160 84% 39%;
+    --tool-result: 204 100% 61%;
+    --base: 220 20% 6%;
+    --surface: 220 25% 9%;
 
     /* HUD tokens. Aliases only, so the pending cyan decision (#4FF3EE vs accent)
        is a one line change here. --hud-mamba follows ember until Victor approves a value. */
@@ -125,10 +125,10 @@
 
 /* WHINK-specific styles */
 .whink-glow {
-  box-shadow: 0 0 15px -3px hsl(160 84% 39% / 0.15);
+  box-shadow: 0 0 15px -3px hsl(var(--whink-accent) / 0.15);
 }
 .mamba-glow {
-  box-shadow: 0 0 15px -3px hsl(35 92% 60% / 0.15);
+  box-shadow: 0 0 15px -3px hsl(var(--mamba-blood) / 0.15);
 }
 
 @keyframes pulse-subtle {

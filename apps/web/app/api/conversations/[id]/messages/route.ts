@@ -124,7 +124,7 @@ export async function POST(
     // Handle persona switch announcement
     let switchAnnouncement = '';
     if (orchResult.personaSwitched) {
-      switchAnnouncement = orchResult.newPersona === 'MAMBA' ? 'MAMBA active.' : 'WHINK active.';
+      switchAnnouncement = orchResult.newPersona === 'MAMBA' ? 'MAMBA active.' : 'Assistant active.';
     }
 
     // Get conversation history for context — most recent 50, in chronological order

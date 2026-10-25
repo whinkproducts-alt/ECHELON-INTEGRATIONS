@@ -645,7 +645,7 @@ export function ConversationSurface() {
                   disabled={streaming}
                   className={`px-4 py-3 rounded-lg border transition-colors disabled:opacity-30 ${
                     isListening
-                      ? 'bg-red-500/20 border-red-500 text-red-400 animate-pulse'
+                      ? 'bg-[hsl(var(--whink-accent)/0.15)] border-[hsl(var(--whink-accent))] text-[hsl(var(--whink-accent))] animate-pulse'
                       : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
                   }`}
                 >

@@ -5,9 +5,11 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Zap } from 'lucide-react';
+import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 
 export function SignupForm() {
   const router = useRouter();
+  const { productName } = useTenantConfig();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,7 +51,7 @@ export function SignupForm() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-3">
             <Zap className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-display font-bold tracking-tight text-foreground">WHINK</h1>
+            <h1 className="text-3xl font-display font-bold tracking-tight text-foreground">{productName}</h1>
           </div>
           <p className="text-sm text-muted-foreground font-mono">Initialize your operating system</p>
         </div>

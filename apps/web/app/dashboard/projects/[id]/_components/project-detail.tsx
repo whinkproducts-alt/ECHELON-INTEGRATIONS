@@ -77,13 +77,13 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         <div className="space-y-4">
           <div className="bg-card rounded-lg border border-border p-5">
             <h2 className="text-sm font-medium text-foreground flex items-center gap-2 mb-3">
-              <AlertTriangle className="h-4 w-4 text-amber-400" /> Risks
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" /> Risks
             </h2>
             {(project?.risks ?? []).length === 0 ? (
               <p className="text-xs text-muted-foreground">No risks identified.</p>
             ) : (project.risks ?? []).map((r: any) => (
               <div key={r.id} className="py-1.5 text-sm text-foreground">
-                <span className="text-xs text-amber-400 font-mono mr-2">[{r.severity}]</span>{r.title}
+                <span className="text-xs text-muted-foreground font-mono mr-2">[{r.severity}]</span>{r.title}
               </div>
             ))}
           </div>
