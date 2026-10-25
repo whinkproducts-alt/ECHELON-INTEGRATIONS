@@ -94,3 +94,43 @@ Limits: nonce cache, rate limiter and HOLO bridge are in memory, correct for one
 Added directUrl = env("DIRECT_URL") to the Prisma datasource. App traffic uses DATABASE_URL (Neon pooled host). Migrations use DIRECT_URL (non-pooled host), because PgBouncer transaction mode breaks Prisma migrate advisory locks. Locally both point at the same Docker Postgres.
 Steps for Neon: create the project with Postgres 16, run CREATE EXTENSION vector (migration 20261002083522 already does this), copy both connection strings into the untracked .env, then run npx prisma migrate deploy. If connections fail, remove channel_binding=require from the URL. Do not use the current password: it is being rotated, and it must never enter git.
 No init_schema migration was created. The repo already has 20 migrations including 20261002045845_init, and a second baseline would conflict with them. Fresh Neon databases get the full history from migrate deploy.
+
+## 2026-10-25  Dynamic model routing in model-router.ts
+Decision: `selectModel()` added to `lib/model-router.ts`. It scores messages using keyword patterns and selects Haiku 5.5 (score 3 or less), Sonnet 5.5 (4 to 6) or Opus 5.5 (7 or more). MAMBA always routes to Opus. Large output (over 2000 tokens) bumps the tier. Callers pass `ModelSelectionHints`; `forceTier` overrides scoring. Routing stays inside the model router, so no route picks a provider or model directly.
+Alternatives: one fixed model per persona; let each route choose its own model.
+Reason: cost efficiency without sacrificing quality for complex tasks.
+
+## 2026-10-25  Persona switch route now ledgers every switch (A2, L-1)
+Decision: `POST /api/persona/switch` and the orchestrator persona-switch path both call `recordActionSafe` after a successful upsert.
+Alternatives: ledger only the route path and leave the orchestrator path silent (the previous behaviour).
+Reason: non-negotiable 5. Every action lands in the ledger.
+
+## 2026-10-25  Cross-turn taint propagation (M-1)
+Decision: when `externalContentThisTurn` is true after a tool loop run, the taint flag `__taint__:<conversationId>` is written and awaited. Previously it was set only on injection-blocked user messages. Turn 2 reads this flag and sets `conversationTainted: true`.
+Alternatives: taint only on blocked user messages (the previous behaviour); fire-and-forget the flag write.
+Reason: external content injected in turn 1 could survive in assistant text and replay as trusted context in turn 2. The write is awaited so turn 2 cannot race ahead of it.
+
+## 2026-10-25  memory_read and calendar_list added to EXTERNAL_TOOLS (M-2)
+Decision: `memory_read` and `calendar_list` now go through the full sanitise, NFKC, injection-scan, wrapAsUntrusted pipeline and set `externalContentThisTurn = true`.
+Alternatives: treat stored memory and calendar data as trusted internal content (the previous behaviour).
+Reason: stored memory can contain content that originated outside WHINK (pasted emails, auto-extracted facts). Treating it as trusted violated non-negotiable 6.
+
+## 2026-10-25  correlationId, persona, initiator required on OAuth and autonomy ledger rows (M-3)
+Decision: `social_connect_failed`, `social_connected`, `social_connection_expired`, `social_disconnected` and `autonomy_level_change` ledger rows now carry `correlationId` (randomUUID per request), `persona` and `initiator`.
+Alternatives: leave these fields optional for non-tool events.
+Reason: A2 requires all seven fields on every ledger write. Missing fields made incident tracing impossible.
+
+## 2026-10-25  Tool limit clamped to 1 to 20 (L-4)
+Decision: `memory_read` and `document_search` clamp `params.limit` to `Math.min(Math.max(1, floor(limit)), 20)`.
+Alternatives: trust the model-supplied limit (the previous behaviour); reject out-of-range values with an error.
+Reason: unbounded model-supplied limits could pull excessive data into context and strain the database. Clamping keeps the tool usable when the model asks for too much.
+
+## 2026-10-25  --primary and --ring remapped to WHINK accent (E7)
+Decision: `--primary: 204 100% 61%` (WHINK accent #38B6FF) in `:root` and `.dark`. `--ring` follows.
+Alternatives: keep the previous green value (`160 84% 39%`).
+Reason: the green had no basis in the WHINK design token palette and conflicted with the product identity. Follows the 2026-09-23 decision that the accent is azure #38B6FF.
+
+## 2026-10-25  CASL deferred to Phase 6
+Decision: social write tools (post, reply, DM, schedule, delete, follow, unfollow) stay Class C at all autonomy levels. CASL compliance (consent and unsubscribe for commercial messages) is required before white-labelling. Victor's personal use proceeds now. Canadian counsel to be engaged before Phase 6 (billing).
+Alternatives: build consent and unsubscribe handling now, before any personal use.
+Reason: with one user approving every send by hand, nothing goes out as unsolicited commercial messaging on WHINK's initiative. Paying customers change that, so the work is tied to the product shell phase.
