@@ -68,7 +68,7 @@ function Room({ meeting, members, onSaved }: { meeting: BoardMeetingView; member
             <div className="absolute inset-[22%] rounded-full border border-[hsl(var(--whink-accent)/0.4)] bg-[radial-gradient(circle,hsl(var(--deep)/0.45),hsl(var(--base)/0.2))] shadow-[0_0_60px_-10px_hsl(var(--whink-accent)/0.5)]" aria-hidden />
             <div className="absolute left-1/2 top-1/2 flex w-[30%] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 text-center">
               <span className="relative block aspect-square w-full overflow-hidden rounded-full border border-primary shadow-[0_0_30px_hsl(var(--whink-accent)/0.6)]">
-                <Image src="/avatar/whink-persona.webp" alt={`${productName} facilitating`} fill sizes="10rem" className="object-cover object-top" />
+                <Image src="/avatar/whink-portrait.webp" alt={`${productName} facilitating`} fill sizes="10rem" className="object-cover object-top" />
               </span>
               <span className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-primary">{productName}</span>
               <span className="text-[0.625rem] text-muted-foreground">Facilitating</span>

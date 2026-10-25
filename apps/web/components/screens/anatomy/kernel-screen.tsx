@@ -150,7 +150,7 @@ export function KernelScreen() {
           <div className="absolute left-1/2 top-1/2 aspect-square w-[21%] -translate-x-1/2 -translate-y-1/2">
             <div className="h-full w-full animate-[holo-float_7s_ease-in-out_infinite] motion-reduce:animate-none">
               <div className="relative h-full w-full overflow-hidden rounded-full border border-primary/60" style={{ boxShadow: '0 0 60px 6px hsl(var(--whink-accent) / 0.45), inset 0 0 24px hsl(var(--base) / 0.6)' }}>
-                <img src="/avatar/whink-persona.webp" alt={`${tenant.productName} portrait`} width={168} height={168} className="h-full w-full object-cover" decoding="async" />
+                <img src="/avatar/whink-portrait.webp" alt={`${tenant.productName} portrait`} width={168} height={168} className="h-full w-full object-cover" decoding="async" />
               </div>
             </div>
           </div>
