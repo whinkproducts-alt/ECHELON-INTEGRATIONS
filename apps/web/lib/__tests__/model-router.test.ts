@@ -380,3 +380,105 @@ describe('Ollama round-trip (integration)', () => {
     5_000, // 5 s timeout for the integration test
   );
 });
+
+// ── selectModel unit tests ────────────────────────────────────────────────────
+
+describe('selectModel', () => {
+  beforeEach(() => vi.resetModules());
+
+  it('returns haiku for a short simple question', async () => {
+    const { selectModel } = await import('../model-router');
+    const model = selectModel([{ role: 'user', content: 'What is the capital of Canada?' }]);
+    expect(model).toBe('claude-haiku-5-5');
+  });
+
+  it('returns opus for MAMBA persona regardless of content', async () => {
+    const { selectModel } = await import('../model-router');
+    const model = selectModel(
+      [{ role: 'user', content: 'What is 2+2?' }],
+      { persona: 'MAMBA' },
+    );
+    expect(model).toBe('claude-opus-5-5');
+  });
+
+  it('returns opus for forceTier opus', async () => {
+    const { selectModel } = await import('../model-router');
+    const model = selectModel([{ role: 'user', content: 'hi' }], { forceTier: 'opus' });
+    expect(model).toBe('claude-opus-5-5');
+  });
+
+  it('returns haiku for forceTier haiku', async () => {
+    const { selectModel } = await import('../model-router');
+    const model = selectModel([{ role: 'user', content: 'Complex architecture review needed' }], { forceTier: 'haiku' });
+    expect(model).toBe('claude-haiku-5-5');
+  });
+
+  it('returns sonnet for forceTier sonnet', async () => {
+    const { selectModel } = await import('../model-router');
+    const model = selectModel([{ role: 'user', content: 'hi' }], { forceTier: 'sonnet' });
+    expect(model).toBe('claude-sonnet-5-5');
+  });
+
+  it('returns opus for high complexityScore', async () => {
+    const { selectModel } = await import('../model-router');
+    const model = selectModel([{ role: 'user', content: 'anything' }], { complexityScore: 8 });
+    expect(model).toBe('claude-opus-5-5');
+  });
+
+  it('returns haiku for low complexityScore', async () => {
+    const { selectModel } = await import('../model-router');
+    const model = selectModel([{ role: 'user', content: 'anything' }], { complexityScore: 2 });
+    expect(model).toBe('claude-haiku-5-5');
+  });
+
+  it('returns sonnet for mid complexityScore', async () => {
+    const { selectModel } = await import('../model-router');
+    const model = selectModel([{ role: 'user', content: 'anything' }], { complexityScore: 5 });
+    expect(model).toBe('claude-sonnet-5-5');
+  });
+
+  it('bumps to opus when estimatedOutputTokens > 2000 on a borderline score', async () => {
+    const { selectModel } = await import('../model-router');
+    // complexityScore 5 = Sonnet, but +2 from large output → 7 = Opus
+    const model = selectModel(
+      [{ role: 'user', content: 'anything' }],
+      { complexityScore: 5, estimatedOutputTokens: 3000 },
+    );
+    expect(model).toBe('claude-opus-5-5');
+  });
+
+  it('auto-selects sonnet for a code-heavy message', async () => {
+    const { selectModel } = await import('../model-router');
+    const model = selectModel([
+      { role: 'user', content: 'Can you refactor this function?\n```typescript\nasync function foo() {}\n```' },
+    ]);
+    expect(model).toBe('claude-sonnet-5-5');
+  });
+
+  it('auto-selects opus for architecture/security keywords', async () => {
+    const { selectModel } = await import('../model-router');
+    const model = selectModel([
+      { role: 'user', content: 'Do a full security threat model and architect a migration strategy for the auth system.' },
+    ]);
+    expect(model).toBe('claude-opus-5-5');
+  });
+
+  it('streamChat uses hints when model is omitted', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    vi.doMock('@anthropic-ai/sdk', () => {
+      const mockStream = (async function* () {
+        yield { type: 'content_block_delta', delta: { type: 'text_delta', text: 'ok' } };
+      })();
+      const streamFn = vi.fn().mockResolvedValue(mockStream);
+      function MockAnthropic(this: any) { this.messages = { stream: streamFn }; }
+      return { default: MockAnthropic };
+    });
+    const { streamChat } = await import('../model-router');
+    const stream = await streamChat({
+      messages: [{ role: 'user', content: 'What is 1+1?' }],
+      hints: { forceTier: 'haiku' },
+    });
+    await drainStream(stream);
+    // No assertion on model string here — just verifies it routes to Anthropic without throwing
+  });
+});

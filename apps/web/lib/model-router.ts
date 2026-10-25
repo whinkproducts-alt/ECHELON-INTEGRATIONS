@@ -9,6 +9,92 @@ export interface ChatMessage {
   content: string;
 }
 
+/**
+ * Signals used by selectModel() to pick the cheapest model that can handle the task.
+ * All fields are optional; omit any you don't know.
+ */
+export interface ModelSelectionHints {
+  /** 'haiku' | 'sonnet' | 'opus' — force a tier regardless of scoring */
+  forceTier?: 'haiku' | 'sonnet' | 'opus';
+  /** Active persona. MAMBA adversarial work always gets Opus. */
+  persona?: 'WHINK' | 'MAMBA';
+  /** Expected output length in tokens. >2000 bumps the tier. */
+  estimatedOutputTokens?: number;
+  /**
+   * Caller-supplied complexity score (0–10).
+   * 0–3 → Haiku, 4–6 → Sonnet, 7–10 → Opus.
+   * When omitted the router scores from message content automatically.
+   */
+  complexityScore?: number;
+}
+
+// Claude 5 model IDs
+const MODEL_HAIKU = 'claude-haiku-5-5';
+const MODEL_SONNET = 'claude-sonnet-5-5';
+const MODEL_OPUS = 'claude-opus-5-5';
+
+// Keywords that raise the complexity tier
+const HIGH_COMPLEXITY_PATTERNS =
+  /\b(architect|design decision|tradeoff|security|migration|strategy|analyze|evaluation|critique)\b/i;
+// Apex keywords that alone justify Opus (+3 bonus)
+const APEX_PATTERNS = /\b(threat model|adversar|multi-step|synthesize|root cause)\b/i;
+const CODE_PATTERNS = /```|import |function |class |async |await |SELECT |UPDATE |CREATE TABLE/i;
+const SIMPLE_PATTERNS =
+  /^(what is|who is|when did|define |list the|how many|yes or no|summarize this in one|translate)\b/i;
+
+/**
+ * Selects the cheapest Claude 5 model that can handle the task.
+ *
+ * Tier mapping:
+ *   Haiku 5.5  — factual Q&A, formatting, short outputs (<300 tokens), no code, no reasoning
+ *   Sonnet 5.5 — standard coding, analysis, multi-turn conversation (default)
+ *   Opus 5.5   — MAMBA, complex architecture, security reviews, score ≥ 7
+ */
+export function selectModel(messages: ChatMessage[], hints: ModelSelectionHints = {}): string {
+  if (hints.forceTier === 'haiku') return MODEL_HAIKU;
+  if (hints.forceTier === 'opus') return MODEL_OPUS;
+  if (hints.forceTier === 'sonnet') return MODEL_SONNET;
+
+  // MAMBA adversarial work always needs the most capable model
+  if (hints.persona === 'MAMBA') return MODEL_OPUS;
+
+  let score: number;
+
+  if (hints.complexityScore !== undefined) {
+    score = hints.complexityScore;
+  } else {
+    score = scoreMessages(messages);
+  }
+
+  // Large expected output bumps the score
+  if ((hints.estimatedOutputTokens ?? 0) > 2000) score += 2;
+
+  if (score <= 3) return MODEL_HAIKU;
+  if (score <= 6) return MODEL_SONNET;
+  return MODEL_OPUS;
+}
+
+function scoreMessages(messages: ChatMessage[]): number {
+  const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+  const text = lastUser?.content ?? '';
+  const totalChars = messages.reduce((n, m) => n + m.content.length, 0);
+
+  let score = 4; // default: Sonnet territory
+
+  // Long conversation history = more context = more complex
+  if (totalChars > 8000) score += 1;
+  if (totalChars > 20000) score += 1;
+
+  // Latest message signals
+  if (HIGH_COMPLEXITY_PATTERNS.test(text)) score += 2;
+  if (APEX_PATTERNS.test(text)) score += 3;
+  if (CODE_PATTERNS.test(text)) score += 1;
+  if (SIMPLE_PATTERNS.test(text)) score -= 2;
+  if (text.length < 80 && !CODE_PATTERNS.test(text)) score -= 1;
+
+  return Math.max(0, Math.min(10, score));
+}
+
 export interface StreamChatOptions {
   messages: ChatMessage[];
   model?: string;
@@ -16,6 +102,11 @@ export interface StreamChatOptions {
   temperature?: number;
   /** Per-user BYOK API key, decrypted. If provided, overrides the server env key. */
   apiKey?: string;
+  /**
+   * When model is omitted, these hints drive automatic model selection
+   * via selectModel(). If both model and hints are provided, model wins.
+   */
+  hints?: ModelSelectionHints;
 }
 
 /**
@@ -29,7 +120,11 @@ export interface StreamChatOptions {
  *   data: {"type":"error","error":"..."}
  */
 export async function streamChat(opts: StreamChatOptions): Promise<ReadableStream<Uint8Array>> {
-  const model = opts.model ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+  const model =
+    opts.model ??
+    (opts.hints ? selectModel(opts.messages, opts.hints) : null) ??
+    process.env.DEFAULT_MODEL ??
+    'llama3.1:8b';
   const maxTokens = opts.maxTokens ?? 4000;
   const temperature = opts.temperature ?? 0.7;
 
@@ -48,7 +143,11 @@ export async function streamChat(opts: StreamChatOptions): Promise<ReadableStrea
  * Throws on error.
  */
 export async function chatOnce(opts: StreamChatOptions): Promise<string> {
-  const model = opts.model ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+  const model =
+    opts.model ??
+    (opts.hints ? selectModel(opts.messages, opts.hints) : null) ??
+    process.env.DEFAULT_MODEL ??
+    'llama3.1:8b';
   const maxTokens = opts.maxTokens ?? 512;
   const temperature = opts.temperature ?? 0.0;
 
