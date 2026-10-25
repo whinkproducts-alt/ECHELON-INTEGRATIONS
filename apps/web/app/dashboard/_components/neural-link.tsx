@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { X, Zap, Clock, Pin, PinOff } from 'lucide-react';
+import { X, Zap, Clock, Pin, PinOff, Lock } from 'lucide-react';
 
 export type NeuralEvent = {
   id: string;
@@ -16,10 +16,10 @@ interface NeuralLinkProps {
   onClose: () => void;
 }
 
-const EVENT_META: Record<NeuralEvent['type'], { icon: string; label: string; colorVar: string; useClockIcon?: boolean }> = {
+const EVENT_META: Record<NeuralEvent['type'], { icon: string; label: string; colorVar: string; useClockIcon?: boolean; useLockIcon?: boolean }> = {
   tool_call:      { icon: '⚙', label: 'tool call',     colorVar: 'var(--tenant-accent, hsl(var(--whink-accent)))' },
   tool_result:    { icon: '✓', label: 'tool result',   colorVar: 'hsl(var(--tool-result))' },
-  security_event: { icon: '⚠', label: 'security',      colorVar: 'hsl(var(--denial))' },
+  security_event: { icon: '⚠', label: 'security',      colorVar: 'hsl(var(--denial))', useLockIcon: true },
   memory_write:   { icon: '◈', label: 'memory',        colorVar: 'hsl(var(--whink-accent))' },
   text_chunk:     { icon: '▸', label: 'stream',        colorVar: 'hsl(var(--muted-foreground))' },
   approval:       { icon: '',  label: 'approval pending', colorVar: 'hsl(var(--pending-amber))', useClockIcon: true },
@@ -145,7 +145,7 @@ export function NeuralLink({ events, open, onClose }: NeuralLinkProps) {
                 style={{ color: meta.colorVar }}
                 aria-label={meta.label}
               >
-                {meta.useClockIcon ? <Clock size={12} /> : meta.icon}
+                {meta.useClockIcon ? <Clock size={12} /> : meta.useLockIcon ? <Lock size={12} /> : meta.icon}
               </span>
               <span className="flex-1 text-muted-foreground break-words py-0.5">
                 {isSecurity && (

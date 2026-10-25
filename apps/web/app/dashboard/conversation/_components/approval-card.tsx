@@ -219,7 +219,7 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code, classNam
           disabled={disabled}
           aria-label={`Approve ${title}`}
           className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-opacity disabled:opacity-40"
-          style={{ color: AMBER, borderColor: AMBER }}
+          style={{ color: ACCENT, borderColor: ACCENT }}
         >
           <Check className="h-3 w-3" aria-hidden /> Approve
         </button>
