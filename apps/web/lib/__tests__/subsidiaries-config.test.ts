@@ -33,3 +33,11 @@ describe('subsidiaries config', () => {
     expect(getSubsidiary('trades')?.notice).toMatch(/no longer accepting investors/);
   });
 });
+
+describe('permission registry', () => {
+  it('registers project_create and project_update as Class A', async () => {
+    const { capabilityClass } = await import('../permission-engine');
+    expect(capabilityClass('project_update')).toBe('A');
+    expect(capabilityClass('project_create')).toBe('A');
+  });
+});

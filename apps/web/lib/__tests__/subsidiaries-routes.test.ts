@@ -11,6 +11,7 @@ function makePrisma() {
   return {
     project: { findMany: fn(), findFirst: fn(), create: fn(), updateMany: fn() },
     projectMember: { create: fn() },
+    $transaction: vi.fn(),
     projectTask: { groupBy: fn() },
     projectMilestone: { findMany: fn() },
     projectRisk: { groupBy: fn() },
@@ -19,6 +20,7 @@ function makePrisma() {
 }
 let db: ReturnType<typeof makePrisma>;
 const writeLedger = vi.fn();
+const checkPermission = vi.fn();
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 const jreq = (method: string, body?: unknown) =>
   new Request('http://localhost/x', { method, headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -27,9 +29,12 @@ function setup(session: unknown) {
   vi.resetModules();
   db = makePrisma();
   writeLedger.mockReset();
+  checkPermission.mockReset().mockResolvedValue({ allowed: true, method: 'auto' });
+  vi.doMock('@/lib/permission-engine', () => ({ checkPermission }));
   vi.doMock('@/auth', () => ({ auth: async () => session }));
   vi.doMock('@/lib/db', () => ({ prisma: db }));
   vi.doMock('@/lib/ledger', () => ({ writeLedger }));
+  db.$transaction.mockImplementation(async (fn: any) => fn(db));
   db.project.findMany.mockResolvedValue([]);
   db.projectTask.groupBy.mockResolvedValue([]);
   db.projectMilestone.findMany.mockResolvedValue([]);
@@ -92,37 +97,85 @@ describe('with a session', () => {
     expect(JSON.stringify(db.project.findMany.mock.calls[0][0].where)).toContain('"userId":"u1"');
   });
 
-  it('POST validates subsidiary', async () => {
+  it('POST validates, checks permission, ledgers', async () => {
     const { POST } = await import('../../app/api/projects/route');
-    expect((await POST(jreq('POST', { name: 'x', subsidiary: 'bogus' }) as any)).status).toBe(400);
+    for (const bad of [{ name: 'x', subsidiary: 'bogus' }, { name: '' }, { name: 'x', extra: 1 }, null, 'str', { name: 'x'.repeat(201) }]) {
+      expect((await POST(jreq('POST', bad) as any)).status).toBe(400);
+    }
+    expect((await POST(new Request('http://x', { method: 'POST', body: '{bad' }) as any)).status).toBe(400);
     expect(db.project.create).not.toHaveBeenCalled();
     db.project.create.mockResolvedValue(P({ subsidiary: 'apps' }));
     expect((await POST(jreq('POST', { name: 'x', subsidiary: 'apps' }) as any)).status).toBe(200);
     expect(db.project.create.mock.calls[0][0].data.subsidiary).toBe('apps');
+    expect(checkPermission).toHaveBeenCalledWith('u1', 'project_create', 'A', expect.any(String));
+    expect(writeLedger.mock.calls[0][0]).toMatchObject({ userId: 'u1', action: 'project_create', status: 'EXECUTED', persona: 'WHINK' });
+    expect(writeLedger.mock.calls[0][0].correlationId).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it('PATCH validates, unassigns with null, ledgers before/after', async () => {
-    const { PATCH } = await import('../../app/api/projects/[id]/route');
-    expect((await PATCH(jreq('PATCH', { subsidiary: 'nope' }) as any, ctx('p1'))).status).toBe(400);
-    expect(db.project.updateMany).not.toHaveBeenCalled();
+  it('POST denied by the permission engine writes nothing but a ledger row', async () => {
+    checkPermission.mockResolvedValue({ allowed: false, method: 'requires_confirmation', reason: 'no' });
+    const { POST } = await import('../../app/api/projects/route');
+    expect((await POST(jreq('POST', { name: 'x' }) as any)).status).toBe(403);
+    expect(db.project.create).not.toHaveBeenCalled();
+    expect(writeLedger.mock.calls[0][0]).toMatchObject({ action: 'project_create', status: 'DENIED' });
+  });
 
-    db.project.findFirst.mockResolvedValue({ subsidiary: 'consult' });
+  it('PATCH validates body: bad shapes are 400, never 500', async () => {
+    const { PATCH } = await import('../../app/api/projects/[id]/route');
+    for (const bad of [{ subsidiary: 'nope' }, null, 'x', [], { status: 'WEIRD' }, { name: '' }, { goal: 'g'.repeat(5001) }, { ownerId: 'u2' }]) {
+      expect((await PATCH(jreq('PATCH', bad) as any, ctx('p1'))).status).toBe(400);
+    }
+    expect((await PATCH(new Request('http://x', { method: 'PATCH', body: '{bad' }) as any, ctx('p1'))).status).toBe(400);
+    expect(db.project.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('PATCH unassigns with null, ledgers update and before/after in one transaction', async () => {
+    const { PATCH } = await import('../../app/api/projects/[id]/route');
+    db.project.findFirst.mockResolvedValue({ id: 'p1', subsidiary: 'consult' });
     db.project.updateMany.mockResolvedValue({ count: 1 });
     expect((await PATCH(jreq('PATCH', { subsidiary: null }) as any, ctx('p1'))).status).toBe(200);
+    expect(checkPermission).toHaveBeenCalledWith('u1', 'project_update', 'A', expect.any(String));
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
     expect(db.project.updateMany.mock.calls[0][0].where).toEqual({ id: 'p1', ownerId: 'u1' });
     expect(db.project.updateMany.mock.calls[0][0].data.subsidiary).toBeNull();
-    expect(writeLedger).toHaveBeenCalledTimes(1);
-    expect(writeLedger.mock.calls[0][0]).toMatchObject({
-      userId: 'u1', action: 'project_subsidiary_set', metadata: { projectId: 'p1', before: 'consult', after: null },
-    });
+    const calls = writeLedger.mock.calls.map((c) => c[0]);
+    expect(calls.map((c) => c.action)).toEqual(['project_update', 'project_subsidiary_set']);
+    expect(calls[1]).toMatchObject({ userId: 'u1', persona: 'WHINK', status: 'EXECUTED', metadata: { projectId: 'p1', before: 'consult', after: null } });
+    expect(calls[1].correlationId).toBe(calls[0].correlationId);
   });
 
-  it('PATCH on another user project is 404 and writes nothing', async () => {
+  it('PATCH denied by permission engine: no update, DENIED ledger row', async () => {
+    checkPermission.mockResolvedValue({ allowed: false, method: 'requires_confirmation' });
     const { PATCH } = await import('../../app/api/projects/[id]/route');
-    db.project.findFirst.mockResolvedValue(null);
+    expect((await PATCH(jreq('PATCH', { name: 'n' }) as any, ctx('p1'))).status).toBe(403);
+    expect(db.project.updateMany).not.toHaveBeenCalled();
+    expect(writeLedger.mock.calls[0][0]).toMatchObject({ action: 'project_update', status: 'DENIED' });
+  });
+
+  it('PATCH by a non-owner (other user or member) is 404, writes nothing, is ledgered', async () => {
+    const { PATCH } = await import('../../app/api/projects/[id]/route');
+    db.project.findFirst.mockResolvedValue(null); // owner check fails
     expect((await PATCH(jreq('PATCH', { subsidiary: 'apps' }) as any, ctx('theirs'))).status).toBe(404);
     expect(db.project.updateMany).not.toHaveBeenCalled();
-    expect(writeLedger).not.toHaveBeenCalled();
+    expect(writeLedger.mock.calls[0][0]).toMatchObject({ action: 'project_update', status: 'FAILED', metadata: { reason: 'not_found' } });
+  });
+
+  it('PATCH returns 404 when updateMany matches nothing', async () => {
+    const { PATCH } = await import('../../app/api/projects/[id]/route');
+    db.project.findFirst.mockResolvedValue({ id: 'p1', subsidiary: null });
+    db.project.updateMany.mockResolvedValue({ count: 0 });
+    expect((await PATCH(jreq('PATCH', { name: 'n' }) as any, ctx('p1'))).status).toBe(404);
+    expect(writeLedger.mock.calls.at(-1)![0]).toMatchObject({ status: 'FAILED' });
+  });
+
+  it('GET /api/projects/[id] is readable by members via owner-or-member scope', async () => {
+    const { GET } = await import('../../app/api/projects/[id]/route');
+    db.project.findFirst.mockResolvedValue({ ...P({ ownerId: 'someone-else' }), tasks: [] });
+    expect((await GET(jreq('GET') as any, ctx('p1'))).status).toBe(200);
+    const where = JSON.stringify(db.project.findFirst.mock.calls[0][0].where);
+    expect(where).toContain('"userId":"u1"');
+    db.project.findFirst.mockResolvedValue(null);
+    expect((await GET(jreq('GET') as any, ctx('x'))).status).toBe(404);
   });
 
   it('GET /api/subsidiaries: counts, openTasks, unassigned bucket, next milestone', async () => {

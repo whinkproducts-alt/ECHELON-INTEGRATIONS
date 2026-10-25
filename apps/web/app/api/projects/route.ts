@@ -2,7 +2,10 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { isSubsidiaryId } from '@/lib/subsidiaries';
+import { randomUUID } from 'crypto';
+import { checkPermission } from '@/lib/permission-engine';
+import { writeLedger } from '@/lib/ledger';
+import { ProjectCreateSchema, parseJson } from '@/lib/project-input';
 import { cardFor, listAccessibleProjects, statsForProjects } from '@/lib/project-cards';
 
 export async function GET() {
@@ -23,22 +26,37 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const body = await req.json();
-  if (body.subsidiary !== undefined && body.subsidiary !== null && !isSubsidiaryId(body.subsidiary)) {
-    return NextResponse.json({ error: 'Invalid subsidiary' }, { status: 400 });
+  const userId = session.user.id;
+  const parsed = ProjectCreateSchema.safeParse(await parseJson(req));
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid project' }, { status: 400 });
+  const body = parsed.data;
+  const correlationId = randomUUID();
+  const led = (status: 'EXECUTED' | 'DENIED' | 'FAILED', metadata: Record<string, unknown>) =>
+    writeLedger({ userId, action: 'project_create', permissionClass: 'A', status, initiator: 'user', persona: 'WHINK', correlationId, metadata });
+
+  const perm = await checkPermission(userId, 'project_create', 'A', correlationId);
+  if (!perm.allowed) {
+    await led('DENIED', { reason: perm.reason ?? 'denied' });
+    return NextResponse.json({ error: 'Not permitted' }, { status: 403 });
   }
-  const project = await prisma.project.create({
-    data: {
-      name: body.name,
-      goal: body.goal ?? null,
-      description: body.description ?? null,
-      subsidiary: body.subsidiary ?? null,
-      ownerId: session.user.id,
-    },
-  });
-  // Add owner as member
-  await prisma.projectMember.create({
-    data: { projectId: project.id, userId: session.user.id, role: 'owner' },
-  });
-  return NextResponse.json(project);
+  try {
+    const project = await prisma.project.create({
+      data: {
+        name: body.name,
+        goal: body.goal ?? null,
+        description: body.description ?? null,
+        subsidiary: body.subsidiary ?? null,
+        ownerId: userId,
+      },
+    });
+    // Add owner as member
+    await prisma.projectMember.create({
+      data: { projectId: project.id, userId, role: 'owner' },
+    });
+    await led('EXECUTED', { projectId: project.id, subsidiary: project.subsidiary ?? null });
+    return NextResponse.json(project);
+  } catch (e) {
+    await led('FAILED', { error: e instanceof Error ? e.message.slice(0, 200) : 'error' });
+    return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
+  }
 }

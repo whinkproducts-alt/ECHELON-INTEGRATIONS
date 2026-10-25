@@ -21,6 +21,8 @@ export const CAPABILITY_CLASSES: Readonly<Record<string, PermissionClass>> = Obj
   contact_import: 'A',
   contact_message: 'C',
   contact_call: 'C',
+  project_create: 'A',
+  project_update: 'A',
 });
 
 export function capabilityClass(capability: string): PermissionClass {
