@@ -2,6 +2,16 @@
 
 Newest first. Each entry: date, decision, alternatives, reason.
 
+## 2026-10-25  AnythingLLM memory budget and external drive storage
+Decision: AnythingLLM container is capped at 4 GB RAM in compose. Storage uses a named Docker volume for now. When Victor moves to the 2TB external drive, devops-engineer remaps the volume mount to `/Volumes/<drive>/whink-data/anythingllm` in `services/anythingllm/docker-compose.yml` — one-line change, no rebuild needed. Logged as a Phase 6 devops task.
+Alternatives: set no memory cap (risk of Mac Mini OOM under heavy document load); use a bind mount path immediately (requires the drive to be present on every dev machine).
+Reason: 4 GB is generous for a Node.js + SQLite AnythingLLM instance with no local LLM (WHINK uses it for retrieval only). The named-volume approach keeps the compose portable across machines until the drive is the permanent home.
+
+## 2026-10-25  AnythingLLM version bump: bump to latest stable, use /query endpoint
+Decision: bump the AnythingLLM pinned image from 1.7.4 to latest stable (exact tag chosen by the integrations-engineer after checking the 1.x changelog). Switch the adapter from the `/chat` endpoint to `/api/v1/workspace/:slug/query` (retrieval-only, no model call). Version change is logged here when the integrations-engineer picks the tag.
+Alternatives: keep 1.7.4 and work around the missing endpoint; switch to a different retrieval service.
+Reason: the `/chat` endpoint runs AnythingLLM's own embedded model outside the WHINK model router (violates non-negotiable 8). The `/query` endpoint returns ranked chunks with source metadata and makes no model call. A version bump within the 1.x line is low risk; the builder tests the new image before committing.
+
 <!-- Phase 3 entries below: lead-architect plan, 2026-10-25. Proposed, not yet confirmed by Victor. Phase 3 starts after Victor passes the Phase 2 checklist. -->
 
 ## 2026-10-25  Phase 3: AnythingLLM in its own hardened compose, retrieval only
