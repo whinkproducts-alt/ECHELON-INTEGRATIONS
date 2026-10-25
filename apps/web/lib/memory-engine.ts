@@ -295,52 +295,62 @@ export async function searchMemory(
 ) {
   const queryVec = await generateEmbedding(query);
 
+  // searchMode is reported on the returned result for observability (3a A10).
+  let searchMode: 'vector' | 'fulltext' | 'text' = 'text';
   let semantics: any[];
   let episodes: any[];
 
   if (queryVec) {
     const vecLiteral = `[${queryVec.join(',')}]`;
 
-    // ── Vector search (cosine distance, lower = more similar) ───────────────
-    const semanticVec = projectId
-      ? await prisma.$queryRawUnsafe<any[]>(
-          `SELECT *, (embedding <=> $1::vector) AS distance
-           FROM memory_semantic
-           WHERE "userId" = $2 AND "projectId" = $3
-             AND "supersededBy" IS NULL AND embedding IS NOT NULL
-           ORDER BY distance LIMIT $4`,
-          vecLiteral, userId, projectId, limit
-        )
-      : await prisma.$queryRawUnsafe<any[]>(
-          `SELECT *, (embedding <=> $1::vector) AS distance
-           FROM memory_semantic
-           WHERE "userId" = $2
-             AND "supersededBy" IS NULL AND embedding IS NOT NULL
-           ORDER BY distance LIMIT $3`,
-          vecLiteral, userId, limit
-        );
+    // ── Vector search (cosine distance) — wrapped in try/catch (H5 fix) ──────
+    // A dimension mismatch or pgvector error must not break the chat turn; fall
+    // through to full-text when it does.
+    let semanticVec: any[] = [];
+    let episodeVec: any[] = [];
+    let vectorSearchFailed = false;
+    try {
+      semanticVec = projectId
+        ? await prisma.$queryRawUnsafe<any[]>(
+            `SELECT *, (embedding <=> $1::vector) AS distance
+             FROM memory_semantic
+             WHERE "userId" = $2 AND "projectId" = $3
+               AND "supersededBy" IS NULL AND embedding IS NOT NULL
+             ORDER BY distance LIMIT $4`,
+            vecLiteral, userId, projectId, limit
+          )
+        : await prisma.$queryRawUnsafe<any[]>(
+            `SELECT *, (embedding <=> $1::vector) AS distance
+             FROM memory_semantic
+             WHERE "userId" = $2
+               AND "supersededBy" IS NULL AND embedding IS NOT NULL
+             ORDER BY distance LIMIT $3`,
+            vecLiteral, userId, limit
+          );
 
-    const episodeVec = projectId
-      ? await prisma.$queryRawUnsafe<any[]>(
-          `SELECT *, (embedding <=> $1::vector) AS distance
-           FROM memory_episodes
-           WHERE "userId" = $2 AND "projectId" = $3
-             AND "supersededBy" IS NULL AND embedding IS NOT NULL
-           ORDER BY distance LIMIT $4`,
-          vecLiteral, userId, projectId, limit
-        )
-      : await prisma.$queryRawUnsafe<any[]>(
-          `SELECT *, (embedding <=> $1::vector) AS distance
-           FROM memory_episodes
-           WHERE "userId" = $2
-             AND "supersededBy" IS NULL AND embedding IS NOT NULL
-           ORDER BY distance LIMIT $3`,
-          vecLiteral, userId, limit
-        );
+      episodeVec = projectId
+        ? await prisma.$queryRawUnsafe<any[]>(
+            `SELECT *, (embedding <=> $1::vector) AS distance
+             FROM memory_episodes
+             WHERE "userId" = $2 AND "projectId" = $3
+               AND "supersededBy" IS NULL AND embedding IS NOT NULL
+             ORDER BY distance LIMIT $4`,
+            vecLiteral, userId, projectId, limit
+          )
+        : await prisma.$queryRawUnsafe<any[]>(
+            `SELECT *, (embedding <=> $1::vector) AS distance
+             FROM memory_episodes
+             WHERE "userId" = $2
+               AND "supersededBy" IS NULL AND embedding IS NOT NULL
+             ORDER BY distance LIMIT $3`,
+            vecLiteral, userId, limit
+          );
+    } catch {
+      // Dimension mismatch or pgvector unavailable — skip vector, use full-text.
+      vectorSearchFailed = true;
+    }
 
     // ── Full-text search (tsvector GIN index) ────────────────────────────────
-    // L1: Use websearch_to_tsquery — safe with punctuation and arbitrary user input.
-    // Wrapped in try/catch to fall back to vector-only results if full-text fails.
     let semanticFt: any[] = [];
     let episodeFt: any[] = [];
     try {
@@ -380,20 +390,25 @@ export async function searchMemory(
             query, userId, query, limit
           );
     } catch {
-      // Full-text query failed (e.g. unsupported syntax) — fall back to vector-only
       semanticFt = [];
       episodeFt = [];
     }
 
-    // ── RRF merge ────────────────────────────────────────────────────────────
-    // If full-text returns nothing, cosine-only result is used.
-    const hasVecResults = semanticVec.length > 0 || episodeVec.length > 0;
+    // ── Decide path and merge ─────────────────────────────────────────────────
+    const hasVecResults = !vectorSearchFailed && (semanticVec.length > 0 || episodeVec.length > 0);
+    const hasFtResults = semanticFt.length > 0 || episodeFt.length > 0;
 
     if (hasVecResults) {
+      searchMode = 'vector';
       semantics = rrfMerge(semanticVec, semanticFt, limit);
       episodes = rrfMerge(episodeVec, episodeFt, limit);
+    } else if (hasFtResults) {
+      searchMode = 'fulltext';
+      semantics = semanticFt;
+      episodes = episodeFt;
     } else {
-      // No vector results — fall back to LIKE for rows without embeddings yet
+      // Vector and full-text both yielded nothing — fall back to text match (3a A10).
+      searchMode = 'text';
       semantics = await prisma.memorySemantic.findMany({
         where: { userId, supersededBy: null, statement: { contains: query }, ...(projectId ? { projectId } : {}) },
         orderBy: { createdAt: 'desc' },
@@ -406,28 +421,63 @@ export async function searchMemory(
       });
     }
   } else {
-    // Embedding unavailable — use SQL LIKE
-    semantics = await prisma.memorySemantic.findMany({
-      where: {
-        userId,
-        supersededBy: null,
-        statement: { contains: query },
-        ...(projectId ? { projectId } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    });
-
-    episodes = await prisma.memoryEpisode.findMany({
-      where: {
-        userId,
-        supersededBy: null,
-        summary: { contains: query },
-        ...(projectId ? { projectId } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    });
+    // Embedding unavailable — full-text first, text-match fallback (3a A10).
+    try {
+      const semanticFt = projectId
+        ? await prisma.$queryRawUnsafe<any[]>(
+            `SELECT *, ts_rank(search_vec, websearch_to_tsquery('english', $1)) AS ft_rank
+             FROM memory_semantic
+             WHERE "userId" = $2 AND "projectId" = $3
+               AND "supersededBy" IS NULL AND search_vec @@ websearch_to_tsquery('english', $4)
+             ORDER BY ft_rank DESC LIMIT $5`,
+            query, userId, projectId, query, limit
+          )
+        : await prisma.$queryRawUnsafe<any[]>(
+            `SELECT *, ts_rank(search_vec, websearch_to_tsquery('english', $1)) AS ft_rank
+             FROM memory_semantic
+             WHERE "userId" = $2
+               AND "supersededBy" IS NULL AND search_vec @@ websearch_to_tsquery('english', $3)
+             ORDER BY ft_rank DESC LIMIT $4`,
+            query, userId, query, limit
+          );
+      const episodeFt = projectId
+        ? await prisma.$queryRawUnsafe<any[]>(
+            `SELECT *, ts_rank(search_vec, websearch_to_tsquery('english', $1)) AS ft_rank
+             FROM memory_episodes
+             WHERE "userId" = $2 AND "projectId" = $3
+               AND "supersededBy" IS NULL AND search_vec @@ websearch_to_tsquery('english', $4)
+             ORDER BY ft_rank DESC LIMIT $5`,
+            query, userId, projectId, query, limit
+          )
+        : await prisma.$queryRawUnsafe<any[]>(
+            `SELECT *, ts_rank(search_vec, websearch_to_tsquery('english', $1)) AS ft_rank
+             FROM memory_episodes
+             WHERE "userId" = $2
+               AND "supersededBy" IS NULL AND search_vec @@ websearch_to_tsquery('english', $3)
+             ORDER BY ft_rank DESC LIMIT $4`,
+            query, userId, query, limit
+          );
+      if (semanticFt.length > 0 || episodeFt.length > 0) {
+        searchMode = 'fulltext';
+        semantics = semanticFt;
+        episodes = episodeFt;
+      } else {
+        throw new Error('no fulltext results');
+      }
+    } catch {
+      // Full-text unavailable or no results — text match (3a A10).
+      searchMode = 'text';
+      semantics = await prisma.memorySemantic.findMany({
+        where: { userId, supersededBy: null, statement: { contains: query }, ...(projectId ? { projectId } : {}) },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
+      episodes = await prisma.memoryEpisode.findMany({
+        where: { userId, supersededBy: null, summary: { contains: query }, ...(projectId ? { projectId } : {}) },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
+    }
   }
 
   const hypotheses = await prisma.hypothesis.findMany({
@@ -450,5 +500,5 @@ export async function searchMemory(
     take: limit,
   });
 
-  return { semantics, episodes, hypotheses, procedurals };
+  return { semantics, episodes, hypotheses, procedurals, searchMode };
 }

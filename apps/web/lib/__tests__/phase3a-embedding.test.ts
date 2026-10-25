@@ -33,6 +33,7 @@ describe('A2 — embed() from model-router switches provider by env (mocked HTTP
     delete process.env.EMBEDDINGS_URL;
     delete process.env.EMBEDDINGS_MODEL;
     delete process.env.EMBEDDING_MODEL;
+    delete process.env.EMBEDDING_DIM;
     delete process.env.OPENAI_API_KEY;
     delete process.env.OLLAMA_URL;
   });
@@ -40,6 +41,7 @@ describe('A2 — embed() from model-router switches provider by env (mocked HTTP
   it('OpenAI-compatible path: EMBEDDINGS_URL set → calls that URL', async () => {
     process.env.EMBEDDINGS_URL = 'http://openai-compat:8080/v1';
     process.env.EMBEDDINGS_MODEL = 'my-embed-model';
+    process.env.EMBEDDING_DIM = '1536';
     delete process.env.OPENAI_API_KEY;
 
     const fakeVec = new Array(1536).fill(0.42);

@@ -42,6 +42,7 @@ model User {
   oauthStates        OAuthState[]
   scheduledPosts     ScheduledPost[]
   documentWorkspaces DocumentWorkspace[]
+  documents          Document[]
 
   @@map("users")
 }
@@ -716,12 +717,36 @@ model TaskHandoff {
 model DocumentWorkspace {
   id            String   @id @default(cuid())
   userId        String   @unique
-  workspaceSlug String
+  workspaceSlug String   @unique
   createdAt     DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents Document[]
 
   @@map("document_workspaces")
+}
+
+// ── Per-file document ownership record (H1 / C6 / PIPEDA Q3) ────
+// One row per uploaded file; anythingllmDocId is the ID AnythingLLM assigned.
+// Ownership is enforced here — no userId means no access.
+
+model Document {
+  id               String   @id @default(cuid())
+  userId           String
+  workspaceId      String
+  anythingllmDocId String
+  filename         String
+  mimeType         String
+  sizeBytes        Int
+  sha256           String
+  uploadedAt       DateTime @default(now())
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace DocumentWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, anythingllmDocId])
+  @@index([userId])
+  @@map("documents")
 }
 
 // ── Compound Agent Intelligence ─────────────────────────────────

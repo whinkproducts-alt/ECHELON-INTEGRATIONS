@@ -245,13 +245,15 @@ describe('assembleContext — blended items (C9)', () => {
 });
 
 describe('assembleContext — document_recall_unavailable ledger (C11)', () => {
-  it('ledgers document_recall_unavailable when queryDocuments returns empty', async () => {
+  it('ledgers document_recall_unavailable when queryDocuments throws', async () => {
     (prisma.documentWorkspace.findUnique as any).mockResolvedValue({
       id: 'ws1',
       userId: USER_ID,
       workspaceSlug: 'test-workspace',
     });
-    (queryDocuments as any).mockResolvedValue([]);
+    // Simulate AnythingLLM being down (throws) — only failures trigger the ledger row,
+    // not empty results (which are valid no-match responses).
+    (queryDocuments as any).mockRejectedValue(new Error('connection refused'));
 
     await assembleContext(USER_ID, CONV_ID, null, undefined, 'anything');
 

@@ -2,6 +2,57 @@
 
 Newest first. Each entry: date, decision, alternatives, reason.
 
+## 2026-10-25  Phase 3d assurance — security and compliance fixes
+
+### D1 Security findings applied (H1–H5, M5, M7)
+
+**H1 — Cross-tenant document delete and missing Document model.**
+Decision: add `Document` table (migration `20261025030000`) with one row per uploaded file.
+`DELETE /api/documents/[id]` now: (a) awaits `params` (Next 16 Promise API), (b) looks up the `Document` row filtered by `{ id, userId }`, (c) returns 404 + security ledger event if the caller does not own it.
+`POST /api/documents/upload` now writes a `Document` record after a successful upload.
+Alternative considered: trust AnythingLLM's own ID space — rejected because WHINK must enforce tenant isolation independently.
+
+**H2 — `isSensitive()` missed most categories.**
+Decision: rewrote `SENSITIVE_PATTERNS` in `auto-memory.ts` with broader lexicons covering ADHD/autism, medications, family relations (named and unnamed via "my wife/daughter/etc."), legal/criminal terms, street address patterns, SIN, and income amounts.
+Alternative: rely on the LLM to classify — rejected because the permission check must happen before the model sees the candidate.
+
+**H3 — `isSecret()` bypassed by natural language and common key prefixes.**
+Decision: rewrote `isSecret()` with NFKC normalisation (strips zero-width homoglyphs), vendor key prefixes (sk-ant-, ghp_, AKIA, xoxb-, AIza), JWT pattern, Luhn check for card numbers, and natural-language passphrase patterns.
+Also: skip the entire turn for auto extraction if the raw user message itself contains a secret.
+
+**H4 — Document chunks from AnythingLLM entered model context without injection scan.**
+Decision: apply both `filterToolResult` and `scanForInjectionPatterns` to `documentName` and `text` before placing in context. If either fires, log `document_injection_blocked` and skip the chunk. `documentName` is now inside the `<untrusted>` envelope, not outside it. `document_recall_unavailable` is now only logged on a caught exception, not on an empty result set (which is a valid no-match). Added `externalContentThisTurn: boolean` to `RetrievedContext`.
+
+**H5 — Paid cloud embedding fallback + no dimension validation + no error handling.**
+Decision: removed branch 3 from `embed()` (the `OPENAI_API_KEY`-alone path to `text-embedding-3-small`). All three fetch branches are now wrapped in `try/catch` returning null. Added `validateEmbedding()` which checks `Array.isArray`, `length === EMBEDDING_DIM` (from `EMBEDDING_DIM` env, default 768), and `Number.isFinite` on every element.
+`searchMemory()` vector queries are now wrapped in `try/catch`; a dimension mismatch falls through to full-text, then text-match, with `searchMode` in the return value.
+Alternative: keep the fallback with a feature flag — rejected to eliminate silent cost and data breach risk.
+
+**M5 — Upload and delete bypass permission engine.**
+Decision: `POST /api/documents/upload` now calls `checkPermission(userId, 'document_upload', 'A')` before proceeding. Class A always passes, but the check is wired so a future policy change takes effect without touching the route.
+
+**M7 — MAMBA persona check was case-sensitive.**
+Decision: compare `persona.toUpperCase() === 'MAMBA'` throughout `auto-memory.ts`.
+
+### D6 Compliance findings applied (PIPEDA / Alberta PIPA)
+
+**PIPEDA Q2 (blocker) — No memory list API.**
+Decision: added `GET /api/memory` with cursor pagination. Returns one memory type per call (semantic / episodic / hypothesis / procedural), scoped by `userId`. Combines with the existing `DELETE /api/memory/[id]` to satisfy the access-and-deletion right.
+
+**PIPEDA Q3 (blocker) — No document inventory.**
+Decision: `GET /api/documents` now reads from the new `Document` table as the primary inventory (not AnythingLLM). AnythingLLM's list is supplementary. Cursor-paginated, scoped by `userId`.
+
+**PIPEDA Q4 (pre-launch gap) — No privacy notice, no consent flow.**
+Decision: deferred to Phase 6 (onboarding). The Connected Apps OAuth flow must present scope and purpose before the first token exchange. Recorded here so it is not forgotten.
+
+**PIPEDA Q5 (pre-launch gap) — No retention or deletion schedule.**
+Decision: deferred to Phase 6. A background job that respects a per-user retention policy must exist before public launch. Memory rows have `createdAt`; the job will filter by that.
+
+**Licence notes (D6 compliance-checker).**
+- AnythingLLM: MIT licence. Confirmed.
+- `mapbox-gl`: BSL 1.1 in v2+; pin to v1.x (Apache 2.0) until a libre alternative (`maplibre-gl`, Apache 2.0) is evaluated. No current usage found in `apps/web` — note recorded to block any future addition of v2+.
+- All new dependencies added in Phase 3a–3c are MIT, Apache 2.0 or BSD. Compliance-checker confirmed.
+
 ## 2026-10-25  Phase 3 learnings sync
 
 Summary of what was built in Phase 3a and the early 3b/3c work, as observed in code on 2026-10-25.

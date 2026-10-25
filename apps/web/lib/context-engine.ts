@@ -39,6 +39,8 @@ export interface RetrievedContext {
   documentCitations: string[];
   /** Blended ranked list of memory and document items (C9). */
   blendedItems: BlendedItem[];
+  /** True when any document chunk was placed in context this turn (sets externalContentThisTurn). */
+  externalContentThisTurn: boolean;
   totalChars: number;
 }
 
@@ -58,6 +60,7 @@ export async function assembleContext(
     hypotheses: [],
     documentCitations: [],
     blendedItems: [],
+    externalContentThisTurn: false,
     totalChars: 0,
   };
 
@@ -186,7 +189,15 @@ export async function assembleContext(
         }
       }
     } catch {
-      // AnythingLLM is optional — failure must not break context assembly (C11)
+      // AnythingLLM is optional — failure must not break context assembly (C11).
+      await recordActionSafe({
+        userId,
+        action: 'document_recall_unavailable',
+        permissionClass: 'A',
+        status: 'FAILED',
+        tool: 'context_engine',
+        inputSummary: `query=${query.slice(0, 200)}`,
+      });
     }
 
     // C9: build blended memory items from already-assembled semanticMemories and episodicMemories

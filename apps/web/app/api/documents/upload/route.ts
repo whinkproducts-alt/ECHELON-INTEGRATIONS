@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { prisma } from '@/lib/db';
 import { uploadDocument } from '@/lib/anythingllm-client';
 import { recordActionSafe } from '@/lib/ledger';
+import { checkPermission } from '@/lib/permission-engine';
 
 // ── MIME type validation ──────────────────────────────────────────────────────
 
@@ -98,6 +99,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // M5 fix: every action through the permission engine (non-negotiable #4).
+  // Document upload is Class A (owner uploading their own file).
+  const permission = await checkPermission(userId, 'document_upload', 'A');
+  if (!permission.allowed) {
+    await recordActionSafe({
+      userId,
+      action: 'document_upload_denied',
+      permissionClass: 'A',
+      status: 'DENIED',
+      tool: 'documents_upload',
+      inputSummary: `filename=${file.name.slice(0, 200)} reason=${permission.reason ?? 'denied'}`,
+    });
+    return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+  }
+
   // Resolve the user's workspace (required — cannot upload without a configured workspace)
   const ws = await prisma.documentWorkspace.findUnique({ where: { userId } });
   if (!ws) {
@@ -125,6 +141,19 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ error: 'Upload to document store failed' }, { status: 502 });
   }
+
+  // H1 / C6 fix: write a Document ownership record so the delete route can enforce tenant isolation.
+  await prisma.document.create({
+    data: {
+      userId,
+      workspaceId: ws.id,
+      anythingllmDocId: result.id,
+      filename: file.name.slice(0, 500),
+      mimeType: validatedMime,
+      sizeBytes: file.size,
+      sha256,
+    },
+  });
 
   // Ledger: filename, size in bytes, hash — never file content (C6)
   await recordActionSafe({
