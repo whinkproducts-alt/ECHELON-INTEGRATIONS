@@ -16,7 +16,7 @@ describe('writeMemory', () => {
     vi.doMock('@/lib/db', () => ({
       prisma: { memoryEpisode: { create: mockCreate } },
     }));
-    vi.doMock('@/lib/logger', () => ({ logger: { info: vi.fn(), security: vi.fn() } }));
+    vi.doMock('@/lib/logger', () => ({ logger: { info: vi.fn(), security: vi.fn(), warn: vi.fn() } }));
 
     const { writeMemory } = await import('../memory-engine');
     await writeMemory({
@@ -28,11 +28,17 @@ describe('writeMemory', () => {
   });
 
   it('creates a semantic memory record', async () => {
-    const mockCreate = vi.fn().mockResolvedValue({ id: 'sem-1' });
+    const mockCreate = vi.fn().mockResolvedValue({ id: 'sem-1', confidence: 0.8 });
     vi.doMock('@/lib/db', () => ({
-      prisma: { memorySemantic: { create: mockCreate } },
+      prisma: {
+        memorySemantic: { create: mockCreate },
+        $queryRawUnsafe: vi.fn().mockResolvedValue([]),
+        $executeRawUnsafe: vi.fn().mockResolvedValue(0),
+      },
     }));
-    vi.doMock('@/lib/logger', () => ({ logger: { info: vi.fn(), security: vi.fn() } }));
+    vi.doMock('@/lib/logger', () => ({ logger: { info: vi.fn(), security: vi.fn(), warn: vi.fn() } }));
+    // Mock embedding-service so writeMemory does not try to connect to Ollama
+    vi.doMock('@/lib/embedding-service', () => ({ generateEmbedding: vi.fn().mockResolvedValue(null) }));
 
     const { writeMemory } = await import('../memory-engine');
     await writeMemory({
@@ -48,7 +54,8 @@ describe('writeMemory', () => {
     vi.doMock('@/lib/db', () => ({
       prisma: { hypothesis: { create: mockCreate } },
     }));
-    vi.doMock('@/lib/logger', () => ({ logger: { info: vi.fn(), security: vi.fn() } }));
+    vi.doMock('@/lib/logger', () => ({ logger: { info: vi.fn(), security: vi.fn(), warn: vi.fn() } }));
+    vi.doMock('@/lib/model-router', () => ({ embed: vi.fn().mockResolvedValue(null) }));
 
     const { writeMemory } = await import('../memory-engine');
     await writeMemory({

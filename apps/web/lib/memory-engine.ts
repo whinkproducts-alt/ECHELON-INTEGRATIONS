@@ -1,6 +1,36 @@
 import { prisma } from '@/lib/db';
 import { generateEmbedding } from '@/lib/embedding-service';
 
+/**
+ * Find memory rows in memory_semantic that are semantically similar to the given
+ * embedding for this userId. Uses pgvector cosine distance (<=>).
+ *
+ * Scoped by userId — never crosses tenant boundaries.
+ * Only compares rows that already have an embedding stored.
+ */
+export async function findSimilarMemories(
+  userId: string,
+  embedding: number[],
+  threshold: number = 0.92,
+  limit: number = 5,
+): Promise<Array<{ id: string; statement: string; confidence: number; distance: number }>> {
+  if (!userId) throw new Error('findSimilarMemories: userId is required');
+  const vecLiteral = `[${embedding.join(',')}]`;
+  // cosine distance: 0 = identical, 1 = orthogonal. threshold 0.92 sim → 0.08 max distance.
+  const distanceThreshold = 1 - threshold;
+  return prisma.$queryRawUnsafe<Array<{ id: string; statement: string; confidence: number; distance: number }>>(
+    `SELECT id, statement, confidence, (embedding <=> $1::vector) AS distance
+     FROM memory_semantic
+     WHERE "userId" = $2
+       AND "supersededBy" IS NULL
+       AND embedding IS NOT NULL
+       AND (embedding <=> $1::vector) <= $3
+     ORDER BY distance
+     LIMIT $4`,
+    vecLiteral, userId, distanceThreshold, limit,
+  );
+}
+
 
 export interface MemoryWriteInput {
   userId: string;
@@ -39,19 +69,45 @@ export async function writeMemory(input: MemoryWriteInput) {
           entities: entities ? JSON.stringify(entities) : null,
         },
       });
-      // Fire-and-forget embedding update
+      // Fire-and-forget embedding update, stamp embeddingModel
+      const embeddingModelName = process.env.EMBEDDING_MODEL ?? 'ollama/nomic-embed-text';
       generateEmbedding(statement).then(async (vec) => {
         if (!vec) return;
         await prisma.$executeRawUnsafe(
-          `UPDATE memory_episodes SET embedding = $1::vector WHERE id = $2`,
+          `UPDATE memory_episodes SET embedding = $1::vector, "embeddingModel" = $3 WHERE id = $2`,
           `[${vec.join(',')}]`,
-          episodeRow.id
+          episodeRow.id,
+          embeddingModelName,
         );
       }).catch(() => {/* non-blocking */});
       return episodeRow;
     }
 
     case 'semantic': {
+      const embeddingModelName = process.env.EMBEDDING_MODEL ?? 'ollama/nomic-embed-text';
+      // Generate embedding upfront so we can check for duplicates before inserting.
+      const vec = await generateEmbedding(statement);
+
+      // Semantic dedup: if a near-identical fact exists (cosine sim >= 0.92), upsert instead.
+      if (vec) {
+        try {
+          const similar = await findSimilarMemories(userId, vec, 0.92, 1);
+          if (similar.length > 0) {
+            const existing = similar[0];
+            const updated = await prisma.memorySemantic.update({
+              where: { id: existing.id },
+              data: {
+                updatedAt: new Date(),
+                confidence: Math.max(existing.confidence, confidence ?? 0.8),
+              },
+            });
+            return updated;
+          }
+        } catch {
+          // dedup query failed (e.g. no pgvector extension in test) — proceed with insert
+        }
+      }
+
       const semanticRow = await prisma.memorySemantic.create({
         data: {
           userId,
@@ -63,15 +119,17 @@ export async function writeMemory(input: MemoryWriteInput) {
           epistemicStatus: epistemicStatus ?? 'KNOWN',
         },
       });
-      // Fire-and-forget embedding update
-      generateEmbedding(statement).then(async (vec) => {
-        if (!vec) return;
-        await prisma.$executeRawUnsafe(
-          `UPDATE memory_semantic SET embedding = $1::vector WHERE id = $2`,
+
+      // Store embedding and model stamp — already generated, skip a second call
+      if (vec) {
+        prisma.$executeRawUnsafe(
+          `UPDATE memory_semantic SET embedding = $1::vector, "embeddingModel" = $3 WHERE id = $2`,
           `[${vec.join(',')}]`,
-          semanticRow.id
-        );
-      }).catch(() => {/* non-blocking */});
+          semanticRow.id,
+          embeddingModelName,
+        ).catch(() => {/* non-blocking */});
+      }
+
       return semanticRow;
     }
 

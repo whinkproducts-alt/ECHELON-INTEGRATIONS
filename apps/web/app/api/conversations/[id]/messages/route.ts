@@ -13,6 +13,7 @@ import { writeMemory } from '@/lib/memory-engine';
 import { chatOnce } from '@/lib/model-router';
 import { decryptKey } from '@/lib/key-encryption';
 import { recordActionSafe } from '@/lib/ledger';
+import { checkPermission } from '@/lib/permission-engine';
 import { resolveChatTools } from '@/lib/gateway-chat';
 import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
 import { normaliseMambaMode } from '@/lib/types';
@@ -437,6 +438,24 @@ Assistant: ${autoMemoryContent}`;
                   const factScan = scanForInjectionPatterns(item.statement);
                   if (factScan.suspicious) continue;
                   const memType = ['episodic', 'procedural'].includes(item.type) ? item.type as 'episodic' | 'procedural' : 'semantic';
+                  // Non-negotiable #4: every action goes through the permission engine.
+                  // Routine facts are Class A. Sensitive facts flagged by the extraction
+                  // prompt are Class B — deferred to a later phase that flags sensitive content.
+                  const autoMemPermClass = 'A';
+                  const autoMemPerm = await checkPermission(autoMemoryUserId, 'memory_auto_write', autoMemPermClass, correlationId);
+                  if (!autoMemPerm.allowed) {
+                    await recordActionSafe({
+                      userId: autoMemoryUserId,
+                      initiator: 'system',
+                      persona: activePersona,
+                      action: 'memory_auto_write',
+                      permissionClass: autoMemPermClass,
+                      status: 'DENIED',
+                      inputSummary: item.statement.substring(0, 200),
+                      correlationId,
+                    });
+                    continue;
+                  }
                   await writeMemory({
                     userId: autoMemoryUserId,
                     type: memType,
@@ -445,6 +464,17 @@ Assistant: ${autoMemoryContent}`;
                     sourceId: autoMemoryConvId,
                     confidence: typeof item.confidence === 'number' ? Math.min(Math.max(item.confidence, 0), 1) : 0.75,
                     epistemicStatus: 'INFERRED',
+                  });
+                  // Non-negotiable #5: every action lands in the ledger.
+                  await recordActionSafe({
+                    userId: autoMemoryUserId,
+                    initiator: 'system',
+                    persona: activePersona,
+                    action: 'memory_auto_write',
+                    permissionClass: autoMemPermClass,
+                    status: 'VALIDATED',
+                    inputSummary: item.statement.substring(0, 200),
+                    correlationId,
                   });
                 }
               } catch { /* non-blocking — never surface */ }

@@ -353,6 +353,103 @@ async function streamGemini(
   });
 }
 
+// ── Embeddings ───────────────────────────────────────────────────────────────
+
+/**
+ * Generate an embedding vector for the given text. Routes to the provider
+ * configured via EMBEDDING_MODEL (default: "ollama/nomic-embed-text").
+ *
+ * Priority order:
+ *  1. EMBEDDINGS_URL is set → OpenAI-compatible endpoint (backward compat)
+ *  2. EMBEDDING_MODEL is set → parsed as "provider/model"
+ *     - "ollama/<model>" → POST OLLAMA_URL/api/embeddings
+ *     - "openai/<model>" → OpenAI embeddings endpoint (requires OPENAI_API_KEY)
+ *  3. OPENAI_API_KEY is set and EMBEDDINGS_URL is not → OpenAI text-embedding-3-small
+ *  4. Default fallback → Ollama OpenAI-compat endpoint at localhost:11434/v1
+ *
+ * Returns null (never throws) when the provider is unreachable or returns an error.
+ */
+export async function embed(opts: { text: string }): Promise<number[] | null> {
+  const embeddingsUrl = process.env.EMBEDDINGS_URL;
+  const openaiApiKey = process.env.OPENAI_API_KEY;
+  const embeddingModel = process.env.EMBEDDING_MODEL;
+
+  // 1. Explicit EMBEDDINGS_URL — OpenAI-compatible
+  if (embeddingsUrl) {
+    const model = process.env.EMBEDDINGS_MODEL ?? 'nomic-embed-text';
+    const apiKey = process.env.EMBEDDINGS_API_KEY;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+    const res = await fetch(`${embeddingsUrl.replace(/\/$/, '')}/embeddings`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ model, input: opts.text }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.data?.[0]?.embedding ?? null;
+  }
+
+  // 2. EMBEDDING_MODEL in "provider/model" format
+  if (embeddingModel) {
+    const slashIdx = embeddingModel.indexOf('/');
+    const provider = slashIdx >= 0 ? embeddingModel.slice(0, slashIdx) : embeddingModel;
+    const model = slashIdx >= 0 ? embeddingModel.slice(slashIdx + 1) : embeddingModel;
+
+    if (provider === 'ollama') {
+      const ollamaBase = (process.env.OLLAMA_URL ?? 'http://localhost:11434').replace(/\/$/, '');
+      const res = await fetch(`${ollamaBase}/api/embeddings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, prompt: opts.text }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) return null;
+      const json = await res.json();
+      return Array.isArray(json?.embedding) ? (json.embedding as number[]) : null;
+    }
+
+    if (provider === 'openai') {
+      if (!openaiApiKey) return null;
+      const res = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiApiKey}` },
+        body: JSON.stringify({ model, input: opts.text }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json?.data?.[0]?.embedding ?? null;
+    }
+  }
+
+  // 3. OPENAI_API_KEY without EMBEDDINGS_URL — OpenAI text-embedding-3-small
+  if (openaiApiKey) {
+    const res = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiApiKey}` },
+      body: JSON.stringify({ model: 'text-embedding-3-small', input: opts.text }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.data?.[0]?.embedding ?? null;
+  }
+
+  // 4. Default: Ollama OpenAI-compatible endpoint
+  const defaultModel = process.env.EMBEDDINGS_MODEL ?? 'nomic-embed-text';
+  const res = await fetch('http://localhost:11434/v1/embeddings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: defaultModel, input: opts.text }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json?.data?.[0]?.embedding ?? null;
+}
+
 // ── OpenAI-compatible (Ollama, local, etc.) ──────────────────────────────────
 
 async function streamOpenAICompatible(

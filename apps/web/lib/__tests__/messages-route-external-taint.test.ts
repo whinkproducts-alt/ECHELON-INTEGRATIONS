@@ -59,6 +59,10 @@ describe('messages route: external content read this turn', () => {
     vi.doMock('@/lib/key-encryption', () => ({ decryptKey: vi.fn() }));
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/gateway-chat', () => ({ resolveChatTools: vi.fn(async (o: { standardTools: unknown[] }) => o.standardTools) }));
+    vi.doMock('@/lib/permission-engine', () => ({
+      checkPermission: vi.fn().mockResolvedValue({ allowed: true, method: 'auto' }),
+      checkMetaAuthorization: vi.fn().mockReturnValue(false),
+    }));
   });
 
   async function run() {

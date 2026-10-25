@@ -420,7 +420,9 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
     if (!ws) return { success: false, error: 'No document workspace configured for this account.', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
     const { searchDocuments } = await import('@/lib/anythingllm-client');
     const limit = Math.min(Math.max(1, Math.floor(Number(params.limit) || 10)), 20);
-    const results = await searchDocuments(params.query, ws.workspaceSlug, limit);
+    // Pass userId as the second argument for tenant-scoped security event logging.
+    // workspaceSlug is resolved server-side above — never trust a model-supplied slug.
+    const results = await searchDocuments(params.query, userId, ws.workspaceSlug, limit);
     return { success: true, data: results, source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 

@@ -317,19 +317,20 @@ model ProjectOpenQuestion {
 // ── Memory Engine ───────────────────────────────────────────────
 
 model MemoryEpisode {
-  id           String                       @id @default(cuid())
-  userId       String
-  projectId    String?
-  eventType    String // decision_made, meeting_completed, correction, mamba_insight, etc.
-  entities     String? // JSON array of entity references
-  summary      String
-  source       String // conversation, tool, integration
-  confidence   Float                        @default(0.8)
-  importance   Float                        @default(0.5)
-  privacyClass String                       @default("PERSONAL")
-  supersededBy String? // ID of newer episode
-  embedding    Unsupported("vector(1536)")?
-  createdAt    DateTime                     @default(now())
+  id             String                      @id @default(cuid())
+  userId         String
+  projectId      String?
+  eventType      String // decision_made, meeting_completed, correction, mamba_insight, etc.
+  entities       String? // JSON array of entity references
+  summary        String
+  source         String // conversation, tool, integration
+  confidence     Float                       @default(0.8)
+  importance     Float                       @default(0.5)
+  privacyClass   String                      @default("PERSONAL")
+  supersededBy   String? // ID of newer episode
+  embedding      Unsupported("vector(768)")?
+  embeddingModel String? // e.g. "ollama/nomic-embed-text"
+  createdAt      DateTime                    @default(now())
 
   project Project? @relation(fields: [projectId], references: [id])
 
@@ -339,22 +340,23 @@ model MemoryEpisode {
 }
 
 model MemorySemantic {
-  id              String                       @id @default(cuid())
+  id              String                      @id @default(cuid())
   userId          String
   projectId       String?
   statement       String
   sourceType      String // user, conversation, integration, mamba
   sourceId        String? // reference to source conversation/message
-  confidence      Float                        @default(0.8)
+  confidence      Float                       @default(0.8)
   epistemicStatus String // KNOWN, INFERRED, HYPOTHESIS, UNVERIFIED
   supersededBy    String? // ID of newer semantic memory
   retrievedAt     DateTime?
-  scope           String?                      @default("general")
-  validFrom       DateTime                     @default(now())
+  scope           String?                     @default("general")
+  validFrom       DateTime                    @default(now())
   supersededAt    DateTime?
-  embedding       Unsupported("vector(1536)")?
-  createdAt       DateTime                     @default(now())
-  updatedAt       DateTime                     @updatedAt
+  embedding       Unsupported("vector(768)")?
+  embeddingModel  String? // e.g. "ollama/nomic-embed-text"
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
 
   project Project? @relation(fields: [projectId], references: [id])
 
