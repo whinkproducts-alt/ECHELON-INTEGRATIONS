@@ -41,8 +41,9 @@ model User {
   socialConnections  SocialConnection[]
   oauthStates        OAuthState[]
   scheduledPosts     ScheduledPost[]
-  documentWorkspaces DocumentWorkspace[]
-  documents          Document[]
+  documentWorkspaces       DocumentWorkspace[]
+  documents                Document[]
+  notificationPreferences  NotificationPreference[]
 
   @@map("users")
 }
@@ -857,4 +858,25 @@ model ScheduledPost {
   @@index([status, sendAt])
   @@index([userId, status])
   @@map("scheduled_posts")
+}
+
+// ── Notification Preferences ─────────────────────────────────────
+
+model NotificationPreference {
+  id       String  @id @default(cuid())
+  userId   String
+  channel  String  // EMAIL | WHATSAPP | SMS | TELEGRAM | PHONE_CALL
+  enabled  Boolean @default(false)
+  address  String? // email, phone E.164, or Telegram chat ID
+  schedule String  @default("DAILY") // DAILY | IMMEDIATE | WEEKLY
+  time     String  @default("08:00") // HH:MM in user's local time
+  timeZone String  @default("America/Edmonton")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel])
+  @@index([userId])
+  @@map("notification_preferences")
 }

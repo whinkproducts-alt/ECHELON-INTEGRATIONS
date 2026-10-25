@@ -43,6 +43,9 @@ npx prisma migrate dev
 8. **No vendor lock.** Models go through the model router. Never call a provider directly from a route.
 9. **Builders never grade their own work.** Code written by a builder agent is checked by a separate assurance agent.
 
+## Staff email standard
+All WHINK Group staff use `firstname.lastname@whinkgroup.com`. This applies to real people and to agent personas that have a named role. When displaying a staff member or board member anywhere in the UI, always show their email in this format.
+
 ## The team
 Builders write code. Assurance agents check it and never write the code they check.
 
@@ -60,6 +63,32 @@ Builders write code. Assurance agents check it and never write the code they che
 | performance-benchmarker | Latency and memory budgets, especially voice | sonnet |
 | brand-guardian | Tokens, palette, white label rules in the interface | haiku |
 | compliance-checker | Licences, Canadian privacy and anti spam law, store rules | sonnet |
+
+## Innovation & Opportunity Directorate
+Reports directly to Victor. Mandate: constantly identify and evaluate new business opportunities, find ways to scale existing WHINK Group businesses, and surface emerging market shifts before competitors see them.
+
+| Role | Email | Focus |
+|---|---|---|
+| Chief Innovation & Opportunity Officer | innovation.lead@whinkgroup.com | Leads the directorate; owns the opportunity pipeline |
+| Senior Opportunity Scout | opportunity.scout@whinkgroup.com | Scans markets, news, and trends for untapped opportunities |
+| Strategic Market Analyst | market.analyst@whinkgroup.com | Deep-dives on specific sectors and competitive landscapes |
+| Growth Strategist | growth.strategist@whinkgroup.com | Finds scale levers for existing WHINK Group products and ventures |
+| Venture Scout | venture.scout@whinkgroup.com | Identifies early-stage investments, acquisition targets, and partnerships |
+
+The directorate delivers a weekly intelligence brief to Victor. It reads the Intelligence Feed news screen and the ledger to spot patterns. Its output feeds directly into WHINK's memory as strategic hypotheses (MAMBA confidence-capped at 0.4).
+
+## Profile pictures
+When displaying board members, staff, or agents in conversation panels, use the `PersonaAvatar` component (`components/ui/persona-avatar.tsx`). If no `imageUrl` is provided, the component renders initials with a deterministic colour from the WHINK palette. Every staff card shows `firstname.lastname@whinkgroup.com`.
+
+## Communications
+WHINK and MAMBA can deliver daily (or immediate) updates via:
+- **Email** — SMTP. Env: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+- **SMS** — Twilio. Env: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`
+- **WhatsApp** — Twilio WhatsApp Business. Env: `TWILIO_WHATSAPP_FROM`
+- **Telegram** — Bot API. Env: `TELEGRAM_BOT_TOKEN`
+- **Phone call** — Twilio Voice with TwiML. Same credentials as SMS.
+
+All sends go through `lib/comms/delivery.ts` → permission engine (Class B — requires delegation). Preferences stored in `notification_preferences` table. Configure credentials in `.env` (never in git).
 
 ## How work flows
 1. lead-architect writes the plan and acceptance criteria for the task.

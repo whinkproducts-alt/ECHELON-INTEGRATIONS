@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Bell, RefreshCw, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
@@ -102,6 +102,9 @@ export function HoloSurface() {
   const [pendingCount, setPendingCount] = useState(0);
   const [preview, setPreview] = useState<AvatarState | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [meetingLoading, setMeetingLoading] = useState(false);
+  const [meetingError, setMeetingError] = useState<string | null>(null);
+  const meetingErrTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Agent registry — fixture data until real API is wired
   useEffect(() => {
@@ -136,6 +139,39 @@ export function HoloSurface() {
     const t = setInterval(poll, 5000);
     return () => clearInterval(t);
   }, []);
+
+  const handleQuickMeeting = useCallback(() => {
+    if (meetingLoading) return;
+    setMeetingLoading(true);
+    setMeetingError(null);
+    if (meetingErrTimer.current) clearTimeout(meetingErrTimer.current);
+    fetch('/api/meetings/quick-start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assistantName: 'Marcus Vale', assistantEmail: 'marcus.vale@whinkgroup.com' }),
+    })
+      .then((r) => {
+        setMeetingLoading(false);
+        if (r.status === 404) {
+          setMeetingError('Meeting room unavailable — contact marcus.vale@whinkgroup.com');
+          meetingErrTimer.current = setTimeout(() => setMeetingError(null), 4000);
+          return;
+        }
+        if (!r.ok) {
+          setMeetingError('Could not start meeting. Please try again.');
+          meetingErrTimer.current = setTimeout(() => setMeetingError(null), 4000);
+          return;
+        }
+        return r.json().then((data: { meetingUrl?: string }) => {
+          if (data.meetingUrl) window.open(data.meetingUrl, '_blank', 'noopener,noreferrer');
+        });
+      })
+      .catch(() => {
+        setMeetingLoading(false);
+        setMeetingError('Meeting room unavailable — contact marcus.vale@whinkgroup.com');
+        meetingErrTimer.current = setTimeout(() => setMeetingError(null), 4000);
+      });
+  }, [meetingLoading]);
 
   const counts = useMemo(() => countByState(agents), [agents]);
   const awaiting = pendingCount > 0 ? pendingCount : counts.awaiting_approval;
@@ -198,6 +234,7 @@ export function HoloSurface() {
               { label: 'Projects', href: '/dashboard' },
               { label: 'Ledger', href: '/dashboard/ledger' },
               { label: 'Connections', href: '/dashboard/connections' },
+            { label: 'News', href: '/dashboard/holo/news' },
             ].map((item) => (
               <Link
                 key={item.label}
@@ -416,6 +453,60 @@ export function HoloSurface() {
               />
 
               <div className="relative z-10 flex flex-col items-center pt-6 pb-4 px-4">
+                {/* Quick Meeting button */}
+                <div className="w-full mb-4">
+                  <button
+                    type="button"
+                    onClick={handleQuickMeeting}
+                    disabled={meetingLoading}
+                    aria-busy={meetingLoading}
+                    style={{
+                      background: 'rgba(56,182,255,0.10)',
+                      border: '1px solid rgba(56,182,255,0.35)',
+                      borderRadius: '12px',
+                      padding: '10px 18px',
+                      color: 'hsl(var(--whink-accent))',
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 600,
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: meetingLoading ? 'not-allowed' : 'pointer',
+                      width: '100%',
+                      justifyContent: 'center',
+                      opacity: meetingLoading ? 0.7 : 1,
+                      transition: 'opacity 0.15s',
+                    }}
+                  >
+                    {meetingLoading ? (
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden className="animate-spin">
+                        <circle cx="8" cy="8" r="6" stroke="hsl(var(--whink-accent))" strokeWidth="2" strokeDasharray="25 10" />
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                        <rect x="1" y="4" width="10" height="8" rx="2" stroke="hsl(var(--whink-accent))" strokeWidth="1.5" />
+                        <path d="M11 7l4-3v8l-4-3V7z" fill="hsl(var(--whink-accent))" />
+                      </svg>
+                    )}
+                    Quick Meeting — Marcus Vale
+                  </button>
+                  {meetingError && (
+                    <p
+                      role="alert"
+                      style={{
+                        fontFamily: 'var(--font-sans)',
+                        fontSize: '11px',
+                        color: 'hsl(var(--denial))',
+                        marginTop: 6,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {meetingError}
+                    </p>
+                  )}
+                </div>
+
                 {/* Avatar label + status chip */}
                 <div className="flex items-center gap-3 mb-4">
                   <p className="font-display text-sm font-semibold tracking-wide" style={{ color: 'hsl(var(--whink-accent))' }}>
