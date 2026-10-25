@@ -837,7 +837,7 @@ export async function executeTool(
     if (riskClass === 'C' && toolName === SCHEDULE_TOOL_NAME) {
       const deny = async (reason: string): Promise<ToolExecutionResult> => {
         await recordActionSafe({
-          userId, initiator: 'system', persona, mambaMode, tool: toolName, action: 'tool_execution_denied',
+          userId, initiator, persona, mambaMode, tool: toolName, action: 'tool_execution_denied',
           permissionClass: 'C', status: 'DENIED', inputSummary: safeJson(params), outputSummary: reason,
           correlationId: cid, latencyMs: Date.now() - startTime,
         });
@@ -861,7 +861,7 @@ export async function executeTool(
       const sp = socialPlatformOf(toolName);
       if (sp && !(await hasActiveConnection(userId, sp))) {
         await recordActionSafe({
-          userId, initiator: 'system', persona, mambaMode, tool: toolName, action: 'social_not_connected',
+          userId, initiator, persona, mambaMode, tool: toolName, action: 'social_not_connected',
           permissionClass: 'C', status: 'DENIED', inputSummary: safeJson(params), outputSummary: 'not_connected',
           correlationId: cid, latencyMs: Date.now() - startTime,
         });
@@ -899,7 +899,7 @@ export async function executeTool(
     }
     await recordActionSafe({
       userId,
-      initiator: 'system',
+      initiator,
       persona,
       mambaMode,
       tool: toolName,
@@ -920,7 +920,7 @@ export async function executeTool(
   try {
     actionRow = await recordAction({
       userId,
-      initiator: 'system',
+      initiator,
       persona,
       mambaMode,
       tool: toolName,

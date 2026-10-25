@@ -10,6 +10,11 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const body = await req.json();
 
+  // Basic shape validation — tool name must be a non-empty string.
+  if (typeof body.tool !== 'string' || body.tool.trim().length === 0) {
+    return NextResponse.json({ error: 'tool must be a non-empty string' }, { status: 400 });
+  }
+
   // L1: Read persona from server-side DB state — never trust client-supplied persona/mambaMode
   const personaState = await prisma.personaState.findUnique({ where: { userId: session.user.id } });
   const persona = personaState?.activePersona ?? 'WHINK';
@@ -20,7 +25,9 @@ export async function POST(req: NextRequest) {
     body.tool,
     body.params ?? {},
     persona,
-    mambaMode
+    mambaMode,
+    undefined,
+    { initiator: 'user' }
   );
   return NextResponse.json(result);
 }
