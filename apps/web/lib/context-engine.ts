@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { listWorkingMemory } from '@/lib/working-memory';
-import { filterToolResult, stripFakeUntrustedTags, wrapUntrustedContent } from '@/lib/content-isolation';
+import { filterToolResult, scanForInjectionPatterns, stripFakeUntrustedTags, wrapUntrustedContent } from '@/lib/content-isolation';
 import { searchMemory } from '@/lib/memory-engine';
 import { queryDocuments } from '@/lib/anythingllm-client';
 import { recordActionSafe } from '@/lib/ledger';
@@ -147,25 +147,31 @@ export async function assembleContext(
         // queryDocuments has a 500 ms internal timeout (C11).
         const chunks = await queryDocuments(userId, ws.workspaceSlug, query, 5);
 
-        if (!chunks.length) {
-          // Log unavailability once per turn (C11).
-          await recordActionSafe({
-            userId,
-            action: 'document_recall_unavailable',
-            permissionClass: 'A',
-            status: 'VALIDATED',
-            tool: 'context_engine',
-            inputSummary: `query=${query.slice(0, 200)}`,
-          });
-        }
-
         for (const chunk of chunks) {
-          const cleanName = stripFakeUntrustedTags(chunk.documentName);
-          const cleanText = stripFakeUntrustedTags(chunk.text);
-          const wrappedText = wrapUntrustedContent(cleanText, 'document', cleanName);
-          const citation = `[${cleanName}] ${wrappedText}`;
-          if (budget - citation.length > 0) {
-            result.documentCitations.push(citation);
+          const cleanName = filterToolResult(stripFakeUntrustedTags(chunk.documentName ?? ''));
+          const cleanText = filterToolResult(stripFakeUntrustedTags(chunk.text ?? ''));
+
+          // H4 fix: scan both name and content for injection before placing in model context.
+          const nameScan = scanForInjectionPatterns(cleanName);
+          const textScan = scanForInjectionPatterns(cleanText);
+          if (nameScan.suspicious || textScan.suspicious) {
+            await recordActionSafe({
+              userId,
+              action: 'document_injection_blocked',
+              permissionClass: 'A',
+              status: 'DENIED',
+              tool: 'context_engine',
+              inputSummary: `chunkId=${String(chunk.chunkId ?? '').slice(0, 200)} patterns=${[...nameScan.patterns, ...textScan.patterns].join(',')}`,
+            });
+            result.externalContentThisTurn = true;
+            continue;
+          }
+
+          // documentName goes inside the untrusted envelope so it cannot escape sanitisation.
+          const wrappedText = wrapUntrustedContent(`[doc:${cleanName}] ${cleanText}`, 'document', chunk.chunkId ?? cleanName);
+          if (budget - wrappedText.length > 0) {
+            result.documentCitations.push(wrappedText);
+            result.externalContentThisTurn = true;
             // C9: add to blended list with citation metadata
             result.blendedItems.push({
               type: 'document',
@@ -175,7 +181,7 @@ export async function assembleContext(
               page: chunk.page,
               score: chunk.score,
             });
-            budget -= citation.length;
+            budget -= wrappedText.length;
           }
         }
       }
