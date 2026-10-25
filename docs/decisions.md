@@ -2,6 +2,11 @@
 
 Newest first. Each entry: date, decision, alternatives, reason.
 
+## 2026-10-25  --destructive is a separate token from --denial
+Decision: `--destructive` (`0 72% 51%`) remains a distinct CSS token for generic UI errors (form validation, destructive button variants). It is not aliased to `--denial` (`356 77% 59%`).
+Alternatives: alias `--destructive` to `--denial` so one colour covers all error states.
+Reason: the two tokens carry different semantic weight. `--denial` signals a security or permission event (access denied, security block) and appears in the ledger, Neural Link, and approval UI. `--destructive` is a neutral UI affordance for irreversible actions and form errors — using the denial colour there would train the eye to ignore it in actual denial contexts.
+
 <!-- Entries 2026-10-03 below: approved by Victor, relayed to lead-architect by the WHINK orchestrator on 2026-10-03. Victor confirms them by running the Phase 2 checklist. -->
 
 ## 2026-10-03  Suspicious user input is blocked, ledgered and surfaced
