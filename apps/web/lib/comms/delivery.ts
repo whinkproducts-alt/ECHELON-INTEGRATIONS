@@ -1,0 +1,68 @@
+// Communication delivery layer.
+// Each channel requires external credentials configured as env vars.
+// Stubs return { sent: false, reason: 'not_configured' } when credentials are absent.
+// Real sends go through the permission engine — Class B (requires delegation).
+
+export type Channel = 'EMAIL' | 'WHATSAPP' | 'SMS' | 'TELEGRAM' | 'PHONE_CALL';
+
+export interface DeliveryResult {
+  sent: boolean;
+  channel: Channel;
+  reason?: string;
+  messageId?: string;
+}
+
+export interface DeliveryPayload {
+  to: string; // email, E.164 phone, or Telegram chat ID
+  subject?: string; // email only
+  body: string;
+  channel: Channel;
+  userId: string; // for ledger and tenant isolation
+}
+
+// Email — uses SMTP via nodemailer (MIT licence).
+// Env: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+async function deliverEmail(payload: DeliveryPayload): Promise<DeliveryResult> {
+  if (!process.env.SMTP_HOST) return { sent: false, channel: 'EMAIL', reason: 'not_configured' };
+  // Real implementation: import nodemailer and send. Placeholder returns configured.
+  return { sent: false, channel: 'EMAIL', reason: 'smtp_not_implemented_yet' };
+}
+
+// SMS / WhatsApp / Phone — uses Twilio.
+// Env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, TWILIO_WHATSAPP_FROM
+async function deliverTwilio(payload: DeliveryPayload): Promise<DeliveryResult> {
+  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+    return { sent: false, channel: payload.channel, reason: 'not_configured' };
+  }
+  // Real implementation: call Twilio REST API.
+  // SMS: POST /2010-04-01/Accounts/{sid}/Messages.json
+  // WhatsApp: same endpoint with 'whatsapp:' prefix on From/To
+  // Phone call: POST /2010-04-01/Accounts/{sid}/Calls.json with TwiML body
+  return { sent: false, channel: payload.channel, reason: 'twilio_not_implemented_yet' };
+}
+
+// Telegram — uses Bot API.
+// Env: TELEGRAM_BOT_TOKEN
+async function deliverTelegram(payload: DeliveryPayload): Promise<DeliveryResult> {
+  if (!process.env.TELEGRAM_BOT_TOKEN)
+    return { sent: false, channel: 'TELEGRAM', reason: 'not_configured' };
+  // Real: POST https://api.telegram.org/bot{token}/sendMessage
+  return { sent: false, channel: 'TELEGRAM', reason: 'telegram_not_implemented_yet' };
+}
+
+export async function deliver(payload: DeliveryPayload): Promise<DeliveryResult> {
+  switch (payload.channel) {
+    case 'EMAIL':
+      return deliverEmail(payload);
+    case 'SMS':
+      return deliverTwilio(payload);
+    case 'WHATSAPP':
+      return deliverTwilio(payload);
+    case 'PHONE_CALL':
+      return deliverTwilio(payload);
+    case 'TELEGRAM':
+      return deliverTelegram(payload);
+    default:
+      return { sent: false, channel: payload.channel, reason: 'unknown_channel' };
+  }
+}

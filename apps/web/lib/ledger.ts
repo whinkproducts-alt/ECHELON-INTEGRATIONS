@@ -14,6 +14,7 @@ export const SUMMARY_CAP = 2000;
 export type LedgerStatus =
   | 'SUBMITTED'
   | 'VALIDATED'
+  | 'EXECUTED'
   | 'FAILED'
   | 'UNVERIFIED'
   | 'AWAITING_APPROVAL'
@@ -34,6 +35,12 @@ export interface LedgerEntry {
   latencyMs?: number | null;
   confirmationMethod?: string | null;
   validationResult?: string | null;
+}
+
+/** Convenience alias used in API routes. metadata is serialised to inputSummary. */
+export interface WriteLedgerEntry extends Omit<LedgerEntry, 'inputSummary'> {
+  metadata?: Record<string, unknown> | null;
+  inputSummary?: string | null;
 }
 
 export interface LedgerPatch {
@@ -107,6 +114,17 @@ export async function updateActionStatus(
   if (patch.latencyMs !== undefined) data.latencyMs = patch.latencyMs;
   const res = await prisma.action.updateMany({ where: { id: actionId, userId }, data });
   return res.count === 1;
+}
+
+/**
+ * Convenience write used by API routes. Serialises metadata into inputSummary.
+ * Falls back to recordActionSafe (never throws).
+ */
+export async function writeLedger(entry: WriteLedgerEntry): Promise<{ id: string } | null> {
+  const { metadata, ...rest } = entry;
+  const inputSummary =
+    rest.inputSummary ?? (metadata ? JSON.stringify(metadata) : undefined) ?? null;
+  return recordActionSafe({ ...rest, inputSummary });
 }
 
 /**
