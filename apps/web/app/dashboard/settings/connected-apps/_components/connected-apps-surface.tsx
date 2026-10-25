@@ -128,7 +128,7 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
           role={notice.kind === 'error' ? 'alert' : 'status'}
           className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${
             notice.kind === 'error'
-              ? 'border-[hsl(var(--denial))] text-[hsl(var(--denial))]'
+              ? 'border-[hsl(var(--destructive))] text-[hsl(var(--destructive))]'
               : 'border-border text-foreground bg-card'
           }`}
         >
@@ -168,8 +168,8 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
       )}
 
       {state === 'error' && (
-        <div role="alert" className="bg-card border border-[hsl(var(--denial))] rounded-lg p-5 space-y-3">
-          <p className="text-sm text-[hsl(var(--denial))]">Error: could not load your connected apps.</p>
+        <div role="alert" className="bg-card border border-[hsl(var(--destructive))] rounded-lg p-5 space-y-3">
+          <p className="text-sm text-[hsl(var(--destructive))]">Error: could not load your connected apps.</p>
           <button
             onClick={() => {
               setState('loading');

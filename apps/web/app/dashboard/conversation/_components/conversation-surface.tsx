@@ -424,7 +424,7 @@ export function ConversationSurface() {
             {isListening && (
               <span
                 className="flex items-center gap-1 text-xs font-mono animate-pulse"
-                style={{ color: 'hsl(var(--denial))' }}
+                style={{ color: 'hsl(var(--whink-accent))' }}
               >
                 <Mic className="h-3 w-3" />
                 Listening

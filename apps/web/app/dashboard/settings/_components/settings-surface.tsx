@@ -277,7 +277,7 @@ export function SettingsSurface() {
                 <p
                   id="autonomy-notice"
                   role={resolution.tone === 'error' ? 'alert' : 'status'}
-                  className={`mt-2 text-xs font-mono ${resolution.tone === 'error' ? 'text-[hsl(var(--denial))]' : 'text-foreground'}`}
+                  className={`mt-2 text-xs font-mono ${resolution.tone === 'error' ? 'text-[hsl(var(--destructive))]' : 'text-foreground'}`}
                 >
                   {resolution.tone === 'error' ? 'Error: ' : ''}{resolution.message}
                 </p>

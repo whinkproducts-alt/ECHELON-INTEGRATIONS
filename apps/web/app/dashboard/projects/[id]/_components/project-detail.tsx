@@ -61,7 +61,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
                 <span className={`text-sm ${t.status === 'DONE' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>{t.title}</span>
                 <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${
                   t.status === 'DONE' ? 'bg-primary/10 text-primary' :
-                  t.status === 'IN_PROGRESS' ? 'bg-blue-400/10 text-blue-400' :
+                  t.status === 'IN_PROGRESS' ? 'bg-[hsl(var(--whink-accent))]/10 text-[hsl(var(--whink-accent))]' :
                   'bg-secondary text-muted-foreground'
                 }`}>{t.status}</span>
               </div>
@@ -89,7 +89,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
           </div>
           <div className="bg-card rounded-lg border border-border p-5">
             <h2 className="text-sm font-medium text-foreground flex items-center gap-2 mb-3">
-              <HelpCircle className="h-4 w-4 text-blue-400" /> Open Questions
+              <HelpCircle className="h-4 w-4 text-[hsl(var(--whink-accent))]" /> Open Questions
             </h2>
             {(project?.openQuestions ?? []).length === 0 ? (
               <p className="text-xs text-muted-foreground">No open questions.</p>

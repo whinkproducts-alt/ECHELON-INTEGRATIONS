@@ -30,7 +30,7 @@ function statusLabel(state: CardState): { text: string; color: string } | null {
     case 'executed': return { text: `Executed${state.detail ? `: ${state.detail}` : ''}`, color: ACCENT };
     case 'denied': return { text: 'Denied. Nothing ran.', color: DENIAL };
     case 'already_decided': return { text: 'Already decided. Nothing ran from this card.', color: 'hsl(var(--muted-foreground))' };
-    case 'failed': return { text: `Failed${state.detail ? `: ${state.detail}` : ''}`, color: DENIAL };
+    case 'failed': return { text: `Failed${state.detail ? `: ${state.detail}` : ''}`, color: 'hsl(var(--destructive))' };
     case 'expired': return { text: 'Expired — nothing ran', color: 'hsl(var(--muted-foreground))' };
     default: return null;
   }
@@ -159,7 +159,7 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code, classNam
         </p>
       )}
       {state.requestError && !terminal && (
-        <p className="text-xs font-mono" style={{ color: DENIAL }} role="alert">
+        <p className="text-xs font-mono" style={{ color: 'hsl(var(--destructive))' }} role="alert">
           {state.requestError}. Nothing was decided; you can try again.
         </p>
       )}

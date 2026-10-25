@@ -200,9 +200,9 @@ export function CommandSurface() {
 function StatusCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
   const colorMap: Record<string, string> = {
     primary: 'text-primary bg-primary/10',
-    blue: 'text-blue-400 bg-blue-400/10',
+    blue: 'text-[hsl(var(--whink-accent))] bg-[hsl(var(--whink-accent))]/10',
     amber: 'text-muted-foreground bg-muted/50',
-    purple: 'text-purple-400 bg-purple-400/10',
+    purple: 'text-muted-foreground bg-muted/50',
   };
   const cls = colorMap[color] ?? colorMap.primary;
   return (

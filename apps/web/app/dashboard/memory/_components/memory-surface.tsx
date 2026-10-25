@@ -105,7 +105,7 @@ export function MemorySurface() {
           {tab === 'episodic' && (results?.episodes ?? []).map((m: any) => (
             <div key={m.id} className="bg-card rounded-lg border border-border p-4">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs bg-blue-400/10 text-blue-400 px-1.5 py-0.5 rounded font-mono">{m.eventType}</span>
+                <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-mono">{m.eventType}</span>
                 <span className="text-xs text-muted-foreground font-mono">importance: {m.importance}</span>
               </div>
               <p className="text-sm text-foreground">{m.summary}</p>
@@ -116,7 +116,7 @@ export function MemorySurface() {
           {tab === 'entities' && (entities ?? []).map((e: any) => (
             <div key={e.id} className="bg-card rounded-lg border border-border p-4">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs bg-purple-400/10 text-purple-400 px-1.5 py-0.5 rounded font-mono">{e.type}</span>
+                <span className="text-xs bg-secondary text-muted-foreground px-1.5 py-0.5 rounded font-mono">{e.type}</span>
                 <span className="text-sm font-medium text-foreground">{e.canonicalName}</span>
               </div>
               {(e.aliases ?? []).length > 0 && (
