@@ -365,6 +365,15 @@ export async function POST(
             }
           }
 
+          // M1: If external content was read this turn, persist the taint flag so the next
+          // turn upgrades Class A/B tools to C, just as the injection-block path does.
+          // Awaited (not fire-and-forget) so the flag is durable before the response closes.
+          if (externalContentThisTurn) {
+            try {
+              await setWorkingMemory(session.user.id, taintKey(conversationId), Date.now().toString(), TAINT_TTL_SECONDS);
+            } catch { /* non-blocking — taint write failure is not fatal */ }
+          }
+
           // Save assistant message
           await prisma.message.create({
             data: {

@@ -18,7 +18,7 @@ import { chatWithTools, ToolsUnsupportedError, redactForLog, type NeutralMessage
 import { logger } from '@/lib/logger';
 import { streamChat } from '@/lib/model-router';
 
-const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search', 'document_search']);
+const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search', 'document_search', 'memory_read', 'calendar_list']);
 export const isExternalTool = (name: string) => EXTERNAL_TOOLS.has(name) || name.startsWith('openclaw__');
 
 export interface ToolDefinition {
