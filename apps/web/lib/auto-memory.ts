@@ -52,39 +52,69 @@ interface RawCandidate {
   eventDate?: string | null;
 }
 
-// ── B6 — Secret-drop patterns ─────────────────────────────────────────────────
+// ── B6 — Secret-drop patterns (H3 fix) ───────────────────────────────────────
 
 const SECRET_PATTERNS: RegExp[] = [
-  /password\s*[=:]\s*\S+/i,
-  /passwd\s*[=:]\s*\S+/i,
-  /(key|token|secret|api[_-]?key)\s*[:=]\s*[A-Za-z0-9_\-]{20,}/i,
-  // 16-digit card numbers with or without spaces / dashes
-  /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/,
-  // PIN followed by digits (with or without intervening words like "is")
-  /\bPIN\b.{0,20}\d{4,}/i,
+  // Natural-language password phrases ("password is X", "my password: X")
+  /\b(password|passwd|passcode|pwd|pin|unlock\s*code)\b.{0,30}\S/i,
+  // Key/token/secret assignments (strict or natural)
+  /(key|token|secret|api[_-]?key)\s*[:=\s]\s*[A-Za-z0-9_\-]{16,}/i,
+  // Vendor key prefixes
+  /\b(sk-[A-Za-z0-9]{20,}|sk-ant-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|xox[bp]-[A-Za-z0-9\-]{20,}|AIza[A-Za-z0-9_\-]{35})/,
+  // JWT (three base64url segments separated by dots)
+  /eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/,
+  // High-entropy random tokens (24+ alphanum/special chars)
+  /[A-Za-z0-9+/]{24,}={0,2}(?!\w)/,
+  // Card numbers — strip separators first (see normalised check below)
+  /\b\d{4}[-.\s]?\d{4}[-.\s]?\d{4}[-.\s]?\d{4}\b/,
+  // Amex 4-6-5
+  /\b\d{4}[-.\s]?\d{6}[-.\s]?\d{5}\b/,
 ];
 
-export function isSecret(statement: string): boolean {
-  return SECRET_PATTERNS.some((p) => p.test(statement));
+function luhn(digits: string): boolean {
+  let sum = 0;
+  let alt = false;
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let n = parseInt(digits[i], 10);
+    if (alt) { n *= 2; if (n > 9) n -= 9; }
+    sum += n;
+    alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+
+export function isSecret(raw: string): boolean {
+  // NFKC normalise and strip zero-width / format characters before matching
+  const statement = raw.normalize('NFKC').replace(/[­​-‏‪-‮﻿]/g, '');
+
+  if (SECRET_PATTERNS.some((p) => p.test(statement))) return true;
+
+  // Card number check: strip separators and run Luhn on 13-19 digit sequences
+  const stripped = statement.replace(/[-.\s]/g, '');
+  const cardCandidates = stripped.match(/\d{13,19}/g) ?? [];
+  for (const c of cardCandidates) {
+    if (luhn(c)) return true;
+  }
+  return false;
 }
 
 // ── B4/B5 — Sensitivity classification ───────────────────────────────────────
 
 const SENSITIVE_PATTERNS: RegExp[] = [
-  // Health / medical
-  /\b(health|medical|diagnosis|medication|doctor|hospital|surgery|illness|disease|mental\s*health|therapy|cancer|diabetes|prescription|treatment|symptom|chronic\s+condition)\b/i,
-  // Financial amounts and account numbers
-  /(\$[\d,]+(?:\.\d{2})?|\b\d{5,}\s*(?:dollars?|usd|cad)\b|account\s*number|routing\s*number|balance|salary|income|net\s*worth|\bdebt\b|loan\b|mortgage|credit\s*card|bank\s*account|iban|swift\s*code)/i,
+  // Health / medical (broadened — H2 fix)
+  /\b(health|medical|diagnosis|medication|doctor|hospital|surgery|illness|disease|mental\s*health|therap(?:y|ist|ies)|cancer|diabetes|prescription|treatment|symptom|chronic\s+condition|ADHD|autism|depression|anxiety|dementia|schizophrenia|bipolar|drug|adderall|ritalin|prozac|antidepressant|antipsychotic|HIV|AIDS|disorder|syndrome|pregnant|pregnancy|disability|rehab|addiction)\b/i,
+  // Financial (word-bounded to avoid "balance sheet")
+  /(\$[\d,]+(?:\.\d{2})?|\b\d{5,}\s*(?:dollars?|usd|cad)\b|\baccount\s*number\b|\brouting\s*number\b|\bsalary\b|\bincome\b|\bearns?\b|\bowes?\b|\bnet\s*worth\b|\bdebt\b|\bloan\b|\bmortgage\b|\bcredit\s*card\b|\bbank\s*account\b|\biban\b|\bswift\s*code\b|\b\d+k\b)/i,
   // Legal matters
-  /\b(lawsuit|attorney|lawyer|legal\s*matter|court|settlement|liability|dispute|litigation|NDA|non-disclosure)\b/i,
-  // Family / relationships (personal)
-  /\b(marriage|married|divorced?|separation|romantic\s*relationship|spouse|boyfriend|girlfriend|custody)\b/i,
-  // Location / home address
-  /\b(home\s*address|street\s*address|zip\s*code|postal\s*code|lives?\s*at|located\s*at|residence\b|home\s*location)\b/i,
-  // Identity documents
-  /\b(ssn|social\s*security\s*number|passport\s*number|driver.?s\s*licen[sc]e|national\s*id|sin\s*number|birth\s*certificate)\b/i,
-  // Personal health or financial facts about a named third party
-  /\b[A-Z][a-z]+(?: [A-Z][a-z]+)+\b.{0,30}\b(health|salary|debt|diagnosis|treatment|address)\b/,
+  /\b(lawsuit|attorney|lawyer|legal\s*matter|court|settlement|liability|dispute|litigation|NDA|non-disclosure|sued|suing|arrested|arrest|criminal|conviction|parole|probation|charges?)\b/i,
+  // Family / relationships (broadened — H2 fix)
+  /\b(marriage|married|divorced?|separation|romantic\s*relationship|spouse|boyfriend|girlfriend|custody|wife|husband|partner|son|daughter|mother|father|parent|sibling|brother|sister|kids?|children|family|relative|grandparent|grandchild|niece|nephew|uncle|aunt)\b/i,
+  // Location / home address (broadened — H2 fix)
+  /\b(home\s*address|street\s*address|zip\s*code|postal\s*code|lives?\s*at|located\s*at|\bresidence\b|home\s*location|\d+\s+[A-Za-z]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Boulevard|Blvd|Lane|Ln|Court|Ct|Way|Place|Pl)\b)/i,
+  // Identity documents (broadened — H2 fix)
+  /\b(ssn|social\s*security\s*(?:number)?|passport\s*(?:number)?|driver.?s\s*licen[sc]e|national\s*id|sin\s*(?:number)?|birth\s*certificate|identity\s*document|national\s*insurance)\b/i,
+  // Personal facts about a named third party OR unnamed relative (H2 fix)
+  /\b(?:[A-Z][a-z]+(?: [A-Z][a-z]+)+|(?:my|his|her|their)\s+(?:wife|husband|son|daughter|mother|father|brother|sister|partner|child|parent))\b.{0,50}\b(health|salary|income|debt|diagnosis|treatment|address|arrested|pregnancy|ill|sick|cancer|depression|disorder)\b/i,
 ];
 
 export function isSensitive(statement: string): boolean {
@@ -218,6 +248,21 @@ export async function extractAndStoreMemories(
       permissionClass: 'A',
       status: 'VALIDATED',
       inputSummary: 'reason: injection_blocked',
+      correlationId,
+    });
+    return;
+  }
+
+  // H3 secondary — skip entire turn if user message contains a secret (H3 fix)
+  if (isSecret(userMessage)) {
+    await recordActionSafe({
+      userId,
+      initiator: 'system',
+      persona,
+      action: 'memory_auto_skipped',
+      permissionClass: 'A',
+      status: 'VALIDATED',
+      inputSummary: 'reason: secret_in_user_message',
       correlationId,
     });
     return;
@@ -378,7 +423,7 @@ Rules:
       ? Math.min(Math.max(candidate.confidence, 0), 0.8)
       : 0.6;
 
-    if (persona === 'MAMBA') {
+    if (persona.toUpperCase() === 'MAMBA') {
       memType = 'hypothesis';
       confidence = Math.min(confidence, 0.4);
     } else {
