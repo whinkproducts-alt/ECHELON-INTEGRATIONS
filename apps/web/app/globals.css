@@ -165,3 +165,37 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* Orbit ring animations for Presence and Obsidian screens */
+@keyframes spin-ccw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+.animate-spin-ccw {
+  animation: spin-ccw 12s linear infinite;
+}
+
+/* Audio bar scale animation for voice screens */
+@keyframes bar-bounce {
+  0%, 100% { transform: scaleY(0.15); }
+  50% { transform: scaleY(1); }
+}
+.animate-bar {
+  animation: bar-bounce 0.6s ease-in-out infinite;
+}
+
+/* Halo breathing for avatar center zone */
+@keyframes whink-halo {
+  0%, 100% { box-shadow: 0 0 28px 10px hsl(var(--whink-accent) / 0.35), 0 0 60px 24px hsl(var(--whink-accent) / 0.12); }
+  50% { box-shadow: 0 0 44px 20px hsl(var(--whink-accent) / 0.55), 0 0 90px 40px hsl(var(--whink-accent) / 0.18); }
+}
+.animate-whink-halo {
+  animation: whink-halo 3s ease-in-out infinite;
+}
+@keyframes ember-halo {
+  0%, 100% { box-shadow: 0 0 28px 10px hsl(var(--ember) / 0.35), 0 0 60px 24px hsl(var(--ember) / 0.12); }
+  50% { box-shadow: 0 0 44px 20px hsl(var(--ember) / 0.55), 0 0 90px 40px hsl(var(--ember) / 0.18); }
+}
+.animate-ember-halo {
+  animation: ember-halo 3s ease-in-out infinite;
+}
