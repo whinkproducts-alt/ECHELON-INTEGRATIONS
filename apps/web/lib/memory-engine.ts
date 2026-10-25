@@ -39,19 +39,32 @@ export interface MemoryWriteInput {
   projectId?: string | null;
   source: string;
   sourceId?: string;
+  /** Id of the message that triggered auto-extraction (B9). */
+  messageId?: string;
+  /** LLM model used for extraction — distinct from the embedding model (B9). */
+  extractorModel?: string;
   confidence?: number;
   importance?: number;
   eventType?: string;
+  /** Absolute event date for episodic memories (B8 — resolved from relative dates). */
+  eventDate?: Date;
   epistemicStatus?: string;
   mambaMode?: string;
   rationale?: string;
   entities?: string[];
 }
 
-export async function writeMemory(input: MemoryWriteInput) {
+/** Returned by writeMemory. Carries the stored row id and a dedup flag (for semantic). */
+export interface MemoryWriteResult {
+  id: string;
+  /** True when an existing near-duplicate row was updated instead of a new row created. */
+  deduped: boolean;
+}
+
+export async function writeMemory(input: MemoryWriteInput): Promise<MemoryWriteResult> {
   const {
-    userId, type, statement, projectId, source, sourceId,
-    confidence, importance, eventType, epistemicStatus,
+    userId, type, statement, projectId, source, sourceId, messageId, extractorModel,
+    confidence, importance, eventType, eventDate, epistemicStatus,
     mambaMode, rationale, entities,
   } = input;
 
@@ -64,6 +77,9 @@ export async function writeMemory(input: MemoryWriteInput) {
           eventType: eventType ?? 'observation',
           summary: statement,
           source,
+          eventDate: eventDate ?? null,
+          messageId: messageId ?? null,
+          extractorModel: extractorModel ?? null,
           confidence: confidence ?? 0.8,
           importance: importance ?? 0.5,
           entities: entities ? JSON.stringify(entities) : null,
@@ -80,7 +96,7 @@ export async function writeMemory(input: MemoryWriteInput) {
           embeddingModelName,
         );
       }).catch(() => {/* non-blocking */});
-      return episodeRow;
+      return { id: episodeRow.id, deduped: false };
     }
 
     case 'semantic': {
@@ -101,7 +117,7 @@ export async function writeMemory(input: MemoryWriteInput) {
                 confidence: Math.max(existing.confidence, confidence ?? 0.8),
               },
             });
-            return updated;
+            return { id: updated.id, deduped: true };
           }
         } catch {
           // dedup query failed (e.g. no pgvector extension in test) — proceed with insert
@@ -115,6 +131,8 @@ export async function writeMemory(input: MemoryWriteInput) {
           statement,
           sourceType: source,
           sourceId: sourceId ?? null,
+          messageId: messageId ?? null,
+          extractorModel: extractorModel ?? null,
           confidence: confidence ?? 0.8,
           epistemicStatus: epistemicStatus ?? 'KNOWN',
         },
@@ -130,11 +148,11 @@ export async function writeMemory(input: MemoryWriteInput) {
         ).catch(() => {/* non-blocking */});
       }
 
-      return semanticRow;
+      return { id: semanticRow.id, deduped: false };
     }
 
-    case 'procedural':
-      return prisma.memoryProcedural.create({
+    case 'procedural': {
+      const proceduralRow = await prisma.memoryProcedural.create({
         data: {
           userId,
           category: eventType ?? 'general',
@@ -142,11 +160,13 @@ export async function writeMemory(input: MemoryWriteInput) {
           confidence: confidence ?? 0.9,
         },
       });
+      return { id: proceduralRow.id, deduped: false };
+    }
 
-    case 'hypothesis':
+    case 'hypothesis': {
       // Enforce MAMBA Memory Firewall: max confidence 0.4
       const cappedConfidence = Math.min(confidence ?? 0.3, 0.4);
-      return prisma.hypothesis.create({
+      const hypothesisRow = await prisma.hypothesis.create({
         data: {
           userId,
           projectId: projectId ?? null,
@@ -158,6 +178,8 @@ export async function writeMemory(input: MemoryWriteInput) {
           rationale: rationale ?? null,
         },
       });
+      return { id: hypothesisRow.id, deduped: false };
+    }
 
     default:
       throw new Error(`Unknown memory type: ${type}`);

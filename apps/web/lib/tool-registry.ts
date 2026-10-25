@@ -412,18 +412,73 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
   },
 
   document_search: async (userId: string, params: any) => {
-    // Resolve workspace from server-side mapping — never trust model-supplied slug for tenant scoping
-    const ws = await prisma.documentWorkspace.findFirst({
-      where: { userId, ...(params.workspace ? { workspaceSlug: params.workspace } : {}) },
-      orderBy: { createdAt: 'asc' },
-    });
-    if (!ws) return { success: false, error: 'No document workspace configured for this account.', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
-    const { searchDocuments } = await import('@/lib/anythingllm-client');
+    // Resolve workspace from the DocumentWorkspace table — one row per user, scoped by userId.
+    // Never trust a model-supplied workspace slug for tenant scoping.
+    const ws = await prisma.documentWorkspace.findUnique({ where: { userId } });
+    if (!ws) return { success: false, error: 'No document workspace configured for this account. Not connected.', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    const { queryDocuments } = await import('@/lib/anythingllm-client');
+    const { wrapUntrustedContent, stripFakeUntrustedTags, scanForInjectionPatterns } = await import('@/lib/content-isolation');
     const limit = Math.min(Math.max(1, Math.floor(Number(params.limit) || 10)), 20);
-    // Pass userId as the second argument for tenant-scoped security event logging.
-    // workspaceSlug is resolved server-side above — never trust a model-supplied slug.
-    const results = await searchDocuments(params.query, userId, ws.workspaceSlug, limit);
-    return { success: true, data: results, source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    // C11: queryDocuments has a 500 ms internal timeout. If it returns empty due to timeout/down,
+    // we ledger the unavailability and return gracefully.
+    let rawChunks;
+    try {
+      rawChunks = await queryDocuments(userId, ws.workspaceSlug, params.query, limit);
+    } catch {
+      rawChunks = [];
+    }
+
+    if (!rawChunks.length) {
+      // Log once per turn when AnythingLLM is down or returns nothing.
+      await recordActionSafe({
+        userId,
+        action: 'document_recall_unavailable',
+        permissionClass: 'A',
+        status: 'VALIDATED',
+        tool: 'document_search',
+        inputSummary: `query=${String(params.query ?? '').slice(0, 200)}`,
+      });
+      return { success: true, data: [], source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    // C7+C8: scan each chunk; strip fake envelope tags from citation fields; wrap text as untrusted.
+    const safe = [];
+    for (const chunk of rawChunks) {
+      // Strip <|...|> and fake untrusted tags from citation fields (names, not chunk text)
+      const cleanName = stripFakeUntrustedTags(String(chunk.documentName ?? '')).replace(/<\|[^|>]*\|>/g, '');
+      const cleanChunkId = String(chunk.chunkId ?? '');
+      const cleanText = stripFakeUntrustedTags(String(chunk.text ?? ''));
+
+      // Injection scan the chunk text
+      const { suspicious } = scanForInjectionPatterns(cleanText);
+      if (suspicious) {
+        // C8: drop the chunk and ledger a security event — no content in the ledger row
+        await recordActionSafe({
+          userId,
+          action: 'document_chunk_blocked',
+          permissionClass: 'C',
+          status: 'DENIED',
+          tool: 'document_search',
+          inputSummary: `documentName=${cleanName.slice(0, 200)}`,
+        });
+        continue;
+      }
+
+      // Wrap chunk text as untrusted before it enters model context
+      const wrappedText = wrapUntrustedContent(cleanText, 'document', cleanName);
+
+      safe.push({
+        documentName: cleanName,
+        chunkId: cleanChunkId,
+        page: chunk.page,
+        score: chunk.score,
+        text: wrappedText,
+      });
+    }
+
+    return { success: true, data: safe, source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
   // Never runs directly: Class C, queued as a 'scheduled_post' approval in executeTool.

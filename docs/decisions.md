@@ -2,15 +2,44 @@
 
 Newest first. Each entry: date, decision, alternatives, reason.
 
+## 2026-10-25  Phase 3 learnings sync
+
+Summary of what was built in Phase 3a and the early 3b/3c work, as observed in code on 2026-10-25.
+
+### New schema tables and fields
+- `DocumentWorkspace`: one row per user, holds their AnythingLLM workspace slug. The shared `ANYTHINGLLM_WORKSPACE_SLUG` env fallback is present in `.env.example` for migration but should not be used in new code. `document_workspaces` is the authoritative source. `@@unique([userId, workspaceSlug])` enforces one workspace per user.
+- `embeddingModel String?` on both `MemoryEpisode` and `MemorySemantic`: records the model that produced the row's embedding. Vector search filters by this field so mixed-model comparisons never happen.
+- `vector(768)` column on both tables (down from `vector(1536)`): matches `nomic-embed-text` output dimension. HNSW cosine index (`vector_cosine_ops`, `m=16`, `ef_construction=64`) added by migration `20261025000000_phase3a_embeddings`.
+
+### Embedding model rationale
+Default: `ollama/nomic-embed-text` (768-dim, Apache 2.0, runs locally via Ollama, nothing leaves the Mac). Configured via `EMBEDDING_MODEL=ollama/nomic-embed-text`. Changing to an OpenAI model (e.g. `openai/text-embedding-3-small`, 1536-dim) requires a new migration to resize the vector column and a `pnpm memory:reembed` run to backfill existing rows. Choosing a paid default needs Victor's approval first.
+
+### AnythingLLM version — NOT yet bumped (status 2026-10-25)
+The compose file is pinned to `1.7.4`. The earlier decision entry (2026-10-25, "AnythingLLM version bump: pinned to 1.18.0") recorded the intent; the 3c agent did not execute the bump because `1.7.4` lacks a pure retrieval endpoint. `lib/anythingllm-client.ts` uses `/api/v1/workspace/:slug/chat` with `mode: "query"` and discards the `textResponse` (LLM output), using only the `sources` array. This is a workaround. The TODO in the client reads: "upgrade to AnythingLLM 2.x for a pure retrieval endpoint". The version bump is an open task for devops-engineer.
+
+### Auto memory permission split (lib/auto-memory.ts)
+`lib/auto-memory.ts` is the single extraction path. It classifies each candidate:
+- **Class A** (`memory_auto_write`): routine facts — preferences, work context, procedural notes.
+- **Class B** (`memory_auto_write_sensitive`): health, money and account numbers, legal, family and relationships, home address, identity documents, third-party personal facts. Requires a delegation row or sufficient autonomy level. Ledger row records category but never the statement text on denial.
+- **Dropped before any permission check**: credentials matching password/key/token/card-number patterns. Ledger row is `memory_secret_dropped` with no content.
+Confidence capped at 0.8 for inferred memories. MAMBA turns produce `hypothesis` rows, confidence capped at 0.4. Daily cap: 200 writes per user per day (configurable via `MEMORY_DAILY_CAP`). At most 5 candidates per turn. Extraction starts as a detached promise — never awaited, failures never surface to the user.
+
+### Context engine blending strategy
+`context-engine.ts` (or the context assembly path) returns memory and document recall results in one ranked list, each tagged `type: "memory" | "document"`. Both fit within the existing token budget. Document chunks carry citation fields: `title`, `chunkId`, `page`, `score`. All citation fields and chunk text are wrapped as untrusted before entering model context. A chunk whose text contains injection-pattern content is dropped and ledgered as `document_chunk_blocked`.
+
+### New env vars added in Phase 3 (not previously in .env.example)
+- `MEMORY_DAILY_CAP` (auto-memory.ts, B12): integer, default 200. Per-user daily write limit for auto extraction.
+- `DOCUMENT_MAX_SIZE_MB` (upload route, C6): integer, default 25. Maximum document upload size in megabytes.
+
 ## 2026-10-25  AnythingLLM memory budget and external drive storage
 Decision: AnythingLLM container is capped at 4 GB RAM in compose. Storage uses a named Docker volume for now. When Victor moves to the 2TB external drive, devops-engineer remaps the volume mount to `/Volumes/<drive>/whink-data/anythingllm` in `services/anythingllm/docker-compose.yml` — one-line change, no rebuild needed. Logged as a Phase 6 devops task.
 Alternatives: set no memory cap (risk of Mac Mini OOM under heavy document load); use a bind mount path immediately (requires the drive to be present on every dev machine).
 Reason: 4 GB is generous for a Node.js + SQLite AnythingLLM instance with no local LLM (WHINK uses it for retrieval only). The named-volume approach keeps the compose portable across machines until the drive is the permanent home.
 
-## 2026-10-25  AnythingLLM version bump: bump to latest stable, use /query endpoint
-Decision: bump the AnythingLLM pinned image from 1.7.4 to latest stable (exact tag chosen by the integrations-engineer after checking the 1.x changelog). Switch the adapter from the `/chat` endpoint to `/api/v1/workspace/:slug/query` (retrieval-only, no model call). Version change is logged here when the integrations-engineer picks the tag.
+## 2026-10-25  AnythingLLM version bump: pinned to 1.18.0, use /query endpoint
+Decision: bump the AnythingLLM pinned image from 1.7.4 to 1.18.0 (latest stable semver tag as of 2026-10-25, verified on hub.docker.com/r/mintplexlabs/anythingllm/tags). Switch the adapter from `/api/v1/workspace/:slug/chat` to `/api/v1/workspace/:slug/query` (retrieval-only, no model call). The adapter is updated in `lib/anythingllm-client.ts`; the compose is updated in `services/anythingllm/docker-compose.yml`.
 Alternatives: keep 1.7.4 and work around the missing endpoint; switch to a different retrieval service.
-Reason: the `/chat` endpoint runs AnythingLLM's own embedded model outside the WHINK model router (violates non-negotiable 8). The `/query` endpoint returns ranked chunks with source metadata and makes no model call. A version bump within the 1.x line is low risk; the builder tests the new image before committing.
+Reason: the `/chat` endpoint runs AnythingLLM's own embedded model outside the WHINK model router (violates non-negotiable 8). The `/query` endpoint returns ranked chunks with source metadata and makes no model call. Version 1.18.0 is a stable 1.x release; the interface is compatible with the existing workspace API.
 
 <!-- Phase 3 entries below: lead-architect plan, 2026-10-25. Proposed, not yet confirmed by Victor. Phase 3 starts after Victor passes the Phase 2 checklist. -->
 

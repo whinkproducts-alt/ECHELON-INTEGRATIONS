@@ -38,9 +38,10 @@ model User {
   calendarEvents    CalendarEvent[]
   notes             Note[]
   approvalRequests  ApprovalRequest[]
-  socialConnections SocialConnection[]
-  oauthStates       OAuthState[]
-  scheduledPosts    ScheduledPost[]
+  socialConnections  SocialConnection[]
+  oauthStates        OAuthState[]
+  scheduledPosts     ScheduledPost[]
+  documentWorkspaces DocumentWorkspace[]
 
   @@map("users")
 }
@@ -109,7 +110,6 @@ model UserPreference {
   defaultFunctionalMode String?
   executionProfile      String   @default("BALANCED")
   preferredModel        String? // e.g. "claude-sonnet-4-5", "gpt-4o", "llama3.1:8b"
-  anythingllmWorkspace  String? // per-user AnythingLLM workspace slug; null falls back to env
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -323,7 +323,10 @@ model MemoryEpisode {
   eventType      String // decision_made, meeting_completed, correction, mamba_insight, etc.
   entities       String? // JSON array of entity references
   summary        String
-  source         String // conversation, tool, integration
+  source         String // conversation, tool, integration, auto
+  eventDate      DateTime? // absolute event date (B8 — resolved from relative dates)
+  messageId      String? // id of the message that triggered auto-extraction (B9)
+  extractorModel String? // LLM model used for extraction, distinct from embeddingModel (B9)
   confidence     Float                       @default(0.8)
   importance     Float                       @default(0.5)
   privacyClass   String                      @default("PERSONAL")
@@ -344,8 +347,10 @@ model MemorySemantic {
   userId          String
   projectId       String?
   statement       String
-  sourceType      String // user, conversation, integration, mamba
+  sourceType      String // user, conversation, integration, mamba, auto
   sourceId        String? // reference to source conversation/message
+  messageId       String? // id of the message that triggered auto-extraction (B9)
+  extractorModel  String? // LLM model used for extraction, distinct from embeddingModel (B9)
   confidence      Float                       @default(0.8)
   epistemicStatus String // KNOWN, INFERRED, HYPOTHESIS, UNVERIFIED
   supersededBy    String? // ID of newer semantic memory
@@ -363,6 +368,21 @@ model MemorySemantic {
   @@index([userId, createdAt])
   @@index([projectId])
   @@map("memory_semantic")
+}
+
+// ── Auto Memory Daily Cap (B12) ─────────────────────────────────
+
+model MemoryDailyCap {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String // YYYY-MM-DD
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("memory_daily_cap")
 }
 
 model MemoryProcedural {
@@ -695,13 +715,12 @@ model TaskHandoff {
 
 model DocumentWorkspace {
   id            String   @id @default(cuid())
-  userId        String
+  userId        String   @unique
   workspaceSlug String
-  displayName   String?
   createdAt     DateTime @default(now())
 
-  @@unique([userId, workspaceSlug])
-  @@index([userId])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("document_workspaces")
 }
 

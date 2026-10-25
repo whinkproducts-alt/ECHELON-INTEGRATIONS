@@ -6,14 +6,11 @@ import { processInput, debriefTurn } from '@/lib/orchestrator';
 import { runToolLoop, STANDARD_TOOLS, isExternalTool } from '@/lib/tool-loop';
 import { logger, generateCorrelationId } from '@/lib/logger';
 import { runTaskGate } from '@/lib/task-gate';
-import { scanForInjectionPatterns } from '@/lib/content-isolation';
 import { isApprovalMessage, BARE_APPROVAL_REPLY } from '@/lib/approval-handler';
 import { createApproval } from '@/lib/approvals';
-import { writeMemory } from '@/lib/memory-engine';
-import { chatOnce } from '@/lib/model-router';
+import { extractAndStoreMemories } from '@/lib/auto-memory';
 import { decryptKey } from '@/lib/key-encryption';
 import { recordActionSafe } from '@/lib/ledger';
-import { checkPermission } from '@/lib/permission-engine';
 import { resolveChatTools } from '@/lib/gateway-chat';
 import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
 import { normaliseMambaMode } from '@/lib/types';
@@ -376,7 +373,7 @@ export async function POST(
           }
 
           // Save assistant message
-          await prisma.message.create({
+          const assistantMessage = await prisma.message.create({
             data: {
               conversationId,
               role: 'assistant',
@@ -387,98 +384,20 @@ export async function POST(
             },
           });
 
-          // Auto memory extraction (detached — does not block the response)
-          // Skipped when external content was read: the assistant text may restate it, and auto-saved
-          // memory from an injected page or DM would be a persistence channel for the attacker.
+          // B1 — Auto memory extraction (detached — does not block the response).
+          // Skipped when a tool wrote memory, a tool ran, or external content was read this turn.
           if (!memoryWriteCalledInLoop && !toolRanThisTurn && !externalContentThisTurn && fullContent.length > 100) {
-            const autoMemoryUserId = session.user.id;
-            const autoMemoryConvId = conversationId;
-            const autoMemoryContent = fullContent;
-            const autoMemoryUserMsg = userMessage;
-            void (async () => {
-              try {
-                const extractModel = process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
-
-                // Fetch 5 most recent semantic memories to help the model skip duplicates
-                const recentMemories = await prisma.memorySemantic.findMany({
-                  where: { userId: autoMemoryUserId, supersededBy: null },
-                  orderBy: { createdAt: 'desc' },
-                  take: 5,
-                  select: { statement: true },
-                });
-                const recentStatements = recentMemories.map((m) => `- ${m.statement}`).join('\n');
-                const dedupeHint = recentStatements
-                  ? `\n\nAlready stored (skip if similar):\n${recentStatements}`
-                  : '';
-
-                const extractPrompt = `You are a Memory Extraction Agent. Extract memories into these categories:
-- episodic: time-bound events with dates
-- semantic: timeless facts about Victor or his work
-- procedural: how-tos, preferences, standing instructions
-Return JSON array: [{ "type": "episodic"|"semantic"|"procedural", "statement": string, "confidence": number }]. Rules: one fact per memory, atomic, from Victor's perspective, normalize relative dates to absolute, return [] if nothing worth storing.${dedupeHint}
-
-User: ${autoMemoryUserMsg}
-Assistant: ${autoMemoryContent}`;
-
-                const result = await chatOnce({
-                  messages: [{ role: 'user', content: extractPrompt }],
-                  model: extractModel,
-                  maxTokens: 512,
-                  temperature: 0,
-                });
-                let items: Array<{ type: string; statement: string; confidence?: number }> = [];
-                try {
-                  const trimmed = result.trim().replace(/^```json\n?|```$/g, '').trim();
-                  items = JSON.parse(trimmed);
-                } catch { /* ignore parse error */ }
-                if (!Array.isArray(items)) return;
-                for (const item of items.slice(0, 3)) {
-                  if (!item || typeof item.statement !== 'string' || item.statement.length < 5) continue;
-                  // Scan each extracted fact before persisting
-                  const factScan = scanForInjectionPatterns(item.statement);
-                  if (factScan.suspicious) continue;
-                  const memType = ['episodic', 'procedural'].includes(item.type) ? item.type as 'episodic' | 'procedural' : 'semantic';
-                  // Non-negotiable #4: every action goes through the permission engine.
-                  // Routine facts are Class A. Sensitive facts flagged by the extraction
-                  // prompt are Class B — deferred to a later phase that flags sensitive content.
-                  const autoMemPermClass = 'A';
-                  const autoMemPerm = await checkPermission(autoMemoryUserId, 'memory_auto_write', autoMemPermClass, correlationId);
-                  if (!autoMemPerm.allowed) {
-                    await recordActionSafe({
-                      userId: autoMemoryUserId,
-                      initiator: 'system',
-                      persona: activePersona,
-                      action: 'memory_auto_write',
-                      permissionClass: autoMemPermClass,
-                      status: 'DENIED',
-                      inputSummary: item.statement.substring(0, 200),
-                      correlationId,
-                    });
-                    continue;
-                  }
-                  await writeMemory({
-                    userId: autoMemoryUserId,
-                    type: memType,
-                    statement: item.statement,
-                    source: 'conversation',
-                    sourceId: autoMemoryConvId,
-                    confidence: typeof item.confidence === 'number' ? Math.min(Math.max(item.confidence, 0), 1) : 0.75,
-                    epistemicStatus: 'INFERRED',
-                  });
-                  // Non-negotiable #5: every action lands in the ledger.
-                  await recordActionSafe({
-                    userId: autoMemoryUserId,
-                    initiator: 'system',
-                    persona: activePersona,
-                    action: 'memory_auto_write',
-                    permissionClass: autoMemPermClass,
-                    status: 'VALIDATED',
-                    inputSummary: item.statement.substring(0, 200),
-                    correlationId,
-                  });
-                }
-              } catch { /* non-blocking — never surface */ }
-            })();
+            void extractAndStoreMemories({
+              userId: session.user.id,
+              conversationId,
+              messageId: assistantMessage.id,
+              userMessage,
+              assistantReply: fullContent,
+              persona: activePersona,
+              correlationId,
+              conversationTainted,
+              injectionBlocked: false,
+            }).catch(() => { /* detached — never surface */ });
           }
 
           // CAI auto-debrief (fire-and-forget)
