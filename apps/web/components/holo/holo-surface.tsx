@@ -235,6 +235,8 @@ export function HoloSurface() {
               { label: 'Ledger', href: '/dashboard/ledger' },
               { label: 'Connections', href: '/dashboard/connections' },
             { label: 'News', href: '/dashboard/holo/news' },
+              { label: 'Today', href: '/dashboard/today' },
+              { label: 'Board', href: '/dashboard/board' },
             ].map((item) => (
               <Link
                 key={item.label}

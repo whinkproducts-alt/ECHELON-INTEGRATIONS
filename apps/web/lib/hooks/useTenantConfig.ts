@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { SocialPlatform } from '@/lib/social-ui';
+import tenantDefaults from '@/config/tenant-defaults.json';
 
 /** Display labels for each social platform. Overridable per tenant. */
 export type PlatformLabels = Record<SocialPlatform, string>;
@@ -22,6 +23,14 @@ const DEFAULT_PLATFORM_NOTES: PlatformNotes = {
 
 export interface TenantConfig {
   productName: string;
+  /** Short app name, e.g. for title bars. Defaults from config/tenant-defaults.json. */
+  appName: string;
+  /** Long form including the acronym dots. */
+  fullName: string;
+  companyName: string;
+  studioName: string;
+  acronymExpansion: string;
+  tagline: string;
   logoUrl: string | null;
   /** Tenant-supplied accent. Null means "use the design token"; no colour lives in code. */
   accentColor: string | null;
@@ -60,7 +69,13 @@ export interface TenantConfig {
 }
 
 const DEFAULT_CONFIG: TenantConfig = {
-  productName: 'Your assistant',
+  productName: tenantDefaults.appName,
+  appName: tenantDefaults.appName,
+  fullName: tenantDefaults.fullName,
+  companyName: tenantDefaults.companyName,
+  studioName: tenantDefaults.studioName,
+  acronymExpansion: tenantDefaults.acronymExpansion,
+  tagline: tenantDefaults.tagline,
   logoUrl: null,
   accentColor: null,
   supportUrl: null,
@@ -98,7 +113,13 @@ export function useTenantConfig(): TenantConfig {
       .then((r) => r.json())
       .then((data) => {
         setConfig({
-          productName: data.productName ?? 'Your assistant',
+          productName: data.productName ?? DEFAULT_CONFIG.productName,
+          appName: data.appName ?? data.productName ?? DEFAULT_CONFIG.appName,
+          fullName: data.fullName ?? DEFAULT_CONFIG.fullName,
+          companyName: data.companyName ?? DEFAULT_CONFIG.companyName,
+          studioName: data.studioName ?? DEFAULT_CONFIG.studioName,
+          acronymExpansion: data.acronymExpansion ?? DEFAULT_CONFIG.acronymExpansion,
+          tagline: data.tagline ?? DEFAULT_CONFIG.tagline,
           logoUrl: data.logoUrl ?? null,
           accentColor: data.accentColor ?? null,
           supportUrl: data.supportUrl ?? null,

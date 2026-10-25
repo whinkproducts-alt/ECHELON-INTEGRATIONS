@@ -4,12 +4,15 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, EyeOff, Zap } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
+import { BrandMark } from '@/components/brand';
+import { BootSequence } from '@/components/shell/boot-sequence';
+import { HoloOrbBackdrop, HoloPanel } from '@/components/ui/holo';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 
 export function LoginForm() {
   const router = useRouter();
-  const { productName } = useTenantConfig();
+  const { productName, acronymExpansion, tagline } = useTenantConfig();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -39,17 +42,20 @@ export function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md px-6">
+    <div className="relative min-h-screen flex items-center justify-center bg-background overflow-hidden">
+      <BootSequence />
+      <HoloOrbBackdrop />
+      <div className="relative z-10 w-full max-w-md px-6">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Zap className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-display font-bold tracking-tight text-foreground">{productName}</h1>
+          <div className="flex justify-center mb-2">
+            <BrandMark company="ultimate" size={112} />
           </div>
-          <p className="text-sm text-muted-foreground font-mono">Intelligence Operating System</p>
+          <h1 className="holo-text-glow text-3xl font-display font-semibold tracking-tight text-foreground">{productName}</h1>
+          <p className="mt-1 text-xs text-muted-foreground font-mono uppercase tracking-widest">{acronymExpansion}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{tagline}</p>
         </div>
 
-        <div className="bg-card rounded-lg p-6 shadow-lg border border-border">
+        <HoloPanel glow="soft" brackets className="p-6">
           <form onSubmit={handleSubmit} className="space-y-4" suppressHydrationWarning>
             <div>
               <label className="block text-sm font-medium text-muted-foreground mb-1.5">Email</label>
@@ -93,7 +99,7 @@ export function LoginForm() {
           <p className="text-center text-sm text-muted-foreground mt-4">
             No account? <Link href="/signup" className="text-primary hover:underline">Create one</Link>
           </p>
-        </div>
+        </HoloPanel>
       </div>
     </div>
   );
