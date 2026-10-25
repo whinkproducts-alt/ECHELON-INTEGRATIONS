@@ -54,6 +54,9 @@ export interface TenantConfig {
   // ── Document upload labels ────────────────────────────────────────────────
   uploadDocumentLabel: string;
   documentsPageTitle: string;
+  // ── Obsidian / adversarial mode label ────────────────────────────────────
+  /** Tenant label for the MAMBA/Obsidian mode. Never hardcode MAMBA in markup. */
+  obsidianLabel: string | null;
 }
 
 const DEFAULT_CONFIG: TenantConfig = {
@@ -84,6 +87,7 @@ const DEFAULT_CONFIG: TenantConfig = {
   citationLabel: 'Source',
   uploadDocumentLabel: 'Upload document',
   documentsPageTitle: 'Documents',
+  obsidianLabel: null,
 };
 
 export function useTenantConfig(): TenantConfig {
@@ -129,6 +133,7 @@ export function useTenantConfig(): TenantConfig {
           citationLabel: data.citationLabel ?? DEFAULT_CONFIG.citationLabel,
           uploadDocumentLabel: data.uploadDocumentLabel ?? DEFAULT_CONFIG.uploadDocumentLabel,
           documentsPageTitle: data.documentsPageTitle ?? DEFAULT_CONFIG.documentsPageTitle,
+          obsidianLabel: data.obsidianLabel ?? null,
         });
       })
       .catch(() => setConfig((c) => ({ ...c, loading: false })));

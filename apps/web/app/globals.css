@@ -60,14 +60,15 @@
     --chart-5: 280 65% 55%;
 
     /* Phase 5 brand tokens — WHINK accent, MAMBA blood, ember, amber */
-    --whink-accent: 204 100% 61%;
-    --mamba-blood: 0 72% 44%;
-    --ember: 14 100% 56%;
-    --pending-amber: 37 90% 55%;
-    --denial: 356 77% 59%;
-    --tool-result: 204 100% 61%;
-    --base: 220 20% 6%;
-    --surface: 220 25% 9%;
+    --whink-accent: 203 100% 61%;      /* #38B6FF */
+    --mamba-blood: 0 73% 44%;          /* #C41E1E */
+    --ember: 12 100% 56%;              /* #FF4A1C */
+    --pending-amber: 37 90% 55%;       /* #F5A623 */
+    --denial: 357 74% 58%;             /* #E5484D */
+    --tool-result: 203 100% 61%;
+    --base: 218 30% 6%;                /* #070B12 */
+    --surface: 218 32% 9%;             /* #0E1520 */
+    --deep: 208 80% 26%;               /* #0B4E7A */
 
     /* HUD tokens. Aliases only, so the pending cyan decision (#4FF3EE vs accent)
        is a one line change here. --hud-mamba follows ember until Victor approves a value. */

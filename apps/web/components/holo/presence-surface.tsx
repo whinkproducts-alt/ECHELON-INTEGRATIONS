@@ -18,23 +18,26 @@ const glassPanel: React.CSSProperties = {
 };
 
 function LiveClock() {
-  const [time, setTime] = useState('');
+  const [display, setDisplay] = useState('');
   useEffect(() => {
-    const fmt = new Intl.DateTimeFormat('en-CA', {
+    const fmtTime = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Edmonton',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
     });
-    const tick = () => setTime(fmt.format(new Date()));
+    const fmtZone = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Edmonton', timeZoneName: 'short',
+    });
+    const tick = () => {
+      const now = new Date();
+      const timeParts = fmtZone.formatToParts(now);
+      const tz = timeParts.find(p => p.type === 'timeZoneName')?.value ?? '';
+      setDisplay(`${fmtTime.format(now)} ${tz}`);
+    };
     tick();
-    const t = setInterval(tick, 1000);
-    return () => clearInterval(t);
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, []);
-  return (
-    <span className="font-mono text-xs tabular-nums" style={{ color: 'hsl(var(--whink-accent))' }}>{time} MDT</span>
-  );
+  return <span className="font-mono text-xs tabular-nums" style={{ color: 'hsl(var(--whink-accent))' }}>{display}</span>;
 }
 
 function WhinkLogoMark() {
@@ -88,7 +91,7 @@ const SWARM = [
   { name: 'test-engineer', state: 'Running tests', active: true },
 ];
 
-export function PresenceSurface() {
+export function PresenceSurface({ userName = '' }: { userName?: string }) {
   const config = useTenantConfig();
   const productName = config.loading ? 'Your assistant' : config.productName;
 
@@ -159,14 +162,22 @@ export function PresenceSurface() {
           <ClientOnly fallback={<span className="h-4 w-24 rounded bg-secondary animate-pulse" />}>
             <LiveClock />
           </ClientOnly>
-          <Link
-            href="/dashboard/holo/obsidian"
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch('/api/persona/switch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mambaMode: 'OBSIDIAN' }),
+              });
+              window.location.href = '/dashboard/holo/obsidian';
+            }}
             className="font-mono text-xs font-semibold transition-colors"
             style={{ color: 'hsl(var(--mamba-blood))' }}
-            aria-label="Wake MAMBA Obsidian mode"
+            aria-label="Wake Obsidian mode"
           >
-            Wake MAMBA
-          </Link>
+            Wake {config.obsidianLabel ?? 'Obsidian'}
+          </button>
         </div>
       </header>
 
@@ -303,7 +314,7 @@ export function PresenceSurface() {
                   }
                 >
                   <p className="font-mono text-[10px] mb-1" style={{ color: msg.role === 'user' ? 'hsl(var(--whink-accent))' : 'hsl(var(--muted-foreground))' }}>
-                    {msg.role === 'user' ? 'Victor' : productName}
+                    {msg.role === 'user' ? (userName || 'You') : productName}
                   </p>
                   {msg.text}
                 </div>
@@ -329,36 +340,11 @@ export function PresenceSurface() {
           <h2 className="font-display text-sm font-semibold" style={{ color: 'hsl(var(--pending-amber))' }}>
             Spoken approval
           </h2>
-          <div
-            className="rounded-lg p-3 space-y-2"
-            style={{ background: 'rgba(245,166,35,0.06)', border: '1px solid rgba(245,166,35,0.2)' }}
-          >
-            <p className="font-mono text-xs text-muted-foreground">EAR ID</p>
-            <p className="font-mono text-sm font-bold tabular-nums" style={{ color: 'hsl(var(--pending-amber))' }}>0142</p>
-            <p className="text-xs text-foreground mt-2">Say to approve:</p>
-            <p className="font-mono text-xs font-semibold" style={{ color: 'hsl(var(--pending-amber))' }}>
-              "approve 0142, code 7 3 1"
-            </p>
-            {/* Three digit boxes */}
-            <div className="flex gap-2 mt-2" role="group" aria-label="Confirmation code digits">
-              {['7', '3', '1'].map((digit, i) => (
-                <div
-                  key={i}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg font-mono text-lg font-bold"
-                  style={{
-                    border: '1.5px solid rgba(245,166,35,0.5)',
-                    background: 'rgba(245,166,35,0.1)',
-                    color: 'hsl(var(--pending-amber))',
-                  }}
-                  aria-label={`Digit ${i + 1}: ${digit}`}
-                >
-                  {digit}
-                </div>
-              ))}
-            </div>
-          </div>
-          {/* No pending approvals state */}
-          <p className="text-xs text-muted-foreground">Approval cards appear here when {productName} needs your decision.</p>
+          <p className="text-xs text-muted-foreground">
+            When {productName} needs your spoken approval, the request and a short code will appear here.
+            Say &quot;approve&quot; followed by the code to confirm.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">No approval waiting right now.</p>
         </div>
       </section>
 
@@ -450,15 +436,15 @@ export function PresenceSurface() {
             <div
               className="rounded-full p-2 transition-colors"
               style={{
-                background: micActive ? 'rgba(229,72,77,0.15)' : 'rgba(14,21,32,0.6)',
-                border: `1px solid ${micActive ? 'hsl(var(--denial))' : 'rgba(56,182,255,0.2)'}`,
+                background: micActive ? 'rgba(56,182,255,0.15)' : 'rgba(14,21,32,0.6)',
+                border: `1px solid ${micActive ? 'hsl(var(--whink-accent))' : 'rgba(56,182,255,0.2)'}`,
               }}
             >
               {micActive
-                ? <Mic className="h-4 w-4" aria-hidden style={{ color: 'hsl(var(--denial))' }} />
+                ? <Mic className="h-4 w-4" aria-hidden style={{ color: 'hsl(var(--whink-accent))' }} />
                 : <MicOff className="h-4 w-4 text-muted-foreground" aria-hidden />}
             </div>
-            <span className="font-mono text-[10px]" style={{ color: micActive ? 'hsl(var(--denial))' : 'hsl(var(--muted-foreground))' }}>
+            <span className="font-mono text-[10px]" style={{ color: micActive ? 'hsl(var(--whink-accent))' : 'hsl(var(--muted-foreground))' }}>
               {micActive ? 'MIC LIVE' : 'MIC OFF'}
             </span>
           </button>

@@ -18,23 +18,26 @@ const mambaPanel: React.CSSProperties = {
 };
 
 function LiveClock() {
-  const [time, setTime] = useState('');
+  const [display, setDisplay] = useState('');
   useEffect(() => {
-    const fmt = new Intl.DateTimeFormat('en-CA', {
+    const fmtTime = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Edmonton',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
     });
-    const tick = () => setTime(fmt.format(new Date()));
+    const fmtZone = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Edmonton', timeZoneName: 'short',
+    });
+    const tick = () => {
+      const now = new Date();
+      const timeParts = fmtZone.formatToParts(now);
+      const tz = timeParts.find(p => p.type === 'timeZoneName')?.value ?? '';
+      setDisplay(`${fmtTime.format(now)} ${tz}`);
+    };
     tick();
-    const t = setInterval(tick, 1000);
-    return () => clearInterval(t);
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, []);
-  return (
-    <span className="font-mono text-xs tabular-nums" style={{ color: 'hsl(var(--ember))' }}>{time} MDT</span>
-  );
+  return <span className="font-mono text-xs tabular-nums" style={{ color: 'hsl(var(--ember))' }}>{display}</span>;
 }
 
 // MAMBA logo — M shape in ember red
@@ -115,7 +118,7 @@ const OBSIDIAN_SWARM = [
 
 const THREAT_COLORS: Record<'HIGH' | 'MED' | 'LOW', React.CSSProperties> = {
   HIGH: { background: 'rgba(196,30,30,0.15)', border: '1px solid rgba(196,30,30,0.4)', color: 'hsl(var(--mamba-blood))' },
-  MED: { background: 'rgba(245,166,35,0.12)', border: '1px solid rgba(245,166,35,0.35)', color: 'hsl(var(--pending-amber))' },
+  MED: { background: 'rgba(143,163,184,0.1)', border: '1px solid rgba(143,163,184,0.4)', color: '#8FA3B8' },
   LOW: { background: 'rgba(14,21,32,0.6)', border: '1px solid rgba(255,255,255,0.08)', color: 'hsl(var(--muted-foreground))' },
 };
 
@@ -179,13 +182,13 @@ export function ObsidianSurface() {
       <header
         className="absolute flex items-center justify-between px-5 py-3 z-20"
         style={{ left: 40, right: 40, top: 28, ...mambaPanel }}
-        aria-label="MAMBA Obsidian header"
+        aria-label="Obsidian header"
       >
         <div className="flex items-center gap-3">
           <MambaLogoMark />
           <div>
             <span className="font-display font-bold text-sm tracking-widest uppercase" style={{ color: 'hsl(var(--ember))' }}>
-              MAMBA
+              {config.obsidianLabel ?? 'Obsidian'}
             </span>
             <span className="ml-2 font-mono text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
               Obsidian mode · adversarial strategist
@@ -211,8 +214,16 @@ export function ObsidianSurface() {
           <ClientOnly fallback={<span className="h-4 w-24 rounded bg-secondary animate-pulse" />}>
             <LiveClock />
           </ClientOnly>
-          <Link
-            href="/dashboard/holo"
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch('/api/persona/switch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mambaMode: null }),
+              });
+              window.location.href = '/dashboard/holo';
+            }}
             className="rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors"
             style={{
               border: '1px solid rgba(56,182,255,0.3)',
@@ -222,7 +233,7 @@ export function ObsidianSurface() {
             aria-label={`Back to ${productName} chief of staff`}
           >
             ← Back to {productName}
-          </Link>
+          </button>
         </div>
       </header>
 
@@ -236,7 +247,7 @@ export function ObsidianSurface() {
           top: '50%',
           transform: 'translate(-50%, -50%)',
         }}
-        aria-label="MAMBA avatar zone"
+        aria-label="Obsidian avatar zone"
       >
         {/* Outer dashed orbit ring — reversed (ember) */}
         <div
@@ -462,7 +473,7 @@ export function ObsidianSurface() {
           backdropFilter: 'blur(16px)',
         }}
         role="region"
-        aria-label="MAMBA voice controls"
+        aria-label="Obsidian voice controls"
       >
         {/* Mic button — ember glow when listening */}
         <button
@@ -505,15 +516,15 @@ export function ObsidianSurface() {
             <div
               className="rounded-full p-2 transition-colors"
               style={{
-                background: micActive ? 'rgba(229,72,77,0.15)' : 'rgba(20,10,12,0.6)',
-                border: `1px solid ${micActive ? 'hsl(var(--denial))' : 'rgba(255,74,28,0.25)'}`,
+                background: micActive ? 'rgba(255,74,28,0.15)' : 'rgba(20,10,12,0.6)',
+                border: `1px solid ${micActive ? 'hsl(var(--ember))' : 'rgba(255,74,28,0.25)'}`,
               }}
             >
               {micActive
-                ? <Mic className="h-4 w-4" aria-hidden style={{ color: 'hsl(var(--denial))' }} />
+                ? <Mic className="h-4 w-4" aria-hidden style={{ color: 'hsl(var(--ember))' }} />
                 : <MicOff className="h-4 w-4 text-muted-foreground" aria-hidden />}
             </div>
-            <span className="font-mono text-[10px]" style={{ color: micActive ? 'hsl(var(--denial))' : 'hsl(var(--muted-foreground))' }}>
+            <span className="font-mono text-[10px]" style={{ color: micActive ? 'hsl(var(--ember))' : 'hsl(var(--muted-foreground))' }}>
               {micActive ? 'MIC LIVE' : 'MIC OFF'}
             </span>
           </button>

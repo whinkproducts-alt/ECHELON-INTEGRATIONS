@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Bell, RefreshCw, Search } from 'lucide-react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import { ClientOnly } from '@/components/client-only';
 import { HoloOrbField } from './holo-orb-field';
@@ -90,6 +91,8 @@ function WhinkLogoMark() {
 export function HoloSurface() {
   const config = useTenantConfig();
   const productName = config.loading ? 'Your assistant' : config.productName;
+  const { data: sessionData } = useSession();
+  const userName = sessionData?.user?.name ?? '';
 
   const [load, setLoad] = useState<Load>('loading');
   const [agents, setAgents] = useState<HoloAgent[]>([]);
@@ -152,7 +155,7 @@ export function HoloSurface() {
     { done: false, text: 'Review investor deck draft' },
     { done: true,  text: 'Send partnership proposal' },
     { done: false, text: 'Schedule Q4 planning call' },
-    { done: false, text: 'Approve MAMBA competitive analysis' },
+    { done: false, text: 'Approve competitive analysis' },
   ];
 
   return (
@@ -219,20 +222,28 @@ export function HoloSurface() {
             />
           </div>
 
-          {/* MAMBA toggle */}
-          <Link
-            href="/dashboard/holo/obsidian"
+          {/* Obsidian toggle */}
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch('/api/persona/switch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mambaMode: 'OBSIDIAN' }),
+              });
+              window.location.href = '/dashboard/holo/obsidian';
+            }}
             className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors shrink-0"
             style={{
               border: '1px solid hsl(var(--mamba-blood))',
               background: 'rgba(196,30,30,0.08)',
               color: 'hsl(var(--mamba-blood))',
             }}
-            aria-label="Switch to MAMBA Obsidian mode"
+            aria-label="Switch to Obsidian mode"
           >
             <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: 'hsl(var(--mamba-blood))' }} />
-            MAMBA
-          </Link>
+            {config.obsidianLabel ?? 'Obsidian'}
+          </button>
 
           {/* Notifications */}
           <button
@@ -273,7 +284,7 @@ export function HoloSurface() {
             {/* Greeting card */}
             <div className="p-5" style={glassPanel}>
               <p className="font-display text-3xl font-bold tracking-tight text-foreground">
-                <ClientOnly fallback="Hello, Victor"><Greeting />, Victor</ClientOnly>
+                <ClientOnly fallback="Hello"><Greeting />{userName ? `, ${userName}` : ''}</ClientOnly>
               </p>
               <p className="mt-1 text-sm text-muted-foreground">Here is what matters today</p>
               <div className="mt-4">
@@ -443,8 +454,8 @@ export function HoloSurface() {
                   )}
                   {(load === 'error' || load === 'webgl') && (
                     <div role="alert" className="flex h-48 flex-col items-center justify-center gap-3 text-center">
-                      <AlertTriangle className="h-5 w-5" aria-hidden style={{ color: 'hsl(var(--denial))' }} />
-                      <p className="text-xs" style={{ color: 'hsl(var(--denial))' }}>
+                      <AlertTriangle className="h-5 w-5" aria-hidden style={{ color: 'hsl(var(--destructive))' }} />
+                      <p className="text-xs" style={{ color: 'hsl(var(--destructive))' }}>
                         {load === 'webgl' ? 'WebGL unavailable — orb field cannot be displayed.' : 'Error: could not load agents.'}
                       </p>
                       <button
@@ -530,12 +541,19 @@ export function HoloSurface() {
               )}
               {eventsLoad === 'ready' && events.length > 0 && (
                 <ul className="space-y-1.5 max-h-60 overflow-y-auto" aria-label="Recent ledger events">
-                  {events.slice(0, 10).map((e) => (
-                    <li key={e.id} className="flex items-start gap-1.5 text-xs">
-                      <span aria-hidden className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'hsl(var(--denial))' }} />
-                      <span className="font-mono text-muted-foreground break-all">{e.kind}</span>
-                    </li>
-                  ))}
+                  {events.slice(0, 10).map((e) => {
+                    const isSecurityKind = /security|denied|blocked|injection/i.test(e.kind);
+                    return (
+                      <li key={e.id} className="flex items-start gap-1.5 text-xs">
+                        <span
+                          aria-hidden
+                          className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{ background: isSecurityKind ? 'hsl(var(--denial))' : 'hsl(var(--muted-foreground))' }}
+                        />
+                        <span className="font-mono text-muted-foreground break-all">{e.kind}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
