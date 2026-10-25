@@ -202,7 +202,7 @@ export function answer(method: string, url: URL, body: unknown, ctx: MockCtx): M
     const t = ctx.now();
     return { status: 200, body: { approvals: empty ? [] : [{
       id: 'apr_fixture_today', kind: 'tool_call', tool: 'contact_message', summary: 'Send SMS to Avery Fixture: See you at 3.',
-      params: { to: '+14035550101', body: 'See you at 3.' }, contentHash: 'fixture', permissionClass: 'C', createdAt: iso(t), expiresAt: iso(t + 30_000),
+      params: { to: '+14035550101', body: 'See you at 3.' }, contentHash: 'fixture', permissionClass: 'C', protected: true, category: 'money', createdAt: iso(t), expiresAt: iso(t + 30_000),
     }] } };
   }
   if (p === '/api/security/status') {

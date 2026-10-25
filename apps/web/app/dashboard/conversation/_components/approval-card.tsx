@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { ShieldAlert, Check, X, Mic, Volume2 } from 'lucide-react';
+import { HoloBadge } from '@/components/ui/holo';
 import { useDecisionListener } from '@/lib/hooks/useDecisionListener';
 import {
   type ApprovalView, type CardState, formatParams, isTerminal, secondsRemaining,
@@ -137,6 +138,15 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code, classNam
             className="h-full"
             style={{ width: `${Math.min(100, (secondsLeft / 30) * 100)}%`, background: AMBER, transition: 'width 1s linear' }}
           />
+        </div>
+      )}
+
+      {approval.protected && (
+        <div className="space-y-1" data-testid="protected-approval">
+          <HoloBadge tone="amber">
+            {approval.category === 'money' ? 'Protected: money' : 'Protected: proprietary information'}
+          </HoloBadge>
+          <p className="text-xs text-muted-foreground">Needs your approval every time. It cannot be delegated.</p>
         </div>
       )}
 

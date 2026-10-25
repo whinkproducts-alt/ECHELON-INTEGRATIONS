@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { recordAction, type LedgerStatus } from '@/lib/ledger';
 import { approvalContentHash, toolArgsHash } from '@/lib/canonical-json';
+import { classifyProtected, type ProtectedCategory } from '@/lib/protected-actions';
 
 export type PermissionClass = 'A' | 'B' | 'C';
 
@@ -26,6 +27,7 @@ export const CAPABILITY_CLASSES: Readonly<Record<string, PermissionClass>> = Obj
 });
 
 export function capabilityClass(capability: string): PermissionClass {
+  if (classifyProtected({ toolName: capability, capability }).protected) return 'C';
   return Object.prototype.hasOwnProperty.call(CAPABILITY_CLASSES, capability) ? CAPABILITY_CLASSES[capability] : 'C';
 }
 
@@ -33,6 +35,9 @@ interface PermissionCheckResult {
   allowed: boolean;
   method: 'auto' | 'delegated' | 'requires_confirmation' | 'human_approved';
   reason?: string;
+  /** True when the action is money movement or disclosure of proprietary information. Always Class C. */
+  protected?: boolean;
+  category?: ProtectedCategory;
 }
 
 export async function checkPermission(
@@ -41,6 +46,27 @@ export async function checkPermission(
   permissionClass: PermissionClass,
   _correlationId?: string
 ): Promise<PermissionCheckResult> {
+  // Protected actions (money, proprietary egress) are decided first and cannot be lowered by
+  // anything below: not the requested class, autonomy, a delegation row, persona or allow-list.
+  const prot = classifyProtected({ toolName: capability, capability });
+  if (prot.protected) {
+    const downgrade = permissionClass !== 'C';
+    if (downgrade) {
+      try {
+        await logSecurityEvent(userId, 'protected_action_downgrade_refused', `${capability} requested as Class ${permissionClass}; protected (${prot.category}) actions are always Class C`, _correlationId, 'DENIED');
+      } catch { /* the refusal stands even if the ledger is down */ }
+    }
+    return {
+      allowed: false,
+      method: 'requires_confirmation',
+      protected: true,
+      category: prot.category,
+      reason: downgrade
+        ? `Protected ${prot.category} action: always Class C, a lower class was refused. Owner approval by request id is required.`
+        : `Protected ${prot.category} action: always requires the owner's explicit approval by request id.`,
+    };
+  }
+
   // Get user's autonomy level
   const profile = await prisma.userProfile.findUnique({ where: { userId } });
   const autonomyLevel = profile?.autonomyLevel ?? 1;

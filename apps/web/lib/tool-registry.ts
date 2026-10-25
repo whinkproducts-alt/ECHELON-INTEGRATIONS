@@ -13,6 +13,7 @@ import { SCHEDULE_TOOL_NAME, checkScheduleCap, createScheduleApproval, parseSche
 import { DAILY_CAP_ERROR, capCategoryOf, checkDailyCap, ledgerCapRefusal } from '@/lib/social/caps';
 import { defHash, neutralDescription, redactSchemaForUnreviewed } from '@/lib/tool-definition';
 import toolClassesConfig from '@/config/tool-classes.json';
+import { classifyProtected } from '@/lib/protected-actions';
 import type { ToolDefinition } from '@/lib/tool-loop';
 import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
 import { validateTaskInput } from '@/lib/task-input';
@@ -680,6 +681,12 @@ function loadToolClassAllowList(): Record<string, AllowListEntry> {
   for (const [name, entry] of Object.entries(toolClassesConfig as Record<string, unknown>)) {
     if (!name.startsWith(GATEWAY_PREFIX)) continue;
     const e = entry as { class?: unknown; defHash?: unknown } | null;
+    if (e && typeof e === 'object' && (e.class === 'A' || e.class === 'B') && classifyProtected({ toolName: name, capability: name }).protected) {
+      // Money and proprietary egress are always Class C. An allow-list entry cannot lower them.
+      console.warn(`[openclaw] ignoring allow-list entry for protected tool ${name}: protected actions are always Class C`);
+      logger.security('protected_allowlist_entry_ignored', { tool: name, details: `allow-list class ${e.class} ignored; protected actions are always Class C` });
+      continue;
+    }
     if (e && typeof e === 'object' && (e.class === 'A' || e.class === 'B' || e.class === 'C') && typeof e.defHash === 'string' && /^[0-9a-f]{64}$/.test(e.defHash)) {
       out[name] = { class: e.class, defHash: e.defHash };
     } else {
@@ -781,7 +788,9 @@ export async function registerOpenClawTools(userId: string): Promise<GatewayRegi
       }
       def = { name: full, description: neutralDescription(original), inputSchema: redacted.inputSchema };
     }
-    plans.push({ full, original, hash, cls: reviewed ? entry.class : 'C', def, unreviewedChange: Boolean(entry) && !reviewed });
+    // Protected tools (judged on name and the gateway description) stay Class C whatever the allow-list says.
+    const protectedTool = classifyProtected({ toolName: full, capability: full, description: tool.description }).protected;
+    plans.push({ full, original, hash, cls: reviewed && !protectedTool ? entry.class : 'C', def, unreviewedChange: Boolean(entry) && !reviewed });
   }
 
   // Phase 2: update the shared maps synchronously, with no await between the drop and the sets.
@@ -976,7 +985,8 @@ export async function executeTool(
   }
 
   // Check permission. A registered tool with no explicit risk entry is treated as Class C.
-  const baseClass = TOOL_RISK_MAP[toolName] ?? 'C';
+  const protectedAction = classifyProtected({ toolName, capability: toolName, params });
+  const baseClass: PermissionClass = protectedAction.protected ? 'C' : (TOOL_RISK_MAP[toolName] ?? 'C');
   // M3: once external content was read this run, Class B and outbound/persisting tools need a human.
   const riskClass = effectiveClassForTaint(toolName, baseClass, opts.tainted === true);
   if (riskClass !== baseClass) {
@@ -1234,7 +1244,7 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
   }
 
   const handler = TOOL_HANDLERS[approval.tool];
-  const riskClass = TOOL_RISK_MAP[approval.tool] ?? 'C';
+  const riskClass: PermissionClass = classifyProtected({ toolName: approval.tool, capability: approval.tool }).protected ? 'C' : (TOOL_RISK_MAP[approval.tool] ?? 'C');
   const base = {
     userId,
     initiator: 'user' as const,

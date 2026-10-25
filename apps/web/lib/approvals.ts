@@ -15,6 +15,7 @@ import { logger } from '@/lib/logger';
 import { recordAction, recordActionSafe, type LedgerStatus } from '@/lib/ledger';
 import { checkApprovedAction, logSecurityEvent } from '@/lib/permission-engine';
 import { approvalContentHash } from '@/lib/canonical-json';
+import { classifyProtected, type ProtectedCategory } from '@/lib/protected-actions';
 import { buildDispatchMessage } from '@/lib/approval-handler';
 import type { ExecutionAuthorizationRequest } from '@whink/org-kit';
 
@@ -34,6 +35,9 @@ export interface ApprovalView {
   params: Record<string, unknown> | null;
   contentHash: string;
   permissionClass: string;
+  /** True for money movement and disclosure of proprietary information. */
+  protected: boolean;
+  category: ProtectedCategory | null;
   createdAt: string;
   expiresAt: string;
 }
@@ -71,6 +75,20 @@ interface ApprovalRow {
 
 const systemClock: Clock = () => new Date();
 
+/** Protected-action metadata for an approval row. Derived from the stored tool, never from a request. */
+function protectedOf(row: { kind: string; tool: string | null }): { protected: boolean; category: ProtectedCategory | null } {
+  if (row.kind === 'scheduled_post') return { protected: true, category: 'proprietary' };
+  if (row.kind !== 'tool_call' || !row.tool) return { protected: false, category: null };
+  const c = classifyProtected({ toolName: row.tool, capability: row.tool });
+  return { protected: c.protected, category: c.category ?? null };
+}
+
+/** Bulk or wildcard ids ("all", "*", lists) are never an approval of anything. */
+export function isBulkApprovalId(id: string): boolean {
+  const t = id.trim().toLowerCase();
+  return t === '' || t === 'all' || t === 'any' || t === 'everything' || t === '*' || /[\s,;*]/.test(t);
+}
+
 function toView(r: ApprovalRow): ApprovalView {
   const params = r.params && typeof r.params === 'object' && !Array.isArray(r.params)
     ? (r.params as Record<string, unknown>)
@@ -83,6 +101,7 @@ function toView(r: ApprovalRow): ApprovalView {
     params,
     contentHash: r.contentHash,
     permissionClass: r.permissionClass,
+    ...protectedOf(r),
     createdAt: r.createdAt.toISOString(),
     expiresAt: r.expiresAt.toISOString(),
   };
@@ -102,8 +121,13 @@ function summarise(kind: ApprovalKind, tool: string | null, params: unknown): st
   return `Run ${tool ?? 'tool'} ${json}`.substring(0, 300);
 }
 
+function protectedMetaOf(row: { kind?: string; tool: string | null }): { protected?: true; category?: ProtectedCategory } {
+  const p = protectedOf({ kind: row.kind ?? 'tool_call', tool: row.tool });
+  return p.protected && p.category ? { protected: true, category: p.category } : {};
+}
+
 async function ledger(
-  row: Pick<ApprovalRow, 'id' | 'userId' | 'tool' | 'permissionClass' | 'correlationId' | 'persona'>,
+  row: Pick<ApprovalRow, 'id' | 'userId' | 'tool' | 'permissionClass' | 'correlationId' | 'persona'> & { kind?: string },
   action: string,
   status: LedgerStatus,
   extra: { outputSummary?: string; confirmationMethod?: string; strict?: boolean } = {},
@@ -120,7 +144,7 @@ async function ledger(
     status,
     confirmationMethod: extra.confirmationMethod,
     outputSummary: extra.outputSummary,
-    validationResult: JSON.stringify({ approvalId: row.id }),
+    validationResult: JSON.stringify({ approvalId: row.id, ...protectedMetaOf(row) }),
     correlationId: row.correlationId,
   });
 }
@@ -186,7 +210,7 @@ export async function createApproval(input: CreateApprovalInput): Promise<Approv
       permissionClass,
       status: 'AWAITING_APPROVAL',
       inputSummary: row.summary,
-      validationResult: JSON.stringify({ approvalId: row.id, contentHash }),
+      validationResult: JSON.stringify({ approvalId: row.id, contentHash, ...protectedMetaOf({ kind, tool }) }),
       correlationId: input.correlationId,
     });
   } catch (e) {
@@ -357,6 +381,11 @@ export async function decide(
   deps: { now?: Clock } = {},
 ): Promise<DecisionOutcome> {
   const clock = deps.now ?? systemClock;
+  if (isBulkApprovalId(id)) {
+    // No "approve all": a decision names exactly one request id.
+    await logSecurityEvent(userId, 'bulk_approval_refused', 'Decision attempted without a single request id');
+    return { id, status: 'NOT_FOUND', result: null };
+  }
   const now = clock();
   await sweepQuietly(userId, now);
 

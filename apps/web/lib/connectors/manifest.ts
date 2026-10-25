@@ -9,6 +9,7 @@
  */
 import { z } from 'zod';
 import { scanForInjectionPatterns, stripFakeUntrustedTags } from '@/lib/content-isolation';
+import { classifyProtected, protectedCapabilities } from '@/lib/protected-actions';
 
 export const ALLOWED_LICENSE_RE = /^(MIT|Apache-2\.0|ISC|0BSD|BSD-[0-9]-Clause(-[A-Za-z]+)*)$/;
 export const TOOL_DESCRIPTION_CAP = 300;
@@ -69,6 +70,23 @@ export function sanitiseToolDescription(d: string): { text: string; suspicious: 
   return { text: stripped.substring(0, TOOL_DESCRIPTION_CAP), suspicious: scan.suspicious };
 }
 
+/**
+ * A manifest whose capabilities or tools are protected (money movement, disclosure of
+ * proprietary information) may not declare a class below C. Returns one error per offender.
+ */
+export function protectedClassErrors(m: { permissionClass?: string; capabilities?: readonly string[]; tools?: ReadonlyArray<{ name: string; description?: string }> }): string[] {
+  if (!m.permissionClass || m.permissionClass === 'C') return [];
+  const errors: string[] = [];
+  for (const p of protectedCapabilities(m.capabilities ?? [])) {
+    errors.push(`capability ${p.capability} is a protected ${p.category} action and cannot be declared below Class C`);
+  }
+  for (const t of m.tools ?? []) {
+    const r = classifyProtected({ toolName: t.name, capability: t.name, description: t.description });
+    if (r.protected) errors.push(`tool ${t.name} is a protected ${r.category} action and cannot be declared below Class C`);
+  }
+  return errors;
+}
+
 export function validateManifest(raw: unknown): ManifestValidation {
   const parsed = ConnectorManifestSchema.safeParse(raw);
   if (!parsed.success) {
@@ -82,6 +100,7 @@ export function validateManifest(raw: unknown): ManifestValidation {
   const warnings: string[] = [];
   const errors: string[] = [];
   const m = parsed.data;
+  errors.push(...protectedClassErrors(m));
   if (m.permissionClass !== 'C') warnings.push(`permissionClass ${m.permissionClass} is advisory only; WHINK treats this connector as Class C.`);
   let tools: SanitisedTool[] | undefined;
   if (m.tools) {

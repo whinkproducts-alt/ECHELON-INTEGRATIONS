@@ -54,6 +54,24 @@ All actions in `security.yml` are pinned to full commit SHAs, each checked again
 - `pnpm audit --prod --json > apps/web/scripts/audit.json` so the status endpoint can show the last audit.
 - `pnpm security:scan -- --all --report scripts/secrets-scan.json` from `apps/web` to give the status endpoint a secrets-scan result. Both report files are git-ignored.
 
+## Protected actions
+
+Owner rule: anything that moves, commits or authorises money, or that sends, shares, publishes, exports or otherwise discloses secrets or proprietary information outside the user's own account, needs the owner's approval. Sending chat context to the configured model providers is not covered; any other egress is.
+
+- Always Class C, at every autonomy level, with or without a delegation row, for WHINK and MAMBA. A gateway, a plugin manifest or a WHINK-side allow-list cannot lower it.
+- Single source of truth: `apps/web/lib/protected-actions.ts` (`classifyProtected`). An explicit registry of named tools and capabilities, an explicit list of local tools that stay in the account, then keyword rules on the name, description and parameter key names for anything unknown. It fails closed: an unknown tool that looks like money or egress is protected. A read-style name (read, list, get, search) is not protected unless it also contains a disclosure or money verb.
+- Enforced in `lib/permission-engine.ts` (`checkPermission` consults it first and refuses a lower requested class, with a ledgered security event), `lib/tool-registry.ts` (execution, approved execution, gateway registration and the allow-list loader, which ignores and logs a protected entry), and `lib/connectors/manifest.ts` plus the catalog loader (a manifest declaring a protected capability below Class C is invalid).
+- Approval: by the owning user only, by request id, within 30 seconds, hash-locked, exactly once. There is no approve-all form: the decision route accepts one id and `{decision}` only, wildcard ids are refused and ledgered, and chat phrases such as "approve all" approve nothing. Spoken approval still needs the on-screen confirmation code. An agent has no route to a decision: only the signed-in user's session reaches `decide`.
+- Ledger rows for protected approvals (created, approved, denied, expired, executed, failed) carry `protected` and `category` in `validationResult`, written through `lib/ledger.ts`.
+- Model-facing: item 5 of the security policy prompt (both personas) tells the model to require approval, never to claim an unapproved action was done, and never to help bypass it. This is guidance only; the enforcement is in code.
+
+Not covered:
+- A person with database or server access, or anyone who holds the owner's session.
+- Model providers receiving chat context by design.
+- Egress hidden in parameters of a tool that is classed as local (for example a URL passed to web_fetch).
+- Names the keyword rules do not recognise. Gateway tools default to Class C regardless; local tools need an entry in the registry.
+- Connector installation itself is Class B: it sends nothing, and every later send is protected.
+
 ## Not covered
 
 - The CSP keeps `style-src 'unsafe-inline'` (React style props). Scripts are strict.

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { PROTECTED_ACTION_SCENARIOS } from './evaluation-scenarios-protected';
 
 const prisma = new PrismaClient();
 
@@ -127,6 +128,8 @@ async function main() {
       expectedBehavior: 'Confidence capped at 0.4 maximum for external source facts.',
     },
   ];
+
+  scenarios.push(...PROTECTED_ACTION_SCENARIOS.map((x) => ({ ...x })));
 
   for (const scenario of scenarios) {
     const existing = await prisma.evaluationScenario.findFirst({

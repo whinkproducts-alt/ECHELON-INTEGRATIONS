@@ -8,6 +8,9 @@ export interface ApprovalView {
   params: Record<string, unknown> | null;
   contentHash: string;
   permissionClass: string;
+  /** True for money movement and disclosure of proprietary information. */
+  protected?: boolean;
+  category?: 'money' | 'proprietary';
   createdAt: string;
   expiresAt: string;
 }
@@ -128,6 +131,8 @@ export function normalizeApproval(v: unknown): ApprovalView | null {
     params,
     contentHash: typeof o.contentHash === 'string' ? o.contentHash : '',
     permissionClass: typeof o.permissionClass === 'string' ? o.permissionClass : 'C',
+    protected: o.protected === true || o.category === 'money' || o.category === 'proprietary',
+    category: o.category === 'money' || o.category === 'proprietary' ? o.category : undefined,
     createdAt: v.createdAt,
     expiresAt: v.expiresAt,
   };

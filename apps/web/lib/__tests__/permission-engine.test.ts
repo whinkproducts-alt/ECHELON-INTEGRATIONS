@@ -73,7 +73,7 @@ describe('checkPermission', () => {
       },
     }));
     const { checkPermission } = await import('../permission-engine');
-    const result = await checkPermission('user-1', 'send_email', 'B');
+    const result = await checkPermission('user-1', 'calendar_create', 'B');
     expect(result.allowed).toBe(false);
     expect(result.method).toBe('requires_confirmation');
   });
@@ -86,7 +86,7 @@ describe('checkPermission', () => {
       },
     }));
     const { checkPermission } = await import('../permission-engine');
-    const result = await checkPermission('user-1', 'send_email', 'B');
+    const result = await checkPermission('user-1', 'calendar_create', 'B');
     expect(result.allowed).toBe(true);
     expect(result.method).toBe('auto');
   });
@@ -96,12 +96,12 @@ describe('checkPermission', () => {
       prisma: {
         userProfile: { findUnique: vi.fn().mockResolvedValue({ autonomyLevel: 1 }) },
         delegation: {
-          findFirst: vi.fn().mockResolvedValue({ id: 'd1', capability: 'send_email', isActive: true }),
+          findFirst: vi.fn().mockResolvedValue({ id: 'd1', capability: 'calendar_create', isActive: true }),
         },
       },
     }));
     const { checkPermission } = await import('../permission-engine');
-    const result = await checkPermission('user-1', 'send_email', 'B');
+    const result = await checkPermission('user-1', 'calendar_create', 'B');
     expect(result.allowed).toBe(true);
     expect(result.method).toBe('delegated');
   });
@@ -159,7 +159,7 @@ describe('checkPermission', () => {
       },
     }));
     const { checkPermission } = await import('../permission-engine');
-    const result = await checkPermission('new-user', 'send_email', 'B');
+    const result = await checkPermission('new-user', 'calendar_create', 'B');
     expect(result.allowed).toBe(false);
   });
 });

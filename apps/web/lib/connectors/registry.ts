@@ -10,7 +10,7 @@
 import { z } from 'zod';
 import catalogJson from '@/config/connectors.catalog.json';
 import { prisma } from '@/lib/db';
-import { ConnectorManifestSchema, type ConnectorManifest } from '@/lib/connectors/manifest';
+import { ConnectorManifestSchema, protectedClassErrors, type ConnectorManifest } from '@/lib/connectors/manifest';
 import { isGatewayConfigured, listOpenClawTools } from '@/lib/openclaw-client';
 import { isAnythingLlmConfigured } from '@/lib/anythingllm-client';
 import { hasActiveConnection } from '@/lib/social/connections';
@@ -44,6 +44,8 @@ export function loadCatalog(raw?: unknown): CatalogEntry[] {
   for (const e of entries) {
     if (ids.has(e.id)) throw new Error(`duplicate connector id ${e.id}`);
     ids.add(e.id);
+    const bad = protectedClassErrors(e);
+    if (bad.length) throw new Error(`connector ${e.id}: ${bad.join('; ')}`);
   }
   if (raw === undefined) cached = entries;
   return entries;
