@@ -7,7 +7,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "memory:reembed": "tsx scripts/backfill-embeddings.ts"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/safe-seed.ts"

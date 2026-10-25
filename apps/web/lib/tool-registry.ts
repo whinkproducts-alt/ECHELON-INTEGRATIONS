@@ -481,6 +481,97 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
     return { success: true, data: safe, source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
+  document_upload: async (userId: string, params: any) => {
+    const ws = await prisma.documentWorkspace.findUnique({ where: { userId } });
+    if (!ws) return { success: false, error: 'No workspace configured', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    const filename = String(params.filename ?? '').trim();
+    const contentBase64 = String(params.contentBase64 ?? '').trim();
+    const mimeType = String(params.mimeType ?? 'application/octet-stream').trim();
+
+    if (!filename) return { success: false, error: 'filename required', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    if (!contentBase64) return { success: false, error: 'contentBase64 required', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(contentBase64, 'base64');
+    } catch {
+      return { success: false, error: 'contentBase64 is not valid base64', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    const maxMb = parseInt(process.env.DOCUMENT_MAX_SIZE_MB ?? '25', 10);
+    const maxBytes = maxMb * 1024 * 1024;
+    if (buffer.byteLength > maxBytes) {
+      return { success: false, error: `File exceeds maximum size of ${maxMb} MB`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    // Content-type check by magic bytes (not trusting the extension).
+    const ALLOWED_MAGIC: Array<{ sig: number[]; mime: string }> = [
+      { sig: [0x25, 0x50, 0x44, 0x46], mime: 'application/pdf' },                    // %PDF
+      { sig: [0x50, 0x4b, 0x03, 0x04], mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }, // DOCX (ZIP)
+    ];
+    const ALLOWED_TEXT_MIMES = new Set(['text/plain', 'text/markdown', 'text/x-markdown']);
+    const headerBytes = [...buffer.slice(0, 4)];
+    const isTextMime = ALLOWED_TEXT_MIMES.has(mimeType.split(';')[0].trim().toLowerCase());
+    const isBinaryOk = ALLOWED_MAGIC.some((m) => m.sig.every((b, i) => headerBytes[i] === b));
+    if (!isBinaryOk && !isTextMime) {
+      return { success: false, error: 'Unsupported file type. Allowed: PDF, DOCX, TXT, MD', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    const { createHash } = await import('crypto');
+    const fileHash = createHash('sha256').update(buffer).digest('hex');
+    const fileSize = buffer.byteLength;
+
+    const { uploadDocument } = await import('@/lib/anythingllm-client');
+    let uploadResult: { id: string };
+    try {
+      uploadResult = await uploadDocument(userId, ws.workspaceSlug, buffer, filename, mimeType);
+    } catch (err: any) {
+      return { success: false, error: err?.message ?? 'Upload failed', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    await recordActionSafe({
+      userId,
+      initiator: 'user',
+      action: 'document_uploaded',
+      permissionClass: 'A',
+      status: 'VALIDATED',
+      tool: 'document_upload',
+      inputSummary: `filename=${filename} size=${fileSize} hash=${fileHash.slice(0, 16)}`,
+    });
+
+    const { wrapUntrustedContent } = await import('@/lib/content-isolation');
+    const safeResult = wrapUntrustedContent(JSON.stringify({ id: uploadResult.id, filename, size: fileSize }), 'document_upload', filename);
+    return { success: true, data: safeResult, source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
+  document_delete: async (userId: string, params: any) => {
+    const documentId = String(params.documentId ?? '').trim();
+    if (!documentId) return { success: false, error: 'documentId required', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    const ws = await prisma.documentWorkspace.findUnique({ where: { userId } });
+    if (!ws) return { success: false, error: 'No workspace configured', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    const { deleteDocument } = await import('@/lib/anythingllm-client');
+    try {
+      await deleteDocument(userId, ws.workspaceSlug, documentId);
+    } catch (err: any) {
+      return { success: false, error: err?.message ?? 'Delete failed', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    await recordActionSafe({
+      userId,
+      initiator: 'user',
+      action: 'document_deleted',
+      permissionClass: 'A',
+      status: 'VALIDATED',
+      tool: 'document_delete',
+      inputSummary: `documentId=${documentId}`,
+    });
+
+    return { success: true, data: { deleted: true }, source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
   // Never runs directly: Class C, queued as a 'scheduled_post' approval in executeTool.
   [SCHEDULE_TOOL_NAME]: async () => ({
     success: false,
@@ -524,6 +615,8 @@ const TOOL_RISK_MAP: Record<string, PermissionClass> = Object.assign(Object.crea
   entity_update: 'B',
   task_create: 'B',
   document_search: 'A',
+  document_upload: 'A',
+  document_delete: 'A',
   web_search: 'A',
   web_fetch: 'B',   // H4: promoted from A to B
   calendar_list: 'A',
