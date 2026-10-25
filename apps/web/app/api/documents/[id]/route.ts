@@ -32,7 +32,7 @@ export async function DELETE(
 
   try {
     await deleteDocument(userId, ws.workspaceSlug, documentId);
-  } catch (err: any) {
+  } catch {
     await recordActionSafe({
       userId,
       action: 'document_delete_failed',

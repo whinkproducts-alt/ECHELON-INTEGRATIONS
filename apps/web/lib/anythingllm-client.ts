@@ -114,7 +114,7 @@ export async function queryDocuments(
       body: JSON.stringify({ query, limit: cappedLimit }),
       signal: AbortSignal.timeout(QUERY_TIMEOUT_MS),
     });
-  } catch (err: any) {
+  } catch {
     // Network error or timeout — caller handles graceful degradation
     return [];
   }
@@ -195,8 +195,8 @@ export async function uploadDocument(
       body: formData,
       signal: AbortSignal.timeout(30_000),
     });
-  } catch (err: any) {
-    throw new Error(`AnythingLLM upload failed: ${err?.message}`);
+  } catch (err: unknown) {
+    throw new Error(`AnythingLLM upload failed: ${(err as Error)?.message ?? 'unknown error'}`);
   }
 
   if (!res.ok) {
@@ -257,8 +257,8 @@ export async function deleteDocument(
       headers,
       signal: AbortSignal.timeout(10_000),
     });
-  } catch (err: any) {
-    throw new Error(`AnythingLLM delete failed: ${err?.message}`);
+  } catch (err: unknown) {
+    throw new Error(`AnythingLLM delete failed: ${(err as Error)?.message ?? 'unknown error'}`);
   }
 
   if (!res.ok) {
@@ -284,7 +284,7 @@ export async function listWorkspaces(): Promise<Workspace[]> {
       headers: buildHeaders(),
       signal: AbortSignal.timeout(10_000),
     });
-  } catch (err: any) {
+  } catch {
     return [];
   }
 

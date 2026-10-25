@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
   let result: { id: string };
   try {
     result = await uploadDocument(userId, ws.workspaceSlug, buf, file.name, validatedMime);
-  } catch (err: any) {
+  } catch {
     await recordActionSafe({
       userId,
       action: 'document_upload_failed',

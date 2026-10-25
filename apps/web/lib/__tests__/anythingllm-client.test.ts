@@ -13,11 +13,6 @@ function makeQueryResponse(results: unknown[] = []) {
   return { results };
 }
 
-// Helper: old /chat response shape (used to verify searchDocuments alias still works)
-function makeChatResponse(sources: unknown[] = [], textResponse?: string) {
-  return { sources, textResponse: textResponse ?? null };
-}
-
 // Helper to mock fetch with a given status and body
 function mockFetch(status: number, body: unknown) {
   return vi.fn().mockResolvedValue({
