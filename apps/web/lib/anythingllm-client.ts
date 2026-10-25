@@ -336,3 +336,59 @@ export async function searchDocuments(
     score: c.score ?? undefined,
   }));
 }
+
+// ── listDocuments ─────────────────────────────────────────────────────────────
+
+export interface WorkspaceDocument {
+  id: string;
+  name: string;
+  /** Approximate size in bytes, if available */
+  size?: number;
+  createdAt?: string;
+}
+
+/**
+ * List documents in a workspace.
+ * Returns empty array if ANYTHINGLLM_URL is not set or the request fails.
+ */
+export async function listDocuments(
+  _userId: string,
+  workspaceSlug: string,
+): Promise<WorkspaceDocument[]> {
+  const base = resolveBaseUrl();
+  if (!base) return [];
+
+  assertKeyForRemoteUrl(base);
+
+  const slug = encodeURIComponent(workspaceSlug);
+  let res: Response;
+  try {
+    res = await fetch(`${base}/api/v1/workspace/${slug}`, {
+      headers: buildHeaders(),
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch {
+    return [];
+  }
+
+  if (!res.ok) return [];
+
+  let json: any;
+  try {
+    json = await res.json();
+  } catch {
+    return [];
+  }
+
+  // AnythingLLM returns { workspace: [{ documents: [...] }] } or similar shapes
+  const wsArr: any[] = Array.isArray(json?.workspace) ? json.workspace : [];
+  const ws = wsArr[0] ?? json?.workspace ?? {};
+  const docs: any[] = Array.isArray(ws?.documents) ? ws.documents : [];
+
+  return docs.map((d: any) => ({
+    id: String(d?.id ?? d?.docpath ?? d?.name ?? ''),
+    name: String(d?.title ?? d?.name ?? d?.filename ?? 'Untitled'),
+    size: typeof d?.size === 'number' ? d.size : undefined,
+    createdAt: d?.createdAt ?? d?.created_at ?? undefined,
+  })).filter((d) => d.id && d.name !== 'Untitled');
+}

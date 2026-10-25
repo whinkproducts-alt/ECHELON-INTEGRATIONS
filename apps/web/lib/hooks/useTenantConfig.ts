@@ -33,6 +33,27 @@ export interface TenantConfig {
   /** Notes shown beneath each platform card. Falls back to defaults when not overridden. */
   platformNotes: PlatformNotes;
   loading: boolean;
+  // ── Memory screen labels ──────────────────────────────────────────────────
+  memoryAutoLabel: string;
+  viewSourceConversation: string;
+  memoryTabSemantic: string;
+  memoryTabEpisodic: string;
+  memoryTabEntities: string;
+  memoryTabHypotheses: string;
+  memoryLabelSource: string;
+  memoryLabelConf: string;
+  memoryLabelImportance: string;
+  memoryLabelHypothesis: string;
+  memoryLabelMamba: string;
+  memoryLabelConfirm: string;
+  memoryLabelCorrect: string;
+  memoryLabelDelete: string;
+  memoryLabelDeleteConfirm: string;
+  // ── Citation labels ───────────────────────────────────────────────────────
+  citationLabel: string;
+  // ── Document upload labels ────────────────────────────────────────────────
+  uploadDocumentLabel: string;
+  documentsPageTitle: string;
 }
 
 const DEFAULT_CONFIG: TenantConfig = {
@@ -45,6 +66,24 @@ const DEFAULT_CONFIG: TenantConfig = {
   platformLabels: DEFAULT_PLATFORM_LABELS,
   platformNotes: DEFAULT_PLATFORM_NOTES,
   loading: true,
+  memoryAutoLabel: 'auto',
+  viewSourceConversation: 'View source',
+  memoryTabSemantic: 'Semantic',
+  memoryTabEpisodic: 'Episodic',
+  memoryTabEntities: 'Entities',
+  memoryTabHypotheses: 'Hypotheses',
+  memoryLabelSource: 'Source',
+  memoryLabelConf: 'conf',
+  memoryLabelImportance: 'importance',
+  memoryLabelHypothesis: 'HYPOTHESIS',
+  memoryLabelMamba: 'MAMBA',
+  memoryLabelConfirm: 'Confirm',
+  memoryLabelCorrect: 'Correct',
+  memoryLabelDelete: 'Delete',
+  memoryLabelDeleteConfirm: 'Are you sure?',
+  citationLabel: 'Source',
+  uploadDocumentLabel: 'Upload document',
+  documentsPageTitle: 'Documents',
 };
 
 export function useTenantConfig(): TenantConfig {
@@ -72,6 +111,24 @@ export function useTenantConfig(): TenantConfig {
             tiktok: Array.isArray(data.platformNotes?.tiktok) ? data.platformNotes.tiktok : DEFAULT_PLATFORM_NOTES.tiktok,
           },
           loading: false,
+          memoryAutoLabel: data.memoryAutoLabel ?? DEFAULT_CONFIG.memoryAutoLabel,
+          viewSourceConversation: data.viewSourceConversation ?? DEFAULT_CONFIG.viewSourceConversation,
+          memoryTabSemantic: data.memoryTabSemantic ?? DEFAULT_CONFIG.memoryTabSemantic,
+          memoryTabEpisodic: data.memoryTabEpisodic ?? DEFAULT_CONFIG.memoryTabEpisodic,
+          memoryTabEntities: data.memoryTabEntities ?? DEFAULT_CONFIG.memoryTabEntities,
+          memoryTabHypotheses: data.memoryTabHypotheses ?? DEFAULT_CONFIG.memoryTabHypotheses,
+          memoryLabelSource: data.memoryLabelSource ?? DEFAULT_CONFIG.memoryLabelSource,
+          memoryLabelConf: data.memoryLabelConf ?? DEFAULT_CONFIG.memoryLabelConf,
+          memoryLabelImportance: data.memoryLabelImportance ?? DEFAULT_CONFIG.memoryLabelImportance,
+          memoryLabelHypothesis: data.memoryLabelHypothesis ?? DEFAULT_CONFIG.memoryLabelHypothesis,
+          memoryLabelMamba: data.memoryLabelMamba ?? DEFAULT_CONFIG.memoryLabelMamba,
+          memoryLabelConfirm: data.memoryLabelConfirm ?? DEFAULT_CONFIG.memoryLabelConfirm,
+          memoryLabelCorrect: data.memoryLabelCorrect ?? DEFAULT_CONFIG.memoryLabelCorrect,
+          memoryLabelDelete: data.memoryLabelDelete ?? DEFAULT_CONFIG.memoryLabelDelete,
+          memoryLabelDeleteConfirm: data.memoryLabelDeleteConfirm ?? DEFAULT_CONFIG.memoryLabelDeleteConfirm,
+          citationLabel: data.citationLabel ?? DEFAULT_CONFIG.citationLabel,
+          uploadDocumentLabel: data.uploadDocumentLabel ?? DEFAULT_CONFIG.uploadDocumentLabel,
+          documentsPageTitle: data.documentsPageTitle ?? DEFAULT_CONFIG.documentsPageTitle,
         });
       })
       .catch(() => setConfig((c) => ({ ...c, loading: false })));
