@@ -207,6 +207,7 @@ describe('POST /api/persona/switch — A3 MAMBA Obsidian-only', () => {
       const actual = await vi.importActual<typeof import('../types')>('../types');
       return actual;
     });
+    vi.doMock('@/lib/ledger', () => ({ recordActionSafe: vi.fn().mockResolvedValue({ id: 'led1' }) }));
   });
 
   it('accepts mambaMode: OBSIDIAN', async () => {
