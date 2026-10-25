@@ -18,7 +18,7 @@ interface NeuralLinkProps {
 
 const EVENT_META: Record<NeuralEvent['type'], { icon: string; label: string; colorVar: string; useClockIcon?: boolean }> = {
   tool_call:      { icon: '⚙', label: 'tool call',     colorVar: 'var(--tenant-accent, hsl(var(--whink-accent)))' },
-  tool_result:    { icon: '✓', label: 'tool result',   colorVar: 'hsl(var(--whink-green))' },
+  tool_result:    { icon: '✓', label: 'tool result',   colorVar: 'hsl(var(--tool-result))' },
   security_event: { icon: '⚠', label: 'security',      colorVar: 'hsl(var(--denial))' },
   memory_write:   { icon: '◈', label: 'memory',        colorVar: 'hsl(var(--whink-accent))' },
   text_chunk:     { icon: '▸', label: 'stream',        colorVar: 'hsl(var(--muted-foreground))' },
@@ -162,9 +162,10 @@ export function NeuralLink({ events, open, onClose }: NeuralLinkProps) {
                 aria-label={isPinned ? 'Unpin event' : 'Pin event'}
                 className={`flex-shrink-0 mt-px transition-colors ${
                   isPinned
-                    ? 'text-primary'
+                    ? 'opacity-100'
                     : 'opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground'
                 }`}
+                style={isPinned ? { color: 'var(--tenant-accent, hsl(var(--whink-accent)))' } : undefined}
               >
                 {isPinned ? <PinOff size={10} /> : <Pin size={10} />}
               </button>

@@ -13,16 +13,25 @@ export interface SocialConnectionView {
   scopes: string[];
 }
 
+/**
+ * Default platform display labels. UI components must read these from useTenantConfig()
+ * so tenants can override them. These defaults remain here for non-UI utility functions
+ * such as noticeFromQuery and server-side helpers.
+ */
 export const PLATFORM_LABELS: Record<SocialPlatform, string> = {
   x: 'X',
   instagram: 'Instagram',
   tiktok: 'TikTok',
 };
 
+/**
+ * Default platform notes. UI components must read these from useTenantConfig()
+ * so tenants can override them.
+ */
 export const PLATFORM_NOTES: Record<SocialPlatform, string[]> = {
   x: [],
   instagram: ['Limited: pending platform app review'],
-  tiktok: ['Limited: pending platform app review', 'Posting only — TikTok has no DM API'],
+  tiktok: ['Limited: pending platform app review', 'Posting only — no DM API'],
 };
 
 export function isSocialPlatform(v: unknown): v is SocialPlatform {
