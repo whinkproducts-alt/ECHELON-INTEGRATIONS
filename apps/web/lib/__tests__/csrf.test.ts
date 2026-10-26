@@ -22,6 +22,14 @@ describe('checkCsrf', () => {
     expect(run({ pathname: '/dashboard' }).ok).toBe(true);
   });
 
+  it('checks passkey and password routes but leaves NextAuth alone', () => {
+    for (const pathname of ['/api/auth/password/forgot', '/api/auth/password/reset', '/api/auth/passkey/login']) {
+      expect(run({ pathname, secFetchSite: 'cross-site' }).ok).toBe(false);
+      expect(run({ pathname, secFetchSite: 'same-origin' }).ok).toBe(true);
+    }
+    expect(run({ pathname: '/api/auth/callback/credentials', secFetchSite: 'cross-site' }).ok).toBe(true);
+  });
+
   it('leaves /api/auth/** to NextAuth', () => {
     expect(run({ pathname: '/api/auth/callback/credentials' }).ok).toBe(true);
     expect(run({ pathname: '/api/auth/signout' }).ok).toBe(true);

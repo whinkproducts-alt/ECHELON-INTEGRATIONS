@@ -86,6 +86,8 @@ export const LOCAL_SAFE_REGISTRY: ReadonlySet<string> = new Set([
   'change_request_create', 'change_request_update', 'change_request_refine', 'change_request_status',
   'meeting_room_create',
   'swarm_plan', 'swarm_start', 'swarm_cancel', 'swarm_memory_write',
+  // Security mail to the account owner's own address with a one-time link; no account data leaves.
+  'password_reset_email',
   'autonomy_change', 'ear',
   'gesture_open_thread', 'gesture_request_brief', 'gesture_propose_task', 'gesture_select', 'gesture_dismiss',
   'gesture_toggle_overview', 'gesture_pause', 'gesture_wake', 'gesture_next', 'gesture_refresh',

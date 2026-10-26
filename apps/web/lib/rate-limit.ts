@@ -68,6 +68,10 @@ export const RATE_RULES = {
   contracts: { limit: 60, windowMs: 60_000 },
   swarm: { limit: 6, windowMs: 60_000 },
   passkey: { limit: 20, windowMs: 60_000 },
+  /** Password reset: per client address, per email hash, and the looser per-route bucket when no trustworthy address exists. */
+  password_reset: { limit: 5, windowMs: 60_000 },
+  password_reset_account: { limit: 3, windowMs: 15 * 60_000 },
+  password_reset_route: { limit: 60, windowMs: 60_000 },
   signup_bootstrap: { limit: 5, windowMs: 60_000 },
   passkey_reauth: { limit: 5, windowMs: 60_000 },
   recommendations: { limit: 60, windowMs: 60_000 },

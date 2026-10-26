@@ -41,6 +41,8 @@ export const CAPABILITY_CLASSES: Readonly<Record<string, PermissionClass>> = Obj
   swarm_start: 'A',
   swarm_cancel: 'A',
   swarm_memory_write: 'A',
+  // System security mail to the account's own address, carrying a one-time link only.
+  password_reset_email: 'A',
 });
 
 export function capabilityClass(capability: string): PermissionClass {

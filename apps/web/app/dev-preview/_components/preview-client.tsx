@@ -35,6 +35,10 @@ const LOADERS: Record<string, Loader> = {
   finance: () => import('@/components/screens/finance/finance-screen'),
   'change-requests': () => import('@/components/screens/change-requests/change-requests-screen'),
   'change-request': () => import('@/components/screens/change-requests/change-request-detail-screen'),
+  // Public pages. Rendered inside the shell frame for preview only. For the reset form open /dev-preview/reset-password?token=sample&state=ready.
+  landing: () => import('@/components/screens/landing/landing-screen'),
+  'forgot-password': () => import('@/app/forgot-password/_components/forgot-form').then((m) => ({ default: m.ForgotForm })),
+  'reset-password': () => import('@/app/reset-password/_components/reset-form').then((m) => ({ default: m.ResetForm })),
 };
 export const SERVER_SCREENS = ['board', 'directory', 'workforce', 'companies', 'roster'] as const;
 export const ALL_SCREENS = [...SERVER_SCREENS, ...Object.keys(LOADERS)];

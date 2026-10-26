@@ -80,6 +80,12 @@ const nextConfig = {
           { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
         ],
       },
+      // Reset links carry a one-time token in the query string: never send it in a Referer.
+      // Later entries win for the same key, so this overrides the global value on these pages.
+      {
+        source: '/:page(reset-password|forgot-password)',
+        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+      },
     ];
   },
 };

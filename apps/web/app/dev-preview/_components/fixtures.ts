@@ -8,6 +8,7 @@ import catalog from '@/config/connectors.catalog.json';
 import { answerWave } from './fixtures-wave-contracts';
 import { answerOps } from './fixtures-ops';
 import { answerSwarm } from './fixtures-swarm';
+import { answerLanding } from './fixtures-landing';
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -160,6 +161,8 @@ export interface MockCtx { state: PreviewState; now: () => number; counters: { c
 
 /** Returns null when the URL is not one the harness knows (the caller answers 404). */
 export function answer(method: string, url: URL, body: unknown, ctx: MockCtx): Mocked | null {
+  const landing = answerLanding(method, url, body, ctx);
+  if (landing) return landing;
   const ops = answerOps(method, url, body, ctx);
   if (ops) return ops;
   const swarm = answerSwarm(method, url, body, ctx);

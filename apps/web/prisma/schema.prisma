@@ -23,6 +23,7 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   passkeys          PasskeyCredential[]
+  passwordResetTokens PasswordResetToken[]
   passkeyChallenges PasskeyChallenge[]
   sessionVersion    Int       @default(0)
   accounts          Account[]
@@ -1306,4 +1307,21 @@ model RateLimitBucket {
   @@id([key, windowStart])
   @@index([windowStart])
   @@map("rate_limit_buckets")
+}
+
+// ── Password reset (only the SHA-256 of the token is stored; single use; 30 minute life) ──
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }

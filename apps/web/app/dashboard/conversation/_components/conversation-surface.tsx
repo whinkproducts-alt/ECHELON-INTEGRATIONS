@@ -3,8 +3,14 @@
 import { useState, useEffect, useRef, useCallback, useReducer } from 'react';
 import {
   Send, Plus, MessageSquare, Zap, ChevronDown,
-  FolderKanban, Mic, MicOff, Volume2, VolumeX, Cpu
+  FolderKanban, Mic, MicOff, Volume2, VolumeX, Cpu, SlidersHorizontal, PanelLeft, HelpCircle
 } from 'lucide-react';
+import { HoloDrawer } from '@/components/ui/holo';
+import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
+import {
+  SLASH_COMMANDS, filterCommands, isSlashMenuOpen, commandInsertText, handleMenuKey, starterRequests,
+  readOptionsFlag, writeOptionsFlag, type SlashCommand,
+} from '@/components/screens/conversation-helpers/slash-commands';
 import { useVoice } from '@/lib/hooks/useVoice';
 import { speakApprovalRequest } from '@/lib/spoken-approval';
 import { AvatarRenderer } from './avatar-renderer';
@@ -57,11 +63,20 @@ function findLastIndexOf<T>(items: readonly T[], predicate: (item: T) => boolean
   return -1;
 }
 
-export function ConversationSurface() {
+export function ConversationSurface({ initialPrompt = '' }: { initialPrompt?: string } = {}) {
+  const tenant = useTenantConfig();
+  const productName = tenant.loading ? '' : tenant.productName;
+  const opponentLabel = tenant.obsidianLabel;
+  const cmdLabels = { productName: productName || 'your assistant', opponentLabel };
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(initialPrompt);
+  const [listOpen, setListOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [menuIndex, setMenuIndex] = useState(0);
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  const [optionsOpen, setOptionsOpen] = useState(() => readOptionsFlag());
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState('');
   const [streamPersona, setStreamPersona] = useState<'WHINK' | 'MAMBA'>('WHINK');
@@ -203,15 +218,16 @@ export function ConversationSurface() {
     setNeuralEvents([]);
   };
 
-  const sendMessage = useCallback(async () => {
-    if (!input.trim() || streaming) return;
+  const sendMessage = useCallback(async (override?: string) => {
+    const text = override ?? input;
+    if (!text.trim() || streaming) return;
 
     let convId = activeConvId;
     if (!convId) {
       const res = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: input.substring(0, 60), projectId: selectedProject }),
+        body: JSON.stringify({ title: text.substring(0, 60), projectId: selectedProject }),
       });
       const conv = await res.json();
       convId = conv.id;
@@ -223,7 +239,7 @@ export function ConversationSurface() {
     const userMsg: Message = {
       id: `temp-${Date.now()}`,
       role: 'user',
-      content: input,
+      content: text,
       persona: null,
       mambaMode: null,
       functionalMode: null,
@@ -233,7 +249,7 @@ export function ConversationSurface() {
     setTraceEntries([]);
     setStreamCitations([]);
     streamCitationsRef.current = [];
-    const messageText = input;
+    const messageText = text;
     setInput('');
     setStreaming(true);
     setStreamText('');
@@ -368,14 +384,75 @@ export function ConversationSurface() {
     } finally {
       setStreaming(false);
     }
-  }, [input, streaming, activeConvId, selectedProject, selectedModel, voiceMode, speak, pushNeuralEvent, addApproval, speakApproval, hasPendingApproval]);
+  }, [input, setInput, streaming, activeConvId, selectedProject, selectedModel, voiceMode, speak, pushNeuralEvent, addApproval, speakApproval, hasPendingApproval]);
+
+  // Slash command menu: open while typing a command token, or from the Commands button.
+  const typedMenu = isSlashMenuOpen(input) && dismissedFor !== input;
+  const menuOpen = typedMenu || helpOpen;
+  const menuCommands: SlashCommand[] = typedMenu ? filterCommands(input) : SLASH_COMMANDS.slice();
+  const activeIndex = Math.min(menuIndex, Math.max(menuCommands.length - 1, 0));
+
+  const chooseCommand = (c: SlashCommand) => {
+    setInput(commandInsertText(c));
+    setHelpOpen(false);
+    setMenuIndex(0);
+    inputRef.current?.focus();
+  };
+
+  const markOptionsUsed = () => { writeOptionsFlag(); };
+
+  // Prefill from ?prompt=: the server page already sanitised it; here we only tidy the URL.
+  useEffect(() => {
+    if (!initialPrompt) return;
+    Promise.resolve().then(() => {
+      window.history.replaceState(null, '', window.location.pathname);
+      inputRef.current?.focus();
+    });
+  }, [initialPrompt]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (menuOpen && typedMenu) {
+      const r = handleMenuKey(e.key, activeIndex, menuCommands.length);
+      if (r.kind === 'move') { e.preventDefault(); setMenuIndex(r.index); return; }
+      if (r.kind === 'select') { e.preventDefault(); chooseCommand(menuCommands[r.index]); return; }
+      if (r.kind === 'dismiss') { e.preventDefault(); setDismissedFor(input); return; }
+    }
+    if (e.key === 'Escape' && helpOpen) { setHelpOpen(false); return; }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
+
+  const conversationList = (afterPick: () => void) => (
+    <>
+      <div className="p-3 border-b border-border">
+        <button
+          onClick={() => { void createConversation(); afterPick(); }}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+        >
+          <Plus className="h-4 w-4" aria-hidden /> New
+        </button>
+      </div>
+      <div className="flex-1 overflow-auto py-1">
+        {(conversations ?? []).map((conv: Conversation) => (
+          <button
+            key={conv.id}
+            onClick={() => { setActiveConvId(conv.id); afterPick(); }}
+            aria-current={activeConvId === conv.id ? 'true' : undefined}
+            className={`w-full text-left px-3 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+              activeConvId === conv.id
+                ? 'bg-accent text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+            }`}
+          >
+            <MessageSquare className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+            <span className="truncate">{conv.title}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
 
   const avatarPersona: 'WHINK' | 'MAMBA' = streaming ? streamPersona : activePersona;
   const avatarMambaMode = streaming ? streamMambaMode : activeMambaMode;
@@ -383,39 +460,28 @@ export function ConversationSurface() {
 
   return (
     <div className="flex h-full">
-      {/* Conversation List */}
-      <div className="w-64 border-r border-border flex flex-col bg-card/50">
-        <div className="p-3 border-b border-border">
-          <button
-            onClick={createConversation}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
-          >
-            <Plus className="h-4 w-4" /> New
-          </button>
-        </div>
-        <div className="flex-1 overflow-auto py-1">
-          {(conversations ?? []).map((conv: Conversation) => (
-            <button
-              key={conv.id}
-              onClick={() => setActiveConvId(conv.id)}
-              className={`w-full text-left px-3 py-2.5 text-sm transition-colors flex items-center gap-2 ${
-                activeConvId === conv.id
-                  ? 'bg-accent text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-              }`}
-            >
-              <MessageSquare className="h-3.5 w-3.5 flex-shrink-0" />
-              <span className="truncate">{conv.title}</span>
-            </button>
-          ))}
-        </div>
+      {/* Conversation list: fixed column from 768px, drawer below */}
+      <div className="hidden md:flex w-64 border-r border-border flex-col bg-card/50">
+        {conversationList(() => {})}
       </div>
+      <HoloDrawer open={listOpen} onOpenChange={setListOpen} side="left" width="18rem" title="Conversations">
+        <div className="-mx-2 flex max-h-[70dvh] flex-col">{conversationList(() => setListOpen(false))}</div>
+      </HoloDrawer>
 
       {/* Chat Area */}
       <ObsidianOverlay active={activeMambaMode === 'OBSIDIAN'}>
         <div className="relative flex flex-col flex-1 min-h-0">
           {/* Header: Avatar + persona pill | Voice toggle | Neural Link toggle | Project selector */}
-          <div className="px-4 py-2 border-b border-border flex items-center gap-3">
+          <div className="px-3 md:px-4 py-2 border-b border-border flex flex-wrap items-center gap-x-3 gap-y-2">
+            <button
+              type="button"
+              onClick={() => setListOpen(true)}
+              aria-label="Conversations"
+              className="md:hidden flex items-center gap-1 px-2 py-1 rounded text-xs bg-secondary text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              <PanelLeft className="h-3.5 w-3.5" aria-hidden />
+              Conversations
+            </button>
             {/* Avatar + persona pill */}
             <div className="flex items-center gap-2">
               <AvatarRenderer
@@ -473,53 +539,40 @@ export function ConversationSurface() {
                   setVoiceMode(next);
                   if (typeof window !== 'undefined') localStorage.setItem('whink-voice-mode', String(next));
                 }}
-                title={voiceMode ? 'Voice mode on — click to disable' : 'Enable voice mode'}
+                title={voiceMode ? 'Voice mode on. Click to turn off.' : 'Turn on voice mode'}
+                aria-label="Voice mode"
+                aria-pressed={voiceMode}
                 className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
                   voiceMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'
                 } ${isSpeaking ? 'animate-pulse' : ''}`}
               >
                 {voiceMode ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-                <span className="font-mono">Voice</span>
+                <span className="font-mono">Voice{voiceMode ? ': on' : ''}</span>
               </button>
             )}
 
-            {/* Neural Link toggle */}
+            {/* Options: model choice and activity feed */}
             <button
-              onClick={() => setNeuralOpen(o => !o)}
-              title="Neural Link — live activity feed"
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors font-mono ${
-                neuralOpen
-                  ? 'bg-primary/10'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-              style={neuralOpen ? { color: 'hsl(var(--whink-accent))' } : {}}
+              type="button"
+              onClick={() => setOptionsOpen(o => !o)}
+              aria-expanded={optionsOpen}
+              aria-controls="conversation-options"
+              title="Model and activity feed"
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
-              <Zap className="h-3.5 w-3.5" />
-              Neural Link
+              <SlidersHorizontal className="h-3 w-3" aria-hidden />
+              <span>Options</span>
+              <ChevronDown className={`h-3 w-3 transition-transform ${optionsOpen ? 'rotate-180' : ''}`} aria-hidden />
             </button>
-
-            {/* Model picker */}
-            <ModelPicker
-              selected={selectedModel}
-              onChange={(m) => {
-                setSelectedModel(m);
-                try { localStorage.setItem('whink-preferred-model', m); } catch {}
-                // Persist to user preferences
-                fetch('/api/settings', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ preferences: { preferredModel: m || null } }),
-                }).catch(() => {});
-                setShowModelPicker(false);
-              }}
-              open={showModelPicker}
-              onToggle={() => setShowModelPicker(o => !o)}
-            />
 
             {/* Project selector */}
             <div className="relative">
               <button
                 onClick={() => setShowProjects(!showProjects)}
+                aria-label="Project"
+                aria-haspopup="menu"
+                aria-expanded={showProjects}
+                title="Project"
                 className="flex items-center gap-2 px-3 py-1.5 text-xs bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors"
               >
                 <FolderKanban className="h-3 w-3" />
@@ -548,16 +601,75 @@ export function ConversationSurface() {
             </div>
           </div>
 
+          {optionsOpen && (
+            <div id="conversation-options" className="px-3 md:px-4 py-2 border-b border-border flex flex-wrap items-center gap-3 bg-card/30">
+            {/* Neural Link toggle */}
+              <button
+                onClick={() => { setNeuralOpen(o => !o); markOptionsUsed(); }}
+                title="Activity: live feed of what is happening"
+                aria-label="Activity"
+                aria-pressed={neuralOpen}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors font-mono ${
+                  neuralOpen
+                    ? 'bg-primary/10'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                style={neuralOpen ? { color: 'hsl(var(--whink-accent))' } : {}}
+              >
+                <Zap className="h-3.5 w-3.5" />
+                Activity
+              </button>
+
+              {/* Model picker */}
+              <ModelPicker
+                selected={selectedModel}
+                onChange={(m) => {
+                  setSelectedModel(m);
+                  markOptionsUsed();
+                  try { localStorage.setItem('whink-preferred-model', m); } catch {}
+                  // Persist to user preferences
+                  fetch('/api/settings', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ preferences: { preferredModel: m || null } }),
+                  }).catch(() => {});
+                  setShowModelPicker(false);
+                }}
+                open={showModelPicker}
+                onToggle={() => setShowModelPicker(o => !o)}
+              />
+
+            </div>
+          )}
+
           {/* Messages + Neural Link panel side by side */}
           <div className="flex flex-1 min-h-0 relative">
             {/* Messages */}
             <div className="flex-1 overflow-auto px-4 py-4 space-y-4">
               {(messages ?? []).length === 0 && !streamText && (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <Zap className="h-10 w-10 text-primary/30 mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground font-mono">{avatarPersona} online.</p>
-                    <p className="text-xs text-muted-foreground/60 mt-1">Type a command or start a conversation.</p>
+                <div className="flex min-h-full items-center justify-center">
+                  <div className="w-full max-w-xl text-center py-6">
+                    <Zap className="h-8 w-8 text-primary/40 mx-auto mb-4" aria-hidden />
+                    <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground">
+                      {productName ? `${productName} is ready.` : 'Ready when you are.'}
+                    </h2>
+                    <p className="mt-2 text-sm text-muted-foreground">Ask for something, or start with one of these.</p>
+                    <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 text-left">
+                      {starterRequests(opponentLabel).map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          disabled={streaming}
+                          onClick={() => { setInput(st.prompt); if (st.id === 'review') { inputRef.current?.focus(); } else { void sendMessage(st.prompt); } }}
+                          className="rounded-lg border border-border bg-card/60 px-4 py-3 text-sm text-foreground transition-[transform,opacity] motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 hover:border-primary disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        >
+                          {st.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-6 text-xs text-muted-foreground">
+                      {productName || 'Your assistant'} asks before it spends money, sends anything out, or shares private information.
+                    </p>
                   </div>
                 </div>
               )}
@@ -641,56 +753,95 @@ export function ConversationSurface() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-border p-4">
-            <div className="flex gap-3 max-w-3xl mx-auto">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type a command or message..."
-                rows={1}
-                className="flex-1 px-4 py-3 bg-secondary rounded-lg border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary text-sm resize-none min-h-[44px] max-h-[120px]"
-                style={{ height: 'auto' }}
-                disabled={streaming}
-              />
-              {supported.stt && (
-                <button
-                  onMouseDown={() => {
-                    startListening();
-                  }}
-                  onMouseUp={async () => {
-                    const t = await stopListening();
-                    if (t.trim()) setInput(t.trim());
-                  }}
-                  onTouchStart={() => startListening()}
-                  onTouchEnd={async () => {
-                    const t = await stopListening();
-                    if (t.trim()) setInput(t.trim());
-                  }}
-                  title={isListening ? 'Listening… release to stop' : 'Hold to speak'}
-                  disabled={streaming}
-                  className={`px-4 py-3 rounded-lg border transition-colors disabled:opacity-30 ${
-                    isListening
-                      ? 'bg-[hsl(var(--whink-accent)/0.15)] border-[hsl(var(--whink-accent))] text-[hsl(var(--whink-accent))] animate-pulse'
-                      : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                </button>
+          <div className="border-t border-border p-3 md:p-4">
+            <div className="relative max-w-3xl mx-auto">
+              {menuOpen && (
+                <div className="absolute bottom-full left-0 right-0 mb-2 rounded-lg border border-border bg-card shadow-lg z-20 overflow-hidden">
+                  <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border">Commands</div>
+                  <ul id="slash-menu" role="listbox" aria-label="Commands" className="max-h-64 overflow-auto py-1">
+                    {menuCommands.map((c, i) => (
+                      <li
+                        key={c.name}
+                        id={`slash-opt-${c.name}`}
+                        role="option"
+                        aria-selected={i === activeIndex}
+                        onMouseDown={(e) => { e.preventDefault(); chooseCommand(c); }}
+                        className={`cursor-pointer px-3 py-2 text-sm ${i === activeIndex ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50'}`}
+                      >
+                        <span className="font-mono text-foreground">/{c.name}</span>
+                        <span className="ml-2">{c.describe(cmdLabels)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
-              <button
-                onClick={sendMessage}
-                disabled={!input.trim() || streaming}
-                className="px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-30"
-              >
-                <Send className="h-4 w-4" />
-              </button>
+              <label htmlFor="conversation-input" className="sr-only">Message</label>
+              <div className="flex gap-2 md:gap-3">
+                <textarea
+                  id="conversation-input"
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => { setInput(e.target.value); setMenuIndex(0); setDismissedFor(null); if (helpOpen) setHelpOpen(false); }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask anything, or type / for commands"
+                  rows={1}
+                  role="combobox"
+                  aria-expanded={menuOpen}
+                  aria-controls="slash-menu"
+                  aria-autocomplete="list"
+                  aria-activedescendant={typedMenu && menuCommands[activeIndex] ? `slash-opt-${menuCommands[activeIndex].name}` : undefined}
+                  className="min-w-0 flex-1 px-3 md:px-4 py-3 bg-secondary rounded-lg border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary text-sm resize-none min-h-[44px] max-h-[120px]"
+                  style={{ height: 'auto' }}
+                  disabled={streaming}
+                />
+                {supported.stt && (
+                  <button
+                    onMouseDown={() => {
+                      startListening();
+                    }}
+                    onMouseUp={async () => {
+                      const t = await stopListening();
+                      if (t.trim()) setInput(t.trim());
+                    }}
+                    onTouchStart={() => startListening()}
+                    onTouchEnd={async () => {
+                      const t = await stopListening();
+                      if (t.trim()) setInput(t.trim());
+                    }}
+                    title={isListening ? 'Listening… release to stop' : 'Hold to speak'}
+                    aria-label={isListening ? 'Listening. Release to stop' : 'Hold to speak'}
+                    disabled={streaming}
+                    className={`px-3 md:px-4 py-3 rounded-lg border transition-colors disabled:opacity-30 ${
+                      isListening
+                        ? 'bg-[hsl(var(--whink-accent)/0.15)] border-[hsl(var(--whink-accent))] text-[hsl(var(--whink-accent))] animate-pulse'
+                        : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {isListening ? <MicOff className="h-4 w-4" aria-hidden /> : <Mic className="h-4 w-4" aria-hidden />}
+                  </button>
+                )}
+                <button
+                  onClick={() => { void sendMessage(); }}
+                  disabled={!input.trim() || streaming}
+                  aria-label="Send"
+                  className="px-3 md:px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-30"
+                >
+                  <Send className="h-4 w-4" aria-hidden />
+                </button>
+              </div>
             </div>
             <div className="flex items-center gap-3 mt-2 max-w-3xl mx-auto">
-              <span className="text-xs text-muted-foreground/50 font-mono">
-                /mamba • /whink • /brief • /deep • /plan • /status
-              </span>
+              <button
+                type="button"
+                onClick={() => { setHelpOpen(o => !o); setMenuIndex(0); }}
+                aria-expanded={helpOpen}
+                aria-controls="slash-menu"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                <HelpCircle className="h-3 w-3" aria-hidden />
+                Commands
+              </button>
+              <span className="text-xs text-muted-foreground/60">Type / for commands</span>
             </div>
           </div>
         </div>
@@ -724,7 +875,10 @@ function ModelPicker({
     <div className="relative">
       <button
         onClick={onToggle}
-        title="Select model"
+        title="Model"
+        aria-label="Model"
+        aria-haspopup="menu"
+        aria-expanded={open}
         className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors text-muted-foreground hover:text-foreground bg-secondary"
       >
         <Cpu className="h-3 w-3" />

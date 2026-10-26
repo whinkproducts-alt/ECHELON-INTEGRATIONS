@@ -25,8 +25,12 @@ export async function getSessionVersion(userId: string, now: number = Date.now()
   return u.sessionVersion;
 }
 
-export async function bumpSessionVersion(userId: string): Promise<number> {
-  const u = await prisma.user.update({
+export async function bumpSessionVersion(
+  userId: string,
+  /** Optional transaction client: the bump then commits or rolls back with the caller's other writes. */
+  tx?: { user: { update: typeof prisma.user.update } },
+): Promise<number> {
+  const u = await (tx ?? prisma).user.update({
     where: { id: userId },
     data: { sessionVersion: { increment: 1 } },
     select: { sessionVersion: true },

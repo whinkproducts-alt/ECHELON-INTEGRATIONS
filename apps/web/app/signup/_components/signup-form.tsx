@@ -4,12 +4,11 @@ import { useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Zap } from 'lucide-react';
-import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
+import { AuthShell, Field, PASSWORD_MIN_LENGTH, PASSWORD_RULES, PasswordInput, StatusNote, StrengthHint, SubmitButton, inputClass } from '@/components/screens/landing/ui';
+import { cn } from '@/lib/utils';
 
 export function SignupForm() {
   const router = useRouter();
-  const { productName } = useTenantConfig();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -65,47 +64,42 @@ export function SignupForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md px-6">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Zap className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-display font-bold tracking-tight text-foreground">{productName}</h1>
-          </div>
-          <p className="text-sm text-muted-foreground font-mono">Initialize your operating system</p>
-        </div>
-        <div className="bg-card rounded-lg p-6 shadow-lg border border-border">
-          <form onSubmit={handleSubmit} className="space-y-4" suppressHydrationWarning>
-            <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1.5">Name</label>
-              <input suppressHydrationWarning type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2.5 bg-secondary rounded-md border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary text-sm" placeholder="Your name" required />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1.5">Email</label>
-              <input suppressHydrationWarning type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-2.5 bg-secondary rounded-md border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary text-sm" placeholder="operator@whink.ai" required />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1.5">Password</label>
-              <input suppressHydrationWarning type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2.5 bg-secondary rounded-md border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary text-sm" placeholder="••••••••" required minLength={6} />
-            </div>
-            {needsToken && (
-              <div>
-                <label htmlFor="signup-setup-token" className="block text-sm font-medium text-muted-foreground mb-1.5">Setup token</label>
-                <input id="signup-setup-token" suppressHydrationWarning type="password" autoComplete="off" value={bootstrapToken} onChange={(e) => setBootstrapToken(e.target.value)} disabled={closed} className="w-full px-3 py-2.5 bg-secondary rounded-md border border-border text-foreground focus:outline-none focus:ring-1 focus:ring-primary text-sm" required aria-describedby="signup-setup-token-help" />
-                <p id="signup-setup-token-help" className="mt-1 text-xs text-muted-foreground">The token set on the server as SIGNUP_BOOTSTRAP_TOKEN. Only the first account needs it.</p>
-              </div>
+    <AuthShell
+      title="Create your account."
+      lead="Set up in a minute. Anything that spends money or shares private information will still wait for you."
+      footer={<>Already have an account? <Link href="/login" className="text-primary hover:underline">Sign in</Link></>}
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5" suppressHydrationWarning>
+        <Field id="signup-name" label="Name">
+          {({ id, describedBy }) => (
+            <input suppressHydrationWarning id={id} name="name" type="text" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" aria-describedby={describedBy} className={inputClass} placeholder="Your name" required />
+          )}
+        </Field>
+        <Field id="signup-email" label="Email" extraDescribedBy={error ? 'signup-error' : undefined}>
+          {({ id, describedBy }) => (
+            <input suppressHydrationWarning id={id} name="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" aria-describedby={describedBy} className={inputClass} placeholder="you@example.com" required />
+          )}
+        </Field>
+        <Field id="signup-password" label="Password" hint={PASSWORD_RULES} extraDescribedBy="signup-strength">
+          {({ id, describedBy }) => (
+            <PasswordInput id={id} value={password} onChange={setPassword} autoComplete="new-password" describedBy={describedBy} minLength={PASSWORD_MIN_LENGTH} disabled={closed} />
+          )}
+        </Field>
+        <StrengthHint id="signup-strength" password={password} />
+        {needsToken && (
+          <Field id="signup-setup-token" label="Setup token" hint="The token set on the server as SIGNUP_BOOTSTRAP_TOKEN. Only the first account needs it.">
+            {({ id, describedBy }) => (
+              <input id={id} name="setup-token" suppressHydrationWarning type="password" autoComplete="off" value={bootstrapToken} onChange={(e) => setBootstrapToken(e.target.value)} disabled={closed} aria-describedby={describedBy} className={inputClass} required />
             )}
-            {closed && <p role="status" className="text-sm text-muted-foreground">Signups are closed on this instance.</p>}
-            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-            <button suppressHydrationWarning type="submit" disabled={loading || closed} className="w-full py-2.5 bg-primary text-primary-foreground rounded-md font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50">
-              {loading ? 'Initializing...' : 'Create Account'}
-            </button>
-          </form>
-          <p className="text-center text-sm text-muted-foreground mt-4">
-            Already initialized? <Link href="/login" className="text-primary hover:underline">Sign in</Link>
-          </p>
-        </div>
-      </div>
-    </div>
+          </Field>
+        )}
+        <StatusNote>{closed ? 'Signups are closed on this instance.' : undefined}</StatusNote>
+        <div id="signup-error" role="alert" aria-live="assertive" className={cn('text-sm text-destructive', !error && 'hidden')}>{error}</div>
+        <SubmitButton busy={loading} busyLabel="Creating account..." disabled={closed}>Create account</SubmitButton>
+        <p className="text-xs text-muted-foreground">
+          By creating an account you agree to the <Link href="/terms" className="text-primary hover:underline">Terms</Link> and <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
+        </p>
+      </form>
+    </AuthShell>
   );
 }

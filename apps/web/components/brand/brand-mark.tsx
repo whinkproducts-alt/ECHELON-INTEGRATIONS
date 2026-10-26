@@ -15,9 +15,11 @@ export interface BrandMarkProps {
   /** 'glyph' crops a square logo to its monogram so it stays recognisable at small sizes. */
   crop?: 'glyph';
   className?: string;
+  /** false renders a plain image with no link or tooltip, for use inside another link (nested anchors are invalid HTML). */
+  interactive?: boolean;
 }
 
-export function BrandMark({ company, size = 40, showName = false, glow = true, crop, className }: BrandMarkProps) {
+export function BrandMark({ company, size = 40, showName = false, glow = true, crop, className, interactive = true }: BrandMarkProps) {
   const c = getCompany(company);
   const cropped = crop === 'glyph' && c.aspect === 1;
   const w = cropped ? size : Math.round(size * c.aspect);
@@ -41,6 +43,9 @@ export function BrandMark({ company, size = 40, showName = false, glow = true, c
     </>
   );
   const base = cn('group relative inline-flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring', className);
+  if (!interactive) {
+    return <span className={cn('inline-flex items-center gap-2', className)}>{content}</span>;
+  }
   if (c.url) {
     return (
       <a href={c.url} target="_blank" rel="noopener noreferrer" className={base} aria-label={`${c.name} (opens in a new tab)`}>

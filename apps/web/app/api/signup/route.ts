@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { logger } from '@/lib/logger';
 import { timingSafeEqual } from 'crypto';
+import { isStrongEnough, PASSWORD_MIN, PASSWORD_MAX_BYTES } from '@/lib/auth/password-policy';
 import { clientKey, limitOr429 } from '@/lib/rate-limit';
 
 const CLOSED = 'Signups are closed on this instance.';
@@ -42,6 +43,9 @@ export async function POST(req: NextRequest) {
 
     if (typeof rawEmail !== 'string' || typeof password !== 'string' || !rawEmail.trim() || !password) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+    }
+    if (!isStrongEnough(password)) {
+      return NextResponse.json({ error: `Password must be at least ${PASSWORD_MIN} characters and at most ${PASSWORD_MAX_BYTES} bytes.` }, { status: 400 });
     }
     const email = rawEmail.trim().toLowerCase();
     if (email.length > 254) return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });

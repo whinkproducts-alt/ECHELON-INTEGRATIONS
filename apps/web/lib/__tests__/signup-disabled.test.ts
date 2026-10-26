@@ -27,8 +27,17 @@ describe('SIGNUP_ENABLED', () => {
 
   const call = async (email = 'a@b.co') => {
     const { POST } = await import('@/app/api/signup/route');
-    return POST(new Request('http://localhost/api/signup', { method: 'POST', body: JSON.stringify({ email, password: 'pw' }) }) as never);
+    return POST(new Request('http://localhost/api/signup', { method: 'POST', body: JSON.stringify({ email, password: 'password123' }) }) as never);
   };
+
+  it('rejects a 7-character password with 400 and a readable message, writing nothing', async () => {
+    vi.stubEnv('SIGNUP_ENABLED', 'true');
+    const { POST } = await import('@/app/api/signup/route');
+    const res = await POST(new Request('http://localhost/api/signup', { method: 'POST', body: JSON.stringify({ email: 'a@b.co', password: '1234567' }) }) as never);
+    expect(res.status).toBe(400);
+    expect(typeof (await res.json()).error).toBe('string');
+    expect(create).not.toHaveBeenCalled();
+  });
 
   it('returns 403, writes nothing and logs a security event when false', async () => {
     vi.stubEnv('SIGNUP_ENABLED', 'false');
@@ -84,7 +93,7 @@ describe('SIGNUP_ENABLED', () => {
   describe('bootstrap token', () => {
     const callWith = async (token?: string) => {
       const { POST } = await import('@/app/api/signup/route');
-      return POST(new Request('http://localhost/api/signup', { method: 'POST', body: JSON.stringify({ email: 'a@b.co', password: 'pw', bootstrapToken: token }) }) as never);
+      return POST(new Request('http://localhost/api/signup', { method: 'POST', body: JSON.stringify({ email: 'a@b.co', password: 'password123', bootstrapToken: token }) }) as never);
     };
     it('first account needs the token when set; wrong or missing is a generic 403', async () => {
       vi.stubEnv('SIGNUP_BOOTSTRAP_TOKEN', 'tok-123');

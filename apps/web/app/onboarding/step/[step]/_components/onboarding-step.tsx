@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
+import { FirstRequestCard } from '@/components/screens/onboarding/first-request';
 import { AutonomyApprovalPanel } from '@/app/dashboard/settings/_components/autonomy-approval-panel';
 import { interpretPatchResponse, resolveDecision, type AutonomyApproval } from '@/lib/autonomy-approval';
 import type { DecisionStatus } from '@/lib/hooks/approval-state';
@@ -126,10 +127,18 @@ export function OnboardingStep({ step }: { step: number }) {
   const productName = config.loading ? '...' : config.productName;
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <div className="min-h-[100dvh] bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-lg">
         {/* Progress */}
-        <div className="flex items-center gap-2 mb-8">
+        <div
+          className="flex items-center gap-2 mb-8"
+          role="progressbar"
+          aria-label="Setup progress"
+          aria-valuemin={1}
+          aria-valuemax={3}
+          aria-valuenow={step}
+          aria-valuetext={`Step ${step} of 3`}
+        >
           {[1, 2, 3].map((n) => (
             <div key={n} className="flex items-center gap-2">
               <div className={`h-2 w-2 rounded-full ${n <= step ? 'bg-primary' : 'bg-muted'}`} />
@@ -151,20 +160,27 @@ export function OnboardingStep({ step }: { step: number }) {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                  <label htmlFor="ob-name" className="block text-sm font-medium text-muted-foreground mb-1.5">
                     Display Name <span className="text-destructive">*</span>
                   </label>
                   <input
+                    id="ob-name"
+                    aria-describedby="ob-name-why"
+                    required
+                    autoComplete="name"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="e.g. Victor"
                     className="w-full px-3 py-2 bg-secondary border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
+                  <p id="ob-name-why" className="mt-1 text-xs text-muted-foreground/80">Why we ask: so replies address you by name. Required to continue.</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1.5">Timezone</label>
+                  <label htmlFor="ob-tz" className="block text-sm font-medium text-muted-foreground mb-1.5">Timezone</label>
                   <select
+                    id="ob-tz"
+                    aria-describedby="ob-tz-why"
                     value={timezone}
                     onChange={(e) => setTimezone(e.target.value)}
                     className="w-full px-3 py-2 bg-secondary border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
@@ -173,18 +189,22 @@ export function OnboardingStep({ step }: { step: number }) {
                       <option key={tz} value={tz}>{tz}</option>
                     ))}
                   </select>
+                  <p id="ob-tz-why" className="mt-1 text-xs text-muted-foreground/80">Why we ask: so dates like &quot;Friday&quot; and meeting times land on the right day. You can change it in Settings.</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                  <label htmlFor="ob-role" className="block text-sm font-medium text-muted-foreground mb-1.5">
                     Role / Title <span className="text-muted-foreground/60">(optional)</span>
                   </label>
                   <input
+                    id="ob-role"
+                    aria-describedby="ob-role-why"
                     value={roleTitle}
                     onChange={(e) => setRoleTitle(e.target.value)}
                     placeholder="e.g. Founder & CEO"
                     className="w-full px-3 py-2 bg-secondary border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
+                  <p id="ob-role-why" className="mt-1 text-xs text-muted-foreground/80">Why we ask: helps match the tone and priorities of advice. Safe to leave empty.</p>
                 </div>
               </div>
 
@@ -209,12 +229,15 @@ export function OnboardingStep({ step }: { step: number }) {
 
               <div className="space-y-4">
                 <div>
+                  <p id="ob-auto-why" className="text-xs text-muted-foreground/80 mb-3">Why we ask: this sets how much runs without a prompt. Spending money, sending anything out and sharing private information always wait for your approval, at every level.</p>
                   <div className="flex justify-between text-xs text-muted-foreground mb-2">
                     <span>Ask first</span>
                     <span>Full autonomy</span>
                   </div>
                   <input
                     type="range"
+                    aria-label="Autonomy level"
+                    aria-describedby="ob-auto-why"
                     min={1}
                     max={4}
                     value={autonomyLevel}
@@ -290,6 +313,16 @@ export function OnboardingStep({ step }: { step: number }) {
                 </div>
               )}
 
+              {!approval && (
+                <button
+                  type="button"
+                  onClick={() => router.push('/onboarding/step/3')}
+                  className="text-xs text-muted-foreground underline hover:text-foreground"
+                >
+                  Skip for now. {productName} will ask before everything until you change it in Settings.
+                </button>
+              )}
+
               <div className="flex gap-3">
                 <button
                   onClick={() => router.push('/onboarding/step/1')}
@@ -332,11 +365,13 @@ export function OnboardingStep({ step }: { step: number }) {
                 </div>
               </div>
 
+              <FirstRequestCard productName={productName} />
+
               <button
                 onClick={() => router.push('/dashboard/conversation')}
-                className="w-full py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90"
+                className="w-full py-2.5 bg-secondary text-foreground rounded-md text-sm font-medium hover:opacity-90"
               >
-                Enter {productName}
+                Enter {productName} without a request
               </button>
             </>
           )}

@@ -50,7 +50,7 @@ export function TopBar({ personaLabel, personaKind, functionalMode, connection =
         </button>
       )}
       <Link href="/dashboard" className="flex items-center gap-2 rounded-md focus-visible:outline-2 focus-visible:outline-ring" aria-label={`${appName} home`}>
-        <BrandMark company="ultimate" size={40} crop="glyph" />
+        <BrandMark company="ultimate" size={40} crop="glyph" interactive={false} />
         <span className="hidden font-display text-sm font-semibold tracking-[0.18em] text-foreground md:inline">{appName}</span>
       </Link>
 
