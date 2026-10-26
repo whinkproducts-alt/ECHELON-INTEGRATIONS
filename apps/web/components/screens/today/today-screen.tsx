@@ -9,6 +9,7 @@ import { ledgerToSecurityEvents } from '@/components/neural-link/security-events
 import { asArray, asRecord, fmtInt, useApi } from '../anatomy/use-api';
 import { PendingApprovals } from './pending-approvals';
 import { RecommendationsColumn } from './recommendations-column';
+import { SmsBriefingCard } from './sms-briefing-card';
 
 function greetingFor(hour: number): string {
   if (hour < 5) return 'Still up';
@@ -102,6 +103,8 @@ export function TodayScreen() {
           <Section title="Needs your approval" icon={<ShieldAlert className="h-3.5 w-3.5" aria-hidden />}>
             <PendingApprovals onCount={setPendingCount} />
           </Section>
+
+          <SmsBriefingCard />
 
           <Section title="Calendar" icon={<CalendarX className="h-3.5 w-3.5" aria-hidden />}>
             <HoloEmpty

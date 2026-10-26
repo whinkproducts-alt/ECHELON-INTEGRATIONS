@@ -602,6 +602,14 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
     return { success: r.sent, data: { sent: r.sent, channel: r.channel }, error: r.sent ? undefined : `not sent: ${r.reason ?? 'unknown'}`, source: 'comms', timestamp: ts(), toolVersion: '1.0.0' };
   },
 
+  // Never offered to the model; Class C and protected (proprietary). Runs only from an approved request
+  // created by lib/briefing/sms.ts. Content hash and the user's own number are re-checked there.
+  sms_briefing_send: async (userId: string, params: any) => {
+    const { runApprovedSmsBriefing } = await import('@/lib/briefing/sms');
+    const r = await runApprovedSmsBriefing(userId, params);
+    return { success: r.success, data: r.data, error: r.error, source: 'sms', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
   contact_call: async (userId: string, params: any) => {
     const ts = () => new Date().toISOString();
     const contact = typeof params?.contactId === 'string'
@@ -653,6 +661,7 @@ const TOOL_RISK_MAP: Record<string, PermissionClass> = Object.assign(Object.crea
   [SCHEDULE_TOOL_NAME]: 'C',
   contact_message: 'C',
   contact_call: 'C',
+  sms_briefing_send: 'C',
   change_request_submit: 'C',
   memory_write: 'A',
   memory_read: 'A',
@@ -1309,7 +1318,8 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
       action: `tool_executed: ${approval.tool}`,
       confirmationMethod: 'user_confirmed',
       status: 'SUBMITTED',
-      inputSummary: safeJson(callParams),
+      // The SMS briefing text and the full number stay out of the ledger; the approval row holds them.
+      inputSummary: approval.tool === 'sms_briefing_send' ? 'sms briefing (content in the approval request)' : approval.tool === 'contact_message' || approval.tool === 'contact_call' ? `${approval.tool} (recipient and content are in the approval request)` : safeJson(callParams),
       validationResult: JSON.stringify({ approvalId: approval.id }),
       latencyMs: 0,
     });

@@ -348,3 +348,8 @@ Uploaded skills are outsider-written data. Pipeline: deterministic scan, securit
 - Contracts are records only (Class A `contract_create`/`contract_update`/`contract_delete`); a contract value never moves money. Field set is an assumption pending Victor's definition.
 - Finance is read-only (`GET /api/finance/summary`): sums come from the database per currency, combined in integer cents. Spend per subsidiary is omitted because usage events carry no project link.
 - Meetings: `MEETING_PROVIDER_BASE_URL` (self-hosted, https or localhost). Unconfigured means no room and no outside call.
+
+## 2026-10-26 Real SMS sending, approval-gated
+- Victor asked for the ability to send SMS. `lib/comms/delivery.ts` now sends SMS for real through the Twilio REST API with plain `fetch` (no new dependency). It makes one attempt with a 10 s timeout and never retries, because a retry after a timeout could double-send. WhatsApp, Telegram, email and calls stay stubs.
+- Sending stays protected (Class C, proprietary, approval by request id). The briefing is sent on demand: `POST /api/briefing/sms` builds a short text without financial figures or counterparty names, creates the approval for `sms_briefing_send`, and the Today card shows it. The old automated daily path (`lib/sms-briefing.ts`) no longer sends; it only surfaces a "briefing ready" reminder once a day. The ledger and approval summary carry a masked number only; the exact content lives in the approval row.
+- Not decided: whether Victor wants a standing approval or an own-number exemption for his daily briefing. None was added. Victor will be asked separately.

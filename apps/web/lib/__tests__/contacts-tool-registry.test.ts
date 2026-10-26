@@ -52,6 +52,15 @@ describe('contact_message / contact_call in the tool registry', () => {
     expect(res.error).toContain('not_configured');
   });
 
+  it('the ledger never receives the recipient number or the message text', async () => {
+    contactFindFirst.mockResolvedValue(contact);
+    const { executeApprovedTool } = await import('../tool-registry');
+    await executeApprovedTool('u1', { ...approved, tool: 'contact_message', params: { contactId: 'c1', channel: 'SMS', to: '+14035550123', body: 'private strategy text' } });
+    const written = JSON.stringify([...recordAction.mock.calls, ...recordActionSafe.mock.calls]);
+    expect(written).not.toContain('+14035550123');
+    expect(written).not.toContain('private strategy text');
+  });
+
   it('if the contact destination changed since approval, nothing is sent', async () => {
     contactFindFirst.mockResolvedValue({ ...contact, phone: '+19995550000' });
     const { executeApprovedTool } = await import('../tool-registry');
