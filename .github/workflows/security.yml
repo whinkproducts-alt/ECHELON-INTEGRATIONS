@@ -32,6 +32,10 @@ jobs:
   gitleaks:
     name: gitleaks secret scan
     runs-on: ubuntu-latest
+    # The action lists the pull request's commits to scan only the new range, which needs pull-requests: read.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -49,6 +53,8 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      # CodeQL reads its own workflow run for status reporting; without this it ends in a configuration error.
+      actions: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # github/codeql-action v3.39.1, pinned by commit SHA.
