@@ -360,3 +360,14 @@ Uploaded skills are outsider-written data. Pipeline: deterministic scan, securit
 - Mail is the account's own security mail: capability `password_reset_email`, Class A, in LOCAL_SAFE_REGISTRY (not protected: recipient is the owner's own address, content is a one-time link, no account data). Link base is `AUTH_URL` (fallback `NEXTAUTH_URL`). `deliver()` email is still a stub in `lib/comms/delivery.ts`, so no mail leaves until SMTP sending is built; the route logs one line without address or link.
 - Signup had no server password rule (form minLength 6). `lib/auth/password-policy.ts` (min 8, max 72 bytes for bcrypt) is the new server policy; signup is not yet wired to it.
 - `proxy.ts` public exact paths added: `/`, `/terms`, `/privacy`, `/forgot-password`, `/reset-password`, and the two password API routes (already under the public `/api/auth` prefix).
+
+## 2026-10-27: Dependency security upgrade before merging to main
+
+The new `pnpm audit` job (security.yml) had never run: it failed at setup because pnpm had no pinned version. With the pin added, the audit found 31 known vulnerabilities in production dependencies, 4 critical and 9 high.
+
+- Next.js 16.3.3 had three critical remote-code-execution advisories (image optimisation, `next/og`, `use cache`), fixed in 16.4.1. Upgraded `next` and `eslint-config-next` to 16.4.3 (same MIT licence). Build, type check and all tests pass on it.
+- Removed unused dependencies `plotly.js`, `react-plotly.js`, their type packages, `lodash` and `react-use` (no imports anywhere in the repo). This also removed the critical `maplibre-gl` and the `js-cookie` findings.
+- Upgraded `postcss` 8.5.32 and `autoprefixer` 10.6.1. Added pnpm overrides (pnpm-workspace.yaml) for transitive packages with patch-level fixes: body-parser, lodash (via formik), source-map-js, ip-address, fast-uri.
+- Upgraded `zod` 3.25.76 to 4.6.7 (high: memory exhaustion on oversized collections). The upgrade changed one behaviour that matters: `.partial()` now keeps a field's `.default()`, which would have reset a contact's tags on every update that did not mention them. The contact schemas now keep the default on the create schema only, with a regression test. No other `.partial()` exists in the codebase.
+- Result: audit exits clean at the high threshold; 3 low or moderate findings remain (csv-parse needs a major upgrade; tracked in pending tasks).
+

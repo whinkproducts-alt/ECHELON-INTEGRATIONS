@@ -9,16 +9,20 @@ import { parseVCard, type ParsedContact } from '@/lib/contacts/vcard';
 
 const E164 = /^\+[1-9]\d{7,14}$/;
 
-export const ContactInputSchema = z.object({
+// Shared field shapes, with no defaults. Zod 4 keeps a field's default inside .partial(), which would reset
+// tags on every update that does not mention them, so the default lives only on the create schema.
+const contactFields = {
   name: z.string().trim().min(1).max(200),
   email: z.string().trim().toLowerCase().email().max(254).nullish(),
   phone: z.string().trim().regex(E164, 'phone must be E.164, for example +14035550123').nullish(),
   company: z.string().trim().max(200).nullish(),
-  tags: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20),
   notes: z.string().max(2000).nullish(),
-}).strict();
+};
 
-export const ContactPatchSchema = ContactInputSchema.partial().strict().refine((v) => Object.keys(v).length > 0, 'nothing to update');
+export const ContactInputSchema = z.object({ ...contactFields, tags: contactFields.tags.default([]) }).strict();
+
+export const ContactPatchSchema = z.object(contactFields).partial().strict().refine((v) => Object.keys(v).length > 0, 'nothing to update');
 
 export type ContactInput = z.infer<typeof ContactInputSchema>;
 

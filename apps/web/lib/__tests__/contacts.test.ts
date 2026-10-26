@@ -88,6 +88,9 @@ describe('contacts CRUD and tenant isolation', () => {
     expect(ContactInputSchema.safeParse({ name: 'x', phone: '4035550123' }).success).toBe(false);
     expect(ContactInputSchema.safeParse({ name: 'x', userId: 'other' }).success).toBe(false);
     expect(ContactPatchSchema.safeParse({}).success).toBe(false);
+    // An update that does not mention tags must not carry a tags value (it would wipe the stored tags).
+    const patched = ContactPatchSchema.safeParse({ name: 'new name' });
+    expect(patched.success && 'tags' in patched.data).toBe(false);
   });
 });
 

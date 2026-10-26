@@ -47,4 +47,5 @@ Source of truth for what is open. Update it when something is done or decided. R
 - Terms and Privacy are internal drafts; legal review before external release. Contact address comes from tenant config (`legalContactEmail`).
 - Per-email reset throttle can be used to annoy a victim (3 per 15 min); add a "check again in 5 minutes" hint and an owner alert when SMTP exists.
 - The standalone `openclaw-jarvis` repo (a copy of the open-source OpenClaw) has no approval step for posting; it defaults to exec security `full`, ask `off`. Keep social logins and credentials away from it, or route posting through WHINK's gateway.
+- Remaining dependency audit findings (below the high gate): csv-parse (moderate, needs a major version bump of the `csv` package) and two low. Revisit with the next dependency pass. Keep `pnpm audit --prod --audit-level=high` green.
 
