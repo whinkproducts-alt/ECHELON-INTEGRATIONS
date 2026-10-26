@@ -4,11 +4,16 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { executeTool } from '@/lib/tool-registry';
 import { normaliseMambaMode } from '@/lib/types';
+import { limitOr429 } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const body = await req.json();
+  const limited = await limitOr429('tools_execute', session.user.id);
+  if (limited) return limited as NextResponse;
+  let body: { tool?: unknown; params?: unknown };
+  try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
 
   // Basic shape validation — tool name must be a non-empty string.
   if (typeof body.tool !== 'string' || body.tool.trim().length === 0) {

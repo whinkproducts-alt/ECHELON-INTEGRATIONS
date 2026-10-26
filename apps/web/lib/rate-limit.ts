@@ -62,6 +62,8 @@ export const RATE_RULES = {
   signup: { limit: 5, windowMs: 60_000 },
   signup_route: { limit: 60, windowMs: 60_000 },
   approvals: { limit: 30, windowMs: 60_000 },
+  /** Direct tool execution: each call can reach an external service or a model, so it is capped per user. */
+  tools_execute: { limit: 60, windowMs: 60_000 },
   comms: { limit: 10, windowMs: 60_000 },
   import: { limit: 5, windowMs: 60_000 },
   change_requests: { limit: 30, windowMs: 60_000 },

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { recordActionSafe } from '@/lib/ledger';
+import { generateCorrelationId } from '@/lib/logger';
 import { EncryptionNotConfiguredError, encryptKey, isEncryptionConfigured, keyHint } from '@/lib/key-encryption';
 
 const VALID_PROVIDERS = new Set(['anthropic', 'openai']);
@@ -23,7 +25,8 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const body = await req.json();
+  let body: { provider?: unknown; key?: unknown } | null;
+  try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
   const provider = body?.provider as string;
   const plaintextKey = body?.key as string;
 
@@ -60,6 +63,13 @@ export async function POST(req: NextRequest) {
     where: { userId_provider: { userId: session.user.id, provider } },
     create: { userId: session.user.id, provider, encryptedKey, keyHint: hint },
     update: { encryptedKey, keyHint: hint },
+  });
+
+  // Provider and the masked hint only. The key itself is never written to the ledger.
+  await recordActionSafe({
+    userId: session.user.id, initiator: 'user', persona: 'WHINK', action: 'api_key_stored', tool: 'settings',
+    permissionClass: 'A', status: 'EXECUTED', correlationId: generateCorrelationId(),
+    inputSummary: `provider=${provider}`,
   });
 
   return NextResponse.json({ provider, keyHint: hint });

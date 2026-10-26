@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+import { isModelAllowed, isModelNameShape } from '@/lib/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
@@ -47,7 +48,7 @@ export async function POST(
     const body = await req.json();
     const userMessage = body?.message ?? '';
     const rawProjectId = body?.projectId ?? null;
-    const requestedModel = body?.model as string | undefined;
+    const requestedModel = isModelNameShape(body?.model) ? body.model : undefined;
 
     // Verify conversation ownership
     const conv = await prisma.conversation.findFirst({
@@ -127,7 +128,7 @@ export async function POST(
 
     // Get conversation history for context — most recent 50, in chronological order
     const history = (await prisma.message.findMany({
-      where: { conversationId },
+      where: { conversationId, conversation: { userId: session.user.id } },
       orderBy: { createdAt: 'desc' },
       take: 50,
     })).reverse();
@@ -255,7 +256,8 @@ export async function POST(
 
     // Resolve model: request body > user preference > env default
     const userPrefs = await prisma.userPreference.findUnique({ where: { userId: session.user.id } });
-    const resolvedModel = requestedModel ?? userPrefs?.preferredModel ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+    const defaultModel = process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+    let resolvedModel = requestedModel ?? userPrefs?.preferredModel ?? defaultModel;
 
     // Load BYOK key for the resolved provider, if one is stored
     let byokApiKey: string | undefined;
@@ -270,6 +272,18 @@ export async function POST(
         if (storedKey) byokApiKey = decryptKey(storedKey.encryptedKey);
       }
     } catch { /* non-blocking — fall back to server key */ }
+
+    // A model the user asked for (or saved as a preference) is used only if it is on the operator's
+    // allow-list or the user pays for it with their own key. Otherwise use the operator's default.
+    if (resolvedModel !== defaultModel && !isModelAllowed(resolvedModel, { hasOwnKey: Boolean(byokApiKey) })) {
+      await recordActionSafe({
+        userId: session.user.id, initiator: 'user', persona: orchResult.newPersona ?? 'WHINK',
+        action: 'model_not_allowed', tool: 'model_policy', permissionClass: 'A', status: 'DENIED',
+        correlationId, inputSummary: `requested model ${String(resolvedModel).slice(0, 100)} is not on the allow-list; using the default`,
+      });
+      resolvedModel = defaultModel;
+      byokApiKey = undefined;
+    }
 
     // M1: Check if a prior injection-blocked turn left a taint flag for this conversation.
     let conversationTainted = false;

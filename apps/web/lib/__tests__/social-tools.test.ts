@@ -481,6 +481,17 @@ describe('L1: tool_definition_changed events for owner-only tools', () => {
   });
 });
 
+describe('L1 follow-up: a non-owner request that registers the gateway first must not swallow the owner\'s event', () => {
+  it('the owner\'s ledger still gets tool_definition_changed on the owner\'s next registration', async () => {
+    listOpenClawTools.mockResolvedValue([{ name: 'ref__echo', description: 'a changed description', inputSchema: { type: 'object' } }]);
+    const { registerOpenClawTools } = await load();
+    await registerOpenClawTools('u2');
+    expect([...recordAction.mock.calls, ...recordActionSafe.mock.calls].some((c) => String(c[0]?.action).includes('tool_definition_changed'))).toBe(false);
+    await registerOpenClawTools('owner-only');
+    expect(recordAction.mock.calls.some((c) => c[0].userId === 'owner-only' && String(c[0].action).includes('tool_definition_changed'))).toBe(true);
+  });
+});
+
 describe('L6: refresh race', () => {
   it('a concurrent refresh that rotated the token is picked up on re-read; a null expiresAt is valid', async () => {
     const first = activeRow({ expiresAt: new Date(Date.now() - 1000) });

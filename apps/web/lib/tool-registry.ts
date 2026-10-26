@@ -729,6 +729,8 @@ export function getGatewayDefHash(fullName: string): string | null {
 
 /** Last hash reported as differing from the reviewed one, per tool: one event per distinct hash. */
 const REPORTED_DEF_HASH = new Map<string, string>();
+/** Definition changes already written to the operator log only (the caller could not use the tool). */
+const LOGGED_DEF_HASH = new Map<string, string>();
 
 function neutralDescriptionsEnabled(): boolean {
   return process.env.OPENCLAW_NEUTRAL_DESCRIPTIONS?.trim().toLowerCase() !== 'false';
@@ -847,13 +849,17 @@ export async function registerOpenClawTools(userId: string): Promise<GatewayRegi
   // Phase 3: security events, after the maps are consistent.
   for (const p of plans) {
     if (!p.unreviewedChange || REPORTED_DEF_HASH.get(p.full) === p.hash) continue;
-    REPORTED_DEF_HASH.set(p.full, p.hash);
     const detail = `Gateway tool ${p.full} no longer matches its reviewed definition hash (now ${p.hash.slice(0, 12)}); treated as Class C`;
     // L1: an owner-only tool's change is operator news. It is never written to a non-owner's ledger.
+    // It is also not marked as reported here, so the owner's next request still ledgers it.
     if (!(await canUseGatewayTool(userId, p.full))) {
-      logger.security('tool_definition_changed', { tool: p.full, details: `${detail} (not ledgered: caller may not use this tool)` });
+      if (LOGGED_DEF_HASH.get(p.full) !== p.hash) {
+        LOGGED_DEF_HASH.set(p.full, p.hash);
+        logger.security('tool_definition_changed', { tool: p.full, details: `${detail} (not ledgered: caller may not use this tool)` });
+      }
       continue;
     }
+    REPORTED_DEF_HASH.set(p.full, p.hash);
     try {
       await logSecurityEvent(userId, 'tool_definition_changed', detail);
     } catch (e) {

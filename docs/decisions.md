@@ -371,3 +371,16 @@ The new `pnpm audit` job (security.yml) had never run: it failed at setup becaus
 - Upgraded `zod` 3.25.76 to 4.6.7 (high: memory exhaustion on oversized collections). The upgrade changed one behaviour that matters: `.partial()` now keeps a field's `.default()`, which would have reset a contact's tags on every update that did not mention them. The contact schemas now keep the default on the create schema only, with a regression test. No other `.partial()` exists in the codebase.
 - Result: audit exits clean at the high threshold; 3 low or moderate findings remain (csv-parse needs a major upgrade; tracked in pending tasks).
 
+## 2026-10-27: External agent review, findings checked against the code
+
+An outside agent scanned the branch and reported six findings. Each was checked in the code before any change.
+
+- F1 (gateway cache misattributes audit log and gives the owner Class C tools): the class claim is wrong. A tool's class comes from the reviewed allow-list, the definition hash and the protected-action check, never from the calling user. One smaller real gap: a non-owner request that triggered registration first marked an owner-only definition-change event as reported, so the owner's ledger never got it. Fixed with a separate log-only marker, with a test.
+- F2 (no rate limit on /api/tools/execute): real. Added a per-user bucket (60 per minute) and a 400 for non-JSON bodies. No in-app caller exists.
+- F3 (any model name reaches the operator's provider key): real. New lib/model-policy.ts: a requested or saved model must be on the allow-list (WHINK_ALLOWED_MODELS, else the picker's list plus DEFAULT_MODEL) or the user must hold their own key for that provider; otherwise the default is used and model_not_allowed is ledgered. Tested against the real chat route.
+- F4 (API key deletion unlogged, provider unvalidated): real, and storing a key was equally unlogged. Both now validate the provider and write a ledger row with the provider only, never key material.
+- F5 (history query not user-scoped): defence in depth, not a live bug (ownership is checked earlier). Scoped anyway; tested.
+- F6 (skill text stored in plaintext without ENCRYPTION_KEY): wrong. Storage throws unless the key is configured or SKILL_ALLOW_PLAINTEXT=true is set explicitly.
+
+Also noted: the report listed COEP among the security headers; the app sets COOP and CORP but not COEP.
+
