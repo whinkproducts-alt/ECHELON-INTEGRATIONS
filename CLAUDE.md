@@ -310,6 +310,7 @@ At the start of every Claude Code session:
 - Read `docs/daily-syncs/` — the most recent file is the current project state
 - Read `docs/decisions.md` — the dated decision log
 - Read `docs/learnings.md` — everything learnt building the app: Victor's preferences, the organisation, what exists, gotchas, open items
+- Read `docs/pending-tasks.md` — the list of everything still open, who it waits on
 - Read `/areas/whink-ai-assistant.md` from memory — long-term stated facts about this build
 
 The end-of-day-memory-sync scheduled task keeps all three in sync automatically.
