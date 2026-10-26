@@ -6,9 +6,10 @@ export const PASSWORD = process.env.E2E_PASSWORD || 'e2e-Test-Pass-1!';
 
 export async function login(page: Page, email: string, password = PASSWORD) {
   await page.goto('/login');
-  await page.getByPlaceholder('operator@whink.ai').fill(email);
-  await page.getByPlaceholder('••••••••').fill(password);
-  await page.getByRole('button', { name: 'Sign In' }).click();
+  // Labels and an exact button name, so the passkey button ("Sign in with a passkey") never matches.
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
 export async function loginAndWait(page: Page, email: string) {

@@ -1,4 +1,4 @@
-# Pending tasks (2026-10-26)
+# Pending tasks (updated 2026-10-27)
 
 Source of truth for what is open. Update it when something is done or decided. Read it at the start of every session.
 
@@ -12,24 +12,24 @@ Source of truth for what is open. Update it when something is done or decided. R
 7. GitHub settings only he can set: branch protection with required reviews, secret-scanning push protection, 2FA, signed commits; install the Claude GitHub App if he wants change requests picked up automatically.
 8. Confirm the board: bios, committees, and that the generated board emails exist; WHINK Ultimate and WhinkOS logos; Whink Predict logo.
 9. Run Victor's Phase 2 checklist (9 items in CLAUDE.md) on his Mac. A phase is not done until it passes for him.
-10. Decide whether to open a pull request for branch `claude/loving-archimedes-70hf66` (none is open).
+10. Merge `claude/loving-archimedes-70hf66` to `main` (Victor asked for this on 2026-10-27; waits on green CI).
 11. Set mail forwarding for whinkgroup.com at the mail provider once the domain exists.
 
 ## B. Proposed, not built (Victor said do not build until approved)
-- Forgot password (emailed one-time link and a local recovery command), change password screen, labelled Sign out, and a Sign out everywhere action. The first password-change route must call `bumpSessionVersion()`.
+- Change password screen and a Sign out everywhere action (forgot password is built: see docs/decisions.md 2026-10-27). The first password-change route must call `bumpSessionVersion()`; the reset flow already does, inside its transaction.
 - Installer for Windows or Mac (stage 1: start script plus browser install; stage 2: signed installer).
 - Agents drafting Change Requests for approval.
 - Hosting migration kit (Docker, Caddy, GitHub Actions deploy, backups, runbook) after A2.
 
 ## C. Requested earlier, not built
 - Edit the product websites from the app; update the company website from news and initiatives.
-- Real sending for email (SMTP), WhatsApp, Telegram and phone calls (stubs today); Gmail, Google Calendar and Drive adapters; Google Contacts sync.
+- Real sending for email: `lib/comms/delivery.ts` is still a stub, so password-reset mail does not leave the server. Needs `nodemailer` (MIT; Victor to approve) and SMTP_* values. Also WhatsApp, Telegram and phone calls (stubs today); Gmail, Google Calendar and Drive adapters; Google Contacts sync.
 - Video room (needs MEETING_PROVIDER_BASE_URL and a server).
 - Phase 3 Recall hardening (embedding dimensions, HNSW index, auto-memory path, AnythingLLM citations): planned, untouched.
 
 ## D. Built but unproven or unverified
-- Real-Postgres CI and Playwright e2e suite exist (.github/workflows/ci.yml, e2e/) but have never run. The builder hit the weekly account limit, which resets Oct 28 09:00 UTC; resume it then.
-- Nothing has run against a real database or a signed-in session; passkey, SMS and the new screens are untested in a real browser; phone width (390 px) not checked on every screen.
+- Real-Postgres CI runs on every push. As of 2026-10-27 typecheck, lint, `prisma migrate deploy` on Postgres 16 + pgvector, seed, unit tests and build pass in CI. The Playwright e2e step failed because the login helper clashed with the passkey button and the new login labels; the helper is fixed and public-page specs added (e2e/tests/public.spec.ts), result pending on the next run.
+- Migrations are proven on a throwaway CI database, but the app has not been used signed in by Victor; passkey, SMS and the new screens are untested in a real browser; phone width (390 px) checked only for the landing and auth pages (conversation and onboarding not rendered).
 - Twilio SMS never called against the real API.
 - The last round of fixes (taint allow-list, bootstrap token, migration changes, passkey ordering) had no third independent security review.
 - Not yet run: brand-guardian review of the new screens, compliance review (CASL, PIPEDA) of social, SMS and email, qa-engineer, ai-evaluator, performance benchmarks (Phase 2e E3 to E7).
@@ -41,3 +41,10 @@ Source of truth for what is open. Update it when something is done or decided. R
 - Approved contact messages by non-SMS channels are stubs; old lib/twilio-adapter.ts remains; the automated briefing reminder still needs BRIEFING_SMS_TO and BRIEFING_REPORTS_DIR.
 - Animated avatars keep the approved portraits; the white-background WHINK and MAMBA images are for the Board Room only.
 - Render has duplicate services (wpma and Wpma, whinkpredict and whink-bet): tidy after the hosting move.
+
+## F. Added 2026-10-27
+- Product-tour screenshots on the landing page show sample-data tells ("Dev", a fake phone number, "Fixture"); recapture with curated demo data before any public release.
+- Terms and Privacy are internal drafts; legal review before external release. Contact address comes from tenant config (`legalContactEmail`).
+- Per-email reset throttle can be used to annoy a victim (3 per 15 min); add a "check again in 5 minutes" hint and an owner alert when SMTP exists.
+- The standalone `openclaw-jarvis` repo (a copy of the open-source OpenClaw) has no approval step for posting; it defaults to exec security `full`, ask `off`. Keep social logins and credentials away from it, or route posting through WHINK's gateway.
+
