@@ -58,7 +58,7 @@ describe('tool loop: usage recording and offline fallback wiring', () => {
     const calls: Array<{ url: string; headers: string }> = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation((async (url: string, init?: { headers?: unknown; body?: string }) => {
       calls.push({ url: String(url), headers: JSON.stringify(init?.headers ?? {}) });
-      if (String(url).startsWith('https://api.cloudllm.example')) {
+      if (new URL(String(url)).hostname === 'api.cloudllm.example') {
         if (String(url).endsWith('/v1')) throw new Error('offline'); // probe of the cloud host fails
         throw new Error('must not call cloud chat when offline');
       }
@@ -71,7 +71,7 @@ describe('tool loop: usage recording and offline fallback wiring', () => {
     expect(chat.url).toBe('http://127.0.0.1:11434/v1/chat/completions');
     expect(chat.headers).not.toContain('sk-user-cloud-key');
     expect(chat.headers).not.toContain('sk-cloud-env-key');
-    expect(calls.some((c) => c.url.startsWith('https://api.cloudllm.example') && c.url.endsWith('/chat/completions'))).toBe(false);
+    expect(calls.some((c) => new URL(c.url).hostname === 'api.cloudllm.example' && c.url.endsWith('/chat/completions'))).toBe(false);
     expect(events.some((e) => e.type === 'text' && e.content === 'local')).toBe(true);
   });
 });

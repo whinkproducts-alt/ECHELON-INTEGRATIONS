@@ -154,7 +154,7 @@ describe('offline routing', () => {
     process.env.WHINK_LOCAL_MODEL = 'qwen2.5:7b';
     db.userPreference.findUnique.mockResolvedValue(null);
     db.usageEvent.aggregate.mockResolvedValue({ _sum: {} });
-    __setProbeFetch(async (url) => { if (url.startsWith('https://cloud.test')) throw new Error('offline'); return { status: 200 }; });
+    __setProbeFetch(async (url) => { if (new URL(url).hostname === 'cloud.test') throw new Error('offline'); return { status: 200 }; });
     const r = await applyOfflineFallback({ userId: 'uA', model: 'claude-x', apiKey: 'byok', correlationId: 'c1' });
     expect(r).toEqual({ model: 'qwen2.5:7b', apiKey: undefined, baseUrl: 'http://127.0.0.1:11434/v1', fellBack: true, reason: 'offline' });
     expect(recordActionSafe).toHaveBeenCalledWith(expect.objectContaining({ userId: 'uA', action: 'model_fallback_local', correlationId: 'c1' }));
@@ -189,10 +189,10 @@ describe('offline routing', () => {
     process.env.ANTHROPIC_BASE_URL = 'https://cloud.test'; process.env.OLLAMA_URL = 'http://127.0.0.1:11434';
     db.userPreference.findUnique.mockResolvedValue(null);
     db.usageEvent.aggregate.mockResolvedValue({ _sum: {} });
-    __setProbeFetch(async (url) => { if (url.startsWith('https://cloud.test')) throw new Error('offline'); return { status: 200 }; });
+    __setProbeFetch(async (url) => { if (new URL(url).hostname === 'cloud.test') throw new Error('offline'); return { status: 200 }; });
     expect((await applyOfflineFallback({ userId: 'uA', model: 'claude-x' })).baseUrl).toBe('http://127.0.0.1:11434/v1');
     process.env.OLLAMA_URL = 'https://ollama.attacker.example';
-    __setProbeFetch(async (url) => { if (url.startsWith('https://cloud.test')) throw new Error('offline'); return { status: 200 }; });
+    __setProbeFetch(async (url) => { if (new URL(url).hostname === 'cloud.test') throw new Error('offline'); return { status: 200 }; });
     const r = await applyOfflineFallback({ userId: 'uA', model: 'claude-x', apiKey: 'byok' });
     expect(r).toMatchObject({ fellBack: false, model: 'claude-x' });
   });

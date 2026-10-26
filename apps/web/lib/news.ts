@@ -4,6 +4,8 @@
  * (keeps the dependency list MIT/Apache only). Everything parsed here is untrusted text.
  */
 
+import { htmlToText } from '@/lib/html-text';
+
 export interface NewsItem { title: string; link: string; pubDate: string; source: string; excerpt: string }
 
 /** Category to feed map used by GET /api/news. Unknown categories fall back to `all`. */
@@ -55,9 +57,9 @@ export function parseRss(text: string, url: string): NewsItem[] {
     const link = (item.match(/<link>(.*?)<\/link>/)?.[1]
       ?? item.match(/<guid>(https?:\/\/[^<]+)<\/guid>/)?.[1] ?? '').trim();
     const pubDate = (item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] ?? '').trim();
-    const excerpt = (item.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/s)?.[1]
-      ?? item.match(/<description>(.*?)<\/description>/s)?.[1] ?? '')
-      .replace(/<[^>]+>/g, '').slice(0, 180).trim();
+    const excerptRaw = item.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/s)?.[1]
+      ?? item.match(/<description>(.*?)<\/description>/s)?.[1] ?? '';
+    const excerpt = htmlToText(excerptRaw, { separator: '', maxChars: 180 });
     if (title && link) out.push({ title, link, pubDate, source: sourceName, excerpt });
   }
   return out;

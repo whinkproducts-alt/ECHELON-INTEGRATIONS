@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { htmlToText } from '@/lib/html-text';
 import { generateCorrelationId, logger } from '@/lib/logger';
 import { recordAction, recordActionSafe, updateActionStatus, type LedgerEntry } from '@/lib/ledger';
 
@@ -369,12 +370,7 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
       }
     }
     // Strip HTML tags for readability
-    const plain = raw
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
+    const plain = htmlToText(raw);
     return { success: true, data: plain, source: url, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
