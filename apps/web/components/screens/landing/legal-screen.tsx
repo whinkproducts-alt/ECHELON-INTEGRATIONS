@@ -2,12 +2,12 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
-import { LEGAL_CONTACT_EMAIL, LEGAL_DRAFT_NOTICE, LEGAL_LAST_UPDATED, PRIVACY, TERMS, type LegalDoc } from './legal-content';
+import { LEGAL_DRAFT_NOTICE, LEGAL_LAST_UPDATED, PRIVACY, TERMS, type LegalDoc } from './legal-content';
 
 export function LegalScreen({ doc }: { doc: 'terms' | 'privacy' }) {
-  const { productName, companyName, studioName } = useTenantConfig();
+  const { productName, companyName, studioName, legalContactEmail } = useTenantConfig();
   const d: LegalDoc = doc === 'terms' ? TERMS : PRIVACY;
-  const values: Record<string, string> = { product: productName, company: companyName, studio: studioName, contact: LEGAL_CONTACT_EMAIL };
+  const values: Record<string, string> = { product: productName, company: companyName, studio: studioName, contact: legalContactEmail };
   const fill = (s: string) => s.replace(/\{(product|company|studio|contact)\}/g, (_m, k: string) => values[k]);
   const other = doc === 'terms' ? { href: '/privacy', label: 'Privacy policy' } : { href: '/terms', label: 'Terms of use' };
   return (

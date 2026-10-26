@@ -10,10 +10,20 @@
  * - HSTS only when the configured public URL is https (browsers ignore it over http anyway).
  * - X-Frame-Options DENY backs up CSP frame-ancestors 'none' for old browsers.
  */
-export function securityHeaders(opts: { https: boolean }): Record<string, string> {
+/** Pages whose URL carries a one-time token: no Referer is ever sent from them. */
+const NO_REFERRER_PATHS: ReadonlySet<string> = new Set(['/reset-password', '/forgot-password']);
+
+export function wantsNoReferrer(pathname: string | undefined): boolean {
+  if (!pathname) return false;
+  let p = pathname;
+  try { p = decodeURIComponent(pathname); } catch { /* keep the raw path */ }
+  return NO_REFERRER_PATHS.has(p.replace(/\/+$/, '').toLowerCase());
+}
+
+export function securityHeaders(opts: { https: boolean; pathname?: string }): Record<string, string> {
   const h: Record<string, string> = {
     'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Referrer-Policy': wantsNoReferrer(opts.pathname) ? 'no-referrer' : 'strict-origin-when-cross-origin',
     'Permissions-Policy': 'camera=(self), microphone=(self), geolocation=(), payment=(), usb=()',
     'X-Frame-Options': 'DENY',
     'Cross-Origin-Opener-Policy': 'same-origin',
@@ -23,7 +33,7 @@ export function securityHeaders(opts: { https: boolean }): Record<string, string
   return h;
 }
 
-export function applySecurityHeaders(res: Response, opts: { https: boolean }): void {
+export function applySecurityHeaders(res: Response, opts: { https: boolean; pathname?: string }): void {
   for (const [k, v] of Object.entries(securityHeaders(opts))) res.headers.set(k, v);
 }
 

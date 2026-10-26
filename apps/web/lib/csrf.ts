@@ -40,7 +40,10 @@ function originOf(url: string | null): string | null {
 export function checkCsrf(input: CsrfInput): CsrfResult {
   const method = input.method.toUpperCase();
   if (!STATE_CHANGING_METHODS.has(method)) return { ok: true };
-  const p = input.pathname;
+  // Match on the decoded, normalised path so an encoded segment cannot dodge the checks below.
+  let p = input.pathname;
+  try { p = decodeURIComponent(p); } catch { /* an undecodable path is checked as written, which is the stricter side */ }
+  p = p.replace(/\/{2,}/g, '/');
   if (p !== '/api' && !p.startsWith('/api/')) return { ok: true };
   // Only NextAuth's own catch-all is left to NextAuth (it has its own CSRF token). Our passkey and
   // password routes are plain fetches from our pages, which always send Sec-Fetch-Site or Origin.

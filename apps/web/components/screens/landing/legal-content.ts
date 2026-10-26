@@ -4,8 +4,6 @@
 
 export const LEGAL_DRAFT_NOTICE = 'Internal draft. Not legal advice. To be reviewed before external release.';
 export const LEGAL_LAST_UPDATED = '2026-10-26';
-/** Staff email standard: firstname.lastname at the group domain. Confirm before release. */
-export const LEGAL_CONTACT_EMAIL = 'victor.igboekwe@whinkgroup.com';
 
 export interface LegalSection { heading: string; paragraphs?: string[]; bullets?: string[] }
 export interface LegalDoc { title: string; intro: string; sections: LegalSection[] }

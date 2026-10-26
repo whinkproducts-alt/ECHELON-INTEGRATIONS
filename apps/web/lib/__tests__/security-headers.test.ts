@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { securityHeaders } from '../security-headers';
+import { securityHeaders, applySecurityHeaders, wantsNoReferrer } from '../security-headers';
 
 describe('securityHeaders', () => {
   it('sets the required headers', () => {
@@ -44,5 +44,21 @@ describe('proxy.ts applies headers and rate limits', () => {
       }))).status;
     }
     expect(last).toBe(429);
+  });
+
+  it('sends no Referer from the token pages, including encoded and trailing-slash forms, and only there', () => {
+    for (const p of ['/reset-password', '/reset-password/', '/forgot-password', '/%72eset-password', '/RESET-PASSWORD']) {
+      expect(wantsNoReferrer(p)).toBe(true);
+      expect(securityHeaders({ https: false, pathname: p })['Referrer-Policy']).toBe('no-referrer');
+    }
+    for (const p of ['/', '/login', '/dashboard', '/reset-password-help', undefined]) {
+      expect(securityHeaders({ https: false, pathname: p })['Referrer-Policy']).toBe('strict-origin-when-cross-origin');
+    }
+  });
+
+  it('applySecurityHeaders overwrites any earlier Referrer-Policy with the per-page one', () => {
+    const res = new Response('x', { headers: { 'Referrer-Policy': 'strict-origin-when-cross-origin' } });
+    applySecurityHeaders(res, { https: false, pathname: '/reset-password' });
+    expect(res.headers.get('Referrer-Policy')).toBe('no-referrer');
   });
 });

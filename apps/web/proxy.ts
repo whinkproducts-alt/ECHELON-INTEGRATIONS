@@ -16,7 +16,7 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
   const https = isHttpsDeployment(process.env.AUTH_URL ?? process.env.NEXTAUTH_URL);
   const res = await handle(req, nonce, csp);
   res.headers.set('Content-Security-Policy', csp);
-  applySecurityHeaders(res, { https });
+  applySecurityHeaders(res, { https, pathname: req.nextUrl.pathname });
   return res;
 });
 

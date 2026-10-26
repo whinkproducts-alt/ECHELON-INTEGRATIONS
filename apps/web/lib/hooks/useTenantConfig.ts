@@ -31,6 +31,8 @@ export interface TenantConfig {
   studioName: string;
   acronymExpansion: string;
   tagline: string;
+  /** Contact address shown on the Terms and Privacy pages. */
+  legalContactEmail: string;
   logoUrl: string | null;
   /** Tenant-supplied accent. Null means "use the design token"; no colour lives in code. */
   accentColor: string | null;
@@ -76,6 +78,7 @@ const DEFAULT_CONFIG: TenantConfig = {
   studioName: tenantDefaults.studioName,
   acronymExpansion: tenantDefaults.acronymExpansion,
   tagline: tenantDefaults.tagline,
+  legalContactEmail: tenantDefaults.legalContactEmail,
   logoUrl: null,
   accentColor: null,
   supportUrl: null,
@@ -120,6 +123,7 @@ export function useTenantConfig(): TenantConfig {
           studioName: data.studioName ?? DEFAULT_CONFIG.studioName,
           acronymExpansion: data.acronymExpansion ?? DEFAULT_CONFIG.acronymExpansion,
           tagline: data.tagline ?? DEFAULT_CONFIG.tagline,
+          legalContactEmail: data.legalContactEmail ?? DEFAULT_CONFIG.legalContactEmail,
           logoUrl: data.logoUrl ?? null,
           accentColor: data.accentColor ?? null,
           supportUrl: data.supportUrl ?? null,
