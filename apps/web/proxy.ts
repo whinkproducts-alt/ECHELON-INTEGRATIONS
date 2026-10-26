@@ -61,7 +61,7 @@ async function handle(req: NextRequest & { auth: any }, nonce: string, csp: stri
   // Public paths — no redirect
   const publicPaths = ['/login', '/signup', '/api/auth', '/manifest.webmanifest'];
   // Exact public API endpoints (no prefix match).
-  const publicExact = ['/api/signup'];
+  const publicExact = ['/api/signup', '/api/signup/status'];
   if (publicExact.includes(pathname) || publicPaths.some((p) => pathname.startsWith(p))) {
     return passThrough();
   }

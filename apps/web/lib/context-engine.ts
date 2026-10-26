@@ -129,6 +129,7 @@ export async function assembleContext(
       const entry = wrapUntrustedContent(raw, 'memory_episode', ep.id);
       if (budget - entry.length > 0) {
         result.episodicMemories.push(entry);
+        if (isTaintingSourceType((ep as { source?: string | null }).source)) result.externalContentThisTurn = true;
         budget -= entry.length;
       }
     }
@@ -138,6 +139,7 @@ export async function assembleContext(
       const entry = wrapUntrustedContent(raw, 'hypothesis', h.id);
       if (budget - entry.length > 0) {
         result.hypotheses.push(entry);
+        if (isTaintingSourceType((h as { source?: string | null }).source)) result.externalContentThisTurn = true;
         budget -= entry.length;
       }
     }
@@ -244,6 +246,7 @@ export async function assembleContext(
       const entry = wrapUntrustedContent(raw, 'memory_episode', ep.id);
       if (budget - entry.length > 0) {
         result.episodicMemories.push(entry);
+        if (isTaintingSourceType((ep as { source?: string | null }).source)) result.externalContentThisTurn = true;
         budget -= entry.length;
       }
     }
@@ -280,6 +283,7 @@ export async function assembleContext(
       const entry = wrapUntrustedContent(raw, 'hypothesis', h.id);
       if (budget - entry.length > 0) {
         result.hypotheses.push(entry);
+        if (isTaintingSourceType((h as { source?: string | null }).source)) result.externalContentThisTurn = true;
         budget -= entry.length;
       }
     }

@@ -80,4 +80,36 @@ describe('SIGNUP_ENABLED', () => {
     const { isOwnerEmail } = await import('@/lib/owner');
     expect(isOwnerEmail('WhinkProducts@Gmail.com', { WHINK_OWNER_EMAILS: 'whinkproducts@gmail.com' })).toBe(true);
   });
+
+  describe('bootstrap token', () => {
+    const callWith = async (token?: string) => {
+      const { POST } = await import('@/app/api/signup/route');
+      return POST(new Request('http://localhost/api/signup', { method: 'POST', body: JSON.stringify({ email: 'a@b.co', password: 'pw', bootstrapToken: token }) }) as never);
+    };
+    it('first account needs the token when set; wrong or missing is a generic 403', async () => {
+      vi.stubEnv('SIGNUP_BOOTSTRAP_TOKEN', 'tok-123');
+      count.mockResolvedValue(0);
+      expect((await callWith()).status).toBe(403);
+      expect((await callWith('tok-12')).status).toBe(403);
+      expect((await callWith('tok-124')).status).toBe(403);
+      expect(create).not.toHaveBeenCalled();
+      expect(security).toHaveBeenCalled();
+      expect((await callWith('tok-123')).status).toBe(200);
+    });
+    it('is not asked for once users exist and signup is open', async () => {
+      vi.stubEnv('SIGNUP_BOOTSTRAP_TOKEN', 'tok-123');
+      vi.stubEnv('SIGNUP_ENABLED', 'true');
+      count.mockResolvedValue(2);
+      expect((await callWith()).status).toBe(200);
+    });
+    it('status endpoint reports only open and needsBootstrapToken', async () => {
+      vi.stubEnv('SIGNUP_BOOTSTRAP_TOKEN', 'tok-123');
+      count.mockResolvedValue(0);
+      const { GET } = await import('@/app/api/signup/status/route');
+      const j = await (await GET(new Request('http://localhost/api/signup/status'))).json();
+      expect(j).toEqual({ open: true, needsBootstrapToken: true });
+      count.mockResolvedValue(1);
+      expect(await (await GET(new Request('http://localhost/api/signup/status'))).json()).toEqual({ open: false, needsBootstrapToken: false });
+    });
+  });
 });

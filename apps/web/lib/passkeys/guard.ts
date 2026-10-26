@@ -32,9 +32,14 @@ export async function passkeyLimit(req: Request, userId?: string | null): Promis
   return limited ? new NextResponse(limited.body, { status: 429, headers: limited.headers }) : null;
 }
 
-/** Client key for cap buckets: trusted address or the shared route bucket. */
-export function challengeBucket(req: Request): string {
-  return `a:${clientKey(req.headers) ?? 'route'}`;
+/**
+ * Client key for the open-challenge cap. Null when no trustworthy client address exists (no
+ * TRUSTED_PROXY_HOPS): a shared bucket would let one attacker lock everyone out, so the cap is
+ * skipped and the per-route rate limit plus cleanup bound the table instead.
+ */
+export function challengeBucket(req: Request): string | null {
+  const k = clientKey(req.headers);
+  return k ? `a:${k}` : null;
 }
 
 export function loadConfig(): { cfg: WebAuthnConfig } | { response: NextResponse } {

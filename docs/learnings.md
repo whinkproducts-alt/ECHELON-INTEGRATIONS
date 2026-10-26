@@ -114,3 +114,17 @@ Open items added by this batch:
 - Victor to decide: the SMS briefing (approve each, treat his verified number as inside his account, or leave blocked), the Playwright e2e interpretation of D9, and the contract fields.
 - Victor to do: set `WHINK_OWNER_EMAILS`, set `WEBAUTHN_*`, configure `DEFAULT_MODEL` or `SKILL_PIPELINE_MODEL`, set mail forwarding for whinkgroup.com at the provider, install the Claude GitHub App if he wants issue pickup, provide the WHINK Ultimate URL, run `npx prisma migrate dev`, run `pnpm worker` on the Mac Mini with `WORKER_ENABLED=true`.
 
+## 11. Security review rounds on the second batch (2026-10-26)
+
+- Two independent reviews of the second batch found no critical issues. Round 1 blocked on a high: skill text beyond the 24,000 character model window could be stored although no model had read it. Fix pattern: never store text a reviewer did not see; reject over-limit input at intake and enforce it again in the writer.
+- Patterns that recurred and are now rules of thumb for this repo:
+  - Any state machine that two runners can touch needs an owner or lease in the WHERE clause of every write, not only a status check (skills pipeline, swarm tasks). Staleness must be measured from a heartbeat, not from when work was queued.
+  - Recalled memory must taint the turn by default. Use an allow-list of trusted memory sources, not a block-list of bad ones, because every new feature adds a new source (skill_upload, news, swarm, worker_brief).
+  - A global setting that rewrites per-account behaviour (staff mail routing) must be conditional on the account, or it leaks across accounts.
+  - Owner-by-email needs normalised emails (trim, lowercase) everywhere and a safe first-account rule, because signup does not verify email ownership. Fresh installs should set `SIGNUP_BOOTSTRAP_TOKEN`.
+  - Credential changes (adding or removing a passkey, changing a password) must require fresh re-authentication and bump a session version so stolen sessions die. The app still has no password-change route; the first one must call `bumpSessionVersion()`.
+  - Budget checks must count other in-flight runs, or parallel starts bypass the cap.
+  - A scanner allow-list must match exact strings, never whole files.
+- Migration policy: several migrations were edited in place after being pushed (passkeys, skill submissions, swarm, change requests). That is only safe because no database had applied them. Once Victor runs `prisma migrate` anywhere, pushed migrations are immutable: add a new migration for every change. If a database applied an earlier commit of this branch it must be reset before applying the latest.
+- Open after round 2: the e2e suite and real-Postgres CI have never run (builder blocked by the weekly account limit until Oct 28 09:00 UTC); a "sign out everywhere" action does not exist; session-version cache can lag up to 15 seconds across processes.
+

@@ -6,6 +6,19 @@ import { decryptKey, encryptKey, isEncryptionConfigured } from '@/lib/key-encryp
 export interface ValidFile { filename: string; name: string; ext: string; text: string; sha256: string; sizeBytes: number }
 export type FileCheck = { ok: true; file: ValidFile } | { ok: false; error: string; tooLong?: boolean };
 
+/** Outsider-controlled label: strip control chars, brackets, quotes and backticks, collapse whitespace, cap. */
+export function sanitizeSkillName(raw: string, max = 80): string {
+  const cleaned = raw
+    .normalize('NFKC')
+    .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, ' ')
+    .replace(/[\[\]{}<>()"'`\u2018\u2019\u201C\u201D]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max)
+    .trim();
+  return cleaned || 'uploaded skill';
+}
+
 export function sanitizeFilename(raw: string): string {
   const base = (raw.split(/[\\/]/).pop() ?? '').replace(/[\u0000-\u001F\u007F‪-‮⁦-⁩]/g, '').trim();
   return base.slice(0, 200);
@@ -58,7 +71,7 @@ export function checkFile(rawName: string, bytes: Uint8Array): FileCheck {
     if (problem) return { ok: false, error: `File is not valid YAML: ${problem}` };
   }
   const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
-  const name = filename.slice(0, dot > 0 ? dot : undefined).replace(/\s+/g, ' ').trim().slice(0, 120) || 'skill';
+  const name = sanitizeSkillName(filename.slice(0, dot > 0 ? dot : undefined));
   return { ok: true, file: { filename, name, ext, text, sha256, sizeBytes: bytes.byteLength } };
 }
 

@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   void maybeCleanupChallenges();
   const bucket = reauthUser ? `u:${reauthUser}` : challengeBucket(req);
   const purpose = reauthUser ? 'reauth' : 'login';
-  if (await tooManyOpenChallenges(bucket, purpose)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  if (bucket && (await tooManyOpenChallenges(bucket, purpose))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
   // No allowCredentials: discoverable credentials, so no email is needed.
   const options = await generateAuthenticationOptions({ rpID: cfg.cfg.rpID, userVerification: 'required' });

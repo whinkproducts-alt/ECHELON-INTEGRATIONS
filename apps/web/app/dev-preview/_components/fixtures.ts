@@ -246,6 +246,7 @@ export function answer(method: string, url: URL, body: unknown, ctx: MockCtx): M
     const r = report(pd[1]);
     return { status: 200, body: { ...r.project, tasks: r.tasks.map((t) => ({ id: t.id, title: t.title, status: t.status })), risks: r.risks, openQuestions: r.openQuestions, decisions: r.decisions } };
   }
+  if (p === '/api/signup/status') return { status: 200, body: { open: !empty, needsBootstrapToken: !empty } };
   if (p === '/api/recommendations') {
     return { status: 200, body: { items: empty ? [] : [
       { id: 'rec_fixture_0001', source: 'Fixture Scout', kind: 'project_stalled', title: 'Fixture project has not moved in 9 days', body: 'Placeholder text. A made-up milestone is overdue.', link: '/dashboard/companies', severity: 'warning', createdAt: '2026-10-25T09:00:00.000Z' },

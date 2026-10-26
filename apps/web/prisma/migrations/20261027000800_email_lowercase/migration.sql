@@ -1,14 +1,17 @@
--- Normalise emails to lower(trim()). Only rows whose normalised form is unique are updated,
--- so a case-variant duplicate pair is left untouched for a human to merge.
-UPDATE "users" u
-SET "email" = lower(trim(u."email"))
-WHERE u."email" <> lower(trim(u."email"))
-  AND (SELECT count(*) FROM "users" x WHERE lower(trim(x."email")) = lower(trim(u."email"))) = 1;
-
--- Case-insensitive uniqueness. Created only when no duplicates remain, so the migration cannot fail on old data.
+-- Fail loudly if two accounts differ only by email case or spacing. Counts only, never emails.
 DO $$
+DECLARE dup_groups integer;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM "users" GROUP BY lower("email") HAVING count(*) > 1) THEN
-    CREATE UNIQUE INDEX IF NOT EXISTS "users_email_lower_key" ON "users" (lower("email"));
+  SELECT count(*) INTO dup_groups FROM (
+    SELECT 1 FROM "users" GROUP BY lower(trim("email")) HAVING count(*) > 1
+  ) d;
+  IF dup_groups > 0 THEN
+    RAISE EXCEPTION 'email_lowercase: % group(s) of accounts share an email that differs only by case or spacing. Merge or delete the duplicate accounts, then re-run the migration.', dup_groups;
   END IF;
 END $$;
+
+-- Safe now: every normalised email is unique.
+UPDATE "users" SET "email" = lower(trim("email")) WHERE "email" <> lower(trim("email"));
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_email_lower_key" ON "users" (lower("email"));

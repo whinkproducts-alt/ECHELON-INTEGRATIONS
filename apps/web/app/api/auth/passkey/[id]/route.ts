@@ -32,12 +32,12 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
   if (re === 'limited') return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   if (re === 'denied') return NextResponse.json({ error: 'Re-authentication failed' }, { status: 403 });
 
+  await bumpSessionVersion(u.userId); // before the delete, same reason as register
   const res = await prisma.passkeyCredential.deleteMany({ where: { id, userId: u.userId } });
   if (res.count !== 1) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   await ledgerPasskey(u.userId, 'passkey_removed', 'EXECUTED', { passkeyId: id });
   await passkeySecurityEvent(u.userId, 'credential_removed', { passkeyId: id, kind: 'passkey' }, 'EXECUTED');
   const remember = ((await auth())?.user as { remember?: boolean } | undefined)?.remember === true;
-  await bumpSessionVersion(u.userId);
   const ticket = await mintLoginTicket(u.userId, remember);
   return NextResponse.json({ ok: true, ticket, expiresInSeconds: 60 }, { headers: { 'cache-control': 'no-store' } });
 }

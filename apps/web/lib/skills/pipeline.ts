@@ -18,7 +18,7 @@ import config from '@/config/skill-pipeline.json';
 import { scanSkill, isBlocking, type ScanReport } from './scanner';
 import { pickCommittee, pickSecurityAgent } from './agents';
 import { ModelStageError, pipelineModel, reviewedText, runDirectorVote, runSecurityReview, type DirectorVote, type SecurityVerdict } from './model';
-import { packContent, unpackContent } from './intake';
+import { packContent, sanitizeSkillName, unpackContent } from './intake';
 import { SKILL_SOURCE_TYPE } from './labels';
 
 export type SkillStatus =
@@ -83,7 +83,7 @@ export async function enqueueSubmission(
   try {
     const row = await prisma.skillSubmission.create({
       data: {
-        userId, name: file.name, filename: file.filename, sha256: file.sha256, sizeBytes: file.sizeBytes,
+        userId, name: sanitizeSkillName(file.name), filename: file.filename, sha256: file.sha256, sizeBytes: file.sizeBytes,
         status: 'QUEUED', content: packContent(file.text), memoryIds: [],
       },
       select: { id: true },
@@ -157,12 +157,14 @@ async function acceptIntoMemory(userId: string, id: string, name: string, filena
   const perm = await checkPermission(userId, 'skill_memory_write', 'A', corr, { params: { submission: id } });
   if (!perm.allowed) throw new Error('skill_memory_write was not permitted');
 
-  const summary = cleanForMemory(`Summary of skill "${name}" (${filename}): ${sumReasons(votes)}`);
+  const safeName = sanitizeSkillName(name);
+  const safeFile = sanitizeSkillName(filename, 120);
+  const summary = cleanForMemory(`Summary of skill "${safeName}" (${safeFile}): ${sumReasons(votes)}`);
   // Only text a model saw may be stored. The tail beyond the review window is never chunked.
   const text = reviewedText(fullText);
   const chunks = chunkText(cleanForMemory(text));
   if (text.length > config.maxModelChars) throw new Error('memory content exceeds reviewed text');
-  const statements = [summary, ...chunks.map((c, i) => cleanForMemory(`Skill "${name}" part ${i + 1} of ${chunks.length}: ${c}`))]
+  const statements = [summary, ...chunks.map((c, i) => cleanForMemory(`Skill "${safeName}" part ${i + 1} of ${chunks.length}: ${c}`))]
     .map((s) => `Uploaded skill (untrusted reference): ${s}`.slice(0, 2000));
 
   const ids: string[] = [];

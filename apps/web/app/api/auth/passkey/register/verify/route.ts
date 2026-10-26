@@ -55,6 +55,8 @@ export async function POST(req: Request) {
   const taken = await prisma.passkeyCredential.findUnique({ where: { credentialId: info.credential.id }, select: { id: true } });
   if (taken) return NextResponse.json({ error: 'Passkey already registered' }, { status: 409 });
 
+  // Revoke other sessions FIRST: if this throws, no credential was added. (Bump clears the local cache.)
+  await bumpSessionVersion(u.userId);
   const row = await prisma.passkeyCredential.create({
     data: {
       userId: u.userId,
@@ -73,7 +75,6 @@ export async function POST(req: Request) {
   // Adding a credential signs out every session of this user, including this one. Hand back a
   // one-time ticket so the client can sign straight back in with signIn('passkey', { ticket }).
   const remember = ((await auth())?.user as { remember?: boolean } | undefined)?.remember === true;
-  await bumpSessionVersion(u.userId);
   const ticket = await mintLoginTicket(u.userId, remember);
   return NextResponse.json(
     { passkey: { id: row.id, deviceName: row.deviceName, createdAt: row.createdAt }, ticket, expiresInSeconds: 60 },

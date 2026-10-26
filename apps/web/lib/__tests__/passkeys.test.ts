@@ -412,4 +412,23 @@ describe('re-authentication, session version, cleanup, caps', () => {
     const r = await loginOptions(req('/api/auth/passkey/login/options', {}));
     expect(r.status).toBe(200); // different bucket (route) is unaffected
   });
+
+  it('open-challenge cap applies only when a trusted client key exists', async () => {
+    const mk = (xff?: string) => new Request('http://localhost:3000/api/auth/passkey/login/options', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', ...(xff ? { 'x-forwarded-for': xff } : {}) },
+      body: '{}',
+    });
+    for (let i = 0; i < MAX_OPEN_CHALLENGES; i++) await issueChallenge('login', 'x', { clientKey: 'a:9.9.9.9' });
+    for (let i = 0; i < MAX_OPEN_CHALLENGES; i++) await issueChallenge('login', 'x', { clientKey: 'a:route' });
+    // no trusted proxy: cap skipped even though the shared bucket is full
+    expect((await loginOptions(mk('9.9.9.9'))).status).toBe(200);
+    process.env.TRUSTED_PROXY_HOPS = '1';
+    try {
+      expect((await loginOptions(mk('9.9.9.9'))).status).toBe(429);
+      expect((await loginOptions(mk('8.8.8.8'))).status).toBe(200);
+    } finally {
+      delete process.env.TRUSTED_PROXY_HOPS;
+    }
+  });
 });
