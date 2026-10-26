@@ -3,14 +3,7 @@
 const path = require('path');
 
 const nextConfig = {
-  // TypeScript type-checking is disabled for production builds in this CI environment
-  // because `prisma generate` cannot download its engine binary through the network proxy.
-  // Without a generated client, new Prisma models (AgentKnowledge, TaskHandoff) are unknown
-  // types, causing spurious TS2305 errors. Run `prisma generate` locally before merging to
-  // verify types are correct. All business logic is covered by the vitest suite.
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // Type errors fail the build (typecheck: `pnpm typecheck`). Run `prisma generate` first.
   // Next 16 builds with Turbopack by default. An explicit (empty) turbopack key tells Next the
   // custom webpack hook below is known, so the build does not abort on the conflict.
   turbopack: {},

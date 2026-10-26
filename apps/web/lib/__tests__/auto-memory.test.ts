@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Minimal mocks for a happy-path run. Override individual fns per test. */
-function buildMocks(overrides: Record<string, unknown> = {}) {
+function buildMocks(overrides: Record<string, Record<string, unknown>> = {}) {
   const chatOnce = vi.fn().mockResolvedValue('[]');
   const writeMemory = vi.fn().mockResolvedValue({ id: 'mem-1', deduped: false });
   const checkPermission = vi.fn().mockResolvedValue({ allowed: true, method: 'auto' });
@@ -39,7 +39,7 @@ function buildMocks(overrides: Record<string, unknown> = {}) {
     ...overrides['@/lib/permission-engine'],
   }));
   vi.doMock('@/lib/ledger', () => ({ recordActionSafe, ...overrides['@/lib/ledger'] }));
-  vi.doMock('@/lib/db', () => ({ prisma: { ...prisma, ...((overrides['@/lib/db'] as any)?.prisma ?? {}) } }));
+  vi.doMock('@/lib/db', () => ({ prisma: { ...prisma, ...((overrides['@/lib/db']?.prisma as Record<string, unknown> | undefined) ?? {}) } }));
   vi.doMock('@/lib/logger', () => ({
     logger: { error: vi.fn(), info: vi.fn(), security: vi.fn(), warn: vi.fn() },
   }));

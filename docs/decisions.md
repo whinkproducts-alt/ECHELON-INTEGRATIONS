@@ -314,3 +314,37 @@ Decision: long-term project knowledge is written to `docs/learnings.md`, `docs/d
 Alternatives: keep knowledge only in chat history.
 Reason: sessions end and containers are ephemeral; the repo is the only store every session reads.
 
+## 2026-10-26 Type errors now fail the build
+Decision: `npx tsc --noEmit` is clean and `typescript.ignoreBuildErrors` is removed from `next.config.js`; `pnpm typecheck` runs `tsc --noEmit`. Root causes were fixed with correct types: route `params` is a Promise in Next 16, the memory list now selects real columns (`sourceType`, `category`, `details`; the old `source` and `steps` selects would have thrown at runtime) and keeps the `source` response field, `initiator` is typed `'user' | 'system' | 'automation'`.
+Alternatives: keep ignoring errors because the Prisma engine download was blocked in CI.
+Reason: the ignore flag hid real runtime bugs. Next 16 has no eslint-in-build option, so lint is enforced by `pnpm lint` in CI only.
+
+## 2026-10-26 Durable rate limiter in Postgres
+Decision: `PostgresRateLimitStore` (`lib/rate-limit-postgres.ts`) behind the existing `RateLimitStore` interface; table `rate_limit_buckets (key, windowStart, count)`; fixed window via one `INSERT ... ON CONFLICT DO UPDATE ... RETURNING count`. Proxy runs on the Node.js runtime in Next 16, so Prisma works there and the limit stays in `proxy.ts`. Rejected hits also count (harmless: the window is short). Cleanup is opportunistic, at most once a minute per process. Memory fallback only when the database errors, with one warning a minute. Loaded lazily so `lib/rate-limit.ts` has no Prisma import.
+Alternatives: Redis store (another service to run); keep memory only.
+Reason: memory counters reset on restart and are not shared across workers, which weakens login throttling.
+
+## 2026-10-26 Staff mail routes to one mailbox
+Decision: Victor's instruction, all `*@whinkgroup.com` email is delivered to `whinkproducts@gmail.com` (config in `config/mail-routing.json`, code in `lib/comms/mail-routing.ts`, used by the EMAIL channel). Exact domain match, ASCII validation, `X-Original-To` kept, UI addresses unchanged, sending stays Class C. Provider-side inbound routing is a manual step (docs/security.md).
+Alternatives: per-person mailboxes.
+Reason: one inbox for a one-person owner during build-out.
+
+## 2026-10-26 SIGNUP_ENABLED switch
+Decision: env `SIGNUP_ENABLED=false` makes `POST /api/signup` return 403; default stays open. Blocked attempts are security-logged, not ledgered (no user id exists).
+Reason: owner matching trusts the email string and signup does not verify mailbox ownership; closing signup after the owner registers removes the takeover path.
+
+
+## 2026-10-26 Browser end-to-end tests live in a separate `e2e/` package (needs Victor's OK)
+Decision: Playwright Test (Apache-2.0) is installed only in `/e2e` (own `package.json` and `package-lock.json`, not in the pnpm workspace, not a dependency of `apps/web`). CI runs it against the built app (`pnpm --filter app start`) and a real `pgvector/pgvector:pg16` database, with two seeded test users (`apps/web/scripts/e2e-seed.ts`, test-only `@example.test` emails, refuses to run on a database whose name lacks test/e2e/ci/scratch).
+Interpretation to confirm: Phase 2 acceptance item D9 says "gateway and app dependencies include no scraping or browser automation library (for example puppeteer, playwright or selenium)". We read D9 as being about what ships in the product (app and gateway dependency graphs and images). A test-only package that drives our own app in CI, is never imported by app code and is never in a production image, is outside that. If Victor disagrees, delete `/e2e` and `scripts/ci/e2e-local.sh`; nothing else depends on them.
+Alternatives: no browser tests (what existed before); Cypress (MIT, but also browser automation and heavier); manual QA only.
+Reason: the app had only mocked unit tests, so UI wiring, the auth proxy, CSP and real SQL were untested.
+
+## 2026-10-27 Skill uploads (untrusted reference pipeline)
+Uploaded skills are outsider-written data. Pipeline: deterministic scan, security agent (org-kit, Cybersecurity & Resilience), 3-director committee, then reference memory (`memory_semantic`, sourceType `skill_upload`, INFERRED, confidence at most 0.6). They never register tools, change permissions or autonomy, approve anything, or enter the org-kit executed skill registry. Capabilities `skill_memory_write` and `skill_intake` are Class A and not protected (data stays in the account). Raw content in `skill_submissions.content` is AES-256-GCM encrypted via `lib/key-encryption.ts` when the encryption key is configured (`enc:` prefix), otherwise stored as plain text (`raw:`). YAML is shape-checked (no tags, anchors, aliases) because no YAML parser dependency was approved.
+
+## 2026-10-27 Change requests, contracts, finance, meetings
+- Change requests: Victor's words are stored as untrusted data; refine goes through the model router into a strict zod spec. Submit sends the spec (source code and strategy) to GitHub, outside the account, so `change_request_submit` is a protected (proprietary) Class C tool: id-bound, 30 s, hash-locked, exactly once, showing the exact issue. The issue is built from the stored spec, never re-generated. With no GitHub env, no approval is created and the owner downloads the markdown instead. Status after SENT is set by hand through `POST /api/change-requests/[id]/status`; a GitHub webhook to automate IN_PROGRESS, PR_OPENED and MERGED is future work.
+- Contracts are records only (Class A `contract_create`/`contract_update`/`contract_delete`); a contract value never moves money. Field set is an assumption pending Victor's definition.
+- Finance is read-only (`GET /api/finance/summary`): sums come from the database per currency, combined in integer cents. Spend per subsidiary is omitted because usage events carry no project link.
+- Meetings: `MEETING_PROVIDER_BASE_URL` (self-hosted, https or localhost). Unconfigured means no room and no outside call.

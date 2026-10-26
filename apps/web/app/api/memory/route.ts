@@ -35,12 +35,14 @@ export async function GET(req: NextRequest) {
         statement: true,
         epistemicStatus: true,
         confidence: true,
-        source: true,
+        sourceType: true,
         createdAt: true,
       },
     });
     const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    // Keep the public response field name `source`; the column is `sourceType`.
+    const items = page.map(({ sourceType, ...rest }) => ({ ...rest, source: sourceType }));
     return NextResponse.json({
       type: 'semantic',
       items,
@@ -102,9 +104,9 @@ export async function GET(req: NextRequest) {
       select: {
         id: true,
         description: true,
-        steps: true,
+        category: true,
+        details: true,
         confidence: true,
-        source: true,
         createdAt: true,
       },
     });

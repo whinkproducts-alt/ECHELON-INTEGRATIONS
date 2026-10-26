@@ -1,11 +1,10 @@
 'use client';
 
-import { useCallback, useReducer, useRef, useState } from 'react';
+import { useCallback, useReducer, useRef } from 'react';
 import { ApprovalCard } from '../../conversation/_components/approval-card';
 import {
   approvalReducer, initialCardState, postDecision, shortResult, type DecisionStatus,
 } from '@/lib/hooks/approval-state';
-import { generateConfirmationCode } from '@/lib/spoken-approval';
 import type { AutonomyApproval } from '@/lib/autonomy-approval';
 
 interface Props {
@@ -17,7 +16,6 @@ interface Props {
 /** Reuses the shared ApprovalCard for an autonomy change. Keyed by approval id by the owner. */
 export function AutonomyApprovalPanel({ approval, onResolved }: Props) {
   const [state, dispatch] = useReducer(approvalReducer, initialCardState);
-  const [code] = useState(() => generateConfirmationCode());
   const resolved = useRef(false);
 
   const finish = useCallback((status: DecisionStatus, detail: string | null) => {
@@ -47,7 +45,7 @@ export function AutonomyApprovalPanel({ approval, onResolved }: Props) {
 
   return (
     <div className="[&>div]:ml-0">
-      <ApprovalCard approval={approval.view} state={state} onTick={onTick} onDecide={onDecide} code={code} />
+      <ApprovalCard approval={approval.view} state={state} onTick={onTick} onDecide={onDecide} />
     </div>
   );
 }

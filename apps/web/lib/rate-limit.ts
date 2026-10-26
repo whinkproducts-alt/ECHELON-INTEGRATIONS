@@ -64,11 +64,41 @@ export const RATE_RULES = {
   approvals: { limit: 30, windowMs: 60_000 },
   comms: { limit: 10, windowMs: 60_000 },
   import: { limit: 5, windowMs: 60_000 },
+  change_requests: { limit: 30, windowMs: 60_000 },
+  contracts: { limit: 60, windowMs: 60_000 },
+  swarm: { limit: 6, windowMs: 60_000 },
+  passkey: { limit: 20, windowMs: 60_000 },
+  recommendations: { limit: 60, windowMs: 60_000 },
+  /** Read-only history, ledger search and health routes. */
+  read: { limit: 120, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateBucket = keyof typeof RATE_RULES;
 
-let store: RateLimitStore = new InMemoryRateLimitStore();
+/**
+ * RATE_LIMIT_STORE=memory|postgres. Default: postgres when DATABASE_URL is set (memory under
+ * test unless asked for explicitly). The Postgres store is loaded lazily so this module stays
+ * free of Prisma imports.
+ */
+export function resolveStoreKind(env: Record<string, string | undefined> = process.env): 'memory' | 'postgres' {
+  const v = (env.RATE_LIMIT_STORE ?? '').trim().toLowerCase();
+  if (v === 'memory' || v === 'postgres') return v;
+  if (env.NODE_ENV === 'test') return 'memory';
+  return env.DATABASE_URL ? 'postgres' : 'memory';
+}
+
+let store: RateLimitStore | null = null;
+
+class LazyDefaultStore implements RateLimitStore {
+  private inner: Promise<RateLimitStore> | null = null;
+  async hit(key: string, rule: RateLimitRule, now: number): Promise<RateLimitResult> {
+    this.inner ??=
+      resolveStoreKind() === 'postgres'
+        ? import('./rate-limit-postgres').then((m) => new m.PostgresRateLimitStore())
+        : Promise.resolve(new InMemoryRateLimitStore());
+    return (await this.inner).hit(key, rule, now);
+  }
+}
 
 export function setRateLimitStore(s: RateLimitStore): void {
   store = s;
@@ -80,6 +110,7 @@ export async function checkRateLimit(
   now: number = Date.now(),
 ): Promise<RateLimitResult> {
   if (!subject) throw new Error('rate-limit: subject is required');
+  store ??= new LazyDefaultStore();
   return store.hit(`${bucket}:${subject}`, RATE_RULES[bucket], now);
 }
 

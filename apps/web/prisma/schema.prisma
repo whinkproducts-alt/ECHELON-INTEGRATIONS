@@ -22,6 +22,7 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  passkeys          PasskeyCredential[]
   accounts          Account[]
   sessions          Session[]
   profile           UserProfile?
@@ -39,6 +40,7 @@ model User {
   notes             Note[]
   approvalRequests  ApprovalRequest[]
   socialConnections  SocialConnection[]
+  skillSubmissions   SkillSubmission[]
   oauthStates        OAuthState[]
   scheduledPosts     ScheduledPost[]
   documentWorkspaces       DocumentWorkspace[]
@@ -48,7 +50,13 @@ model User {
   connectorInstalls        ConnectorInstall[]
   usageEvents              UsageEvent[]
   contacts                 Contact[]
+  changeRequests           ChangeRequest[]
+  contracts                Contract[]
   commsRequests            CommsRequest[]
+  swarmRuns                SwarmRun[]
+  agentJobs                AgentJob[]
+  recommendations          Recommendation[]
+  newsSeen                 NewsSeen[]
 
   @@map("users")
 }
@@ -989,4 +997,301 @@ model CommsRequest {
 
   @@index([userId, contactId])
   @@map("comms_requests")
+}
+
+// ── Change requests and contracts ────────────────────────────────
+
+model ChangeRequest {
+  id                String   @id @default(cuid())
+  userId            String
+  title             String
+  body              String
+  status            String   @default("DRAFT") // DRAFT | REFINED | AWAITING_APPROVAL | SENT | IN_PROGRESS | PR_OPENED | MERGED | REJECTED | FAILED
+  spec              Json?
+  risk              String?
+  approvalId        String?
+  githubIssueUrl    String?
+  githubIssueNumber Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@map("change_requests")
+}
+
+model Contract {
+  id           String    @id @default(cuid())
+  userId       String
+  title        String
+  counterparty String
+  subsidiary   String?
+  projectId    String?
+  valueAmount  Decimal?  @db.Decimal(14, 2)
+  currency     String    @default("CAD")
+  status       String    @default("DRAFT") // DRAFT | ACTIVE | COMPLETED | TERMINATED
+  startDate    DateTime?
+  endDate      DateTime?
+  renewalDate  DateTime?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, subsidiary])
+  @@index([userId, projectId])
+  @@index([userId, createdAt, id])
+  @@map("contracts")
+}
+
+// ── Skill uploads (untrusted reference knowledge pipeline) ──────────
+// An uploaded skill is outsider-written data. It can become reference memory; it never
+// registers tools, changes permissions, or enters the org-kit executed skill registry.
+
+model SkillSubmission {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  filename    String
+  sha256      String
+  sizeBytes   Int
+  status      String   @default("QUEUED") // QUEUED | SCANNING | REJECTED_SECURITY | ASSESSING | ACCEPTED | REJECTED_VALUE | WAITING_MODEL | FAILED
+  content     String // raw upload, encrypted at rest when ENCRYPTION_KEY is configured ("enc:" prefix), else "raw:"
+  scanReport  Json?
+  committee   Json?
+  decision    String?
+  reason      String?
+  memoryIds   String[]
+  attempts    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sha256])
+  @@index([userId, createdAt])
+  @@index([status, updatedAt])
+  @@map("skill_submissions")
+}
+
+model PasskeyCredential {
+  id           String    @id @default(cuid())
+  userId       String
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      BigInt    @default(0)
+  transports   String[]
+  deviceName   String
+  backedUp     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("passkey_credentials")
+}
+
+// Single-use WebAuthn challenges and 60 second login tickets. Consumed by a conditional update.
+model PasskeyChallenge {
+  id        String    @id @default(cuid())
+  userId    String?
+  challenge String
+  purpose   String
+  remember  Boolean   @default(false)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@map("passkey_challenges")
+}
+
+// ── Standing roster worker (24/7 organisation) ──────────────────
+
+// One row per (job, user). Claimed with an atomic conditional update; see lib/worker/scheduler.ts.
+model AgentJob {
+  id                  String    @id @default(cuid())
+  jobKey              String
+  userId              String
+  nextRunAt           DateTime
+  lastRunAt           DateTime?
+  lastStatus          String? // OK | FAILED | SKIPPED | TIMEOUT
+  lastError           String? // short reason code, never content
+  leaseUntil          DateTime?
+  leaseOwner          String?
+  runs                Int       @default(0)
+  consecutiveFailures Int       @default(0)
+  createdAt           DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([jobKey, userId])
+  @@index([nextRunAt])
+  @@index([userId])
+  @@map("agent_jobs")
+}
+
+// Process-level facts only (no user data).
+model AgentHeartbeat {
+  workerId  String   @id
+  startedAt DateTime
+  lastSeenAt DateTime
+  version   String
+
+  @@map("agent_heartbeats")
+}
+
+// What the news desk has already seen, so the same link is never scored twice. Pruned after 14 days.
+model NewsSeen {
+  id        String   @id @default(cuid())
+  userId    String
+  linkHash  String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, linkHash])
+  @@index([createdAt])
+  @@map("news_seen")
+}
+
+// Suggestions from the standing roster, shown in the "WHINK recommends" column.
+model Recommendation {
+  id          String    @id @default(cuid())
+  userId      String
+  source      String // agent name
+  kind        String
+  title       String
+  body        String
+  link        String?
+  severity    String    @default("info") // info | warning | critical
+  dedupeKey   String?
+  createdAt   DateTime  @default(now())
+  dismissedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, dismissedAt, createdAt])
+  @@map("recommendations")
+}
+
+// ── Swarm: many agents, one initiative, no overlap ───────────────
+
+model SwarmRun {
+  id              String    @id @default(cuid())
+  userId          String
+  projectId       String?
+  subsidiary      String?
+  title           String
+  initiative      String // untrusted user text, always wrapped before model use
+  status          String    @default("PLANNED") // PLANNED | RUNNING | FINALIZING | DONE | FAILED | CANCELLED
+  minAgents       Int
+  agentCount      Int
+  estimate        Json
+  tokenCap        Int
+  tokensUsed      Int       @default(0)
+  cancelRequested Boolean   @default(false)
+  stopReason      String?
+  result          String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks     SwarmTask[]
+  claims    SwarmClaim[]
+  learnings SwarmLearning[]
+
+  @@index([userId, createdAt])
+  @@map("swarm_runs")
+}
+
+model SwarmTask {
+  id             String    @id @default(cuid())
+  runId          String
+  userId         String
+  lane           String // exclusive scope key
+  role           String // lead | integrator | redteam | reviewer | worker
+  agentId        String // real org-kit agent_id
+  fit            String // matched | generalist
+  title          String
+  objective      String
+  deliverable    String
+  requiredSkills String[]
+  covers         String[] // lanes this task reviews, challenges or integrates
+  dependsOn      String[] // lanes
+  estimatedCalls Int       @default(1)
+  status         String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED | SKIPPED
+  attempts       Int       @default(0)
+  output         Json?
+  error          String?
+  tokensIn       Int       @default(0)
+  tokensOut      Int       @default(0)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  run SwarmRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, lane])
+  @@index([runId, status])
+  @@index([userId])
+  @@map("swarm_tasks")
+}
+
+// DB-level exclusive claim on a lane. The unique key is what makes two engines unable to run one lane.
+model SwarmClaim {
+  id        String   @id @default(cuid())
+  runId     String
+  userId    String
+  lane      String
+  taskId    String
+  owner     String
+  createdAt DateTime @default(now())
+
+  run SwarmRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, lane])
+  @@index([userId])
+  @@map("swarm_claims")
+}
+
+model SwarmLearning {
+  id         String   @id @default(cuid())
+  runId      String
+  userId     String
+  agentId    String
+  lane       String
+  text       String
+  sha256     String
+  confidence Float    @default(0.5)
+  createdAt  DateTime @default(now())
+
+  run SwarmRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, sha256])
+  @@index([runId, createdAt])
+  @@index([userId])
+  @@map("swarm_learnings")
+}
+
+// ── Durable rate limiter (fixed-window counters, shared across workers/restarts) ──
+// Keys are "<bucket>:<subject>" (subject is a client address or sign-in account, hashed or
+// plain); this table holds no user content and is not tenant data.
+
+model RateLimitBucket {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+  @@map("rate_limit_buckets")
 }

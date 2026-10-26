@@ -83,3 +83,73 @@ Not covered:
 - The CSP keeps `style-src 'unsafe-inline'` (React style props). Scripts are strict.
 - The in-memory rate limiter does not share state between instances.
 - Contact messaging and calls are stubs: nothing leaves the machine yet, and approval still works end to end.
+
+## Staff mail routing (added 2026-10-26)
+`config/mail-routing.json` and `lib/comms/mail-routing.ts` send every email addressed to a listed domain (`whinkgroup.com`, exact match) to one catch-all mailbox (`whinkproducts@gmail.com`), with an `X-Original-To` header. The match is on the parsed domain after the single `@`, ASCII only, so `evil.whinkgroup.com.attacker.io`, `whinkgroup.com@evil.com`, subdomains and unicode lookalikes are not routed, and malformed or multi-address strings are refused. Staff addresses shown in the UI are unchanged. Sending email stays Class C / protected; routing only chooses the delivery address.
+
+Code cannot do DNS or mailbox setup. For real inbound mail to `*@whinkgroup.com` to reach the catch-all, the domain's mail provider must also be configured (MX records plus a catch-all or forwarding rule to `whinkproducts@gmail.com`). That is Victor's task at the provider. Until then, outbound routing only affects mail WHINK itself sends. The SMTP sender is still a stub (`smtp_not_implemented_yet`); when it is built it must use the `deliveredTo` and `headers` the delivery layer returns.
+
+## Signup control (added 2026-10-26)
+`SIGNUP_ENABLED` (default true). When `false`, `POST /api/signup` returns 403 and logs a security event. The ledger needs a real user id and a blocked visitor has none, so it is a logger event, not a ledger row.
+
+Why: `WHINK_OWNER_EMAILS` matches the owner by email string, and signup does not verify that the registrant owns that mailbox. Anyone who registers first with the owner's address would be treated as the owner. On a single-owner instance, the owner must register first, then set `SIGNUP_ENABLED=false`.
+
+## Durable rate limiting (added 2026-10-26)
+Counters live in Postgres (`rate_limit_buckets`, fixed window, one atomic upsert per hit) so they survive restarts and are shared across workers. `RATE_LIMIT_STORE=memory|postgres` (default postgres when `DATABASE_URL` is set). If the database is unreachable, the limiter falls back to the per-process in-memory store (still enforcing) and warns once a minute.
+
+
+## Passkeys
+
+Remember me, passkeys and Touch ID (a Mac platform authenticator used through WebAuthn). Added 2026-10-27. The password path is unchanged.
+
+### Session lifetime
+`lib/auth/session-lifetime.ts`. The jwt callback stamps `authAt` and `remember` at sign-in and checks them on every read. Not remembered: absolute 12 hours. Remembered: 30 days. The limit is absolute (a refresh does not extend it). An expired token returns null, which Auth.js treats as signed out. Legacy tokens without `authAt` fall back to `iat` and the 12 hour limit; a token with neither fails closed. The browser cookie itself still lasts up to 30 days; only the server check is short.
+
+### Setup
+Env: `WEBAUTHN_RP_ID` (bare domain) and `WEBAUTHN_ORIGIN` (exact origin, comma list allowed). Both empty means the routes return 503 "Passkeys are not available". Non-HTTPS origins are refused except localhost. Each origin host must equal the RP ID or be a subdomain of it.
+- Localhost: `WEBAUTHN_RP_ID=localhost`, `WEBAUTHN_ORIGIN=http://localhost:3000`.
+- Mac Mini: serve over HTTPS (a real hostname, not a bare IP), then `WEBAUTHN_RP_ID=host.example.com`, `WEBAUTHN_ORIGIN=https://host.example.com`. Passkeys are bound to the RP ID; changing it orphans existing passkeys. Keep `AUTH_URL` on the same origin.
+
+### Client contract (all JSON, all POST/DELETE need a same-origin browser fetch with `content-type: application/json`; errors are `{ error }`)
+Use `@simplewebauthn/browser` (`startRegistration({ optionsJSON })`, `startAuthentication({ optionsJSON })`).
+- `POST /api/auth/passkey/register/options` (session required). Body `{}`. 200 `{ options, challengeId }`. 409 at 10 passkeys.
+- `POST /api/auth/passkey/register/verify` (session). Body `{ challengeId, deviceName?, response }` where `response` is the `startRegistration` result. 201 `{ passkey: { id, deviceName, createdAt } }`. 400 on any failure.
+- `POST /api/auth/passkey/login/options` (no session). Body `{ remember?: boolean }`. 200 `{ options, challengeId }`. No email needed (discoverable credentials).
+- `POST /api/auth/passkey/login/verify` (no session). Body `{ challengeId, response }` (the `startAuthentication` result). 200 `{ ticket, expiresInSeconds: 60 }`. 401 `{ error }` for every failure (deliberately generic).
+- Then sign in with the ticket within 60 seconds: `signIn('passkey', { ticket, redirect: false })` (next-auth/react), the same way the password form calls `signIn('credentials', { email, password, remember: String(remember), redirect: false })`. The ticket is single use.
+- `GET /api/auth/passkey` (session). 200 `{ passkeys: [{ id, deviceName, createdAt, lastUsedAt }] }`. Never keys or credential ids.
+- `DELETE /api/auth/passkey/[id]` (session). 200 `{ ok: true }`; 404 for an unknown id or another user's id.
+Status codes common to all: 400 invalid body, 401, 403 cross-site, 413, 415, 429, 503 not configured.
+
+### Guarantees
+Challenges are single use with a 5 minute life, consumed by one conditional update. Registration challenges are bound to the user. Verification enforces origin, RP ID, challenge, user verification, and a signature counter that must advance (unless both stored and reported are 0); the counter update is conditional so a concurrent replay loses. The user handle must match the credential owner. The ticket is `<rowId>.<HMAC-SHA256 with AUTH_SECRET>`, 60 seconds, consumed atomically in the passkey provider's `authorize`. Ledger: `passkey_registered`, `passkey_login`, `passkey_deleted`; failures write `SECURITY_EVENT:passkey_replay | passkey_origin_mismatch | passkey_user_mismatch | passkey_assertion_invalid | passkey_register_failed`. An unknown credential is logged only (no user to ledger against). Challenges, keys and signatures are never logged or ledgered. `lib/csrf.ts` exempts `/api/auth/**`, so these routes call the same check themselves (`lib/passkeys/guard.ts`).
+
+## Standing roster and worker
+
+Victor's requirement: the organisation works 24 hours a day. The org-kit holds 326 dormant agents; they are LLM personas, not processes, so "active" means woken on a schedule, which costs model tokens. `apps/web/config/standing-roster.json` recommends 28 always-on entries chosen from real org-kit agents by department and skill (five committee personas are kept as `kind: persona`, because no org-kit agent carries those names). 21 entries have a job and are enabled; 7 (executive office 3, operations 2, finance watch 1, legal and compliance watch 1) are standby entries with `job: null` and `enabled: false` until a job exists for them. A test validates every id against the org-kit and the staff directory.
+
+### What runs
+`pnpm worker` (apps/web/scripts/worker.ts, only when `WORKER_ENABLED=true`) loops every 15 s, writes a heartbeat, creates job rows for each user with a conversation or a named profile, claims due jobs with one atomic `UPDATE ... FOR UPDATE SKIP LOCKED` (10 minute lease, safe with several workers, a crashed worker's lease expires), and runs them under `WORKER_CONCURRENCY` (default 3), a per-job timeout (default 120 s), and exponential backoff (cap 6 h). SIGTERM stops claiming and waits up to 30 s for running jobs.
+
+| Job | Default schedule | Model call | Writes |
+|---|---|---|---|
+| news_digest (6 desks) | every 30 min each | at most one per 10 new items | memory (semantic, source `news`, INFERRED, confidence at most 0.5), `news_seen` |
+| opportunity_scan (4 committee members) | 1 h, 6 h, 6 h, 12 h | one, only when fresh news memories exist | hypotheses (confidence at most 0.4), recommendations |
+| weekly_brief (Amara Okafor) | 7 d | one, once per ISO week | one brief memory (confidence at most 0.4), one recommendation |
+| project_monitor (5 subsidiaries) | every 2 h each | none | recommendations with deep links |
+| memory_curation (2) | every 24 h | none | supersedes near-duplicates, decays stale low-confidence items; never touches KNOWN, never deletes |
+| security_watch (3) | 15 min, 30 min, 1 h | none | recommendations from ledger counts only |
+| skills_sweeper (system) | every 5 min | none | calls `resumeStalled()` from lib/skills if it exists, else no-op |
+
+### What it can never do
+- No outbound action. Jobs get no tool executor (`ctx.tools` is always empty and asserted), call the router with no tools, and can exercise only two capabilities, `worker_memory_write` and `recommendation_write` (Class A, in `CAPABILITY_CLASSES` and `LOCAL_SAFE_REGISTRY`). `assertWorkerCapability` rejects any other name and any capability the protected-action classifier flags. No sends, posts, payments or sharing, so nothing protected can happen here.
+- Every write goes through `checkPermission` first and the run is ledgered through `lib/ledger.ts` (initiator `system`, persona WHINK, per-run correlation id). Ledger rows carry counts, never news text, memory text or recommendation bodies.
+- News, memory text and project text are untrusted: envelope tags stripped, injection-scanned (a flagged news item is dropped, remembered as seen, and one `SECURITY_EVENT: news_item_flagged` row with a count is written), wrapped with `wrapUntrustedContent` before the model sees them. Model output is scanned again before it is stored. Hypotheses are capped at 0.4 and news memories at 0.5, so worker output is never presented as fact.
+- Recommendation links must be internal paths (`/...`).
+- Account scope: the job queue is the one deliberately global table (the worker serves every account). Each row carries its `userId` and every query a job runs is scoped to it. Recommendation and status routes are scoped to the session user; another user's id is a 404.
+
+### Cost model and budget guard
+Cost per user per day is (model runs per day) x (tokens per run). Defaults, from the config: news desks 6 x 48 = 288 runs, committee 24 + 4 + 4 + 2 = 34 runs, weekly brief 1/7 run: at most 322 model calls per user per day. A news run with nothing new makes no call, and an opportunity run with no fresh news makes none, so real use is a fraction of that. `maxTokensPerRun` caps each call (input is trimmed to 60% of it, output limited to 40%): 2,500 for news, 3,000 for opportunity, 4,000 for the brief, so the hard ceiling is about 0.82 million tokens per user per day. Models come from `WORKER_MODEL_FAST|STANDARD|DEEP` (unset means the router default; set them to a local model to make it free). Each run records usage, so the monthly budget in `lib/budget.ts` sees it. At the soft limit non-critical loops are skipped (only security_watch and skills_sweeper continue); at the hard limit every loop is skipped. Offline with no local fallback, model jobs are skipped. Each skip is ledgered once per user, job and reason per day (`worker_job_skipped`).
+
+### Mac Mini deployment
+Run one worker process under launchd; see `docs/whink-worker.plist.example` (an example only, not installed or executed by anything here). Set `WORKER_ENABLED=true` in the environment file the plist loads, run `npx prisma migrate deploy` first, and check `GET /api/worker/status` (heartbeat age should stay under about 30 s). More than one worker is safe; the lease prevents double runs.

@@ -1,0 +1,23 @@
+{
+  "allowedExtensions": [".md", ".txt", ".json", ".yaml", ".yml"],
+  "maxFileBytes": 262144,
+  "maxFilesPerRequest": 10,
+  "dailyCap": 20,
+  "valueThreshold": 3.5,
+  "minApprovals": 2,
+  "committeeSize": 3,
+  "stalledMinutes": 10,
+  "maxAttempts": 5,
+  "maxModelChars": 24000,
+  "chunkChars": 1500,
+  "maxChunks": 40,
+  "base64BlobChars": 200,
+  "memoryConfidenceCap": 0.6,
+  "securityDirectorate": "Cybersecurity & Resilience",
+  "securityMinConfidence": 0.5,
+  "defaultCommitteeDirectorates": [
+    "Executive Office & Corporate Strategy",
+    "Engineering & Technology",
+    "Data & Artificial Intelligence"
+  ]
+}

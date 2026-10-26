@@ -45,6 +45,7 @@ export const PROTECTED_REGISTRY: Readonly<Record<string, { category: ProtectedCa
   // Social and gateway writes (openclaw__<platform>__post, reply, send_dm, follow, publish_*) are caught by the
   // keyword rules below, so no gateway tool name is hardcoded here.
   social_schedule_post: { category: 'proprietary', reason: 'schedules a public post' },
+  change_request_submit: { category: 'proprietary', reason: 'sends a change specification (source code and strategy) to GitHub, outside the account' },
   // Connector capabilities that send or write outside the account
   email_send: { category: 'proprietary', reason: 'sends email' },
   chat_send: { category: 'proprietary', reason: 'sends chat messages' },
@@ -79,7 +80,12 @@ export const LOCAL_SAFE_REGISTRY: ReadonlySet<string> = new Set([
   'calendar_list', 'calendar_create', 'note_write',
   'board_meeting_create', 'board_minutes_write', 'connector_manage', 'usage_budget_set',
   'contact_create', 'contact_update', 'contact_delete', 'contact_import',
-  'project_create', 'project_update',
+  'worker_memory_write', 'recommendation_write',
+  'project_create', 'project_update', 'skill_memory_write', 'skill_intake',
+  'contract_create', 'contract_update', 'contract_delete',
+  'change_request_create', 'change_request_update', 'change_request_refine', 'change_request_status',
+  'meeting_room_create',
+  'swarm_plan', 'swarm_start', 'swarm_cancel', 'swarm_memory_write',
   'autonomy_change', 'ear',
   'gesture_open_thread', 'gesture_request_brief', 'gesture_propose_task', 'gesture_select', 'gesture_dismiss',
   'gesture_toggle_overview', 'gesture_pause', 'gesture_wake', 'gesture_next', 'gesture_refresh',

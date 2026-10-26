@@ -65,7 +65,7 @@ function isPrivateAddress(ip: string): boolean {
   return false;
 }
 
-async function assertSafeUrl(rawUrl: string): Promise<void> {
+export async function assertSafeUrl(rawUrl: string): Promise<void> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -429,7 +429,7 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
 
     // C11: queryDocuments has a 500 ms internal timeout. If it returns empty due to timeout/down,
     // we ledger the unavailability and return gracefully.
-    let rawChunks;
+    let rawChunks: Awaited<ReturnType<typeof queryDocuments>>;
     try {
       rawChunks = await queryDocuments(userId, ws.workspaceSlug, params.query, limit);
     } catch {
@@ -615,6 +615,14 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
     return { success: r.sent, data: { sent: r.sent, channel: r.channel }, error: r.sent ? undefined : `not placed: ${r.reason ?? 'unknown'}`, source: 'comms', timestamp: ts(), toolVersion: '1.0.0' };
   },
 
+  // Never offered to the model; Class C and protected (proprietary). Runs only from an approved request
+  // created by lib/change-requests/service.ts. The issue is rebuilt from the stored spec and must match.
+  change_request_submit: async (userId: string, params: any) => {
+    const { runApprovedSubmit } = await import('@/lib/change-requests/handler');
+    const r = await runApprovedSubmit(userId, params);
+    return { success: r.success, data: r.data, error: r.error, source: 'github', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
   task_create: async (userId: string, params: any) => {
     if (typeof params?.projectId !== 'string' || params.projectId.length === 0) {
       return { success: false, error: 'projectId required', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
@@ -645,6 +653,7 @@ const TOOL_RISK_MAP: Record<string, PermissionClass> = Object.assign(Object.crea
   [SCHEDULE_TOOL_NAME]: 'C',
   contact_message: 'C',
   contact_call: 'C',
+  change_request_submit: 'C',
   memory_write: 'A',
   memory_read: 'A',
   memory_correct: 'B',
@@ -941,7 +950,7 @@ export async function executeTool(
   persona?: string,
   mambaMode?: string,
   correlationId?: string,
-  opts: { approvalAlreadyPending?: boolean; tainted?: boolean; initiator?: string } = {}
+  opts: { approvalAlreadyPending?: boolean; tainted?: boolean; initiator?: 'user' | 'system' | 'automation' } = {}
 ): Promise<ToolExecutionResult> {
   const cid = correlationId ?? generateCorrelationId();
   // Every ledger row for a protected call carries its category (judged on name, params and taint).

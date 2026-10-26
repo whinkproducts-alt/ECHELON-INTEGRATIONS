@@ -2,8 +2,15 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { logger } from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
+  // SIGNUP_ENABLED=false closes registration (single-owner instance). The ledger needs a real
+  // user id and there is none here, so the blocked attempt is a security log event instead.
+  if ((process.env.SIGNUP_ENABLED ?? 'true').trim().toLowerCase() === 'false') {
+    logger.security('signup blocked: SIGNUP_ENABLED=false', { path: '/api/signup' });
+    return NextResponse.json({ error: 'Signups are closed on this instance.' }, { status: 403 });
+  }
   try {
     const body = await req.json();
     const { email, password, name } = body ?? {};

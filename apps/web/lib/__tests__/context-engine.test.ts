@@ -224,7 +224,7 @@ describe('assembleContext — blended items (C9)', () => {
     // blendedItems must have the document item with citation
     const item = ctx.blendedItems.find((i) => i.documentName === 'Annual Report 2025');
     expect(item).toBeDefined();
-    expect(item?.chunkId ?? item?.id).toBe('c-42');
+    expect(item?.id).toBe('c-42');
     expect(item?.page).toBe(7);
     expect(item?.score).toBe(0.95);
   });

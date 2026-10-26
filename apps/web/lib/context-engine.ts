@@ -1,3 +1,4 @@
+import { semanticEnvelopeSource } from '@/lib/skills/labels';
 import { prisma } from '@/lib/db';
 import { listWorkingMemory } from '@/lib/working-memory';
 import { filterToolResult, scanForInjectionPatterns, stripFakeUntrustedTags, wrapUntrustedContent } from '@/lib/content-isolation';
@@ -115,7 +116,7 @@ export async function assembleContext(
     for (const mem of searchResults.semantics ?? []) {
       const cleanStatement = stripFakeUntrustedTags(mem.statement);
       const raw = `[${mem.epistemicStatus}] ${cleanStatement} (confidence: ${mem.confidence})`;
-      const entry = wrapUntrustedContent(raw, 'memory_semantic', mem.id);
+      const entry = wrapUntrustedContent(raw, semanticEnvelopeSource((mem as { sourceType?: string | null }).sourceType), mem.id);
       if (budget - entry.length > 0) {
         result.semanticMemories.push(entry);
         budget -= entry.length;
@@ -221,7 +222,7 @@ export async function assembleContext(
     for (const mem of semantics ?? []) {
       const cleanStatement = stripFakeUntrustedTags(mem.statement);
       const raw = `[${mem.epistemicStatus}] ${cleanStatement} (confidence: ${mem.confidence})`;
-      const entry = wrapUntrustedContent(raw, 'memory_semantic', mem.id);
+      const entry = wrapUntrustedContent(raw, semanticEnvelopeSource((mem as { sourceType?: string | null }).sourceType), mem.id);
       if (budget - entry.length > 0) {
         result.semanticMemories.push(entry);
         budget -= entry.length;

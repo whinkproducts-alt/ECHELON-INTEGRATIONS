@@ -1,0 +1,31 @@
+{
+  "defaultMinAgents": 50,
+  "minAgents": 50,
+  "maxAgents": 120,
+  "concurrency": 8,
+  "maxConcurrency": 20,
+  "taskTimeoutMs": 120000,
+  "maxRetries": 2,
+  "retryDelayMs": 750,
+  "tokenCapPerRun": 3000000,
+  "tokenCapMultiplier": 1.5,
+  "learningDigestMax": 12,
+  "learningDigestChars": 2400,
+  "learningMaxChars": 300,
+  "learningsPerTask": 5,
+  "outputMaxChars": 3000,
+  "depOutputMaxChars": 1500,
+  "depTotalMaxChars": 7000,
+  "resultMaxChars": 6000,
+  "memoryConfidenceThreshold": 0.6,
+  "memoryConfidenceCap": 0.6,
+  "maxMemoryWrites": 60,
+  "model": null,
+  "roleMix": { "integrators": 0.12, "redteam": 0.06, "reviewers": 0.2 },
+  "estimate": {
+    "avgCallSeconds": 20,
+    "retryRate": 0.1,
+    "tokensIn": { "worker": 2500, "reviewer": 4500, "redteam": 4500, "integrator": 5000, "lead": 6000, "planner": 3000 },
+    "tokensOut": { "worker": 1200, "reviewer": 800, "redteam": 800, "integrator": 1500, "lead": 2000, "planner": 4000 }
+  }
+}

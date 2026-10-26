@@ -24,6 +24,23 @@ export const CAPABILITY_CLASSES: Readonly<Record<string, PermissionClass>> = Obj
   contact_call: 'C',
   project_create: 'A',
   project_update: 'A',
+  worker_memory_write: 'A',
+  recommendation_write: 'A',
+  skill_memory_write: 'A',
+  skill_intake: 'A',
+  contract_create: 'A',
+  contract_update: 'A',
+  contract_delete: 'A',
+  change_request_create: 'A',
+  change_request_update: 'A',
+  change_request_refine: 'A',
+  change_request_status: 'A',
+  change_request_submit: 'C',
+  meeting_room_create: 'A',
+  swarm_plan: 'A',
+  swarm_start: 'A',
+  swarm_cancel: 'A',
+  swarm_memory_write: 'A',
 });
 
 export function capabilityClass(capability: string): PermissionClass {

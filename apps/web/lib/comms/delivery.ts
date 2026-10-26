@@ -3,6 +3,8 @@
 // Stubs return { sent: false, reason: 'not_configured' } when credentials are absent.
 // Real sends go through the permission engine — Class B (requires delegation).
 
+import { routeRecipient, routingHeaders } from './mail-routing';
+
 export type Channel = 'EMAIL' | 'WHATSAPP' | 'SMS' | 'TELEGRAM' | 'PHONE_CALL';
 
 export interface DeliveryResult {
@@ -10,6 +12,11 @@ export interface DeliveryResult {
   channel: Channel;
   reason?: string;
   messageId?: string;
+  /** EMAIL only: the address actually used after staff mail routing, and the one asked for. */
+  deliveredTo?: string;
+  originalTo?: string;
+  /** EMAIL only: headers the SMTP sender must add (X-Original-To). */
+  headers?: Record<string, string>;
 }
 
 export interface DeliveryPayload {
@@ -23,9 +30,13 @@ export interface DeliveryPayload {
 // Email — uses SMTP via nodemailer (MIT licence).
 // Env: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 async function deliverEmail(payload: DeliveryPayload): Promise<DeliveryResult> {
-  if (!process.env.SMTP_HOST) return { sent: false, channel: 'EMAIL', reason: 'not_configured' };
-  // Real implementation: import nodemailer and send. Placeholder returns configured.
-  return { sent: false, channel: 'EMAIL', reason: 'smtp_not_implemented_yet' };
+  const route = routeRecipient(payload.to);
+  if (!route.valid) return { sent: false, channel: 'EMAIL', reason: 'invalid_recipient' };
+  const info = { deliveredTo: route.deliverTo, originalTo: route.original, headers: routingHeaders(route) };
+  if (!process.env.SMTP_HOST) return { sent: false, channel: 'EMAIL', reason: 'not_configured', ...info };
+  // Real implementation: import nodemailer and send to route.deliverTo with
+  // info.headers (X-Original-To). Placeholder returns configured.
+  return { sent: false, channel: 'EMAIL', reason: 'smtp_not_implemented_yet', ...info };
 }
 
 // SMS / WhatsApp / Phone — uses Twilio.

@@ -5,7 +5,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { recordActionSafe } from '@/lib/ledger';
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 /**
  * PATCH /api/memory/[id]
@@ -18,7 +18,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const userId = session.user.id;
-  const { id } = params;
+  const { id } = await params;
 
   let body: { statement?: string; epistemicStatus?: string };
   try {
@@ -83,7 +83,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const userId = session.user.id;
-  const { id } = params;
+  const { id } = await params;
 
   // Attempt MemorySemantic first
   const semantic = await prisma.memorySemantic.findFirst({
