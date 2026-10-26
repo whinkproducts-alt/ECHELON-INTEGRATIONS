@@ -5,9 +5,10 @@ import { generateRegistrationOptions } from '@simplewebauthn/server';
 import { prisma } from '@/lib/db';
 import { requireUserId, readJsonBody } from '@/lib/api-helpers';
 import { loadConfig, passkeyCsrf, passkeyLimit } from '@/lib/passkeys/guard';
-import { issueChallenge } from '@/lib/passkeys/challenges';
+import { issueChallenge, maybeCleanupChallenges, tooManyOpenChallenges } from '@/lib/passkeys/challenges';
+import { ReauthFields, hasOneReauth, verifyReauth } from '@/lib/passkeys/reauth';
 
-const Body = z.object({}).strict();
+const Body = z.object(ReauthFields).strict().refine(hasOneReauth);
 const MAX_PASSKEYS = 10;
 
 export async function POST(req: Request) {
@@ -22,7 +23,14 @@ export async function POST(req: Request) {
 
   const parsed = await readJsonBody(req, 2 * 1024);
   if ('response' in parsed) return parsed.response;
-  if (!Body.safeParse(parsed.body).success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  const body = Body.safeParse(parsed.body);
+  if (!body.success) return NextResponse.json({ error: 'Invalid request: send password or ticket' }, { status: 400 });
+
+  const re = await verifyReauth(u.userId, body.data);
+  if (re === 'limited') return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  if (re === 'denied') return NextResponse.json({ error: 'Re-authentication failed' }, { status: 403 });
+  void maybeCleanupChallenges();
+  if (await tooManyOpenChallenges(`u:${u.userId}`, 'register')) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
   const user = await prisma.user.findUnique({ where: { id: u.userId }, select: { id: true, email: true, name: true } });
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -42,6 +50,6 @@ export async function POST(req: Request) {
     excludeCredentials: existing.map((c) => ({ id: c.credentialId, transports: c.transports as any })),
     authenticatorSelection: { residentKey: 'preferred', userVerification: 'required' },
   });
-  const challengeId = await issueChallenge('register', options.challenge, { userId: u.userId });
+  const challengeId = await issueChallenge('register', options.challenge, { userId: u.userId, clientKey: `u:${u.userId}` });
   return NextResponse.json({ options, challengeId }, { headers: { 'cache-control': 'no-store' } });
 }

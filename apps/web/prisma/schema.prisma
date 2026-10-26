@@ -23,6 +23,8 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   passkeys          PasskeyCredential[]
+  passkeyChallenges PasskeyChallenge[]
+  sessionVersion    Int       @default(0)
   accounts          Account[]
   sessions          Session[]
   profile           UserProfile?
@@ -231,6 +233,7 @@ model Project {
   memorySemantic MemorySemantic[]
   entityEdges    EntityEdge[]
   hypotheses     Hypothesis[]
+  contracts      Contract[]
 
   @@index([ownerId])
   @@index([ownerId, subsidiary])
@@ -1039,7 +1042,8 @@ model Contract {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([userId, status])
   @@index([userId, subsidiary])
@@ -1067,6 +1071,8 @@ model SkillSubmission {
   reason      String?
   memoryIds   String[]
   attempts    Int      @default(0)
+  leaseOwner  String?
+  leaseUntil  DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1103,11 +1109,15 @@ model PasskeyChallenge {
   challenge String
   purpose   String
   remember  Boolean   @default(false)
+  clientKey String?
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
 
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([expiresAt])
+  @@index([clientKey, purpose])
   @@map("passkey_challenges")
 }
 
@@ -1234,7 +1244,9 @@ model SwarmTask {
   error          String?
   tokensIn       Int       @default(0)
   tokensOut      Int       @default(0)
+  claimOwner     String? // engine instance holding the lane claim; every write after acquire checks it
   startedAt      DateTime?
+  heartbeatAt    DateTime?
   finishedAt     DateTime?
   createdAt      DateTime  @default(now())
 

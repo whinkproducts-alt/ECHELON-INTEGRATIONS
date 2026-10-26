@@ -11,7 +11,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isExempt, isForbiddenEnvFile, parseIgnoreFile, scanText, shouldScanPath, type SecretFinding } from '../lib/secret-scan';
+import { isExempt, isForbiddenEnvFile, parseAllowFile, parseIgnoreFile, scanText, shouldScanPath, type SecretFinding } from '../lib/secret-scan';
 
 const args = process.argv.slice(2);
 const all = args.includes('--all');
@@ -25,6 +25,8 @@ const files = (all ? git(['-C', root, 'ls-files', '-z']) : git(['-C', root, 'dif
 
 const ignoreFile = path.join(root, 'apps', 'web', '.secret-scan-ignore');
 const extraExempt = fs.existsSync(ignoreFile) ? parseIgnoreFile(fs.readFileSync(ignoreFile, 'utf8')) : [];
+const allowFile = path.join(root, 'apps', 'web', '.secret-scan-allow');
+const allowLiterals = fs.existsSync(allowFile) ? parseAllowFile(fs.readFileSync(allowFile, 'utf8')) : [];
 const findings: SecretFinding[] = [];
 const envFiles = files.filter(isForbiddenEnvFile);
 for (const rel of files) {
@@ -42,7 +44,7 @@ for (const rel of files) {
     }
   } catch { continue; }
   if (buf.length > 2 * 1024 * 1024 || buf.includes(0)) continue; // too large or binary
-  findings.push(...scanText(rel, buf.toString('utf8')));
+  findings.push(...scanText(rel, buf.toString('utf8'), allowLiterals));
 }
 
 for (const f of envFiles) console.error(`BLOCKED: ${f} is an env file and must not be committed`);

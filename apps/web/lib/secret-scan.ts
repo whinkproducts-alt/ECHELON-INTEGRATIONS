@@ -37,7 +37,13 @@ function redact(line: string, re: RegExp): string {
   return shown.trim().substring(0, 60);
 }
 
-export function scanText(file: string, text: string): SecretFinding[] {
+/**
+ * `allow` holds literal fake values (apps/web/.secret-scan-allow). A match is suppressed only
+ * when its full matched text EQUALS an allow-listed literal; a real key in the same file is
+ * still reported.
+ */
+export function scanText(file: string, text: string, allow: Iterable<string> = []): SecretFinding[] {
+  const allowed = new Set(allow);
   const findings: SecretFinding[] = [];
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
@@ -45,6 +51,8 @@ export function scanText(file: string, text: string): SecretFinding[] {
     if (line.length > 2000 || line.includes('scan-secrets:ignore')) continue;
     for (const rule of SECRET_RULES) {
       if (!rule.re.test(line)) continue;
+      const matches = [...line.matchAll(new RegExp(rule.re.source, rule.re.flags.includes('i') ? 'gi' : 'g'))];
+      if (matches.length > 0 && matches.every((m) => allowed.has(m[0]))) continue;
       if (rule.name === 'secret_assignment' && (PLACEHOLDER_RE.test(line) || /['"](?:https?:)?\/\//.test(line) || /['"][A-Z][A-Z0-9_]{5,}['"]/.test(line) || (TEST_PATH_RE.test(file)))) continue;
       if (rule.name === 'database_url_with_password' && /:\/\/[^:@/\s]+:(?:password|pass|postgres|secret|changeme|example|user|x)@/i.test(line)) continue;
       findings.push({ rule: rule.name, file, line: i + 1, preview: redact(line, rule.re) });
@@ -83,4 +91,9 @@ export function isExempt(repoRelativePath: string, extra: Iterable<string> = [])
 /** Parse the ignore file: one repo-relative path per line, # comments allowed. */
 export function parseIgnoreFile(text: string): string[] {
   return text.split('\n').map((l) => l.replace(/#.*/, '').trim()).filter(Boolean);
+}
+
+/** Parse the allow-list file: one literal fake value per line; lines starting with # are comments. */
+export function parseAllowFile(text: string): string[] {
+  return text.split('\n').map((l) => l.replace(/\r$/, '')).filter((l) => l.trim() !== '' && !l.startsWith('#'));
 }

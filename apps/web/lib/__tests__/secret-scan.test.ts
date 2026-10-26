@@ -82,3 +82,28 @@ describe('exemptions and staged-blob scanning', () => {
     expect(code).toBe(1);
   });
 });
+
+import { parseAllowFile as _parseAllowFile, scanText as _scanText } from '../secret-scan';
+import { describe as _d, it as _it, expect as _e } from 'vitest';
+
+_d('exact-string allow-list', () => {
+  const fake = 'sk-ant-api03-abcdef1234567890';
+  const real = 'sk-ant-api03-ZZZZrealLookingKey9876543210';
+  _it('suppresses only a finding whose matched text equals a listed literal', () => {
+    _e(_scanText('a.ts', `const k = '${fake}'`).length).toBeGreaterThan(0);
+    _e(_scanText('a.ts', `const k = '${fake}'`, [fake])).toHaveLength(0);
+  });
+  _it('still reports a different key in the same file or on the same line', () => {
+    const text = `a = '${fake}'\nb = '${real}'`;
+    const f = _scanText('a.ts', text, [fake]);
+    _e(f.length).toBeGreaterThan(0);
+    _e(f.every((x) => x.line === 2)).toBe(true);
+    _e(_scanText('a.ts', `x('${fake}', '${real}')`, [fake]).length).toBeGreaterThan(0);
+  });
+  _it('does not allow a prefix or superset of a literal', () => {
+    _e(_scanText('a.ts', `k = '${fake}9999'`, [fake]).length).toBeGreaterThan(0);
+  });
+  _it('parses the allow file, skipping comments and blanks', () => {
+    _e(_parseAllowFile('# c\n\nabc\r\ndef\n')).toEqual(['abc', 'def']);
+  });
+});

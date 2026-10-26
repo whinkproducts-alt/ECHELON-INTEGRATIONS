@@ -86,7 +86,7 @@ export async function finalizeRun(runId: string, userId: string, opts: { resume?
   );
   if (!guarded.ok) memoryOk = false;
 
-  const status = cancelled ? 'CANCELLED' : report ? 'DONE' : 'FAILED';
+  const status = cancelled ? 'CANCELLED' : run.stopReason === 'budget_hard_limit' ? 'FAILED' : report ? 'DONE' : 'FAILED';
   await prisma.swarmRun.updateMany({
     where: { id: runId, userId },
     data: { status, result: report || null, finishedAt: new Date(), stopReason: run.stopReason ?? (cancelled ? 'cancelled' : null) },

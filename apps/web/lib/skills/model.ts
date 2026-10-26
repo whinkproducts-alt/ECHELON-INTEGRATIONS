@@ -36,8 +36,13 @@ export function extractJson(raw: string): unknown {
   return JSON.parse(t.slice(a, b + 1));
 }
 
+/** The only text any model sees, and therefore the only text that may ever be stored. */
+export function reviewedText(text: string): string {
+  return text.slice(0, config.maxModelChars);
+}
+
 function skillBlock(submissionId: string, text: string): string {
-  return wrapUntrustedContent(stripFakeUntrustedTags(text.slice(0, config.maxModelChars)), 'uploaded_skill', `skill:${submissionId}`);
+  return wrapUntrustedContent(stripFakeUntrustedTags(reviewedText(text)), 'uploaded_skill', `skill:${submissionId}`);
 }
 
 function personaBlock(r: ReviewerRecord): string {

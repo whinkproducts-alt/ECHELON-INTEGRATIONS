@@ -4,7 +4,7 @@ import config from '@/config/skill-pipeline.json';
 import { decryptKey, encryptKey, isEncryptionConfigured } from '@/lib/key-encryption';
 
 export interface ValidFile { filename: string; name: string; ext: string; text: string; sha256: string; sizeBytes: number }
-export type FileCheck = { ok: true; file: ValidFile } | { ok: false; error: string };
+export type FileCheck = { ok: true; file: ValidFile } | { ok: false; error: string; tooLong?: boolean };
 
 export function sanitizeFilename(raw: string): string {
   const base = (raw.split(/[\\/]/).pop() ?? '').replace(/[\u0000-\u001F\u007F‪-‮⁦-⁩]/g, '').trim();
@@ -47,6 +47,9 @@ export function checkFile(rawName: string, bytes: Uint8Array): FileCheck {
   } catch {
     return { ok: false, error: 'File is not valid UTF-8 text' };
   }
+  if (text.length > config.maxModelChars) {
+    return { ok: false, tooLong: true, error: `Skill text is ${text.length} characters; the limit is ${config.maxModelChars} because every character must be reviewed before it is stored. Split it into smaller files.` };
+  }
   if (ext === '.json') {
     try { JSON.parse(text); } catch { return { ok: false, error: 'File is not valid JSON' }; }
   }
@@ -60,7 +63,17 @@ export function checkFile(rawName: string, bytes: Uint8Array): FileCheck {
 }
 
 /** At rest: AES-256-GCM through lib/key-encryption.ts when configured, otherwise plain text. */
+export function plaintextAllowed(): boolean {
+  return process.env.SKILL_ALLOW_PLAINTEXT === 'true';
+}
+
+/** True when uploads may be stored: the encryption key is configured, or plaintext was explicitly allowed. */
+export function storageReady(): boolean {
+  return isEncryptionConfigured() || plaintextAllowed();
+}
+
 export function packContent(text: string): string {
+  if (!storageReady()) throw new Error('encryption key not configured');
   return isEncryptionConfigured() ? `enc:${encryptKey(text)}` : `raw:${text}`;
 }
 

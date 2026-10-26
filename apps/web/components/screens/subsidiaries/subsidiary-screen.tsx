@@ -9,6 +9,7 @@ import { PersonaAvatar } from '@/components/ui/persona-avatar';
 import { accentStyle } from './accent';
 import { humanize } from './format';
 import { ProjectPortfolioCard } from './project-card';
+import { SubsidiaryContracts } from '@/components/screens/contracts/subsidiary-contracts';
 import { SubsidiaryLogo } from './subsidiary-logo';
 import { useJson } from './use-json';
 import type { ProjectCardData, SubsidiaryInfo, SubsidiaryProjectsResponse } from './types';
@@ -155,6 +156,12 @@ export function SubsidiaryScreen({ id, subsidiary }: { id: string; subsidiary: S
           <h2 id="portfolio-title" className="font-display text-2xl font-semibold text-foreground">Project portfolio</h2>
           <Portfolio id={id} name={name} />
         </section>
+        {subsidiary && (
+          <section aria-labelledby="contracts-title" className="space-y-4">
+            <h2 id="contracts-title" className="font-display text-2xl font-semibold text-foreground">Contracts</h2>
+            <SubsidiaryContracts subsidiaryId={id} />
+          </section>
+        )}
         {subsidiary && <Directors s={subsidiary} />}
         {subsidiary && (
           <>

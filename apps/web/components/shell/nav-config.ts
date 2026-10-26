@@ -4,8 +4,11 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Command, Sun, MessageSquare, Orbit, Brain, FileText, Newspaper, Network, Users, BookUser, Building2, Contact,
   FolderKanban, CheckSquare, Bot, Plug, Gauge, ShieldAlert, Settings, Link2, CreditCard,
+  ClipboardCheck, ScrollText, Activity, Video,
+  FileSignature, Landmark, GitPullRequest,
 } from 'lucide-react';
 
+import { BookOpenCheck, Waypoints, Moon } from 'lucide-react';
 import { getSubsidiaryList } from '@/components/subsidiaries/subsidiary-map';
 
 // Subsidiary names come from config so the palette finds the hub by each name, with no names hardcoded here.
@@ -63,12 +66,22 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'workforce', label: 'Workforce', href: '/dashboard/workforce', icon: Bot, group: 'operations', description: 'Agents and what they are doing', keywords: ['agents', 'staff'], status: 'soon' },
   { id: 'connectors', label: 'Connectors', href: '/dashboard/connectors', icon: Plug, group: 'operations', description: 'Connected tools and gateways', keywords: ['mcp', 'integrations', 'gateway'], status: 'soon' },
   { id: 'usage', label: 'Usage', href: '/dashboard/usage', icon: Gauge, group: 'operations', description: 'Model usage and limits', keywords: ['cost', 'tokens', 'limits'], status: 'soon' },
+  { id: 'contracts', label: 'Contracts', href: '/dashboard/contracts', icon: FileSignature, group: 'operations', description: 'Agreements you hold, with renewals', keywords: ['agreements', 'renewals', 'counterparty', 'legal'], status: 'live' },
+  { id: 'finance', label: 'Finance', href: '/dashboard/finance', icon: Landmark, group: 'operations', description: 'Contract value, upcoming dates and model spend (read only)', keywords: ['money', 'spend', 'budget', 'revenue', 'currency'], status: 'live' },
+  { id: 'change-requests', label: 'Change requests', href: '/dashboard/change-requests', icon: GitPullRequest, group: 'operations', description: 'Ask for product changes, approve what is sent', keywords: ['feature', 'pull request', 'github', 'issue', 'build'], status: 'live' },
 
   { id: 'security', label: 'Security', href: '/dashboard/security', icon: ShieldAlert, group: 'security', description: 'Security events, approvals and the ledger', keywords: ['ledger', 'approvals', 'audit'], status: 'soon' },
 
   { id: 'settings', label: 'Settings', href: '/dashboard/settings', icon: Settings, group: 'settings', description: 'Preferences and profile', keywords: ['preferences', 'install', 'app'], status: 'live' },
   { id: 'connected-apps', label: 'Connected apps', href: '/dashboard/settings/connected-apps', icon: Link2, group: 'settings', description: 'Social platform connections', keywords: ['social', 'x', 'instagram', 'tiktok'], status: 'live' },
   { id: 'billing', label: 'Billing', href: '/dashboard/settings/billing', icon: CreditCard, group: 'settings', description: 'Plan and billing', keywords: ['plan', 'invoice'], status: 'live' },
+  { id: 'approvals', label: 'Approvals', href: '/dashboard/approvals', icon: ClipboardCheck, group: 'security', description: 'Requests waiting for your yes, and their history', keywords: ['approve', 'deny', 'pending', 'protected', 'money', 'history'], status: 'live' },
+  { id: 'ledger', label: 'Ledger', href: '/dashboard/ledger', icon: ScrollText, group: 'security', description: 'Search every action that ran, waited or was denied', keywords: ['audit', 'log', 'actions', 'correlation', 'security events'], status: 'live' },
+  { id: 'system', label: 'System health', href: '/dashboard/system', icon: Activity, group: 'operations', description: 'Status of the database, models, gateway and worker', keywords: ['status', 'health', 'uptime', 'ollama', 'gateway', 'migrations'], status: 'live' },
+  { id: 'meeting', label: 'Meeting room', href: '/dashboard/meeting', icon: Video, group: 'people', description: 'Start a private video meeting with the board', keywords: ['video', 'jitsi', 'call', 'board'], status: 'live' },
+  { id: 'skills', label: 'Skill library', href: '/dashboard/skills', icon: BookOpenCheck, group: 'intelligence', description: 'Upload skills, scanned and reviewed before they reach memory', keywords: ['skills', 'upload', 'knowledge', 'pipeline', 'scan', 'committee'], status: 'live' },
+  { id: 'swarm', label: 'Swarm control', href: '/dashboard/swarm', icon: Waypoints, group: 'operations', description: 'Plan and run a swarm of agents on one initiative', keywords: ['swarm', 'agents', 'initiative', 'parallel', 'lanes'], status: 'live' },
+  { id: 'roster', label: 'Standing roster', href: '/dashboard/roster', icon: Moon, group: 'operations', description: 'The always-on organisation and its background worker', keywords: ['roster', 'worker', 'heartbeat', 'jobs', 'always on', 'schedule'], status: 'live' },
 ];
 
 /** Longest matching href wins, so /dashboard/holo/news highlights Intelligence feed, not Holo. */

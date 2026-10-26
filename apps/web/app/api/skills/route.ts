@@ -7,7 +7,7 @@ import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/permission-engine';
 import { recordActionSafe } from '@/lib/ledger';
 import config from '@/config/skill-pipeline.json';
-import { checkFile } from '@/lib/skills/intake';
+import { checkFile, storageReady } from '@/lib/skills/intake';
 import { countToday, enqueueSubmission, resumeStalled, startProcessing } from '@/lib/skills/pipeline';
 
 const LIST_SELECT = {
@@ -44,6 +44,10 @@ export async function POST(req: Request) {
   if ('response' in a) return a.response;
   const userId = a.userId;
 
+  if (!storageReady()) {
+    return NextResponse.json({ error: 'Skill uploads are unavailable: encryption key not configured' }, { status: 503 });
+  }
+
   const limited = await limitOr429('import', userId);
   if (limited) return limited as NextResponse;
 
@@ -79,12 +83,12 @@ export async function POST(req: Request) {
   }
 
   const submissions: Array<{ id: string; filename: string; name: string; status: string; duplicate: boolean }> = [];
-  const rejected: Array<{ filename: string; error: string }> = [];
+  const rejected: Array<{ filename: string; error: string; status?: number }> = [];
   for (const f of files) {
     const filename = f.name.slice(0, 200);
     if (f.size > config.maxFileBytes) { rejected.push({ filename, error: `File exceeds ${Math.floor(config.maxFileBytes / 1024)} KB` }); continue; }
     const check = checkFile(f.name, new Uint8Array(await f.arrayBuffer()));
-    if (!check.ok) { rejected.push({ filename, error: check.error }); continue; }
+    if (!check.ok) { rejected.push({ filename, error: check.error, ...(check.tooLong ? { status: 413 } : {}) }); continue; }
     const existing = await prisma.skillSubmission.findFirst({ where: { userId, sha256: check.file.sha256 }, select: { id: true, status: true } });
     if (existing) { submissions.push({ id: existing.id, filename: check.file.filename, name: check.file.name, status: existing.status, duplicate: true }); continue; }
     if (used >= config.dailyCap) { rejected.push({ filename, error: 'Daily skill upload cap reached' }); continue; }
@@ -93,6 +97,9 @@ export async function POST(req: Request) {
     submissions.push({ id: q.id, filename: check.file.filename, name: check.file.name, status: 'QUEUED', duplicate: q.duplicate });
   }
 
-  if (submissions.length === 0) return NextResponse.json({ error: 'No files accepted', rejected }, { status: 400 });
+  if (submissions.length === 0) {
+    const allTooLong = rejected.length > 0 && rejected.every((r) => r.status === 413);
+    return NextResponse.json({ error: allTooLong ? rejected[0].error : 'No files accepted', rejected }, { status: allTooLong ? 413 : 400 });
+  }
   return NextResponse.json({ submissions, rejected }, { status: 202 });
 }

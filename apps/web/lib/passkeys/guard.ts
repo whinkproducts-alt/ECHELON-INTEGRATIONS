@@ -32,6 +32,11 @@ export async function passkeyLimit(req: Request, userId?: string | null): Promis
   return limited ? new NextResponse(limited.body, { status: 429, headers: limited.headers }) : null;
 }
 
+/** Client key for cap buckets: trusted address or the shared route bucket. */
+export function challengeBucket(req: Request): string {
+  return `a:${clientKey(req.headers) ?? 'route'}`;
+}
+
 export function loadConfig(): { cfg: WebAuthnConfig } | { response: NextResponse } {
   try {
     return { cfg: getWebAuthnConfig() };
@@ -60,8 +65,13 @@ export async function ledgerPasskey(
 }
 
 /** Security event (SECURITY_EVENT: prefix, as read by countSecurityEvents). Unknown user: log only. */
-export async function passkeySecurityEvent(userId: string | null, event: string, detail: Record<string, unknown> = {}): Promise<void> {
+export async function passkeySecurityEvent(
+  userId: string | null,
+  event: string,
+  detail: Record<string, unknown> = {},
+  status: 'EXECUTED' | 'DENIED' = 'DENIED',
+): Promise<void> {
   logger.security('passkey security event', { event, userId: userId ?? undefined });
   if (!userId) return;
-  await ledgerPasskey(userId, `SECURITY_EVENT:${event}`, 'DENIED', detail);
+  await ledgerPasskey(userId, `SECURITY_EVENT:${event}`, status, detail);
 }

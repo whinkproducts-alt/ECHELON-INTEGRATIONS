@@ -21,6 +21,7 @@ CREATE TABLE "passkey_challenges" (
     "challenge" TEXT NOT NULL,
     "purpose" TEXT NOT NULL,
     "remember" BOOLEAN NOT NULL DEFAULT false,
+    "clientKey" TEXT,
     "expiresAt" TIMESTAMP(3) NOT NULL,
     "usedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -37,5 +38,10 @@ CREATE INDEX "passkey_credentials_userId_idx" ON "passkey_credentials"("userId")
 -- CreateIndex
 CREATE INDEX "passkey_challenges_expiresAt_idx" ON "passkey_challenges"("expiresAt");
 
+-- CreateIndex
+CREATE INDEX "passkey_challenges_clientKey_purpose_idx" ON "passkey_challenges"("clientKey", "purpose");
+
 -- AddForeignKey
 ALTER TABLE "passkey_credentials" ADD CONSTRAINT "passkey_credentials_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "passkey_challenges" ADD CONSTRAINT "passkey_challenges_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

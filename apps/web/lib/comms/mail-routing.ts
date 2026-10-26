@@ -30,7 +30,16 @@ function isValidAddress(a: string): boolean {
   return a.length <= 254 && ADDRESS_RE.test(a) && !a.includes('..');
 }
 
-export function routeRecipient(address: string, config: MailRoutingConfig = raw): RoutedRecipient {
+/**
+ * The catch-all is the OWNER's inbox, so it applies only when the sending account is an owner
+ * (`senderIsOwner`). Mail from any other account goes to the real address unchanged; otherwise
+ * one tenant's staff mail would land with the owner.
+ */
+export function routeRecipient(
+  address: string,
+  opts: { senderIsOwner: boolean },
+  config: MailRoutingConfig = raw,
+): RoutedRecipient {
   const original = typeof address === 'string' ? address.trim().toLowerCase() : '';
   if (!isValidAddress(original)) return { valid: false, deliverTo: '', original, routed: false };
   const catchAll = config.catchAllTo.trim().toLowerCase();
@@ -40,7 +49,7 @@ export function routeRecipient(address: string, config: MailRoutingConfig = raw)
   // The ADDRESS_RE guarantees exactly one '@', so the domain is everything after it. Exact match
   // only: no suffix or subdomain matching.
   const domain = original.slice(original.indexOf('@') + 1);
-  if (domains.includes(domain)) return { valid: true, deliverTo: catchAll, original, routed: true };
+  if (opts.senderIsOwner && domains.includes(domain)) return { valid: true, deliverTo: catchAll, original, routed: true };
   return { valid: true, deliverTo: original, original, routed: false };
 }
 

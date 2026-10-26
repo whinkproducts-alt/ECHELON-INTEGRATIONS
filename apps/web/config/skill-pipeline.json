@@ -1,5 +1,11 @@
 {
-  "allowedExtensions": [".md", ".txt", ".json", ".yaml", ".yml"],
+  "allowedExtensions": [
+    ".md",
+    ".txt",
+    ".json",
+    ".yaml",
+    ".yml"
+  ],
   "maxFileBytes": 262144,
   "maxFilesPerRequest": 10,
   "dailyCap": 20,
@@ -19,5 +25,7 @@
     "Executive Office & Corporate Strategy",
     "Engineering & Technology",
     "Data & Artificial Intelligence"
-  ]
+  ],
+  "limitsNote": "maxModelChars is the hard limit on skill text length: a file longer than this is rejected at upload because only this many characters are ever sent to the security agent and committee, and nothing a model did not see may be stored. leaseMinutes is how long a runner owns a submission before another may take it.",
+  "leaseMinutes": 5
 }

@@ -22,8 +22,21 @@ const LOADERS: Record<string, Loader> = {
   subsidiaries: () => import('@/components/screens/subsidiaries/subsidiaries-screen'),
   subsidiary: () => import('@/components/screens/subsidiaries/subsidiary-screen'),
   'project-report': () => import('@/components/screens/subsidiaries/project-report-screen'),
+  passkeys: () => import('@/app/dashboard/settings/_components/passkeys-panel').then((m) => ({ default: () => <div className="mx-auto max-w-3xl p-4 sm:p-8"><m.PasskeysPanel /></div> })),
+  approvals: () => import('@/components/screens/approvals/approvals-screen'),
+  ledger: () => import('@/components/screens/ledger/ledger-screen'),
+  system: () => import('@/components/screens/system/system-screen'),
+  meeting: () => import('@/components/screens/meeting/meeting-screen'),
+  skills: () => import('@/components/screens/skills/skills-screen'),
+  swarm: () => import('@/components/screens/swarm/swarm-screen'),
+  'swarm-run': () => import('@/components/screens/swarm/run-screen'),
+  contracts: () => import('@/components/screens/contracts/contracts-screen'),
+  contract: () => import('@/components/screens/contracts/contract-detail-screen'),
+  finance: () => import('@/components/screens/finance/finance-screen'),
+  'change-requests': () => import('@/components/screens/change-requests/change-requests-screen'),
+  'change-request': () => import('@/components/screens/change-requests/change-request-detail-screen'),
 };
-export const SERVER_SCREENS = ['board', 'directory', 'workforce', 'companies'] as const;
+export const SERVER_SCREENS = ['board', 'directory', 'workforce', 'companies', 'roster'] as const;
 export const ALL_SCREENS = [...SERVER_SCREENS, ...Object.keys(LOADERS)];
 
 const STATES: PreviewState[] = ['ready', 'loading', 'error', 'empty'];

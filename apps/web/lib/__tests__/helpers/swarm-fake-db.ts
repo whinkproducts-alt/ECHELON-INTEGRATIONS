@@ -26,7 +26,7 @@ export function createSwarmFakeDb() {
   const p2002 = () => Object.assign(new Error('unique'), { code: 'P2002' });
   const defaults: Record<string, Row> = {
     run: { status: 'PLANNED', tokensUsed: 0, cancelRequested: false, stopReason: null, result: null, startedAt: null, finishedAt: null, projectId: null, subsidiary: null },
-    task: { status: 'PENDING', attempts: 0, output: null, error: null, tokensIn: 0, tokensOut: 0, startedAt: null, finishedAt: null, estimatedCalls: 1 },
+    task: { status: 'PENDING', attempts: 0, output: null, error: null, tokensIn: 0, tokensOut: 0, startedAt: null, finishedAt: null, estimatedCalls: 1, claimOwner: null, heartbeatAt: null },
   };
   const sortDesc = (rows: Row[]) => rows.slice().sort((a, b) => b._seq - a._seq);
   const take = (rows: Row[], n?: number) => (n ? rows.slice(0, n) : rows);

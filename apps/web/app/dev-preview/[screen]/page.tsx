@@ -4,6 +4,9 @@ import { notFound } from 'next/navigation';
 import { BoardScreen } from '@/components/screens/board/board-screen';
 import { getBoardMembers } from '@/lib/board';
 import { getSubsidiary } from '@/lib/subsidiaries';
+import { toMeetingProps } from '@/components/screens/meeting/props';
+import { RosterScreen } from '@/components/screens/roster/roster-screen';
+import { getRosterView } from '@/components/screens/roster/server-data';
 import { PreviewClient } from '../_components/preview-client';
 import type { PreviewState } from '../_components/fixtures';
 
@@ -32,8 +35,9 @@ export default async function DevPreviewPage({ params, searchParams }: {
   const loadPage = SERVER_PAGES[screen];
   const Page = loadPage ? ((await loadPage()).default as unknown as React.ComponentType) : null;
   // The real board page is owner-gated through auth(); the dev preview renders the screen directly.
-  const body = screen === 'board' ? <BoardScreen members={getBoardMembers()} /> : Page ? <Page /> : undefined;
+  const body = screen === 'board' ? <BoardScreen members={getBoardMembers()} /> : screen === 'roster' ? <RosterScreen {...getRosterView()} /> : Page ? <Page /> : undefined;
   // SubsidiaryScreen takes its config row from the server page; the harness supplies it the same way.
-  const extraProps = screen === 'subsidiary' ? { subsidiary: getSubsidiary(entityId ?? 'consult') } : undefined;
+  const extraProps = screen === 'subsidiary' ? { subsidiary: getSubsidiary(entityId ?? 'consult') }
+    : screen === 'meeting' ? { ...toMeetingProps(getBoardMembers()) } : undefined;
   return <PreviewClient screen={screen} state={state} entityId={entityId} extraProps={extraProps}>{body}</PreviewClient>;
 }

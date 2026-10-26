@@ -5,6 +5,9 @@ export type PreviewState = 'ready' | 'loading' | 'error' | 'empty';
 export interface Mocked { status: number; body: unknown; delayMs?: number }
 
 import catalog from '@/config/connectors.catalog.json';
+import { answerWave } from './fixtures-wave-contracts';
+import { answerOps } from './fixtures-ops';
+import { answerSwarm } from './fixtures-swarm';
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -157,14 +160,20 @@ export interface MockCtx { state: PreviewState; now: () => number; counters: { c
 
 /** Returns null when the URL is not one the harness knows (the caller answers 404). */
 export function answer(method: string, url: URL, body: unknown, ctx: MockCtx): Mocked | null {
+  const ops = answerOps(method, url, body, ctx);
+  if (ops) return ops;
+  const swarm = answerSwarm(method, url, body, ctx);
+  if (swarm) return swarm;
   const p = url.pathname;
   const { state } = ctx;
-  const isData = p === '/api/contacts' || p === '/api/usage' || p === '/api/connectors' || p === '/api/news' || p === '/api/ledger' || p === '/api/approvals' || p === '/api/memory' || p === '/api/security/status' || p === '/api/board' || p === '/api/subsidiaries' || p === '/api/projects' || /^\/api\/(subsidiaries\/[^/]+\/projects|projects\/[^/]+(\/report)?)$/.test(p);
+  const isData = p === '/api/contacts' || p === '/api/usage' || p === '/api/connectors' || p === '/api/news' || p === '/api/ledger' || p === '/api/approvals' || p === '/api/memory' || p === '/api/security/status' || p === '/api/board' || p === '/api/recommendations' || p === '/api/auth/passkey' || p === '/api/subsidiaries' || p === '/api/projects' || /^\/api\/(subsidiaries\/[^/]+\/projects|projects\/[^/]+(\/report)?)$/.test(p);
   if (isData && method === 'GET') {
     if (state === 'error') return { status: 500, body: { error: 'Fixture error' } };
     if (state === 'loading') return { status: 200, body: {}, delayMs: 600_000 };
   }
   const empty = state === 'empty';
+  const wave = answerWave(method, url, body, ctx);
+  if (wave) return wave;
 
   if (p === '/api/auth/session') return { status: 200, body: {} };
   if (p === '/api/tenant/config') return { status: 200, body: {} };
@@ -237,6 +246,27 @@ export function answer(method: string, url: URL, body: unknown, ctx: MockCtx): M
     const r = report(pd[1]);
     return { status: 200, body: { ...r.project, tasks: r.tasks.map((t) => ({ id: t.id, title: t.title, status: t.status })), risks: r.risks, openQuestions: r.openQuestions, decisions: r.decisions } };
   }
+  if (p === '/api/recommendations') {
+    return { status: 200, body: { items: empty ? [] : [
+      { id: 'rec_fixture_0001', source: 'Fixture Scout', kind: 'project_stalled', title: 'Fixture project has not moved in 9 days', body: 'Placeholder text. A made-up milestone is overdue.', link: '/dashboard/companies', severity: 'warning', createdAt: '2026-10-25T09:00:00.000Z' },
+      { id: 'rec_fixture_0002', source: 'Fixture Analyst', kind: 'brief', title: 'Weekly brief is ready', body: 'Nothing real here. <b>Markup</b> stays plain text.', link: 'https://example.test/not-internal', severity: 'info', createdAt: '2026-10-25T08:00:00.000Z' },
+      { id: 'rec_fixture_0003', source: 'Fixture Watch', kind: 'security_watch', title: 'Unusual number of blocked requests', body: 'Counts only. Fixture data.', link: null, severity: 'critical', createdAt: '2026-10-25T07:00:00.000Z' },
+    ] } };
+  }
+  if (/^\/api\/recommendations\/[^/]+\/dismiss$/.test(p)) return { status: 200, body: { ok: true } };
+  if (p === '/api/auth/passkey') return { status: 200, body: { passkeys: empty ? [] : [
+    { id: 'pk_fixture_1', deviceName: 'Fixture MacBook', createdAt: '2026-09-01T10:00:00.000Z', lastUsedAt: '2026-10-24T10:00:00.000Z' },
+    { id: 'pk_fixture_2', deviceName: 'Fixture phone', createdAt: '2026-10-02T10:00:00.000Z', lastUsedAt: null },
+  ] } };
+  // Re-auth contract: exactly one of {password} or {ticket}. Fixture password is 'fixture-password'; anything else is a 403.
+  const proofOk = (b: unknown) => { const o = (b ?? {}) as { password?: string; ticket?: string }; return (o.password === undefined) !== (o.ticket === undefined) && (o.ticket !== undefined || o.password === 'fixture-password'); };
+  if (/^\/api\/auth\/passkey\/[^/]+$/.test(p) && method === 'DELETE') {
+    return proofOk(body) ? { status: 200, body: { ok: true, ticket: 'fixture-ticket', expiresInSeconds: 60 } } : { status: 403, body: { error: 'Re-authentication failed' } };
+  }
+  if (p === '/api/auth/passkey/register/options') {
+    return proofOk(body) ? { status: 503, body: { error: 'Passkeys are not available' } } : { status: 403, body: { error: 'Re-authentication failed' } };
+  }
+  if (p === '/api/auth/passkey/login/options') return { status: 503, body: { error: 'Passkeys are not available' } };
   if (p === '/api/news') return { status: 200, body: empty ? { items: [], fetchedAt: iso(ctx.now()) } : NEWS };
   if (p === '/api/usage') return { status: 200, body: usage(url.searchParams.get('range') ?? '7d') };
   if (p === '/api/connectors') return { status: 200, body: { connectors: empty ? [] : CONNECTORS } };

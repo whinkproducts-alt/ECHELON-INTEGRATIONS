@@ -68,6 +68,7 @@ export const RATE_RULES = {
   contracts: { limit: 60, windowMs: 60_000 },
   swarm: { limit: 6, windowMs: 60_000 },
   passkey: { limit: 20, windowMs: 60_000 },
+  passkey_reauth: { limit: 5, windowMs: 60_000 },
   recommendations: { limit: 60, windowMs: 60_000 },
   /** Read-only history, ledger search and health routes. */
   read: { limit: 120, windowMs: 60_000 },

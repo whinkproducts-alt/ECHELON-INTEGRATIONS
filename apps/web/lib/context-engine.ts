@@ -1,4 +1,4 @@
-import { semanticEnvelopeSource } from '@/lib/skills/labels';
+import { isTaintingSourceType, semanticEnvelopeSource } from '@/lib/skills/labels';
 import { prisma } from '@/lib/db';
 import { listWorkingMemory } from '@/lib/working-memory';
 import { filterToolResult, scanForInjectionPatterns, stripFakeUntrustedTags, wrapUntrustedContent } from '@/lib/content-isolation';
@@ -119,6 +119,7 @@ export async function assembleContext(
       const entry = wrapUntrustedContent(raw, semanticEnvelopeSource((mem as { sourceType?: string | null }).sourceType), mem.id);
       if (budget - entry.length > 0) {
         result.semanticMemories.push(entry);
+        if (isTaintingSourceType((mem as { sourceType?: string | null }).sourceType)) result.externalContentThisTurn = true;
         budget -= entry.length;
       }
     }
@@ -225,6 +226,7 @@ export async function assembleContext(
       const entry = wrapUntrustedContent(raw, semanticEnvelopeSource((mem as { sourceType?: string | null }).sourceType), mem.id);
       if (budget - entry.length > 0) {
         result.semanticMemories.push(entry);
+        if (isTaintingSourceType((mem as { sourceType?: string | null }).sourceType)) result.externalContentThisTurn = true;
         budget -= entry.length;
       }
     }

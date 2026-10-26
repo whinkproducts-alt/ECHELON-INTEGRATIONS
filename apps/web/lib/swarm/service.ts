@@ -38,12 +38,30 @@ export interface BudgetFlag {
   used: number;
   limit: number | null;
   estimatedTokens: number;
+  /** Remaining estimated tokens of this user's other PLANNED/RUNNING runs, counted in the projection. */
+  committedTokens: number;
 }
 
-export async function budgetFor(userId: string, estimatedTokens: number): Promise<BudgetFlag> {
+/**
+ * Tokens other live runs of this user may still spend: PLANNED runs their whole estimate, RUNNING runs the
+ * estimate minus what is already metered (that part is in usage already), FINALIZING runs nothing.
+ */
+export async function committedTokens(userId: string, excludeRunId?: string): Promise<number> {
+  const rows = (await prisma.swarmRun.findMany({ where: { userId, status: { in: ['PLANNED', 'RUNNING'] } } })) as RunRow[];
+  let sum = 0;
+  for (const r of rows) {
+    if (r.id === excludeRunId) continue;
+    const est = (r.estimate as SwarmEstimate | null)?.tokens ?? 0;
+    sum += r.status === 'PLANNED' ? est : Math.max(0, est - r.tokensUsed);
+  }
+  return sum;
+}
+
+export async function budgetFor(userId: string, estimatedTokens: number, excludeRunId?: string): Promise<BudgetFlag> {
   const b = await budgetState(userId);
-  const projectedState = decideBudget(b.used + estimatedTokens, b.limit, b.softPct, b.hardPct);
-  return { state: b.state, projectedState, flag: projectedState === 'hard' ? 'red' : projectedState === 'soft' ? 'amber' : 'none', used: b.used, limit: b.limit, estimatedTokens };
+  const committed = await committedTokens(userId, excludeRunId);
+  const projectedState = decideBudget(b.used + committed + estimatedTokens, b.limit, b.softPct, b.hardPct);
+  return { state: b.state, projectedState, flag: projectedState === 'hard' ? 'red' : projectedState === 'soft' ? 'amber' : 'none', used: b.used, limit: b.limit, estimatedTokens, committedTokens: committed };
 }
 
 export type ServiceResult<T> =
@@ -136,7 +154,7 @@ export async function startRun(userId: string, id: string): Promise<ServiceResul
   if (!row) return { ok: false, status: 404, error: 'Not found' };
   if (row.status !== 'PLANNED') return { ok: false, status: 409, error: 'Run is not in PLANNED state', code: 'not_planned' };
   const est = row.estimate as SwarmEstimate;
-  const budget = await budgetFor(userId, est.tokens);
+  const budget = await budgetFor(userId, est.tokens, id);
   if (budget.state === 'hard' || budget.projectedState === 'hard') {
     await writeLedger({
       userId, action: 'swarm_start_refused', tool: 'swarm_start', permissionClass: 'A', status: 'DENIED', initiator: 'user', persona: 'WHINK', correlationId: id,
@@ -149,11 +167,22 @@ export async function startRun(userId: string, id: string): Promise<ServiceResul
       summary: `explicit_start=1 agents=${row.agentCount} estTokens=${est.tokens} estCalls=${est.expectedCalls} etaSeconds=${est.etaSeconds} budget=${budget.flag}` },
     async () => {
       const moved = await prisma.swarmRun.updateMany({ where: { id, userId, status: 'PLANNED' }, data: { status: 'RUNNING', startedAt: new Date() } });
-      return moved.count === 1;
+      if (moved.count !== 1) return 'conflict' as const;
+      // Cap on concurrently running runs per user. Checked after the atomic move so racing starts cannot both slip past.
+      const running = (await prisma.swarmRun.findMany({ where: { userId, status: 'RUNNING' } })) as RunRow[];
+      if (running.length > swarmConfig().maxConcurrentRuns) {
+        await prisma.swarmRun.updateMany({ where: { id, userId, status: 'RUNNING' }, data: { status: 'PLANNED', startedAt: null } });
+        return 'limit' as const;
+      }
+      return 'started' as const;
     },
   );
   if (!g.ok) return { ok: false, status: g.status === 403 ? 403 : 500, error: g.error };
-  if (!g.value) return { ok: false, status: 409, error: 'Run was already started', code: 'not_planned' };
+  if (g.value === 'limit') {
+    await writeLedger({ userId, action: 'swarm_start_refused', tool: 'swarm_start', permissionClass: 'A', status: 'DENIED', initiator: 'user', persona: 'WHINK', correlationId: id, metadata: { reason: 'too_many_running', max: swarmConfig().maxConcurrentRuns } });
+    return { ok: false, status: 409, error: 'Too many runs are already running. Wait for one to finish or cancel it.', code: 'too_many_running' };
+  }
+  if (g.value === 'conflict') return { ok: false, status: 409, error: 'Run was already started', code: 'not_planned' };
   void runSwarm(id, userId).catch(() => {});
   const fresh = (await prisma.swarmRun.findFirst({ where: { id, userId } })) as RunRow | null;
   return { ok: true, value: { run: runView((fresh ?? row) as RunRow), budget } };

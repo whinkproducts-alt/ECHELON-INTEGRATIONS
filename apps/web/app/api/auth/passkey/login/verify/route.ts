@@ -4,8 +4,9 @@ import { z } from 'zod';
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
 import { prisma } from '@/lib/db';
 import { readJsonBody } from '@/lib/api-helpers';
+import { auth } from '@/auth';
 import { loadConfig, passkeyCsrf, passkeyLimit, ledgerPasskey, passkeySecurityEvent } from '@/lib/passkeys/guard';
-import { consumeChallenge, mintLoginTicket } from '@/lib/passkeys/challenges';
+import { consumeChallenge, mintLoginTicket, mintReauthTicket, REAUTH_TTL_MS } from '@/lib/passkeys/challenges';
 
 const Body = z
   .object({
@@ -29,7 +30,13 @@ export async function POST(req: Request) {
   const body = Body.safeParse(parsed.body);
   if (!body.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
-  const ch = await consumeChallenge(body.data.challengeId, 'login');
+  let ch = await consumeChallenge(body.data.challengeId, 'login');
+  let reauthUser: string | null = null;
+  if (!ch) {
+    // Not a login challenge: maybe a re-auth challenge bound to the signed-in user.
+    reauthUser = (await auth())?.user?.id ?? null;
+    if (reauthUser) ch = await consumeChallenge(body.data.challengeId, 'reauth', { userId: reauthUser });
+  }
   if (!ch) return fail();
 
   const cred = await prisma.passkeyCredential.findUnique({ where: { credentialId: body.data.response.id } });
@@ -89,6 +96,15 @@ export async function POST(req: Request) {
     return fail();
   }
 
+  if (reauthUser) {
+    if (cred.userId !== reauthUser) {
+      await passkeySecurityEvent(reauthUser, 'passkey_user_mismatch');
+      return fail();
+    }
+    const rt = await mintReauthTicket(reauthUser);
+    await ledgerPasskey(reauthUser, 'passkey_reauth', 'EXECUTED', { passkeyId: cred.id });
+    return NextResponse.json({ ticket: rt, expiresInSeconds: REAUTH_TTL_MS / 1000 }, { headers: { 'cache-control': 'no-store' } });
+  }
   const ticket = await mintLoginTicket(cred.userId, ch.remember);
   await ledgerPasskey(cred.userId, 'passkey_login', 'EXECUTED', { passkeyId: cred.id, remember: ch.remember });
   return NextResponse.json({ ticket, expiresInSeconds: 60 }, { headers: { 'cache-control': 'no-store' } });

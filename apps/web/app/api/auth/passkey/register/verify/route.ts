@@ -3,9 +3,11 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyRegistrationResponse } from '@simplewebauthn/server';
 import { prisma } from '@/lib/db';
+import { auth } from '@/auth';
 import { requireUserId, readJsonBody } from '@/lib/api-helpers';
 import { loadConfig, passkeyCsrf, passkeyLimit, ledgerPasskey, passkeySecurityEvent } from '@/lib/passkeys/guard';
-import { consumeChallenge } from '@/lib/passkeys/challenges';
+import { consumeChallenge, mintLoginTicket } from '@/lib/passkeys/challenges';
+import { bumpSessionVersion } from '@/lib/auth/session-version';
 
 const Body = z
   .object({
@@ -66,5 +68,15 @@ export async function POST(req: Request) {
     select: { id: true, deviceName: true, createdAt: true },
   });
   await ledgerPasskey(u.userId, 'passkey_registered', 'EXECUTED', { passkeyId: row.id });
-  return NextResponse.json({ passkey: { id: row.id, deviceName: row.deviceName, createdAt: row.createdAt } }, { status: 201 });
+  // Owner-visible notice (Neural Link shows SECURITY_EVENT rows).
+  await passkeySecurityEvent(u.userId, 'credential_added', { passkeyId: row.id, kind: 'passkey' }, 'EXECUTED');
+  // Adding a credential signs out every session of this user, including this one. Hand back a
+  // one-time ticket so the client can sign straight back in with signIn('passkey', { ticket }).
+  const remember = ((await auth())?.user as { remember?: boolean } | undefined)?.remember === true;
+  await bumpSessionVersion(u.userId);
+  const ticket = await mintLoginTicket(u.userId, remember);
+  return NextResponse.json(
+    { passkey: { id: row.id, deviceName: row.deviceName, createdAt: row.createdAt }, ticket, expiresInSeconds: 60 },
+    { status: 201, headers: { 'cache-control': 'no-store' } },
+  );
 }

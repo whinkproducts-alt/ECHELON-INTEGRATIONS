@@ -45,7 +45,9 @@ CREATE TABLE "swarm_tasks" (
     "error" TEXT,
     "tokensIn" INTEGER NOT NULL DEFAULT 0,
     "tokensOut" INTEGER NOT NULL DEFAULT 0,
+    "claimOwner" TEXT,
     "startedAt" TIMESTAMP(3),
+    "heartbeatAt" TIMESTAMP(3),
     "finishedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

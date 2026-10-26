@@ -2,11 +2,11 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { generateAuthenticationOptions } from '@simplewebauthn/server';
-import { readJsonBody } from '@/lib/api-helpers';
-import { loadConfig, passkeyCsrf, passkeyLimit } from '@/lib/passkeys/guard';
-import { issueChallenge } from '@/lib/passkeys/challenges';
+import { readJsonBody, requireUserId } from '@/lib/api-helpers';
+import { loadConfig, passkeyCsrf, passkeyLimit, challengeBucket } from '@/lib/passkeys/guard';
+import { issueChallenge, maybeCleanupChallenges, tooManyOpenChallenges } from '@/lib/passkeys/challenges';
 
-const Body = z.object({ remember: z.boolean().optional() }).strict();
+const Body = z.object({ remember: z.boolean().optional(), reauth: z.boolean().optional() }).strict();
 
 export async function POST(req: Request) {
   const csrf = passkeyCsrf(req);
@@ -21,8 +21,24 @@ export async function POST(req: Request) {
   const body = Body.safeParse(parsed.body);
   if (!body.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
+  // reauth: a signed-in user proves possession of a passkey (needed to add or remove one).
+  let reauthUser: string | null = null;
+  if (body.data.reauth === true) {
+    const u = await requireUserId();
+    if ('response' in u) return u.response;
+    reauthUser = u.userId;
+  }
+  void maybeCleanupChallenges();
+  const bucket = reauthUser ? `u:${reauthUser}` : challengeBucket(req);
+  const purpose = reauthUser ? 'reauth' : 'login';
+  if (await tooManyOpenChallenges(bucket, purpose)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+
   // No allowCredentials: discoverable credentials, so no email is needed.
   const options = await generateAuthenticationOptions({ rpID: cfg.cfg.rpID, userVerification: 'required' });
-  const challengeId = await issueChallenge('login', options.challenge, { remember: body.data.remember === true });
+  const challengeId = await issueChallenge(purpose, options.challenge, {
+    remember: body.data.remember === true,
+    userId: reauthUser,
+    clientKey: bucket,
+  });
   return NextResponse.json({ options, challengeId }, { headers: { 'cache-control': 'no-store' } });
 }

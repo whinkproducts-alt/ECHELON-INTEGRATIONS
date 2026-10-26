@@ -26,9 +26,11 @@ export function SignupForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, name }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(data?.error ?? 'Signup failed');
+        // 403 means signup is closed on this instance; the server sends a plain message, show it as is.
+        const msg = typeof data?.error === 'string' && data.error ? data.error : null;
+        setError(msg ?? (res.status === 403 ? 'Signups are closed on this instance.' : 'Signup failed'));
         return;
       }
       // Auto-login
@@ -69,7 +71,7 @@ export function SignupForm() {
               <label className="block text-sm font-medium text-muted-foreground mb-1.5">Password</label>
               <input suppressHydrationWarning type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2.5 bg-secondary rounded-md border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary text-sm" placeholder="••••••••" required minLength={6} />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
             <button suppressHydrationWarning type="submit" disabled={loading} className="w-full py-2.5 bg-primary text-primary-foreground rounded-md font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50">
               {loading ? 'Initializing...' : 'Create Account'}
             </button>

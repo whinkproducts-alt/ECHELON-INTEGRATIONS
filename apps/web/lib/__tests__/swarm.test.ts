@@ -26,7 +26,7 @@ vi.mock('@/lib/budget', async () => {
 });
 vi.mock('@/config/swarm.json', async () => {
   const actual = await vi.importActual<{ default: Record<string, unknown> }>('@/config/swarm.json');
-  return { default: { ...actual.default, retryDelayMs: 0, taskTimeoutMs: 5000, concurrency: 8 } };
+  return { default: { ...actual.default, retryDelayMs: 0, taskTimeoutMs: 5000, concurrency: 8, heartbeatMs: 20, budgetCheckMs: 0 } };
 });
 
 import { prisma } from '@/lib/db';
@@ -597,5 +597,192 @@ describe('security', () => {
     ];
     expect(calls.length).toBeGreaterThan(0);
     for (const c of calls) expect(c[0].where.userId).toBe(U);
+  });
+});
+
+const sleepMs = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function until(cond: () => boolean, ms = 4000) {
+  for (let i = 0; i < ms / 10 && !cond(); i++) await sleepMs(10);
+  if (!cond()) throw new Error('condition not met');
+}
+
+describe('lane exclusivity under supersession', () => {
+  it("a superseded engine's late DONE write is ignored", async () => {
+    const p = await plan();
+    await db.swarmRun.updateMany({ where: { id: p.run.id }, data: { status: 'RUNNING' } });
+    let open!: () => void;
+    const gate = new Promise<void>((r) => { open = r; });
+    brain.before = async (lane) => { if (lane === 'lane-1') await gate; };
+    const running = runSwarm(p.run.id, U);
+    await until(() => brain.perLane['lane-1'] === 1);
+    const t = () => tasksOf(p.run.id).find((x: any) => x.lane === 'lane-1');
+    expect(t().claimOwner).toBeTruthy();
+    // another engine takes over the lane (as after a resume)
+    await db.swarmTask.updateMany({ where: { id: t().id }, data: { claimOwner: 'engine-B' } });
+    open();
+    await sleepMs(60);
+    expect(t().status).toBe('RUNNING');
+    expect(t().output).toBeNull();
+    expect(db.tables.learning.some((l: any) => l.lane === 'lane-1')).toBe(false);
+    expect(h.ledger.some((e) => e.action === 'swarm_task_done' && e.metadata?.lane === 'lane-1')).toBe(false);
+    // engine B finishes the lane; the run completes with B's output only
+    await db.swarmTask.updateMany({ where: { id: t().id, claimOwner: 'engine-B' }, data: { status: 'DONE', output: { result: 'B', learnings: [], confidence: 0.8 } } });
+    await running;
+    expect(t().output.result).toBe('B');
+    expect(brain.perLane['lane-1']).toBe(1);
+  });
+
+  it('every task write after the claim carries the owner', async () => {
+    const p = await planAndRun();
+    const writes = db.swarmTask.updateMany.mock.calls.map((c: any) => c[0]).filter((a: any) => a.where.status === 'RUNNING');
+    expect(writes.length).toBeGreaterThan(0);
+    for (const w of writes) expect(typeof w.where.claimOwner).toBe('string');
+    expect(tasksOf(p.run.id).every((t: any) => t.claimOwner || t.status === 'SKIPPED')).toBe(true);
+  });
+
+  it('a task blocked waiting for a model slot is not RUNNING and has no stale timestamps', async () => {
+    const x = await plan();
+    await db.swarmRun.updateMany({ where: { id: x.run.id }, data: { status: 'RUNNING' } });
+    let open!: () => void;
+    const gate = new Promise<void>((r) => { open = r; });
+    brain.before = async () => { if (brain.calls.length <= 8) await gate; };
+    const runX = runSwarm(x.run.id, U);
+    await until(() => brain.calls.length === 8);
+    const y = await plan(U);
+    await db.swarmRun.updateMany({ where: { id: y.run.id }, data: { status: 'RUNNING' } });
+    const runY = runSwarm(y.run.id, U);
+    await sleepMs(100);
+    const yTasks = tasksOf(y.run.id);
+    expect(brain.calls).toHaveLength(8); // Y is waiting for slots
+    expect(yTasks.filter((t: any) => t.status === 'RUNNING')).toHaveLength(0);
+    expect(yTasks.every((t: any) => t.startedAt === null && t.heartbeatAt === null)).toBe(true);
+    expect(db.tables.claim.filter((c: any) => c.runId === y.run.id)).toHaveLength(0);
+    open();
+    await Promise.all([runX, runY]);
+    expect(runRow(x.run.id).status).toBe('DONE');
+    expect(runRow(y.run.id).status).toBe('DONE');
+  });
+
+  it('a running task refreshes its heartbeat during a long call', async () => {
+    const p = await plan();
+    await db.swarmRun.updateMany({ where: { id: p.run.id }, data: { status: 'RUNNING' } });
+    brain.before = async (lane) => { if (lane === 'lane-1') await sleepMs(120); };
+    const running = runSwarm(p.run.id, U);
+    await until(() => brain.perLane['lane-1'] === 1);
+    const first = tasksOf(p.run.id).find((x: any) => x.lane === 'lane-1').heartbeatAt.getTime();
+    await sleepMs(80);
+    const later = tasksOf(p.run.id).find((x: any) => x.lane === 'lane-1').heartbeatAt?.getTime() ?? first;
+    expect(later).toBeGreaterThan(first);
+    await running;
+  });
+
+  it('resume uses the heartbeat, not the start time: a live old task is left alone, a silent one is re-queued', async () => {
+    const p = await plan();
+    const t = tasksOf(p.run.id).find((x: any) => x.lane === 'lane-20');
+    await claimLane(p.run.id, U, t.lane, t.id, 'engine-alive');
+    await db.swarmTask.updateMany({ where: { id: t.id }, data: { status: 'RUNNING', claimOwner: 'engine-alive', startedAt: new Date(Date.now() - 3_600_000), heartbeatAt: new Date(), attempts: 1 } });
+    await db.swarmRun.updateMany({ where: { id: p.run.id }, data: { status: 'RUNNING', updatedAt: new Date(Date.now() - 3_600_000) } });
+    expect(await resumeSwarms()).toBe(0);
+    expect(tasksOf(p.run.id).find((x: any) => x.lane === 'lane-20')).toMatchObject({ status: 'RUNNING', claimOwner: 'engine-alive' });
+    expect(db.tables.claim.some((c: any) => c.lane === 'lane-20')).toBe(true);
+
+    await db.swarmTask.updateMany({ where: { id: t.id }, data: { heartbeatAt: new Date(Date.now() - 3_600_000) } });
+    expect(await resumeSwarms()).toBe(1);
+    await until(() => runRow(p.run.id).status === 'DONE', 6000);
+    expect(brain.perLane['lane-20']).toBe(1);
+    expect(tasksOf(p.run.id).find((x: any) => x.lane === 'lane-20').claimOwner).not.toBe('engine-alive');
+  });
+
+  it('acquire never waits forever: a timeout fails the attempt', async () => {
+    vi.resetModules();
+    vi.doMock('@/config/swarm.json', async () => {
+      const actual = await vi.importActual<{ default: Record<string, unknown> }>('@/config/swarm.json');
+      return { default: { ...actual.default, retryDelayMs: 0, concurrency: 1, acquireTimeoutMs: 40, maxRetries: 1, budgetCheckMs: 0, heartbeatMs: 20 } };
+    });
+    const { createPlan: cp } = await import('@/lib/swarm/service');
+    const eng = await import('@/lib/swarm/engine');
+    const { prisma: pr } = (await import('@/lib/db')) as any;
+    let open!: () => void;
+    const gate = new Promise<void>((r) => { open = r; });
+    h.chat.mockImplementation(async (o: any) => {
+      if (o.messages[0].content.includes('planning step')) return plannerReply();
+      await gate;
+      return JSON.stringify({ result: 'r', learnings: [], confidence: 0.5 });
+    });
+    const a = await cp(U, { initiative: 'x' });
+    const b = await cp(U, { initiative: 'y' });
+    if (!a.ok || !b.ok) throw new Error('plan');
+    await pr.swarmRun.updateMany({ where: { id: a.value.run.id }, data: { status: 'RUNNING' } });
+    const runA = eng.runSwarm(a.value.run.id, U); // takes the only slot and holds it
+    await sleepMs(50);
+    await pr.swarmRun.updateMany({ where: { id: b.value.run.id }, data: { status: 'RUNNING' } });
+    const runB = eng.runSwarm(b.value.run.id, U);
+    await until(() => pr.tables.task.some((t: any) => t.runId === b.value.run.id && t.status === 'FAILED' && t.error === 'acquire timeout'), 3000);
+    const failed = pr.tables.task.find((t: any) => t.runId === b.value.run.id && t.error === 'acquire timeout');
+    expect(failed.attempts).toBe(2);
+    expect(failed.claimOwner).toBeNull(); // never claimed: it never ran
+    await pr.swarmRun.updateMany({ where: { userId: U }, data: { cancelRequested: true } });
+    open();
+    await Promise.all([runA, runB]);
+    vi.doUnmock('@/config/swarm.json');
+  });
+});
+
+describe('budget across parallel runs', () => {
+  it('plan and start count the other live runs, and start refuses when the combined projection passes the hard limit', async () => {
+    const first = await plan();
+    const est = first.run.estimate.tokens;
+    h.budget.mockResolvedValue({ state: 'ok', used: 0, limit: Math.round(est * 1.5), softPct: 80, hardPct: 100, resetsAt: '' });
+    const second = await plan();
+    expect(second.budget.committedTokens).toBe(est);
+    expect(second.budget.projectedState).toBe('hard');
+    expect(second.budget.flag).toBe('red');
+    const r = await startRun(U, second.run.id);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('budget_hard_limit');
+    expect(runRow(second.run.id).status).toBe('PLANNED');
+    expect(h.ledger.some((e) => e.action === 'swarm_start_refused' && e.correlationId === second.run.id)).toBe(true);
+  });
+
+  it('a RUNNING run counts only its unspent estimate; finished and cancelled runs count nothing', async () => {
+    const a = await plan(); const b = await plan(); const c = await plan();
+    const est = a.run.estimate.tokens;
+    await db.swarmRun.updateMany({ where: { id: a.run.id }, data: { status: 'RUNNING', tokensUsed: Math.floor(est / 2) } });
+    await db.swarmRun.updateMany({ where: { id: b.run.id }, data: { status: 'DONE' } });
+    await db.swarmRun.updateMany({ where: { id: c.run.id }, data: { status: 'CANCELLED' } });
+    const { committedTokens } = await import('@/lib/swarm/service');
+    expect(await committedTokens(U)).toBe(est - Math.floor(est / 2));
+    expect(await committedTokens(U, a.run.id)).toBe(0);
+    expect(await committedTokens(V)).toBe(0);
+  });
+
+  it('the engine re-checks the budget between tasks and stops the run with a ledgered reason', async () => {
+    const p = await plan();
+    h.budget.mockImplementation(async () => ({ state: brain.calls.length >= 5 ? 'hard' : 'ok', used: 0, limit: 1, softPct: 80, hardPct: 100, resetsAt: '' }));
+    await db.swarmRun.updateMany({ where: { id: p.run.id }, data: { status: 'RUNNING' } });
+    await runSwarm(p.run.id, U);
+    expect(runRow(p.run.id).status).toBe('FAILED');
+    expect(runRow(p.run.id).stopReason).toBe('budget_hard_limit');
+    expect(brain.calls.length).toBeLessThan(50);
+    expect(tasksOf(p.run.id).filter((t: any) => t.status === 'PENDING')).toHaveLength(0);
+    expect(h.ledger.some((e) => e.action === 'swarm_budget_stopped' && e.correlationId === p.run.id && e.status === 'DENIED')).toBe(true);
+  });
+
+  it('caps concurrently running runs per user (default 2)', async () => {
+    const runs = [await plan(), await plan(), await plan()];
+    let open!: () => void;
+    const gate = new Promise<void>((r) => { open = r; });
+    brain.before = async () => { await gate; };
+    expect((await startRun(U, runs[0].run.id)).ok).toBe(true);
+    expect((await startRun(U, runs[1].run.id)).ok).toBe(true);
+    const third = await startRun(U, runs[2].run.id);
+    expect(third.ok).toBe(false);
+    if (!third.ok) { expect(third.status).toBe(409); expect(third.code).toBe('too_many_running'); }
+    expect(runRow(runs[2].run.id).status).toBe('PLANNED');
+    expect(h.ledger.some((e) => e.action === 'swarm_start_refused' && e.metadata?.reason === 'too_many_running')).toBe(true);
+    // another user is not affected by this user's runs
+    await cancelRun(U, runs[0].run.id); await cancelRun(U, runs[1].run.id);
+    open();
+    await until(() => ['CANCELLED', 'DONE', 'FAILED'].includes(runRow(runs[0].run.id).status) && ['CANCELLED', 'DONE', 'FAILED'].includes(runRow(runs[1].run.id).status), 8000);
   });
 });

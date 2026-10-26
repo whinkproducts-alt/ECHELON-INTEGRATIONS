@@ -8,6 +8,7 @@ import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import { ledgerToSecurityEvents } from '@/components/neural-link/security-events';
 import { asArray, asRecord, fmtInt, useApi } from '../anatomy/use-api';
 import { PendingApprovals } from './pending-approvals';
+import { RecommendationsColumn } from './recommendations-column';
 
 function greetingFor(hour: number): string {
   if (hour < 5) return 'Still up';
@@ -138,12 +139,7 @@ export function TodayScreen() {
         </div>
 
         <Section title={`${productName} recommends`} icon={<Sparkles className="h-3.5 w-3.5" aria-hidden />}>
-          {/* No recommendations endpoint exists yet. Nothing is invented here; this fills only when the API returns items. */}
-          <HoloEmpty
-            icon={<Sparkles className="h-6 w-6" aria-hidden />}
-            title="Nothing recommended yet"
-            description="Recommendations appear here as the assistant learns your work, your people and your priorities. Until then this stays empty rather than guessing."
-          />
+          <RecommendationsColumn />
         </Section>
       </div>
     </div>

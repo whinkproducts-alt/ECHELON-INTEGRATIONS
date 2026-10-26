@@ -4,6 +4,18 @@
 // Real sends go through the permission engine — Class B (requires delegation).
 
 import { routeRecipient, routingHeaders } from './mail-routing';
+import { isOwnerEmail } from '@/lib/owner';
+
+/** True only when the sending user exists and their email is an owner email. Any failure means false. */
+async function senderIsOwner(userId: string): Promise<boolean> {
+  try {
+    const { prisma } = await import('@/lib/db');
+    const u = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    return isOwnerEmail(u?.email);
+  } catch {
+    return false;
+  }
+}
 
 export type Channel = 'EMAIL' | 'WHATSAPP' | 'SMS' | 'TELEGRAM' | 'PHONE_CALL';
 
@@ -30,7 +42,7 @@ export interface DeliveryPayload {
 // Email — uses SMTP via nodemailer (MIT licence).
 // Env: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 async function deliverEmail(payload: DeliveryPayload): Promise<DeliveryResult> {
-  const route = routeRecipient(payload.to);
+  const route = routeRecipient(payload.to, { senderIsOwner: await senderIsOwner(payload.userId) });
   if (!route.valid) return { sent: false, channel: 'EMAIL', reason: 'invalid_recipient' };
   const info = { deliveredTo: route.deliverTo, originalTo: route.original, headers: routingHeaders(route) };
   if (!process.env.SMTP_HOST) return { sent: false, channel: 'EMAIL', reason: 'not_configured', ...info };

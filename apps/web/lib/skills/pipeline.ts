@@ -7,6 +7,7 @@
  * sourceType 'skill_upload'. Nothing here registers tools, touches permissions or autonomy, approves
  * anything or reaches the org-kit executed skill registry.
  */
+import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { recordActionSafe, type LedgerStatus } from '@/lib/ledger';
 import { checkPermission } from '@/lib/permission-engine';
@@ -16,7 +17,7 @@ import { logger } from '@/lib/logger';
 import config from '@/config/skill-pipeline.json';
 import { scanSkill, isBlocking, type ScanReport } from './scanner';
 import { pickCommittee, pickSecurityAgent } from './agents';
-import { ModelStageError, pipelineModel, runDirectorVote, runSecurityReview, type DirectorVote, type SecurityVerdict } from './model';
+import { ModelStageError, pipelineModel, reviewedText, runDirectorVote, runSecurityReview, type DirectorVote, type SecurityVerdict } from './model';
 import { packContent, unpackContent } from './intake';
 import { SKILL_SOURCE_TYPE } from './labels';
 
@@ -37,14 +38,34 @@ async function ledger(userId: string, id: string, action: string, status: Ledger
   });
 }
 
-/** Atomic conditional transition. Returns true only for the single caller that won it. */
+export class LeaseLostError extends Error {
+  constructor() { super('lease lost'); }
+}
+
+const leaseMs = () => config.leaseMinutes * 60_000;
+const ACTIVE: SkillStatus[] = ['SCANNING', 'ASSESSING'];
+
+/** Extend the lease. Throws LeaseLostError when this runner no longer owns the submission. */
+async function renew(userId: string, id: string, owner: string): Promise<void> {
+  const res = await prisma.skillSubmission.updateMany({
+    where: { id, userId, leaseOwner: owner, status: { in: ACTIVE } },
+    data: { leaseUntil: new Date(Date.now() + leaseMs()) },
+  });
+  if (res.count !== 1) throw new LeaseLostError();
+}
+
+/**
+ * Atomic conditional transition: status must match AND this runner must own the lease.
+ * Moving to a non-active status releases the lease. Returns true only for the caller that won it.
+ */
 async function transition(
   userId: string, id: string, from: SkillStatus[], to: SkillStatus,
-  data: Record<string, unknown> = {}, note: Record<string, unknown> = {},
+  data: Record<string, unknown>, note: Record<string, unknown>, owner: string,
 ): Promise<boolean> {
+  const lease = ACTIVE.includes(to) ? { leaseUntil: new Date(Date.now() + leaseMs()) } : { leaseOwner: null, leaseUntil: null };
   const res = await prisma.skillSubmission.updateMany({
-    where: { id, userId, status: { in: from } },
-    data: { ...data, status: to },
+    where: { id, userId, status: { in: from }, leaseOwner: owner },
+    data: { ...data, ...lease, status: to },
   });
   if (res.count !== 1) return false;
   await ledger(userId, id, `skill_${to.toLowerCase()}`, LEDGER_STATUS[to], { from: from.join('|'), to, ...note });
@@ -92,7 +113,7 @@ export function startProcessing(userId: string, id: string): void {
 
 export type ProcessOutcome = SkillStatus | 'SKIPPED';
 
-async function modelTrouble(userId: string, id: string, from: SkillStatus, err: unknown, extra: Record<string, unknown>): Promise<ProcessOutcome> {
+async function modelTrouble(userId: string, id: string, from: SkillStatus, err: unknown, extra: Record<string, unknown>, owner: string): Promise<ProcessOutcome> {
   const row = await prisma.skillSubmission.findFirst({ where: { id, userId }, select: { attempts: true } });
   const attempts = (row?.attempts ?? 0) + 1;
   const kind = err instanceof ModelStageError ? err.kind : 'unavailable';
@@ -101,8 +122,8 @@ async function modelTrouble(userId: string, id: string, from: SkillStatus, err: 
   const reason = exhausted
     ? `Model stage failed ${attempts} times (${kind}); not accepted.`
     : `Model stage ${kind === 'invalid' ? 'returned an invalid verdict' : 'unavailable'}; waiting to retry. Not accepted.`;
-  await transition(userId, id, [from], to, { attempts, reason, decision: exhausted ? 'failed' : 'waiting_model', ...extra }, { attempts, kind });
-  return to;
+  const applied = await transition(userId, id, [from], to, { attempts, reason, decision: exhausted ? 'failed' : 'waiting_model', ...extra }, { attempts, kind }, owner);
+  return applied ? to : 'SKIPPED';
 }
 
 function sumReasons(votes: DirectorVote[]): string {
@@ -131,13 +152,16 @@ function cleanForMemory(s: string): string {
   return stripFakeUntrustedTags(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').replace(/\[\/?UNTRUSTED/gi, '(untrusted');
 }
 
-async function acceptIntoMemory(userId: string, id: string, name: string, filename: string, text: string, votes: DirectorVote[]): Promise<{ ids: string[]; note: Record<string, unknown> }> {
+async function acceptIntoMemory(userId: string, id: string, name: string, filename: string, fullText: string, votes: DirectorVote[], owner: string): Promise<{ ids: string[]; note: Record<string, unknown> }> {
   const corr = correlationFor(id);
   const perm = await checkPermission(userId, 'skill_memory_write', 'A', corr, { params: { submission: id } });
   if (!perm.allowed) throw new Error('skill_memory_write was not permitted');
 
   const summary = cleanForMemory(`Summary of skill "${name}" (${filename}): ${sumReasons(votes)}`);
+  // Only text a model saw may be stored. The tail beyond the review window is never chunked.
+  const text = reviewedText(fullText);
   const chunks = chunkText(cleanForMemory(text));
+  if (text.length > config.maxModelChars) throw new Error('memory content exceeds reviewed text');
   const statements = [summary, ...chunks.map((c, i) => cleanForMemory(`Skill "${name}" part ${i + 1} of ${chunks.length}: ${c}`))]
     .map((s) => `Uploaded skill (untrusted reference): ${s}`.slice(0, 2000));
 
@@ -145,6 +169,7 @@ async function acceptIntoMemory(userId: string, id: string, name: string, filena
   let deduped = 0;
   try {
     for (const statement of statements) {
+      await renew(userId, id, owner);
       const dup = await prisma.memorySemantic.findFirst({ where: { userId, sourceType: SKILL_SOURCE_TYPE, statement }, select: { id: true } });
       if (dup) { deduped++; continue; }
       const r = await writeMemory({
@@ -163,9 +188,26 @@ async function acceptIntoMemory(userId: string, id: string, name: string, filena
 
 export async function processSubmission(userId: string, id: string): Promise<ProcessOutcome> {
   if (!userId || !id) throw new Error('skills: userId and id are required');
-  // Claim. Exactly one concurrent runner wins this update.
-  const claimed = await transition(userId, id, ['QUEUED', 'WAITING_MODEL'], 'SCANNING');
-  if (!claimed) return 'SKIPPED';
+  const owner = randomUUID();
+  // Claim: status must be startable AND the lease empty or expired. Exactly one runner wins.
+  const now = new Date();
+  const claim = await prisma.skillSubmission.updateMany({
+    where: { id, userId, status: { in: ['QUEUED', 'WAITING_MODEL'] }, OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }] },
+    data: { status: 'SCANNING', leaseOwner: owner, leaseUntil: new Date(now.getTime() + leaseMs()) },
+  });
+  if (claim.count !== 1) return 'SKIPPED';
+  await ledger(userId, id, 'skill_scanning', LEDGER_STATUS.SCANNING, { from: 'QUEUED|WAITING_MODEL', to: 'SCANNING' });
+  try {
+    return await runStages(userId, id, owner);
+  } catch (e) {
+    if (e instanceof LeaseLostError) return 'SKIPPED';
+    throw e;
+  }
+}
+
+async function runStages(userId: string, id: string, owner: string): Promise<ProcessOutcome> {
+  const T = (from: SkillStatus[], to: SkillStatus, data: Record<string, unknown> = {}, note: Record<string, unknown> = {}) =>
+    transition(userId, id, from, to, data, note, owner);
 
   const row = await prisma.skillSubmission.findFirst({ where: { id, userId } });
   if (!row) return 'SKIPPED';
@@ -173,7 +215,11 @@ export async function processSubmission(userId: string, id: string): Promise<Pro
   try {
     text = unpackContent(row.content);
   } catch {
-    await transition(userId, id, ['SCANNING'], 'FAILED', { decision: 'failed', reason: 'Stored content could not be read.' });
+    await T(['SCANNING'], 'FAILED', { decision: 'failed', reason: 'Stored content could not be read.' });
+    return 'FAILED';
+  }
+  if (text.length > config.maxModelChars) {
+    await T(['SCANNING'], 'FAILED', { decision: 'failed', reason: `Skill text exceeds the ${config.maxModelChars} character review limit; nothing unreviewed is stored.` }, { stage: 'length' });
     return 'FAILED';
   }
 
@@ -181,7 +227,7 @@ export async function processSubmission(userId: string, id: string): Promise<Pro
   const report = scanSkill(text);
   if (isBlocking(report)) {
     const rules = report.findings.filter((f) => f.severity === 'CRITICAL').map((f) => f.rule);
-    await transition(userId, id, ['SCANNING'], 'REJECTED_SECURITY',
+    await T(['SCANNING'], 'REJECTED_SECURITY',
       { scanReport: report as never, decision: 'rejected_security', reason: `Deterministic scan blocked this skill (${(rules.length ? rules : ['score']).slice(0, 5).join(', ')}).` },
       { stage: 'scan', score: report.score, rules: rules.slice(0, 10) });
     return 'REJECTED_SECURITY';
@@ -189,8 +235,7 @@ export async function processSubmission(userId: string, id: string): Promise<Pro
 
   const model = pipelineModel();
   if (!model) {
-    await transition(userId, id, ['SCANNING'], 'WAITING_MODEL',
-      { scanReport: report as never, decision: 'waiting_model', reason: 'No model is configured. Waiting; not accepted.' });
+    await T(['SCANNING'], 'WAITING_MODEL', { scanReport: report as never, decision: 'waiting_model', reason: 'No model is configured. Waiting; not accepted.' });
     return 'WAITING_MODEL';
   }
 
@@ -200,35 +245,37 @@ export async function processSubmission(userId: string, id: string): Promise<Pro
   let agentInfo = prior?.agent && prior.agent.verdict.verdict === 'clean' ? prior.agent : null;
   if (!agentInfo) {
     try {
+      await renew(userId, id, owner);
       const agent = await pickSecurityAgent(text);
       const verdict = await runSecurityReview(model, agent, id, text);
       agentInfo = { id: agent.id, name: agent.name, verdict };
     } catch (e) {
-      return modelTrouble(userId, id, 'SCANNING', e, { scanReport: report as never });
+      if (e instanceof LeaseLostError) throw e;
+      return modelTrouble(userId, id, 'SCANNING', e, { scanReport: report as never }, owner);
     }
     const full = { ...report, agent: agentInfo } as StoredReport;
     const v = agentInfo.verdict;
     if (v.verdict !== 'clean' || v.confidence < config.securityMinConfidence) {
-      await transition(userId, id, ['SCANNING'], 'REJECTED_SECURITY',
+      const ok = await T(['SCANNING'], 'REJECTED_SECURITY',
         { scanReport: full as never, decision: 'rejected_security', reason: `Security review (${agentInfo.name}) judged this skill ${v.verdict === 'clean' ? 'uncertain' : v.verdict}.` },
         { stage: 'security_agent', verdict: v.verdict, confidence: v.confidence });
-      return 'REJECTED_SECURITY';
+      return ok ? 'REJECTED_SECURITY' : 'SKIPPED';
     }
-    const moved = await transition(userId, id, ['SCANNING'], 'ASSESSING', { scanReport: full as never }, { stage: 'security_agent', verdict: 'clean' });
-    if (!moved) return 'SKIPPED';
+    if (!(await T(['SCANNING'], 'ASSESSING', { scanReport: full as never }, { stage: 'security_agent', verdict: 'clean' }))) return 'SKIPPED';
   } else {
-    const moved = await transition(userId, id, ['SCANNING'], 'ASSESSING', {}, { stage: 'security_agent', verdict: 'clean', resumed: true });
-    if (!moved) return 'SKIPPED';
+    if (!(await T(['SCANNING'], 'ASSESSING', {}, { stage: 'security_agent', verdict: 'clean', resumed: true }))) return 'SKIPPED';
   }
 
   // Stage 3: committee of three directors.
   let directors: Awaited<ReturnType<typeof pickCommittee>>;
   let votes: DirectorVote[];
   try {
+    await renew(userId, id, owner);
     directors = await pickCommittee(text);
-    votes = await Promise.all(directors.map((d) => runDirectorVote(model, d, id, text)));
+    votes = await Promise.all(directors.map(async (d) => { await renew(userId, id, owner); return runDirectorVote(model, d, id, text); }));
   } catch (e) {
-    return modelTrouble(userId, id, 'ASSESSING', e, {});
+    if (e instanceof LeaseLostError) throw e;
+    return modelTrouble(userId, id, 'ASSESSING', e, {}, owner);
   }
   const approvals = votes.filter((v) => v.approve).length;
   const mean = votes.reduce((s, v) => s + v.valueScore, 0) / votes.length;
@@ -239,27 +286,28 @@ export async function processSubmission(userId: string, id: string): Promise<Pro
   };
 
   if (!accepted) {
-    await transition(userId, id, ['ASSESSING'], 'REJECTED_VALUE',
+    const ok = await T(['ASSESSING'], 'REJECTED_VALUE',
       { committee: committee as never, decision: 'rejected_value', reason: `Committee did not accept: ${approvals} of ${votes.length} approved, mean value ${committee.meanScore} (needs ${config.minApprovals} approvals and ${config.valueThreshold}).` },
       { stage: 'committee', approvals, mean: committee.meanScore });
-    return 'REJECTED_VALUE';
+    return ok ? 'REJECTED_VALUE' : 'SKIPPED';
   }
 
-  // Stage 4: write to memory, then finish the transition.
+  // Stage 4: write to memory (each write re-checks the lease), then finish the transition.
   let memoryIds: string[];
   let acceptNote: Record<string, unknown>;
   try {
-    ({ ids: memoryIds, note: acceptNote } = await acceptIntoMemory(userId, id, row.name, row.filename, text, votes));
+    ({ ids: memoryIds, note: acceptNote } = await acceptIntoMemory(userId, id, row.name, row.filename, text, votes, owner));
   } catch (e) {
+    if (e instanceof LeaseLostError) return 'SKIPPED';
     logger.error('skill memory write failed', { userId, submissionId: id, error: (e as Error)?.message });
-    await transition(userId, id, ['ASSESSING'], 'FAILED', { committee: committee as never, decision: 'failed', reason: 'Accepted by the committee but memory could not be written.' });
+    await T(['ASSESSING'], 'FAILED', { committee: committee as never, decision: 'failed', reason: 'Accepted by the committee but memory could not be written.' });
     return 'FAILED';
   }
-  const done = await transition(userId, id, ['ASSESSING'], 'ACCEPTED',
+  const done = await T(['ASSESSING'], 'ACCEPTED',
     { committee: committee as never, decision: 'accepted', reason: `Accepted: ${approvals} of ${votes.length} approved, mean value ${committee.meanScore}.`, memoryIds },
     { stage: 'accept', memoryIds, ...acceptNote });
   if (!done) {
-    // Deleted or taken while we wrote: remove what we added.
+    // Lost the lease or deleted while writing: remove what this runner added.
     await prisma.memorySemantic.deleteMany({ where: { userId, id: { in: memoryIds }, sourceType: SKILL_SOURCE_TYPE } });
     return 'SKIPPED';
   }
@@ -281,15 +329,15 @@ export async function resumeStalled(opts: { userId?: string; now?: Date; limit?:
   const scope = opts.userId ? { userId: opts.userId } : {};
   const stalledBefore = new Date(now.getTime() - config.stalledMinutes * 60_000);
   const stalled = await prisma.skillSubmission.findMany({
-    where: { ...scope, status: { in: ['SCANNING', 'ASSESSING'] }, updatedAt: { lt: stalledBefore } },
+    where: { ...scope, status: { in: ['SCANNING', 'ASSESSING'] }, updatedAt: { lt: stalledBefore }, OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }] },
     select: { id: true, userId: true, status: true }, take: limit,
   });
   let requeued = 0;
   const toStart: Array<{ userId: string; id: string }> = [];
   for (const s of stalled) {
     const res = await prisma.skillSubmission.updateMany({
-      where: { id: s.id, userId: s.userId, status: s.status, updatedAt: { lt: stalledBefore } },
-      data: { status: 'QUEUED' },
+      where: { id: s.id, userId: s.userId, status: s.status, updatedAt: { lt: stalledBefore }, OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }] },
+      data: { status: 'QUEUED', leaseOwner: null, leaseUntil: null },
     });
     if (res.count === 1) {
       requeued++;

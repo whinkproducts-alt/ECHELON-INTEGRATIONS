@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { BillingSurface } from '../billing/_components/billing-surface';
 import { AutonomyApprovalPanel } from './autonomy-approval-panel';
+import { PasskeysPanel } from './passkeys-panel';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import {
   interpretPatchResponse, pickPendingAutonomy, resolveDecision, type AutonomyApproval,
@@ -339,6 +340,7 @@ export function SettingsSurface() {
           <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50">
             <Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Settings'}
           </button>
+          <PasskeysPanel />
         </>
       )}
 

@@ -6,6 +6,8 @@ const h = vi.hoisted(() => ({
   creds: [] as any[],
   ledger: [] as any[],
   seq: 0,
+  sv: {} as Record<string, number>,
+  pw: 'secret',
   verifyAuth: vi.fn(),
   verifyReg: vi.fn(),
 }));
@@ -14,6 +16,7 @@ function match(row: any, where: any): boolean {
   return Object.entries(where).every(([k, v]: [string, any]) => {
     if (v && typeof v === 'object' && !(v instanceof Date) && !Array.isArray(v)) {
       if ('gt' in v) return row[k] > v.gt;
+      if ('lt' in v) return row[k] < v.lt;
       if ('not' in v) return row[k] !== v.not;
     }
     return row[k] === v;
@@ -23,7 +26,8 @@ function match(row: any, where: any): boolean {
 vi.mock('@/lib/db', () => ({
   prisma: {
     user: {
-      findUnique: async ({ where }: any) => ({ id: where.id, email: `${where.id}@x.test`, name: 'N', role: 'user' }),
+      findUnique: async ({ where }: any) => ({ id: where.id, email: `${where.id}@x.test`, name: 'N', role: 'user', passwordHash: 'hash', sessionVersion: h.sv[where.id] ?? 0 }),
+      update: async ({ where }: any) => { h.sv[where.id] = (h.sv[where.id] ?? 0) + 1; return { sessionVersion: h.sv[where.id] }; },
     },
     passkeyChallenge: {
       create: async ({ data }: any) => { const r = { id: `c${++h.seq}`, usedAt: null, ...data }; h.challenges.push(r); return r; },
@@ -33,12 +37,19 @@ vi.mock('@/lib/db', () => ({
         return { count: rows.length };
       },
       findUnique: async ({ where }: any) => h.challenges.find((r) => r.id === where.id) ?? null,
+      count: async ({ where }: any) => h.challenges.filter((r) => match(r, where)).length,
+      deleteMany: async ({ where }: any) => {
+        const n = h.challenges.length;
+        h.challenges = h.challenges.filter((r) => !(where.OR as any[]).some((w) => match(r, w)));
+        return { count: n - h.challenges.length };
+      },
     },
     passkeyCredential: {
       findMany: async ({ where, select }: any) =>
         h.creds.filter((c) => c.userId === where.userId).map((c) =>
           select ? Object.fromEntries(Object.keys(select).map((k) => [k, c[k]])) : c),
       findUnique: async ({ where }: any) => h.creds.find((c) => c.credentialId === where.credentialId) ?? null,
+      findFirst: async ({ where }: any) => h.creds.find((c) => match(c, where)) ?? null,
       create: async ({ data }: any) => { const r = { id: `p${++h.seq}`, createdAt: new Date(), ...data }; h.creds.push(r); return r; },
       updateMany: async ({ where, data }: any) => {
         const rows = h.creds.filter((c) => match(c, where));
@@ -53,7 +64,8 @@ vi.mock('@/lib/db', () => ({
     },
   },
 }));
-vi.mock('@/auth', () => ({ auth: async () => (h.session ? { user: { id: h.session } } : null) }));
+vi.mock('@/auth', () => ({ auth: async () => (h.session ? { user: { id: h.session, remember: false } } : null) }));
+vi.mock('bcryptjs', () => ({ default: { compare: async (p: string) => p === h.pw } }));
 vi.mock('@/lib/ledger', () => ({ writeLedger: async (e: any) => { h.ledger.push(e); return { id: 'l' }; } }));
 vi.mock('@simplewebauthn/server', () => ({
   generateRegistrationOptions: async () => ({ challenge: 'chal-reg' }),
@@ -73,6 +85,7 @@ import { getWebAuthnConfig } from '@/lib/passkeys/config';
 import { applyLifetime as applyLifetimeTyped, SESSION_TTL_SHORT_SECONDS, SESSION_TTL_REMEMBER_SECONDS, type LifetimeToken } from '@/lib/auth/session-lifetime';
 
 const applyLifetime = (token: LifetimeToken, ...rest: [Parameters<typeof applyLifetimeTyped>[1], number]) => applyLifetimeTyped<LifetimeToken>(token, ...rest);
+import { cleanupPasskeyChallenges, tooManyOpenChallenges, MAX_OPEN_CHALLENGES, mintReauthTicket, redeemReauthTicket } from '@/lib/passkeys/challenges';
 import { setRateLimitStore, InMemoryRateLimitStore } from '@/lib/rate-limit';
 
 const req = (url: string, body: unknown, method = 'POST') =>
@@ -82,8 +95,15 @@ const req = (url: string, body: unknown, method = 'POST') =>
     body: method !== 'POST' ? undefined : JSON.stringify(body),
   });
 
+const delReq = (body: unknown) =>
+  new Request('http://localhost:3000/api/auth/passkey/pk1', {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
+    body: JSON.stringify(body),
+  });
+
 beforeEach(() => {
-  h.session = null; h.challenges = []; h.creds = []; h.ledger = []; h.seq = 0;
+  h.session = null; h.sv = {}; h.challenges = []; h.creds = []; h.ledger = []; h.seq = 0;
   h.verifyAuth.mockReset(); h.verifyReg.mockReset();
   process.env.WEBAUTHN_RP_ID = 'localhost';
   process.env.WEBAUTHN_ORIGIN = 'http://localhost:3000';
@@ -220,7 +240,7 @@ describe('login flow', () => {
 
 describe('registration and management', () => {
   it('requires a session', async () => {
-    expect((await regOptions(req('/api/auth/passkey/register/options', {}))).status).toBe(401);
+    expect((await regOptions(req('/api/auth/passkey/register/options', { password: 'secret' }))).status).toBe(401);
     expect((await listKeys(req('/api/auth/passkey', null, 'GET') as any)).status).toBe(401);
   });
 
@@ -230,7 +250,7 @@ describe('registration and management', () => {
       verified: true,
       registrationInfo: { userVerified: true, credentialBackedUp: true, credential: { id: 'newcred', publicKey: new Uint8Array([1]), counter: 0, transports: ['internal'] } },
     });
-    const o = await (await regOptions(req('/api/auth/passkey/register/options', {}))).json();
+    const o = await (await regOptions(req('/api/auth/passkey/register/options', { password: 'secret' }))).json();
     const body = { challengeId: o.challengeId, deviceName: 'MacBook', response: { id: 'newcred' } };
     const res = await regVerify(req('/api/auth/passkey/register/verify', body));
     expect(res.status).toBe(201);
@@ -238,7 +258,7 @@ describe('registration and management', () => {
     expect(h.ledger.some((l) => l.action === 'passkey_registered')).toBe(true);
     expect((await regVerify(req('/api/auth/passkey/register/verify', body))).status).toBe(400);
     // another user cannot consume this user's challenge
-    const o2 = await (await regOptions(req('/api/auth/passkey/register/options', {}))).json();
+    const o2 = await (await regOptions(req('/api/auth/passkey/register/options', { password: 'secret' }))).json();
     h.session = 'u2';
     expect((await regVerify(req('/api/auth/passkey/register/verify', { challengeId: o2.challengeId, response: { id: 'z' } }))).status).toBe(400);
   });
@@ -255,12 +275,12 @@ describe('registration and management', () => {
     seedCred();
     h.session = 'u2';
     const ctx = { params: Promise.resolve({ id: 'pk1' }) };
-    expect((await delKey(req('/api/auth/passkey/pk1', null, 'DELETE'), ctx)).status).toBe(404);
+    expect((await delKey(delReq({ password: 'secret' }), ctx)).status).toBe(404);
     expect(h.creds).toHaveLength(1);
     h.session = 'u1';
-    expect((await delKey(req('/api/auth/passkey/pk1', null, 'DELETE'), ctx)).status).toBe(200);
+    expect((await delKey(delReq({ password: 'secret' }), ctx)).status).toBe(200);
     expect(h.creds).toHaveLength(0);
-    expect(h.ledger.some((l) => l.action === 'passkey_deleted')).toBe(true);
+    expect(h.ledger.some((l) => l.action === 'passkey_removed')).toBe(true);
   });
 
   it('validation: unknown fields rejected', async () => {
@@ -292,5 +312,104 @@ describe('remember me lifetimes (controlled clock)', () => {
     expect(applyLifetime({ iat: s(T0) }, null, T0 + 3600_000)).not.toBeNull();
     expect(applyLifetime({ iat: s(T0) }, null, T0 + 13 * 3600_000)).toBeNull();
     expect(applyLifetime({}, null, T0)).toBeNull();
+  });
+});
+
+describe('re-authentication, session version, cleanup, caps', () => {
+  const regBody = (extra: any = {}) => req('/api/auth/passkey/register/options', extra);
+
+  it('adding a passkey requires a password or ticket; wrong password is 403 with a security event', async () => {
+    h.session = 'u1';
+    expect((await regOptions(regBody({}))).status).toBe(400);
+    expect((await regOptions(regBody({ password: 'a', ticket: 'b' }))).status).toBe(400);
+    expect((await regOptions(regBody({ password: 'wrong' }))).status).toBe(403);
+    expect(h.ledger.some((l) => l.action === 'SECURITY_EVENT:passkey_reauth_failed')).toBe(true);
+    expect((await regOptions(regBody({ password: 'secret' }))).status).toBe(200);
+  });
+
+  it('password re-auth is rate limited', async () => {
+    h.session = 'u1';
+    let last = 0;
+    for (let i = 0; i < 7; i++) last = (await regOptions(regBody({ password: 'wrong' }))).status;
+    expect(last).toBe(429);
+  });
+
+  it('delete without re-auth is 400 and nothing is deleted; wrong password is 403', async () => {
+    seedCred(); h.session = 'u1';
+    const ctx = { params: Promise.resolve({ id: 'pk1' }) };
+    expect((await delKey(delReq({}), ctx)).status).toBe(400);
+    expect((await delKey(delReq({ password: 'nope' }), ctx)).status).toBe(403);
+    expect(h.creds).toHaveLength(1);
+  });
+
+  it('passkey re-auth ticket: single use, bound to the user, 5 minute life', async () => {
+    const t = await mintReauthTicket('u1', 1_000);
+    expect(await redeemReauthTicket(t, 'u2', 1_001)).toBe(false);
+    expect(await redeemReauthTicket(t, 'u1', 1_001)).toBe(true);
+    expect(await redeemReauthTicket(t, 'u1', 1_002)).toBe(false);
+    const t2 = await mintReauthTicket('u1', 1_000);
+    expect(await redeemReauthTicket(t2, 'u1', 1_000 + 5 * 60_000 + 1)).toBe(false);
+    // a login ticket is not a re-auth ticket
+    expect(await redeemReauthTicket(await mintLoginTicket('u1', false), 'u1')).toBe(false);
+  });
+
+  it('full re-auth by passkey ticket works for adding a passkey', async () => {
+    seedCred(); h.session = 'u1'; authOk(6);
+    const o = await (await loginOptions(req('/api/auth/passkey/login/options', { reauth: true }))).json();
+    const v = await loginVerify(assertion(o.challengeId));
+    expect(v.status).toBe(200);
+    const { ticket, expiresInSeconds } = await v.json();
+    expect(expiresInSeconds).toBe(300);
+    expect(h.ledger.some((l) => l.action === 'passkey_login')).toBe(false);
+    expect((await regOptions(regBody({ ticket }))).status).toBe(200);
+    expect((await regOptions(regBody({ ticket }))).status).toBe(403); // single use
+  });
+
+  it('reauth challenges need a session and cannot be verified by another user', async () => {
+    expect((await loginOptions(req('/api/auth/passkey/login/options', { reauth: true }))).status).toBe(401);
+    seedCred(); h.session = 'u2'; authOk(6);
+    const o = await (await loginOptions(req('/api/auth/passkey/login/options', { reauth: true }))).json();
+    expect((await loginVerify(assertion(o.challengeId))).status).toBe(401); // cred1 belongs to u1
+  });
+
+  it('adding and removing a passkey bump the session version, write owner-visible events and return a re-login ticket', async () => {
+    h.session = 'u1';
+    h.verifyReg.mockResolvedValue({
+      verified: true,
+      registrationInfo: { userVerified: true, credentialBackedUp: false, credential: { id: 'nc', publicKey: new Uint8Array([1]), counter: 0, transports: [] } },
+    });
+    const o = await (await regOptions(regBody({ password: 'secret' }))).json();
+    const res = await regVerify(req('/api/auth/passkey/register/verify', { challengeId: o.challengeId, response: { id: 'nc' } }));
+    const j = await res.json();
+    expect(h.sv.u1).toBe(1);
+    expect(h.ledger.some((l) => l.action === 'SECURITY_EVENT:credential_added')).toBe(true);
+    expect(await redeemLoginTicket(j.ticket)).toEqual({ userId: 'u1', remember: false });
+    const id = h.creds[0].id;
+    const del = await delKey(delReq({ password: 'secret' }), { params: Promise.resolve({ id }) });
+    expect(del.status).toBe(200);
+    expect(h.sv.u1).toBe(2);
+    expect(h.ledger.some((l) => l.action === 'SECURITY_EVENT:credential_removed')).toBe(true);
+  });
+
+  it('jwt callback: stale sessionVersion signs the user out', async () => {
+    const { getSessionVersion, bumpSessionVersion, clearSessionVersionCache } = await import('@/lib/auth/session-version');
+    clearSessionVersionCache();
+    expect(await getSessionVersion('u9')).toBe(0);
+    await bumpSessionVersion('u9');
+    expect(await getSessionVersion('u9')).toBe(1);
+  });
+
+  it('cleanup removes expired and used rows only; open challenges are capped', async () => {
+    await issueChallenge('login', 'a', { now: 1_000, clientKey: 'a:1' });
+    await issueChallenge('login', 'b', { now: Date.now(), clientKey: 'a:1' });
+    const used = await issueChallenge('login', 'c', { now: Date.now(), clientKey: 'a:1' });
+    await consumeChallenge(used, 'login');
+    expect(await cleanupPasskeyChallenges()).toBe(2);
+    expect(h.challenges).toHaveLength(1);
+    for (let i = 0; i < MAX_OPEN_CHALLENGES; i++) await issueChallenge('login', 'x', { clientKey: 'a:2' });
+    expect(await tooManyOpenChallenges('a:2', 'login')).toBe(true);
+    expect(await tooManyOpenChallenges('a:3', 'login')).toBe(false);
+    const r = await loginOptions(req('/api/auth/passkey/login/options', {}));
+    expect(r.status).toBe(200); // different bucket (route) is unaffected
   });
 });

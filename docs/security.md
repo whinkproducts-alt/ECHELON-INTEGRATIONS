@@ -85,12 +85,12 @@ Not covered:
 - Contact messaging and calls are stubs: nothing leaves the machine yet, and approval still works end to end.
 
 ## Staff mail routing (added 2026-10-26)
-`config/mail-routing.json` and `lib/comms/mail-routing.ts` send every email addressed to a listed domain (`whinkgroup.com`, exact match) to one catch-all mailbox (`whinkproducts@gmail.com`), with an `X-Original-To` header. The match is on the parsed domain after the single `@`, ASCII only, so `evil.whinkgroup.com.attacker.io`, `whinkgroup.com@evil.com`, subdomains and unicode lookalikes are not routed, and malformed or multi-address strings are refused. Staff addresses shown in the UI are unchanged. Sending email stays Class C / protected; routing only chooses the delivery address.
+`config/mail-routing.json` and `lib/comms/mail-routing.ts` send every email addressed to a listed domain (`whinkgroup.com`, exact match) to one catch-all mailbox (`whinkproducts@gmail.com`), with an `X-Original-To` header. The match is on the parsed domain after the single `@`, ASCII only, so `evil.whinkgroup.com.attacker.io`, `whinkgroup.com@evil.com`, subdomains and unicode lookalikes are not routed, and malformed or multi-address strings are refused. The catch-all applies only when the sending account is an owner (`WHINK_OWNER_EMAILS`); mail from any other account goes to its real address, so no tenant's staff mail lands in the owner's inbox. Staff addresses shown in the UI are unchanged. Sending email stays Class C / protected; routing only chooses the delivery address.
 
 Code cannot do DNS or mailbox setup. For real inbound mail to `*@whinkgroup.com` to reach the catch-all, the domain's mail provider must also be configured (MX records plus a catch-all or forwarding rule to `whinkproducts@gmail.com`). That is Victor's task at the provider. Until then, outbound routing only affects mail WHINK itself sends. The SMTP sender is still a stub (`smtp_not_implemented_yet`); when it is built it must use the `deliveredTo` and `headers` the delivery layer returns.
 
 ## Signup control (added 2026-10-26)
-`SIGNUP_ENABLED` (default true). When `false`, `POST /api/signup` returns 403 and logs a security event. The ledger needs a real user id and a blocked visitor has none, so it is a logger event, not a ledger row.
+`SIGNUP_ENABLED`: signup is open only when it is exactly `true`, or while the users table is empty (first-user bootstrap, decided inside the insert transaction under an advisory lock). Unset or empty is closed once a user exists; `false` closes it even when empty. Closed returns 403 and logs a security event. Emails are trimmed and lowercased at signup and sign-in; migration `20261027000800_email_lowercase` normalises old rows (rows whose lowercase form collides are left for a human to merge) and adds a unique index on `lower(email)` only if no duplicates remain. Register the owner first, then leave signup closed. The ledger needs a real user id and a blocked visitor has none, so it is a logger event, not a ledger row.
 
 Why: `WHINK_OWNER_EMAILS` matches the owner by email string, and signup does not verify that the registrant owns that mailbox. Anyone who registers first with the owner's address would be treated as the owner. On a single-owner instance, the owner must register first, then set `SIGNUP_ENABLED=false`.
 
@@ -153,3 +153,21 @@ Cost per user per day is (model runs per day) x (tokens per run). Defaults, from
 
 ### Mac Mini deployment
 Run one worker process under launchd; see `docs/whink-worker.plist.example` (an example only, not installed or executed by anything here). Set `WORKER_ENABLED=true` in the environment file the plist loads, run `npx prisma migrate deploy` first, and check `GET /api/worker/status` (heartbeat age should stay under about 30 s). More than one worker is safe; the lease prevents double runs.
+
+## Skill uploads (added 2026-10-27)
+An uploaded skill is untrusted outsider text. It passes a deterministic scan, a security agent and a three director committee, and may then become reference memory (`skill_upload`, INFERRED, confidence at most 0.6). It never registers tools, changes permissions or autonomy, approves anything, or enters the org-kit skill registry.
+- Only text a model reviewed is stored: files over `maxModelChars` (config/skill-pipeline.json) are rejected at upload, and the memory writer slices to the same window.
+- Runners hold a lease (`leaseOwner`, `leaseUntil`). Every transition and memory write requires the lease, and the sweeper only re-queues expired leases, so a slow runner cannot advance after another takes over.
+- Raw content is encrypted at rest with `ENCRYPTION_KEY`. Without it, uploads are refused with 503 "encryption key not configured" unless `SKILL_ALLOW_PLAINTEXT=true`.
+- Recalling a `skill_upload`, `news` or `swarm` memory sets `externalContentThisTurn`, so the turn is not auto-extracted.
+
+### Passkeys: re-authentication and session version (update 2026-10-27)
+Adding or removing a passkey needs a fresh credential, and changes sign out every other session.
+Request body changes:
+- `POST /api/auth/passkey/register/options`: body was `{}`, now exactly one of `{ "password": "<account password>" }` or `{ "ticket": "<re-auth ticket>" }`. Neither or both: 400. Wrong: 403. More than 5 tries a minute: 429.
+- `DELETE /api/auth/passkey/[id]`: previously no body, now the same `{ password }` or `{ ticket }` body (`content-type: application/json`).
+- `POST /api/auth/passkey/login/options`: new optional `reauth: true` (session required). Then `login/verify` with the assertion returns `{ ticket, expiresInSeconds: 300 }`, a single-use re-auth ticket for the session user, usable only for add or remove. It is not a login ticket and writes no `passkey_login` row.
+- `register/verify` (201) and DELETE (200) now also return `{ ticket, expiresInSeconds: 60 }` because the change bumps `User.sessionVersion`, which signs out every session including the current one. The client must immediately call `signIn('passkey', { ticket, redirect: false })` to stay signed in.
+Ledger: `passkey_registered` / `passkey_removed`, plus owner-visible `SECURITY_EVENT:credential_added` / `credential_removed` (shown in Neural Link), `SECURITY_EVENT:passkey_reauth_failed`.
+Session version: copied into the JWT at sign-in and compared on every read (cached 15 s per process); a mismatch or a deleted user means signed out; DB errors fail closed. `lib/auth/session-version.ts` `bumpSessionVersion(userId)` must be called by anything that changes the password. There is no password-change route today.
+Housekeeping: expired and used `passkey_challenges` rows are deleted opportunistically (at most once a minute per process); `cleanupPasskeyChallenges()` in `lib/passkeys/challenges.ts` is exported for the worker. At most 30 open challenges per client key (per user for register and re-auth).
