@@ -64,6 +64,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'subsidiaries', label: 'Subsidiaries', href: '/dashboard/subsidiaries', icon: Building2, group: 'operations', description: 'The five subsidiaries and their projects', keywords: SUBSIDIARY_KEYWORDS, status: 'live' },
   { id: 'tasks', label: 'Tasks', href: '/dashboard/tasks', icon: CheckSquare, group: 'operations', description: 'Task board', keywords: ['todo'], status: 'live' },
   { id: 'workforce', label: 'Workforce', href: '/dashboard/workforce', icon: Bot, group: 'operations', description: 'Agents and what they are doing', keywords: ['agents', 'staff'], status: 'soon' },
+  { id: 'kill-team', label: 'Kill Team', href: '/dashboard/kill-team', icon: ShieldAlert, group: 'operations', description: 'Founder-controlled specialist team', keywords: ['peter', 'paul', 'micah', 'nandi', 'michael carrick', 'scout', 'research'], status: 'live' },
   { id: 'connectors', label: 'Connectors', href: '/dashboard/connectors', icon: Plug, group: 'operations', description: 'Connected tools and gateways', keywords: ['mcp', 'integrations', 'gateway'], status: 'soon' },
   { id: 'usage', label: 'Usage', href: '/dashboard/usage', icon: Gauge, group: 'operations', description: 'Model usage and limits', keywords: ['cost', 'tokens', 'limits'], status: 'soon' },
   { id: 'contracts', label: 'Contracts', href: '/dashboard/contracts', icon: FileSignature, group: 'operations', description: 'Agreements you hold, with renewals', keywords: ['agreements', 'renewals', 'counterparty', 'legal'], status: 'live' },

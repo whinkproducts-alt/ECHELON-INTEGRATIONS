@@ -7,6 +7,11 @@ describe('protected-actions instruction in the system prompt', () => {
     [{ persona: 'WHINK' }],
     [{ persona: 'MAMBA', mambaMode: 'OBSIDIAN' }],
     [{ persona: 'MAMBA' }],
+    [{ persona: 'PETER' }],
+    [{ persona: 'PAUL' }],
+    [{ persona: 'MICAH' }],
+    [{ persona: 'NANDI' }],
+    [{ persona: 'SCOUT' }],
   ])('is present for %o', (ctx) => {
     const prompt = buildSystemPrompt(ctx);
     expect(prompt).toContain(PROTECTED_ACTIONS_POLICY);
@@ -19,5 +24,19 @@ describe('protected-actions instruction in the system prompt', () => {
   it('comes before the persona layer so a persona cannot override it', () => {
     const prompt = buildSystemPrompt({ persona: 'MAMBA' });
     expect(prompt.indexOf(PROTECTED_ACTIONS_POLICY)).toBeLessThan(prompt.indexOf('ACTIVE PERSONA: MAMBA'));
+  });
+
+  it.each([['PETER', 'Principal Reverse Engineer'], ['PAUL', 'Principal Reconstruction Engineer']])('%s loads its dedicated evidence protocol', (persona, role) => {
+    const prompt = buildSystemPrompt({ persona });
+    expect(prompt).toContain(role);
+    expect(prompt).toContain('ABSOLUTE NO-HALLUCINATION PROTOCOL');
+    expect(prompt).toContain('UNCONFIRMED');
+  });
+
+  it.each([['MICAH', 'Principal Product Auditor'], ['NANDI', 'Growth, Marketing, Conversion & Revenue Strategist'], ['SCOUT', 'Master Researcher & Opportunity Intelligence Scout']])('%s loads its dedicated evidence protocol', (persona, role) => {
+    const prompt = buildSystemPrompt({ persona });
+    expect(prompt).toContain(role);
+    expect(prompt).toContain('ABSOLUTE NO-HALLUCINATION PROTOCOL');
+    expect(prompt).toContain('UNCONFIRMED');
   });
 });

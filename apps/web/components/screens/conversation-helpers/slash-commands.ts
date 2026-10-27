@@ -2,7 +2,7 @@
 // ?prompt= handling and the Options disclosure flag. No React, no DOM, easy to test.
 //
 // Behaviour of each command is taken from lib/orchestrator.ts:
-//  - /whink and /mamba switch the active persona (MAMBA is Obsidian only).
+//  - /whink, /mamba, /peter, /paul, /micah, /nandi and /scout switch the active persona (MAMBA is Obsidian only).
 //  - /brief /deep /plan /status set a response style (functional mode) that stays on
 //    until another style command replaces it. Switching minds or styles never changes permissions.
 
@@ -21,6 +21,11 @@ export interface CommandLabels {
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: 'whink', describe: (l) => `Switch back to ${l.productName}, your main assistant.` },
   { name: 'mamba', describe: (l) => `Switch to ${l.opponentLabel ?? 'the opponent mind'}, which argues the other side so you see hard moves coming.` },
+  { name: 'peter', describe: () => 'Switch to the principal reverse engineer for evidence-backed product and codebase forensics.' },
+  { name: 'paul', describe: () => 'Switch to the principal reconstruction engineer for clean-room, production-grade implementation.' },
+  { name: 'micah', describe: () => 'Switch to the principal product auditor for evidence-backed product and market strategy.' },
+  { name: 'nandi', describe: () => 'Switch to the growth, marketing, conversion and revenue strategist.' },
+  { name: 'scout', describe: () => 'Switch to Michael Carrick, the master researcher who finds public market signals and opportunity leads for the team.' },
   { name: 'brief', describe: () => 'Short, direct answers with no padding. Stays on until you pick another style.' },
   { name: 'deep', describe: () => 'Thorough analysis from several angles, including second-order effects.' },
   { name: 'plan', describe: () => 'Break a goal into steps with dependencies, risks and blockers.' },

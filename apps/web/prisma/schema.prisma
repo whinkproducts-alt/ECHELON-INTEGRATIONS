@@ -196,7 +196,7 @@ model Message {
   conversationId String
   role           String // user | assistant | system
   content        String
-  persona        String? // WHINK | MAMBA
+  persona        String? // WHINK | MAMBA | PETER | PAUL | MICAH | NANDI
   mambaMode      String? // OBSIDIAN | null
   functionalMode String?
   toolCalls      String? // JSON string of tool calls

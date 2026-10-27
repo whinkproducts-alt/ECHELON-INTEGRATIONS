@@ -12,14 +12,15 @@ describe('slash menu', () => {
     expect(isSlashMenuOpen('/')).toBe(true);
     expect(filterCommands('/')).toHaveLength(SLASH_COMMANDS.length);
     expect(filterCommands('/b').map((c) => c.name)).toEqual(['brief']);
-    expect(filterCommands('/P').map((c) => c.name)).toEqual(['plan']);
+    expect(filterCommands('/pla').map((c) => c.name)).toEqual(['plan']);
+    expect(filterCommands('/p').map((c) => c.name)).toEqual(['peter', 'paul', 'plan']);
     expect(filterCommands('/zzz')).toEqual([]);
     expect(isSlashMenuOpen('/brief ')).toBe(false);
     expect(isSlashMenuOpen('/brief')).toBe(false);
   });
   it('keyboard: arrows wrap, Enter and Tab select, Escape dismisses', () => {
-    expect(handleMenuKey('ArrowDown', 5, 6)).toEqual({ kind: 'move', index: 0 });
-    expect(handleMenuKey('ArrowUp', 0, 6)).toEqual({ kind: 'move', index: 5 });
+    expect(handleMenuKey('ArrowDown', 7, 8)).toEqual({ kind: 'move', index: 0 });
+    expect(handleMenuKey('ArrowUp', 0, 8)).toEqual({ kind: 'move', index: 7 });
     expect(handleMenuKey('Enter', 2, 6)).toEqual({ kind: 'select', index: 2 });
     expect(handleMenuKey('Tab', 1, 6)).toEqual({ kind: 'select', index: 1 });
     expect(handleMenuKey('Escape', 0, 6)).toEqual({ kind: 'dismiss' });
@@ -28,13 +29,15 @@ describe('slash menu', () => {
     expect(moveIndex(0, -1, 0)).toBe(0);
   });
   it('selecting inserts the command with a trailing space and never sends', () => {
-    expect(commandInsertText(SLASH_COMMANDS[2])).toBe('/brief ');
+    expect(commandInsertText(SLASH_COMMANDS.find((c) => c.name === 'brief')!)).toBe('/brief ');
   });
   it('descriptions use tenant labels, no hardcoded mind name', () => {
     const mamba = SLASH_COMMANDS.find((c) => c.name === 'mamba')!;
     expect(mamba.describe(labels)).not.toMatch(/mamba/i);
     expect(mamba.describe({ ...labels, opponentLabel: 'Obsidian' })).toContain('Obsidian');
     expect(SLASH_COMMANDS.find((c) => c.name === 'whink')!.describe(labels)).toContain('Acme');
+    expect(SLASH_COMMANDS.find((c) => c.name === 'peter')!.describe(labels)).toMatch(/reverse engineer/i);
+    expect(SLASH_COMMANDS.find((c) => c.name === 'paul')!.describe(labels)).toMatch(/reconstruction engineer/i);
   });
 });
 

@@ -25,6 +25,12 @@ import {
   approvalReducer, initialCardState, normalizeApproval, postDecision, secondsRemaining,
 } from '@/lib/hooks/approval-state';
 
+type SelectablePersona = 'WHINK' | 'MAMBA' | 'PETER' | 'PAUL' | 'MICAH' | 'NANDI' | 'SCOUT';
+const SELECTABLE_PERSONAS: readonly SelectablePersona[] = ['WHINK', 'MAMBA', 'PETER', 'PAUL', 'MICAH', 'NANDI', 'SCOUT'];
+function isSelectablePersona(value: unknown): value is SelectablePersona {
+  return typeof value === 'string' && SELECTABLE_PERSONAS.some((persona) => persona === value);
+}
+
 interface Message {
   id: string;
   role: string;
@@ -79,9 +85,10 @@ export function ConversationSurface({ initialPrompt = '' }: { initialPrompt?: st
   const [optionsOpen, setOptionsOpen] = useState(() => readOptionsFlag());
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState('');
-  const [streamPersona, setStreamPersona] = useState<'WHINK' | 'MAMBA'>('WHINK');
+  const [streamPersona, setStreamPersona] = useState<SelectablePersona>('WHINK');
   const [streamMambaMode, setStreamMambaMode] = useState<string | null>(null);
-  const [activePersona, setActivePersona] = useState<'WHINK' | 'MAMBA'>('WHINK');
+  const [activePersona, setActivePersona] = useState<SelectablePersona>('WHINK');
+  const [switchingPersona, setSwitchingPersona] = useState(false);
   const [activeMambaMode, setActiveMambaMode] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
@@ -122,12 +129,44 @@ export function ConversationSurface({ initialPrompt = '' }: { initialPrompt?: st
   const cardStatesRef = useRef(cardStates);
   useEffect(() => { cardStatesRef.current = cardStates; }, [cardStates]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/persona/state')
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled || !isSelectablePersona(data?.activePersona)) return;
+        setActivePersona(data.activePersona);
+        setActiveMambaMode(data.activePersona === 'MAMBA' ? data.mambaMode ?? 'OBSIDIAN' : null);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const pushNeuralEvent = useCallback((type: NeuralEvent['type'], text: string) => {
     setNeuralEvents(prev => [
       ...prev,
       { id: `${Date.now()}-${Math.random()}`, type, text, ts: Date.now() },
     ]);
   }, []);
+
+  const selectPersona = useCallback(async (persona: SelectablePersona) => {
+    if (switchingPersona || persona === activePersona) return;
+    setSwitchingPersona(true);
+    try {
+      const response = await fetch('/api/persona/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ persona, mambaMode: persona === 'MAMBA' ? 'OBSIDIAN' : null }),
+      });
+      if (!response.ok) throw new Error('Agent switch was rejected');
+      setActivePersona(persona);
+      setActiveMambaMode(persona === 'MAMBA' ? 'OBSIDIAN' : null);
+    } catch {
+      pushNeuralEvent('error', 'Could not switch agent. Please try again.');
+    } finally {
+      setSwitchingPersona(false);
+    }
+  }, [activePersona, pushNeuralEvent, switchingPersona]);
 
   const submitDecision = useCallback(async (id: string, decision: 'approve' | 'deny', voice?: { code: string }) => {
     const cur = cardStatesRef.current[id] ?? initialCardState;
@@ -271,7 +310,7 @@ export function ConversationSurface({ initialPrompt = '' }: { initialPrompt?: st
       const decoder = new TextDecoder();
       let buffer = '';
       let fullText = '';
-      let persona: 'WHINK' | 'MAMBA' = 'WHINK';
+      let persona: SelectablePersona = 'WHINK';
       let mambaMode: string | null = null;
 
       while (true) {
@@ -288,7 +327,7 @@ export function ConversationSurface({ initialPrompt = '' }: { initialPrompt?: st
               if (data.type === 'text') {
                 fullText += data.content ?? '';
                 setStreamText(fullText);
-                persona = (data.persona as 'WHINK' | 'MAMBA') ?? 'WHINK';
+                persona = isSelectablePersona(data.persona) ? data.persona : 'WHINK';
                 mambaMode = data.mambaMode ?? null;
                 setStreamPersona(persona);
                 setStreamMambaMode(mambaMode);
@@ -344,7 +383,7 @@ export function ConversationSurface({ initialPrompt = '' }: { initialPrompt?: st
               } else if (data.type === 'error') {
                 pushNeuralEvent('error', data.message ?? 'error');
               } else if (data.type === 'done') {
-                persona = (data.persona as 'WHINK' | 'MAMBA') ?? persona;
+                persona = isSelectablePersona(data.persona) ? data.persona : persona;
                 mambaMode = data.mambaMode ?? mambaMode;
               }
             } catch {}
@@ -454,7 +493,7 @@ export function ConversationSurface({ initialPrompt = '' }: { initialPrompt?: st
     </>
   );
 
-  const avatarPersona: 'WHINK' | 'MAMBA' = streaming ? streamPersona : activePersona;
+  const avatarPersona: SelectablePersona = streaming ? streamPersona : activePersona;
   const avatarMambaMode = streaming ? streamMambaMode : activeMambaMode;
   const avatarIsSpeaking = voiceMode && (streaming || isSpeaking);
 
@@ -492,6 +531,23 @@ export function ConversationSurface({ initialPrompt = '' }: { initialPrompt?: st
                 lipSyncAmplitude={avatarIsSpeaking ? lipSyncAmplitude : 0}
                 size="sm"
               />
+              <label className="sr-only" htmlFor="conversation-agent-select">Select agent</label>
+              <select
+                id="conversation-agent-select"
+                aria-label="Select agent"
+                value={activePersona}
+                disabled={switchingPersona || streaming}
+                onChange={(event) => { if (isSelectablePersona(event.target.value)) void selectPersona(event.target.value); }}
+                className="max-w-36 rounded border border-border bg-background px-2 py-1 text-xs font-mono text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60"
+              >
+                <option value="WHINK">WHINK · Assistant</option>
+                <option value="MAMBA">MAMBA · Obsidian</option>
+                <option value="PETER">PETER · Forensics</option>
+                <option value="PAUL">PAUL · Reconstruction</option>
+                <option value="MICAH">MICAH · Product audit</option>
+                <option value="NANDI">NANDI · Growth &amp; marketing</option>
+                <option value="SCOUT">Michael Carrick · Research &amp; opportunities</option>
+              </select>
               <span
                 className="text-xs font-mono font-medium px-1.5 py-0.5 rounded"
                 style={{

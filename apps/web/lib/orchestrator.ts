@@ -10,6 +10,11 @@ import { recordActionSafe } from '@/lib/ledger';
 
 const PERSONA_SWITCH_PATTERNS: Array<{ regex: RegExp; persona: string; mode?: string }> = [
   { regex: /^\/?mamba\b/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
+  { regex: /^\/?peter\b/i, persona: 'PETER' },
+  { regex: /^\/?paul\b/i, persona: 'PAUL' },
+  { regex: /^\/?micah\b/i, persona: 'MICAH' },
+  { regex: /^\/?nandi\b/i, persona: 'NANDI' },
+  { regex: /^\/?scout\b/i, persona: 'SCOUT' },
   { regex: /mamba mode/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
   { regex: /activate mamba/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
   { regex: /switch to mamba/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
@@ -183,7 +188,7 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
   const contextStr = formatContextForPrompt(context);
 
   // 6b. Read agent lessons (CAI) — scoped by accountId for tenant isolation
-  const agentId = activePersona === 'MAMBA' ? 'mamba' : 'whink';
+  const agentId = activePersona.toLowerCase();
   const taskTypeDomain = activeFunctionalMode?.toLowerCase() ?? 'general';
   // TODO: when User model has an accountId field, use it here. For now, userId is the accountId.
   const userForAccount = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });

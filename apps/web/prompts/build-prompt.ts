@@ -2,6 +2,11 @@ import { SYSTEM_CONSTITUTION, PROMPT_VERSION } from './system-constitution';
 import { SECURITY_POLICY } from './security-policy';
 import { WHINK_PERSONA } from './persona-whink';
 import { MAMBA_PERSONA } from './persona-mamba';
+import { PETER_PERSONA } from './persona-peter';
+import { PAUL_PERSONA } from './persona-paul';
+import { MICAH_PERSONA } from './persona-micah';
+import { NANDI_PERSONA } from './persona-nandi';
+import { SCOUT_PERSONA } from './persona-scout';
 import { MAMBA_MODES } from './mamba-modes';
 import { FUNCTIONAL_MODES } from './functional-modes';
 
@@ -30,11 +35,16 @@ export function buildSystemPrompt(ctx: PromptContext): string {
   layers.push(SECURITY_POLICY);
 
   // Layer 3: Active Persona
-  if (ctx.persona === 'MAMBA') {
-    layers.push(MAMBA_PERSONA);
-  } else {
-    layers.push(WHINK_PERSONA);
-  }
+  const personaPrompts: Record<string, string> = {
+    WHINK: WHINK_PERSONA,
+    MAMBA: MAMBA_PERSONA,
+    PETER: PETER_PERSONA,
+    PAUL: PAUL_PERSONA,
+    MICAH: MICAH_PERSONA,
+    NANDI: NANDI_PERSONA,
+    SCOUT: SCOUT_PERSONA,
+  };
+  layers.push(personaPrompts[ctx.persona] ?? WHINK_PERSONA);
 
   // Layer 4: MAMBA Mode (if active)
   if (ctx.persona === 'MAMBA' && ctx.mambaMode) {

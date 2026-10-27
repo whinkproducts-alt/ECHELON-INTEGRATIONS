@@ -9,7 +9,7 @@ import { logger, generateCorrelationId } from '@/lib/logger';
 import { runTaskGate } from '@/lib/task-gate';
 import { isApprovalMessage, BARE_APPROVAL_REPLY } from '@/lib/approval-handler';
 import { createApproval } from '@/lib/approvals';
-import { extractAndStoreMemories } from '@/lib/auto-memory';
+import { extractAndStoreMemories, recordCompletedTurn } from '@/lib/auto-memory';
 import { decryptKey } from '@/lib/key-encryption';
 import { recordActionSafe } from '@/lib/ledger';
 import { resolveChatTools } from '@/lib/gateway-chat';
@@ -405,6 +405,19 @@ export async function POST(
             },
           });
 
+          // Save the completed exchange to episodic memory for later task recall. It remains
+          // source-linked and untrusted on retrieval; secret and sensitive-memory gates apply.
+          await recordCompletedTurn({
+            userId: session.user.id,
+            conversationId,
+            messageId: assistantMessage.id,
+            userMessage,
+            assistantReply: fullContent,
+            persona: activePersona,
+            projectId: projectId ?? conv.projectId,
+            correlationId,
+          });
+
           // B1 — Auto memory extraction (detached — does not block the response).
           // Skipped when a tool wrote memory, a tool ran, or external content was read this turn.
           if (!memoryWriteCalledInLoop && !toolRanThisTurn && !externalContentThisTurn && fullContent.length > 100) {
@@ -425,7 +438,7 @@ export async function POST(
           if (fullContent.length > 100) {
             void debriefTurn({
               userId: session.user.id,
-              agentId: activePersona === 'MAMBA' ? 'mamba' : 'whink',
+              agentId: activePersona.toLowerCase(),
               userMessage,
               assistantResponse: fullContent,
               accountId: session.user.id,

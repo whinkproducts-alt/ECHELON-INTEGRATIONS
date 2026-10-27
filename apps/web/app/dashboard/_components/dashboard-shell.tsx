@@ -46,9 +46,12 @@ export function DashboardShell({ children, user, connection = 'online' }: { chil
   useCommandPaletteHotkey(togglePalette);
 
   const isWhink = personaState.activePersona === 'WHINK';
+  const isMamba = personaState.activePersona === 'MAMBA';
   const personaLabel = isWhink
     ? tenantConfig.productName
-    : `${tenantConfig.memoryLabelMamba} • ${tenantConfig.obsidianLabel ?? personaState.mambaMode ?? 'Obsidian'}`;
+    : isMamba
+      ? `${tenantConfig.memoryLabelMamba} • ${tenantConfig.obsidianLabel ?? personaState.mambaMode ?? 'Obsidian'}`
+      : personaState.activePersona;
   // Consumers (neural-link, connected-apps) read --tenant-accent with a token fallback.
   const accentStyle = tenantConfig.accentColor ? ({ '--tenant-accent': tenantConfig.accentColor } as React.CSSProperties) : undefined;
   const signOutNow = () => signOut({ redirectTo: '/login' });
@@ -70,7 +73,7 @@ export function DashboardShell({ children, user, connection = 'online' }: { chil
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar
-          personaLabel={personaLabel} personaKind={isWhink ? 'primary' : 'adversarial'} functionalMode={personaState.functionalMode}
+          personaLabel={personaLabel} personaKind={isMamba ? 'adversarial' : 'primary'} functionalMode={personaState.functionalMode}
           connection={offline ? 'offline' : connection} userEmail={user?.email ?? undefined}
           onOpenPalette={() => setPalette(true)} onOpenNav={() => setMobileNav(true)}
         />

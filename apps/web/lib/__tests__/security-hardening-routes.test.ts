@@ -222,6 +222,12 @@ describe('POST /api/persona/switch — A3 MAMBA Obsidian-only', () => {
     expect(res.status).toBe(200);
   });
 
+  it.each(['MICAH', 'NANDI', 'SCOUT'])('accepts %s as a selectable persona', async (persona) => {
+    const { POST } = await import('../../app/api/persona/switch/route');
+    const res = await POST(req({ persona }));
+    expect(res.status).toBe(200);
+  });
+
   it('rejects mambaMode: WHITE with 400', async () => {
     const { POST } = await import('../../app/api/persona/switch/route');
     const res = await POST(req({ persona: 'MAMBA', mambaMode: 'WHITE' }));

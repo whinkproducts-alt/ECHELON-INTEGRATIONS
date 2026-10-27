@@ -121,6 +121,83 @@ export function isSensitive(statement: string): boolean {
   return SENSITIVE_PATTERNS.some((p) => p.test(statement));
 }
 
+/**
+ * Store the completed chat exchange as a source-linked episodic record. This is a verbatim
+ * work record, not a verified-facts extraction: retrieval wraps it as untrusted content.
+ * Secrets are never persisted here; sensitive records still pass the normal Class B gate.
+ */
+export async function recordCompletedTurn(input: {
+  userId: string;
+  conversationId: string;
+  messageId: string;
+  userMessage: string;
+  assistantReply: string;
+  persona: string;
+  projectId?: string | null;
+  correlationId: string;
+}): Promise<void> {
+  const { userId, conversationId, messageId, userMessage, assistantReply, persona, projectId, correlationId } = input;
+  const statement = `Completed conversation turn with ${persona}.\nUser request:\n${userMessage}\n\nAssistant result:\n${assistantReply}`;
+  if (!userId || !conversationId || !messageId || !statement.trim()) return;
+
+  if (isSecret(statement)) {
+    await recordActionSafe({
+      userId, initiator: 'system', persona, action: 'memory_task_record_skipped',
+      permissionClass: 'A', status: 'VALIDATED', inputSummary: 'reason: secret_detected', correlationId,
+    });
+    return;
+  }
+
+  const sensitive = isSensitive(statement);
+  const permissionClass: 'A' | 'B' = sensitive ? 'B' : 'A';
+  let permission: Awaited<ReturnType<typeof checkPermission>>;
+  try {
+    permission = await checkPermission(
+      userId,
+      sensitive ? 'memory_auto_write_sensitive' : 'memory_auto_write',
+      permissionClass,
+      correlationId,
+    );
+  } catch {
+    permission = { allowed: false, method: 'requires_confirmation', reason: 'permission engine error' };
+  }
+  if (!permission.allowed) {
+    await recordActionSafe({
+      userId, initiator: 'system', persona, action: 'memory_task_record_denied',
+      permissionClass, status: 'DENIED', inputSummary: `reason: ${sensitive ? 'sensitive' : 'permission'}`, correlationId,
+    });
+    return;
+  }
+
+  try {
+    await writeMemory({
+      userId,
+      type: 'episodic',
+      statement,
+      projectId: projectId ?? null,
+      source: 'conversation',
+      sourceId: conversationId,
+      messageId,
+      extractorModel: 'verbatim_exchange',
+      eventType: 'completed_work',
+      confidence: 1,
+      importance: 0.7,
+    });
+    await recordActionSafe({
+      userId, initiator: 'system', persona, action: 'memory_task_recorded',
+      permissionClass, status: 'VALIDATED', inputSummary: 'type: completed_work', correlationId,
+    });
+  } catch (err) {
+    logger.error('auto-memory: completed work record failed', {
+      userId, correlationId, error: (err as Error)?.message,
+    });
+    await recordActionSafe({
+      userId, initiator: 'system', persona, action: 'memory_task_record_failed',
+      permissionClass, status: 'FAILED', inputSummary: 'type: completed_work', correlationId,
+    });
+  }
+}
+
 // ── B12 — Daily cap helpers ───────────────────────────────────────────────────
 
 const DEFAULT_DAILY_CAP = 200;

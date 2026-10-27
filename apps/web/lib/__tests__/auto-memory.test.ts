@@ -103,6 +103,51 @@ describe('B1 — detached execution', () => {
   });
 });
 
+describe('completed work records', () => {
+  beforeEach(() => { vi.resetModules(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('stores the completed exchange as a source-linked episodic record', async () => {
+    const { writeMemory, checkPermission } = buildMocks();
+    const { recordCompletedTurn } = await import('../auto-memory');
+    await recordCompletedTurn({
+      userId: 'u1', conversationId: 'c1', messageId: 'm1',
+      userMessage: 'Build the feature', assistantReply: 'Implemented the feature.',
+      persona: 'MICAH', projectId: 'p1', correlationId: 'corr-retro',
+    });
+    expect(checkPermission).toHaveBeenCalledWith('u1', 'memory_auto_write', 'A', 'corr-retro');
+    expect(writeMemory).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'u1', type: 'episodic', projectId: 'p1', source: 'conversation',
+      sourceId: 'c1', messageId: 'm1', eventType: 'completed_work', confidence: 1,
+    }));
+    expect(writeMemory.mock.calls[0][0].statement).toContain('Implemented the feature.');
+  });
+
+  it('does not persist a completed exchange that contains a detected secret', async () => {
+    const { writeMemory, recordActionSafe } = buildMocks();
+    const { recordCompletedTurn } = await import('../auto-memory');
+    await recordCompletedTurn({
+      userId: 'u1', conversationId: 'c1', messageId: 'm1',
+      userMessage: 'My password is definitely secret123', assistantReply: 'Understood.',
+      persona: 'WHINK', correlationId: 'corr-secret',
+    });
+    expect(writeMemory).not.toHaveBeenCalled();
+    expect(recordActionSafe).toHaveBeenCalledWith(expect.objectContaining({ action: 'memory_task_record_skipped' }));
+  });
+
+  it('uses the sensitive-memory permission class before storing sensitive content', async () => {
+    const { writeMemory, checkPermission } = buildMocks();
+    const { recordCompletedTurn } = await import('../auto-memory');
+    await recordCompletedTurn({
+      userId: 'u1', conversationId: 'c1', messageId: 'm1',
+      userMessage: 'I need to review my salary with my manager.', assistantReply: 'Here is a draft.',
+      persona: 'WHINK', correlationId: 'corr-sensitive',
+    });
+    expect(checkPermission).toHaveBeenCalledWith('u1', 'memory_auto_write_sensitive', 'B', 'corr-sensitive');
+    expect(writeMemory).toHaveBeenCalledTimes(1);
+  });
+});
+
 // ── B2 — Model router only ────────────────────────────────────────────────────
 
 describe('B2 — uses chatOnce from model router, not provider SDK', () => {
