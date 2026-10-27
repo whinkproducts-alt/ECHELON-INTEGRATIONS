@@ -384,3 +384,12 @@ An outside agent scanned the branch and reported six findings. Each was checked 
 
 Also noted: the report listed COEP among the security headers; the app sets COOP and CORP but not COEP.
 
+## 2026-10-27: Hold postcss at 8.5.31 so a fresh install passes pnpm 12's release-age rule
+
+Victor's first install on his Mac (pnpm 12.5.1) failed with ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION: pnpm 12 refuses any package published in the last 24 hours, and the lockfile held postcss@8.5.32, published about 20 hours before. The security upgrade that day took "latest" without checking its age; CI never caught it because CI pins pnpm 10.28.0, which has no such rule.
+
+- Pinned postcss to 8.5.31 (published 2026-10-18, above the 8.5.18 security fix) and added an override so the Tailwind plugins that resolve postcss as a peer also stay at 8.5.31 (pnpm-workspace.yaml).
+- Verified by running pnpm 12.5.1 install --frozen-lockfile against the new lockfile in a clean copy: "Lockfile passes supply-chain policies", exit 0.
+- Lesson: when bumping dependencies, check the publish date of each new version against pnpm 12's 24 hour rule, and test with the pnpm version the owner actually uses (12.x), not only the one CI pins.
+- The age rule is a supply-chain protection and stays on; it was not relaxed.
+

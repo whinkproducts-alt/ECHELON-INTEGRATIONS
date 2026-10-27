@@ -76,3 +76,23 @@ git push origin main
 - Prisma error: `npx prisma generate` then `npx prisma db push`
 - Node version: Use `nvm use 22`
 - Port 3000 in use: Kill with `lsof -i :3000 | grep LISTEN | awk '{print $2}' | xargs kill -9`
+
+## Troubleshooting: port 5432 is already in use
+
+If `docker compose up -d postgres` fails with `bind: address already in use` on 5432, another Postgres is
+running on your machine. Do not stop it. Run this project's database on another port instead:
+
+1. In the repo root (next to docker-compose.yml) create a file named `.env` containing `POSTGRES_PORT=5433`.
+2. In `apps/web/.env` change both `DATABASE_URL` and `DIRECT_URL` to use `127.0.0.1:5433`.
+3. Run `docker compose up -d postgres` again.
+
+## Troubleshooting: `docker-credential-desktop` not found
+
+Docker Desktop's helper tool is not on your PATH. Add `export PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"`
+to `~/.zshrc` and open a new Terminal window.
+
+## Troubleshooting: pnpm 12 `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`
+
+pnpm 12 refuses packages published in the last 24 hours. When bumping dependencies, check each new version's publish
+date first and test with pnpm 12. See docs/decisions.md, 2026-10-27.
+
