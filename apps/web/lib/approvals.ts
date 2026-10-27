@@ -18,6 +18,7 @@ import { approvalContentHash } from '@/lib/canonical-json';
 import { approvalConfirmationCode, verifyConfirmationCode } from '@/lib/approval-code';
 import { classifyProtected, type ProtectedCategory } from '@/lib/protected-actions';
 import { buildDispatchMessage } from '@/lib/approval-handler';
+import { assessLateApproval, COUNCIL_SIZE } from '@/lib/approval-council';
 import type { ExecutionAuthorizationRequest } from '@whink/org-kit';
 
 export const APPROVAL_TTL_MS = 30_000;
@@ -74,6 +75,7 @@ interface ApprovalRow {
   persona: string;
   createdAt: Date;
   expiresAt: Date;
+  result?: unknown;
 }
 
 const systemClock: Clock = () => new Date();
@@ -252,13 +254,33 @@ export async function sweepApprovals(now: Date, userId: string): Promise<{ expir
     where: { userId, status: 'PENDING', expiresAt: { lte: now } },
   }) as ApprovalRow[];
   for (const row of stale) {
+    const council = assessLateApproval(row);
+    if (council.eligible) {
+      // Re-open the short execution window only for a unanimous council vote
+      // on an explicitly read-only internal capability. The normal approval
+      // path performs the atomic claim, hash check, and permission check.
+      const extended = await prisma.approvalRequest.updateMany({
+        where: { id: row.id, userId, status: 'PENDING', expiresAt: { lte: now } },
+        data: {
+          expiresAt: new Date(now.getTime() + APPROVAL_TTL_MS),
+          result: { council: { members: council.members, votes: council.votes, consensus: true, size: COUNCIL_SIZE } },
+        },
+      });
+      if (extended.count !== 1) continue;
+      await ledger(row, 'approval_council_consensus', 'VALIDATED', {
+        outputSummary: `Unanimous ${COUNCIL_SIZE}/5 council approval: ${council.members.join(', ')}`,
+        confirmationMethod: 'council_consensus',
+      });
+      await decide(userId, row.id, 'approve', { now: () => now, council: true });
+      continue;
+    }
     const won = await prisma.approvalRequest.updateMany({
       where: { id: row.id, userId, status: 'PENDING', expiresAt: { lte: now } },
       data: { status: 'EXPIRED', decidedAt: now },
     });
     if (won.count !== 1) continue;
     expired++;
-    await ledger(row, 'approval_expired', 'DENIED', { outputSummary: 'Expired before a decision' });
+    await ledger(row, 'approval_expired', 'DENIED', { outputSummary: `Expired; council declined: ${council.reason}` });
   }
 
   const cutoff = new Date(now.getTime() - EXECUTING_STUCK_MS);
@@ -321,6 +343,7 @@ async function finish(
   status: 'EXECUTED' | 'FAILED',
   result: ApprovalResult,
   now: Clock,
+  confirmationMethod: string = 'user_confirmed',
 ): Promise<DecisionOutcome> {
   const capped = capResult(result);
   await prisma.approvalRequest.updateMany({
@@ -331,7 +354,7 @@ async function finish(
     row,
     status === 'EXECUTED' ? 'approval_executed' : 'approval_failed',
     status === 'EXECUTED' ? 'VALIDATED' : 'FAILED',
-    { outputSummary: (capped.error ?? 'ok').substring(0, 300), confirmationMethod: 'user_confirmed' },
+    { outputSummary: (capped.error ?? 'ok').substring(0, 300), confirmationMethod },
   );
   return { id: row.id, status, result: capped };
 }
@@ -389,7 +412,7 @@ export async function decide(
   userId: string,
   id: string,
   decision: 'approve' | 'deny',
-  deps: { now?: Clock; voice?: { code?: unknown } } = {},
+  deps: { now?: Clock; voice?: { code?: unknown }; council?: boolean } = {},
 ): Promise<DecisionOutcome> {
   const clock = deps.now ?? systemClock;
   if (isBulkApprovalId(id)) {
@@ -398,10 +421,10 @@ export async function decide(
     return { id, status: 'NOT_FOUND', result: null };
   }
   const now = clock();
-  await sweepQuietly(userId, now);
+  if (!deps.council) await sweepQuietly(userId, now);
 
   // B4: atomically expire a stale PENDING row.
-  const expired = await prisma.approvalRequest.updateMany({
+  const expired = deps.council ? { count: 0 } : await prisma.approvalRequest.updateMany({
     where: { id, userId, status: 'PENDING', expiresAt: { lte: now } },
     data: { status: 'EXPIRED', decidedAt: now },
   });
@@ -423,7 +446,7 @@ export async function decide(
   }
 
   // Spoken approval: the server checks the confirmation code before anything changes state.
-  if (deps.voice) {
+  if (deps.voice && !deps.council) {
     const pending = await prisma.approvalRequest.findFirst({ where: { id, userId, status: 'PENDING', expiresAt: { gt: now } } }) as ApprovalRow | null;
     if (!pending) return explainLoss(userId, id);
     if (!verifyConfirmationCode(approvalConfirmationCode(userId, id, pending.contentHash), deps.voice.code)) {
@@ -443,7 +466,7 @@ export async function decide(
   if (!row) return { id, status: 'FAILED', result: { success: false, error: 'Approval vanished' } };
   // L4: no execution without the approval being on the ledger first. If the write fails, fail the row, run nothing.
   try {
-    await ledger(row, 'approval_approved', 'VALIDATED', { confirmationMethod: 'user_confirmed', strict: true });
+    await ledger(row, 'approval_approved', 'VALIDATED', { confirmationMethod: deps.council ? 'council_consensus' : 'user_confirmed', strict: true });
   } catch (e) {
     logger.error('approval_approved ledger write failed; not run', { userId, approvalId: row.id, error: (e as Error)?.message });
     await prisma.approvalRequest.updateMany({
@@ -504,7 +527,8 @@ export async function decide(
       persona: row.persona,
     });
     return finish(row, 'EXECUTING', res.success ? 'EXECUTED' : 'FAILED',
-      { success: res.success, data: res.data, error: res.error }, clock);
+      { success: res.success, data: res.data, error: res.error }, clock,
+      deps.council ? 'council_consensus' : 'user_confirmed');
   } catch (e) {
     logger.error('approved execution threw', { userId, approvalId: row.id, error: (e as Error)?.message });
     return finish(row, 'EXECUTING', 'FAILED', { success: false, error: 'Execution failed' }, clock);
