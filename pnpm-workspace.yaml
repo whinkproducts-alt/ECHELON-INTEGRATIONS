@@ -11,7 +11,11 @@ allowBuilds:
 # Security: the MCP SDK pulls in express, which pins a vulnerable body-parser (GHSA-27r3-jxmh-p828, fixed in 2.4.0).
 # Remove this override once @modelcontextprotocol/sdk depends on a patched express.
 #   lodash (via formik), source-map-js (via next's postcss), ip-address and fast-uri (via the MCP SDK) are patch-level fixes.
+#   postcss: pnpm 12 refuses any package published in the last 24 hours (minimumReleaseAge). 8.5.32 was brand new
+#   when the lockfile was written, so everything is held at 8.5.31 (published 2026-10-18, above the 8.5.18 security fix).
+#   Safe to drop once 8.5.32 is a few days old.
 overrides:
+  'postcss@>=8.5.32': 8.5.31
   'body-parser@>=2.0.0 <2.4.0': 2.4.0
   'lodash@<4.18.0': 4.18.1
   'source-map-js@<1.2.2': 1.2.2
