@@ -14,7 +14,7 @@ pnpm install
 
 ## Local Ollama Model
 
-Wink Ultimate defaults to a local Qwen 3.5 9B Q4 model profile with an 8K context. On a 16 GB Mac, this keeps inference local while leaving memory for macOS and the app. From the repository root, install the base model and create the profile:
+WHINK Ultimate defaults to a local Qwen 3.5 9B Q4 model profile with an 8K context. On a 16 GB Mac, this keeps inference local while leaving memory for macOS and the app. From the repository root, install the base model and create the profile:
 
 ```sh
 ollama pull qwen3.5:9b-q4_K_M
