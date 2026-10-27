@@ -48,7 +48,7 @@ describe('messages route: external content read this turn', () => {
       STANDARD_TOOLS: [],
       isExternalTool: (n: string) => ['web_fetch', 'web_search', 'document_search'].includes(n) || n.startsWith('openclaw__'),
     }));
-    vi.doMock('@/lib/auto-memory', () => ({ extractAndStoreMemories }));
+    vi.doMock('@/lib/auto-memory', () => ({ extractAndStoreMemories, recordCompletedTurn: vi.fn().mockResolvedValue(undefined) }));
     vi.doMock('@/lib/task-gate', () => ({ runTaskGate: vi.fn().mockReturnValue({ intercepted: false }) }));
     vi.doMock('@/lib/approval-handler', () => ({ isApprovalMessage: vi.fn().mockReturnValue(false), BARE_APPROVAL_REPLY: 'x' }));
     vi.doMock('@/lib/approvals', () => ({ createApproval: vi.fn() }));
