@@ -1,34 +1,26 @@
 /**
- * Daily SMS briefing to the owner (CSA Phase 2).
+ * Daily SMS briefing (automated path). It NEVER sends.
  *
- * Flow each tick: is today inside the configured window, is it past the send time, has the
- * briefing already gone out today (ledger, no new table) -> collect the directorate reports ->
- * format a short GSM-7 message -> checkPermission -> sendSms -> ledger.
+ * Sending an SMS is a protected action (sms_briefing_send, Class C, proprietary): it needs the
+ * owner's approval by request id every time. Each due tick this worker writes at most one ledger
+ * row and one Recommendation per day saying a briefing is waiting. The owner then opens Today and
+ * taps Send briefing by SMS, which goes through POST /api/briefing/sms and the approval card.
+ * No delegation, standing approval or own-number exemption exists or is implied.
  *
- * Safety:
- * - Off by default. Nothing is sent until BRIEFING_SMS_ENABLED=true.
- * - The recipient comes from env only. No model, report or tool input can change it.
- * - This is not a model tool, so injected text cannot trigger it.
- * - Report files are untrusted data: parsed, type checked, stripped to a safe charset, capped.
- *   They are never sent to a model.
- * - Capability sms_briefing_send is Class B: it needs a delegation row or autonomy 2 or higher.
- *   Without one, the send is DENIED and ledgered, once per day.
- * - A Twilio failure never throws. It is logged, ledgered as FAILED, and retried a few times.
+ * Off by default (BRIEFING_SMS_ENABLED=true). Report files are untrusted data and are not used
+ * for the approval text any more; that text is built by lib/briefing/sms.ts.
  */
 
 import { promises as fs } from 'fs';
 import path from 'path';
 import { logger } from '@/lib/logger';
-import { recordActionSafe, countByCorrelation } from '@/lib/ledger';
-import { checkPermission } from '@/lib/permission-engine';
-import { sendSms, maskNumber, isE164, twilioConfigured, type SmsResult } from '@/lib/twilio-adapter';
+import { isE164, twilioConfigured } from '@/lib/twilio-adapter';
+import { surfaceBriefingWaiting } from '@/lib/briefing/sms';
 
 export const SMS_TOOL = 'sms_briefing_send';
 export const MAX_SEGMENTS = 3;
 export const SEGMENT_CHARS = 153; // GSM-7 concatenated segment size.
 export const MAX_SMS_CHARS = MAX_SEGMENTS * SEGMENT_CHARS;
-const MAX_ATTEMPTS_PER_DAY = 3;
-const RETRY_SPACING_MS = 5 * 60_000;
 const CATCH_UP_MINUTES = 90;
 const STALE_AFTER_MS = 36 * 60 * 60_000;
 const MAX_REPORT_FILES = 20;
@@ -205,16 +197,13 @@ export function segmentCount(body: string): number {
 // ── Run ────────────────────────────────────────────────────────
 
 export type TickOutcome =
-  | 'skipped_disabled' | 'skipped_not_due' | 'skipped_done' | 'skipped_config' | 'skipped_spacing'
-  | 'denied' | 'sent' | 'failed';
+  | 'skipped_disabled' | 'skipped_not_due' | 'skipped_done' | 'skipped_config'
+  | 'waiting_for_approval' | 'failed';
 
 export interface TickDeps {
   env?: Env;
-  send?: (i: { to: string; body: string }) => Promise<SmsResult>;
-  loadReports?: (dir: string, now: Date) => Promise<DirectorateReport[]>;
 }
 
-let lastFailureAt = 0;
 let lastProblemLogDay = '';
 
 export async function runBriefingTick(now: Date = new Date(), deps: TickDeps = {}): Promise<TickOutcome> {
@@ -236,38 +225,13 @@ export async function runBriefingTick(now: Date = new Date(), deps: TickDeps = {
   const { due, date } = isDue(now, c);
   if (!due) return 'skipped_not_due';
 
-  const correlationId = `sms-briefing:${date}`;
-  const [sent, failed, denied] = await Promise.all([
-    countByCorrelation(c.userId, SMS_TOOL, correlationId, ['VALIDATED', 'SUBMITTED']),
-    countByCorrelation(c.userId, SMS_TOOL, correlationId, ['FAILED']),
-    countByCorrelation(c.userId, SMS_TOOL, correlationId, ['DENIED']),
-  ]);
-  if (sent > 0 || denied > 0 || failed >= MAX_ATTEMPTS_PER_DAY) return 'skipped_done';
-  if (failed > 0 && now.getTime() - lastFailureAt < RETRY_SPACING_MS) return 'skipped_spacing';
-
-  const base = { userId: c.userId, initiator: 'automation' as const, tool: SMS_TOOL, correlationId, permissionClass: 'B', action: `tool_executed: ${SMS_TOOL}` };
-  const started = Date.now();
-
-  const perm = await checkPermission(c.userId, SMS_TOOL, 'B', correlationId);
-  if (!perm.allowed) {
-    await recordActionSafe({ ...base, status: 'DENIED', validationResult: perm.method, outputSummary: `Not sent: ${perm.reason ?? 'permission denied'}. Grant a delegation for ${SMS_TOOL} to enable.` });
-    logger.warn('sms briefing denied by permission engine', { correlationId });
-    return 'denied';
+  try {
+    const r = await surfaceBriefingWaiting(c.userId, date);
+    return r === 'created' ? 'waiting_for_approval' : 'skipped_done';
+  } catch (e) {
+    logger.error('sms briefing reminder failed', { error: (e as Error)?.message });
+    return 'failed';
   }
-
-  const reports = await (deps.loadReports ?? loadReports)(c.reportsDir, now);
-  const body = formatBriefing(reports, date);
-  const result = await (deps.send ?? ((i) => sendSms(i, { env })))({ to: c.to, body });
-  const latencyMs = Date.now() - started;
-  const summary = `to ${maskNumber(c.to)}, ${body.length} chars, ${segmentCount(body)} segment(s), ${reports.length} report(s)`;
-
-  if (result.ok) {
-    await recordActionSafe({ ...base, status: 'VALIDATED', confirmationMethod: perm.method, latencyMs, inputSummary: summary, outputSummary: `Twilio ${result.status} ${result.sid}\n${body}` });
-    return 'sent';
-  }
-  lastFailureAt = now.getTime();
-  await recordActionSafe({ ...base, status: 'FAILED', confirmationMethod: perm.method, latencyMs, inputSummary: summary, outputSummary: `${result.reason}${result.code ? ` ${result.code}` : ''}: ${result.message}` });
-  return 'failed';
 }
 
 // ── Worker ─────────────────────────────────────────────────────
@@ -292,4 +256,4 @@ export function startBriefingWorker(): boolean {
 }
 
 /** Test helper. */
-export function _resetBriefingState(): void { lastFailureAt = 0; lastProblemLogDay = ''; }
+export function _resetBriefingState(): void { lastProblemLogDay = ''; }

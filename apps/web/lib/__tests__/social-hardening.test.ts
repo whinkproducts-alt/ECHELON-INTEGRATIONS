@@ -219,7 +219,7 @@ describe('M2 routes return 503 encryption_not_configured', () => {
 describe('middleware: /api/signup is reachable without a session, only exactly', () => {
   async function load() {
     vi.doMock('@/auth', () => ({ auth: (fn: unknown) => fn }));
-    const mod = await import('../../middleware');
+    const mod = await import('../../proxy');
     const { NextRequest } = await import('next/server');
     return { mw: mod.default as unknown as (req: InstanceType<typeof NextRequest>) => Promise<Response>, NextRequest };
   }

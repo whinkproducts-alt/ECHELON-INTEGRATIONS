@@ -1,6 +1,10 @@
 import { prisma } from '@/lib/db';
+import { htmlToText } from '@/lib/html-text';
 import { generateCorrelationId, logger } from '@/lib/logger';
-import { recordAction, recordActionSafe, updateActionStatus } from '@/lib/ledger';
+import { recordAction, recordActionSafe, updateActionStatus, type LedgerEntry } from '@/lib/ledger';
+
+const recordActionBase = recordAction;
+const recordActionSafeBase = recordActionSafe;
 import { checkPermission, checkApprovedAction, logSecurityEvent, type PermissionClass } from '@/lib/permission-engine';
 import { createApproval, type ApprovalView } from '@/lib/approvals';
 import { stripFakeUntrustedTags, scanForInjectionPatterns, filterToolResult } from '@/lib/content-isolation';
@@ -13,9 +17,12 @@ import { SCHEDULE_TOOL_NAME, checkScheduleCap, createScheduleApproval, parseSche
 import { DAILY_CAP_ERROR, capCategoryOf, checkDailyCap, ledgerCapRefusal } from '@/lib/social/caps';
 import { defHash, neutralDescription, redactSchemaForUnreviewed } from '@/lib/tool-definition';
 import toolClassesConfig from '@/config/tool-classes.json';
+import { classifyProtected } from '@/lib/protected-actions';
 import type { ToolDefinition } from '@/lib/tool-loop';
 import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
 import { validateTaskInput } from '@/lib/task-input';
+import { sendToContact, placeCall } from '@/lib/comms/delivery';
+import { resolveDestination } from '@/lib/contacts/comms';
 import dns from 'dns';
 import net from 'net';
 import https from 'https';
@@ -59,7 +66,7 @@ function isPrivateAddress(ip: string): boolean {
   return false;
 }
 
-async function assertSafeUrl(rawUrl: string): Promise<void> {
+export async function assertSafeUrl(rawUrl: string): Promise<void> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -211,7 +218,8 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
   },
 
   memory_read: async (userId: string, params: any) => {
-    const result = await searchMemory(userId, params.query, params.projectId, params.limit);
+    const limit = Math.min(Math.max(1, Math.floor(Number(params.limit) || 10)), 20);
+    const result = await searchMemory(userId, params.query, params.projectId, limit);
     return { success: true, data: result, source: 'memory_engine', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
@@ -362,12 +370,7 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
       }
     }
     // Strip HTML tags for readability
-    const plain = raw
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
+    const plain = htmlToText(raw);
     return { success: true, data: plain, source: url, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
@@ -411,15 +414,164 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
   },
 
   document_search: async (userId: string, params: any) => {
-    // Resolve workspace from server-side mapping — never trust model-supplied slug for tenant scoping
-    const ws = await prisma.documentWorkspace.findFirst({
-      where: { userId, ...(params.workspace ? { workspaceSlug: params.workspace } : {}) },
-      orderBy: { createdAt: 'asc' },
+    // Resolve workspace from the DocumentWorkspace table — one row per user, scoped by userId.
+    // Never trust a model-supplied workspace slug for tenant scoping.
+    const ws = await prisma.documentWorkspace.findUnique({ where: { userId } });
+    if (!ws) return { success: false, error: 'No document workspace configured for this account. Not connected.', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    const { queryDocuments } = await import('@/lib/anythingllm-client');
+    const { wrapUntrustedContent, stripFakeUntrustedTags, scanForInjectionPatterns } = await import('@/lib/content-isolation');
+    const limit = Math.min(Math.max(1, Math.floor(Number(params.limit) || 10)), 20);
+
+    // C11: queryDocuments has a 500 ms internal timeout. If it returns empty due to timeout/down,
+    // we ledger the unavailability and return gracefully.
+    let rawChunks: Awaited<ReturnType<typeof queryDocuments>>;
+    try {
+      rawChunks = await queryDocuments(userId, ws.workspaceSlug, params.query, limit);
+    } catch {
+      rawChunks = [];
+    }
+
+    if (!rawChunks.length) {
+      // Log once per turn when AnythingLLM is down or returns nothing.
+      await recordActionSafe({
+        userId,
+        action: 'document_recall_unavailable',
+        permissionClass: 'A',
+        status: 'VALIDATED',
+        tool: 'document_search',
+        inputSummary: `query=${String(params.query ?? '').slice(0, 200)}`,
+      });
+      return { success: true, data: [], source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    // C7+C8: scan each chunk; strip fake envelope tags from citation fields; wrap text as untrusted.
+    const safe = [];
+    for (const chunk of rawChunks) {
+      // Strip <|...|> and fake untrusted tags from citation fields (names, not chunk text)
+      const cleanName = stripFakeUntrustedTags(String(chunk.documentName ?? '')).replace(/<\|[^|>]*\|>/g, '');
+      const cleanChunkId = String(chunk.chunkId ?? '');
+      const cleanText = stripFakeUntrustedTags(String(chunk.text ?? ''));
+
+      // Injection scan the chunk text
+      const { suspicious } = scanForInjectionPatterns(cleanText);
+      if (suspicious) {
+        // C8: drop the chunk and ledger a security event — no content in the ledger row
+        await recordActionSafe({
+          userId,
+          action: 'document_chunk_blocked',
+          permissionClass: 'C',
+          status: 'DENIED',
+          tool: 'document_search',
+          inputSummary: `documentName=${cleanName.slice(0, 200)}`,
+        });
+        continue;
+      }
+
+      // Wrap chunk text as untrusted before it enters model context
+      const wrappedText = wrapUntrustedContent(cleanText, 'document', cleanName);
+
+      safe.push({
+        documentName: cleanName,
+        chunkId: cleanChunkId,
+        page: chunk.page,
+        score: chunk.score,
+        text: wrappedText,
+      });
+    }
+
+    return { success: true, data: safe, source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
+  document_upload: async (userId: string, params: any) => {
+    const ws = await prisma.documentWorkspace.findUnique({ where: { userId } });
+    if (!ws) return { success: false, error: 'No workspace configured', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    const filename = String(params.filename ?? '').trim();
+    const contentBase64 = String(params.contentBase64 ?? '').trim();
+    const mimeType = String(params.mimeType ?? 'application/octet-stream').trim();
+
+    if (!filename) return { success: false, error: 'filename required', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    if (!contentBase64) return { success: false, error: 'contentBase64 required', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(contentBase64, 'base64');
+    } catch {
+      return { success: false, error: 'contentBase64 is not valid base64', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    const maxMb = parseInt(process.env.DOCUMENT_MAX_SIZE_MB ?? '25', 10);
+    const maxBytes = maxMb * 1024 * 1024;
+    if (buffer.byteLength > maxBytes) {
+      return { success: false, error: `File exceeds maximum size of ${maxMb} MB`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    // Content-type check by magic bytes (not trusting the extension).
+    const ALLOWED_MAGIC: Array<{ sig: number[]; mime: string }> = [
+      { sig: [0x25, 0x50, 0x44, 0x46], mime: 'application/pdf' },                    // %PDF
+      { sig: [0x50, 0x4b, 0x03, 0x04], mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }, // DOCX (ZIP)
+    ];
+    const ALLOWED_TEXT_MIMES = new Set(['text/plain', 'text/markdown', 'text/x-markdown']);
+    const headerBytes = [...buffer.slice(0, 4)];
+    const isTextMime = ALLOWED_TEXT_MIMES.has(mimeType.split(';')[0].trim().toLowerCase());
+    const isBinaryOk = ALLOWED_MAGIC.some((m) => m.sig.every((b, i) => headerBytes[i] === b));
+    if (!isBinaryOk && !isTextMime) {
+      return { success: false, error: 'Unsupported file type. Allowed: PDF, DOCX, TXT, MD', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    const { createHash } = await import('crypto');
+    const fileHash = createHash('sha256').update(buffer).digest('hex');
+    const fileSize = buffer.byteLength;
+
+    const { uploadDocument } = await import('@/lib/anythingllm-client');
+    let uploadResult: { id: string };
+    try {
+      uploadResult = await uploadDocument(userId, ws.workspaceSlug, buffer, filename, mimeType);
+    } catch (err: any) {
+      return { success: false, error: err?.message ?? 'Upload failed', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    await recordActionSafe({
+      userId,
+      initiator: 'user',
+      action: 'document_uploaded',
+      permissionClass: 'A',
+      status: 'VALIDATED',
+      tool: 'document_upload',
+      inputSummary: `filename=${filename} size=${fileSize} hash=${fileHash.slice(0, 16)}`,
     });
-    if (!ws) return { success: false, error: 'No document workspace configured for this account.', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
-    const { searchDocuments } = await import('@/lib/anythingllm-client');
-    const results = await searchDocuments(params.query, ws.workspaceSlug, params.limit ?? 5);
-    return { success: true, data: results, source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    const { wrapUntrustedContent } = await import('@/lib/content-isolation');
+    const safeResult = wrapUntrustedContent(JSON.stringify({ id: uploadResult.id, filename, size: fileSize }), 'document_upload', filename);
+    return { success: true, data: safeResult, source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
+  document_delete: async (userId: string, params: any) => {
+    const documentId = String(params.documentId ?? '').trim();
+    if (!documentId) return { success: false, error: 'documentId required', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    const ws = await prisma.documentWorkspace.findUnique({ where: { userId } });
+    if (!ws) return { success: false, error: 'No workspace configured', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+
+    const { deleteDocument } = await import('@/lib/anythingllm-client');
+    try {
+      await deleteDocument(userId, ws.workspaceSlug, documentId);
+    } catch (err: any) {
+      return { success: false, error: err?.message ?? 'Delete failed', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+    }
+
+    await recordActionSafe({
+      userId,
+      initiator: 'user',
+      action: 'document_deleted',
+      permissionClass: 'A',
+      status: 'VALIDATED',
+      tool: 'document_delete',
+      inputSummary: `documentId=${documentId}`,
+    });
+
+    return { success: true, data: { deleted: true }, source: 'anythingllm', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
   // Never runs directly: Class C, queued as a 'scheduled_post' approval in executeTool.
@@ -429,6 +581,51 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
     timestamp: new Date().toISOString(),
     toolVersion: '1.0.0',
   }),
+
+  // Never offered to the model; Class C. Runs only from an approved request created by
+  // lib/contacts/comms.ts. The recipient is re-read here and must still match what was approved.
+  contact_message: async (userId: string, params: any) => {
+    const ts = () => new Date().toISOString();
+    const contact = typeof params?.contactId === 'string'
+      ? await prisma.contact.findFirst({ where: { id: params.contactId, userId } })
+      : null;
+    if (!contact) return { success: false, error: 'Contact not found', timestamp: ts(), toolVersion: '1.0.0' };
+    const channel = params.channel;
+    if (!['SMS', 'WHATSAPP', 'TELEGRAM', 'EMAIL'].includes(channel) || resolveDestination(contact, channel) !== params.to) {
+      return { success: false, error: 'Contact details changed since approval; not sent', timestamp: ts(), toolVersion: '1.0.0' };
+    }
+    const r = await sendToContact({ userId, channel, to: params.to, body: String(params.body ?? '') });
+    return { success: r.sent, data: { sent: r.sent, channel: r.channel }, error: r.sent ? undefined : `not sent: ${r.reason ?? 'unknown'}`, source: 'comms', timestamp: ts(), toolVersion: '1.0.0' };
+  },
+
+  // Never offered to the model; Class C and protected (proprietary). Runs only from an approved request
+  // created by lib/briefing/sms.ts. Content hash and the user's own number are re-checked there.
+  sms_briefing_send: async (userId: string, params: any) => {
+    const { runApprovedSmsBriefing } = await import('@/lib/briefing/sms');
+    const r = await runApprovedSmsBriefing(userId, params);
+    return { success: r.success, data: r.data, error: r.error, source: 'sms', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
+  contact_call: async (userId: string, params: any) => {
+    const ts = () => new Date().toISOString();
+    const contact = typeof params?.contactId === 'string'
+      ? await prisma.contact.findFirst({ where: { id: params.contactId, userId } })
+      : null;
+    if (!contact) return { success: false, error: 'Contact not found', timestamp: ts(), toolVersion: '1.0.0' };
+    if (resolveDestination(contact, 'PHONE_CALL') !== params.to) {
+      return { success: false, error: 'Contact details changed since approval; not called', timestamp: ts(), toolVersion: '1.0.0' };
+    }
+    const r = await placeCall({ userId, to: params.to, script: typeof params.script === 'string' ? params.script : undefined });
+    return { success: r.sent, data: { sent: r.sent, channel: r.channel }, error: r.sent ? undefined : `not placed: ${r.reason ?? 'unknown'}`, source: 'comms', timestamp: ts(), toolVersion: '1.0.0' };
+  },
+
+  // Never offered to the model; Class C and protected (proprietary). Runs only from an approved request
+  // created by lib/change-requests/service.ts. The issue is rebuilt from the stored spec and must match.
+  change_request_submit: async (userId: string, params: any) => {
+    const { runApprovedSubmit } = await import('@/lib/change-requests/handler');
+    const r = await runApprovedSubmit(userId, params);
+    return { success: r.success, data: r.data, error: r.error, source: 'github', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
 
   task_create: async (userId: string, params: any) => {
     if (typeof params?.projectId !== 'string' || params.projectId.length === 0) {
@@ -458,6 +655,10 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
 const TOOL_RISK_MAP: Record<string, PermissionClass> = Object.assign(Object.create(null), {
   // Class C always: runs only through an approval of kind 'scheduled_post' (never as a direct call).
   [SCHEDULE_TOOL_NAME]: 'C',
+  contact_message: 'C',
+  contact_call: 'C',
+  sms_briefing_send: 'C',
+  change_request_submit: 'C',
   memory_write: 'A',
   memory_read: 'A',
   memory_correct: 'B',
@@ -465,6 +666,8 @@ const TOOL_RISK_MAP: Record<string, PermissionClass> = Object.assign(Object.crea
   entity_update: 'B',
   task_create: 'B',
   document_search: 'A',
+  document_upload: 'A',
+  document_delete: 'A',
   web_search: 'A',
   web_fetch: 'B',   // H4: promoted from A to B
   calendar_list: 'A',
@@ -495,6 +698,12 @@ function loadToolClassAllowList(): Record<string, AllowListEntry> {
   for (const [name, entry] of Object.entries(toolClassesConfig as Record<string, unknown>)) {
     if (!name.startsWith(GATEWAY_PREFIX)) continue;
     const e = entry as { class?: unknown; defHash?: unknown } | null;
+    if (e && typeof e === 'object' && (e.class === 'A' || e.class === 'B') && classifyProtected({ toolName: name, capability: name }).protected) {
+      // Money and proprietary egress are always Class C. An allow-list entry cannot lower them.
+      console.warn(`[openclaw] ignoring allow-list entry for protected tool ${name}: protected actions are always Class C`);
+      logger.security('protected_allowlist_entry_ignored', { tool: name, details: `allow-list class ${e.class} ignored; protected actions are always Class C` });
+      continue;
+    }
     if (e && typeof e === 'object' && (e.class === 'A' || e.class === 'B' || e.class === 'C') && typeof e.defHash === 'string' && /^[0-9a-f]{64}$/.test(e.defHash)) {
       out[name] = { class: e.class, defHash: e.defHash };
     } else {
@@ -516,6 +725,8 @@ export function getGatewayDefHash(fullName: string): string | null {
 
 /** Last hash reported as differing from the reviewed one, per tool: one event per distinct hash. */
 const REPORTED_DEF_HASH = new Map<string, string>();
+/** Definition changes already written to the operator log only (the caller could not use the tool). */
+const LOGGED_DEF_HASH = new Map<string, string>();
 
 function neutralDescriptionsEnabled(): boolean {
   return process.env.OPENCLAW_NEUTRAL_DESCRIPTIONS?.trim().toLowerCase() !== 'false';
@@ -596,7 +807,9 @@ export async function registerOpenClawTools(userId: string): Promise<GatewayRegi
       }
       def = { name: full, description: neutralDescription(original), inputSchema: redacted.inputSchema };
     }
-    plans.push({ full, original, hash, cls: reviewed ? entry.class : 'C', def, unreviewedChange: Boolean(entry) && !reviewed });
+    // Protected tools (judged on name and the gateway description) stay Class C whatever the allow-list says.
+    const protectedTool = classifyProtected({ toolName: full, capability: full, description: tool.description }).protected;
+    plans.push({ full, original, hash, cls: reviewed && !protectedTool ? entry.class : 'C', def, unreviewedChange: Boolean(entry) && !reviewed });
   }
 
   // Phase 2: update the shared maps synchronously, with no await between the drop and the sets.
@@ -632,13 +845,17 @@ export async function registerOpenClawTools(userId: string): Promise<GatewayRegi
   // Phase 3: security events, after the maps are consistent.
   for (const p of plans) {
     if (!p.unreviewedChange || REPORTED_DEF_HASH.get(p.full) === p.hash) continue;
-    REPORTED_DEF_HASH.set(p.full, p.hash);
     const detail = `Gateway tool ${p.full} no longer matches its reviewed definition hash (now ${p.hash.slice(0, 12)}); treated as Class C`;
     // L1: an owner-only tool's change is operator news. It is never written to a non-owner's ledger.
+    // It is also not marked as reported here, so the owner's next request still ledgers it.
     if (!(await canUseGatewayTool(userId, p.full))) {
-      logger.security('tool_definition_changed', { tool: p.full, details: `${detail} (not ledgered: caller may not use this tool)` });
+      if (LOGGED_DEF_HASH.get(p.full) !== p.hash) {
+        LOGGED_DEF_HASH.set(p.full, p.hash);
+        logger.security('tool_definition_changed', { tool: p.full, details: `${detail} (not ledgered: caller may not use this tool)` });
+      }
       continue;
     }
+    REPORTED_DEF_HASH.set(p.full, p.hash);
     try {
       await logSecurityEvent(userId, 'tool_definition_changed', detail);
     } catch (e) {
@@ -744,9 +961,14 @@ export async function executeTool(
   persona?: string,
   mambaMode?: string,
   correlationId?: string,
-  opts: { approvalAlreadyPending?: boolean; tainted?: boolean } = {}
+  opts: { approvalAlreadyPending?: boolean; tainted?: boolean; initiator?: 'user' | 'system' | 'automation' } = {}
 ): Promise<ToolExecutionResult> {
   const cid = correlationId ?? generateCorrelationId();
+  // Every ledger row for a protected call carries its category (judged on name, params and taint).
+  const pa = classifyProtected({ toolName, capability: toolName, params, tainted: opts.tainted === true });
+  const recordActionSafe = (e: LedgerEntry) => recordActionSafeBase({ ...e, protectedCategory: pa.protected ? pa.category : undefined });
+  const recordAction = (e: LedgerEntry) => recordActionBase({ ...e, protectedCategory: pa.protected ? pa.category : undefined });
+  const initiator = opts.initiator ?? 'system';
   const startTime = Date.now();
 
   // H1: gateway tools are owner-only, except the social platforms (per-user credentials).
@@ -754,7 +976,7 @@ export async function executeTool(
   if (isGatewayTool(toolName) && !(await canUseGatewayTool(userId, toolName))) {
     await recordActionSafe({
       userId,
-      initiator: 'system',
+      initiator,
       persona,
       mambaMode,
       tool: toolName,
@@ -774,7 +996,7 @@ export async function executeTool(
   if (!handler) {
     await recordActionSafe({
       userId,
-      initiator: 'system',
+      initiator,
       persona,
       mambaMode,
       tool: toolName,
@@ -790,13 +1012,13 @@ export async function executeTool(
   }
 
   // Check permission. A registered tool with no explicit risk entry is treated as Class C.
-  const baseClass = TOOL_RISK_MAP[toolName] ?? 'C';
+  const baseClass: PermissionClass = pa.protected ? 'C' : (TOOL_RISK_MAP[toolName] ?? 'C');
   // M3: once external content was read this run, Class B and outbound/persisting tools need a human.
   const riskClass = effectiveClassForTaint(toolName, baseClass, opts.tainted === true);
   if (riskClass !== baseClass) {
     await recordActionSafe({
       userId,
-      initiator: 'system',
+      initiator,
       persona,
       mambaMode,
       tool: toolName,
@@ -809,7 +1031,7 @@ export async function executeTool(
       latencyMs: Date.now() - startTime,
     });
   }
-  const permCheck = await checkPermission(userId, toolName, riskClass, cid);
+  const permCheck = await checkPermission(userId, toolName, riskClass, cid, { params, tainted: opts.tainted === true });
 
   if (!permCheck.allowed) {
     // Class C: queue a full-fidelity approval request (the ledger row is written by createApproval).
@@ -817,7 +1039,7 @@ export async function executeTool(
       // L7: one approval per tool-loop run. Further Class C calls in the same run are denied, not queued.
       await recordActionSafe({
         userId,
-        initiator: 'system',
+        initiator,
         persona,
         mambaMode,
         tool: toolName,
@@ -834,7 +1056,7 @@ export async function executeTool(
     if (riskClass === 'C' && toolName === SCHEDULE_TOOL_NAME) {
       const deny = async (reason: string): Promise<ToolExecutionResult> => {
         await recordActionSafe({
-          userId, initiator: 'system', persona, mambaMode, tool: toolName, action: 'tool_execution_denied',
+          userId, initiator, persona, mambaMode, tool: toolName, action: 'tool_execution_denied',
           permissionClass: 'C', status: 'DENIED', inputSummary: safeJson(params), outputSummary: reason,
           correlationId: cid, latencyMs: Date.now() - startTime,
         });
@@ -858,7 +1080,7 @@ export async function executeTool(
       const sp = socialPlatformOf(toolName);
       if (sp && !(await hasActiveConnection(userId, sp))) {
         await recordActionSafe({
-          userId, initiator: 'system', persona, mambaMode, tool: toolName, action: 'social_not_connected',
+          userId, initiator, persona, mambaMode, tool: toolName, action: 'social_not_connected',
           permissionClass: 'C', status: 'DENIED', inputSummary: safeJson(params), outputSummary: 'not_connected',
           correlationId: cid, latencyMs: Date.now() - startTime,
         });
@@ -896,7 +1118,7 @@ export async function executeTool(
     }
     await recordActionSafe({
       userId,
-      initiator: 'system',
+      initiator,
       persona,
       mambaMode,
       tool: toolName,
@@ -917,7 +1139,7 @@ export async function executeTool(
   try {
     actionRow = await recordAction({
       userId,
-      initiator: 'system',
+      initiator,
       persona,
       mambaMode,
       tool: toolName,
@@ -1048,8 +1270,10 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
   }
 
   const handler = TOOL_HANDLERS[approval.tool];
-  const riskClass = TOOL_RISK_MAP[approval.tool] ?? 'C';
+  const approvedPa = classifyProtected({ toolName: approval.tool, capability: approval.tool, params: approval.params });
+  const riskClass: PermissionClass = approvedPa.protected ? 'C' : (TOOL_RISK_MAP[approval.tool] ?? 'C');
   const base = {
+    protectedCategory: approvedPa.protected ? approvedPa.category : undefined,
     userId,
     initiator: 'user' as const,
     persona: approval.persona,
@@ -1096,7 +1320,8 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
       action: `tool_executed: ${approval.tool}`,
       confirmationMethod: 'user_confirmed',
       status: 'SUBMITTED',
-      inputSummary: safeJson(callParams),
+      // The SMS briefing text and the full number stay out of the ledger; the approval row holds them.
+      inputSummary: approval.tool === 'sms_briefing_send' ? 'sms briefing (content in the approval request)' : approval.tool === 'contact_message' || approval.tool === 'contact_call' ? `${approval.tool} (recipient and content are in the approval request)` : safeJson(callParams),
       validationResult: JSON.stringify({ approvalId: approval.id }),
       latencyMs: 0,
     });

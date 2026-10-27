@@ -47,7 +47,7 @@ describe('C2 swap test, apps/web side', () => {
   it('no non-test source in apps/web hardcodes an openclaw__<platform>__<action> name', () => {
     let out = '';
     try {
-      out = execFileSync('grep', ['-rnE', 'openclaw__[a-z0-9]+__', 'app', 'lib', 'components', 'middleware.ts', '--include=*.ts', '--include=*.tsx'], { cwd: root, encoding: 'utf8' });
+      out = execFileSync('grep', ['-rnE', 'openclaw__[a-z0-9]+__', 'app', 'lib', 'components', 'proxy.ts', '--include=*.ts', '--include=*.tsx'], { cwd: root, encoding: 'utf8' });
     } catch (e) {
       if ((e as { status?: number }).status !== 1) throw e;
     }
@@ -124,10 +124,10 @@ describe('owner-only gateway in resolveChatTools (real gateway-access)', () => {
   });
 });
 
-describe('CSP through the real middleware', () => {
+describe('CSP through the real proxy', () => {
   async function loadMw(session: unknown) {
     vi.doMock('@/auth', () => ({ auth: (fn: any) => (req: any) => fn(Object.assign(req, { auth: session })) }));
-    const mod = await import('@/middleware');
+    const mod = await import('@/proxy');
     const { NextRequest } = await import('next/server');
     return { mw: mod.default as (r: any) => Promise<Response>, NextRequest };
   }
@@ -170,7 +170,7 @@ describe('CSP through the real middleware', () => {
 
   it('L-6: the matcher never excludes /api paths by extension, and CSRF + CSP run on /api/x.png', async () => {
     const { mw, NextRequest } = await loadMw({ user: { id: 'u1' } });
-    const mod = await import('@/middleware');
+    const mod = await import('@/proxy');
     const patterns = mod.config.matcher;
     expect(patterns).toContain('/api/:path*');
     const catchAll = new RegExp(`^${patterns.find((p: string) => p.startsWith('/(('))!}$`);

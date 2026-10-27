@@ -17,3 +17,13 @@ export async function assertOwnedProject(userId: string, projectId: unknown): Pr
   });
   return project?.id ?? null;
 }
+
+/** Prisma where-fragment for projects the user owns or is a member of. Always combine with other filters via AND. */
+export function accessibleProjectWhere(userId: string) {
+  return { OR: [{ ownerId: userId }, { members: { some: { userId } } }] };
+}
+
+/** True when the user owns the project (members may read but not reassign). */
+export async function isProjectOwner(userId: string, projectId: string): Promise<boolean> {
+  return (await assertOwnedProject(userId, projectId)) !== null;
+}

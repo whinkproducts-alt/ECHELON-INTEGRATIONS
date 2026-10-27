@@ -2,21 +2,92 @@ import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { recordAction, type LedgerStatus } from '@/lib/ledger';
 import { approvalContentHash, toolArgsHash } from '@/lib/canonical-json';
+import { classifyProtected, type ProtectedCategory } from '@/lib/protected-actions';
 
 export type PermissionClass = 'A' | 'B' | 'C';
+
+/**
+ * Registered capabilities for server-side (non tool-call) actions. The class here is the
+ * truth: a caller that asks for a lower class than registered is refused, and an unregistered
+ * capability is Class C (never runs without a human). Tool-call classes live in tool-registry.
+ */
+export const CAPABILITY_CLASSES: Readonly<Record<string, PermissionClass>> = Object.freeze({
+  board_meeting_create: 'A',
+  board_minutes_write: 'A',
+  connector_manage: 'B',
+  usage_budget_set: 'A',
+  contact_create: 'A',
+  contact_update: 'A',
+  contact_delete: 'A',
+  contact_import: 'A',
+  contact_message: 'C',
+  contact_call: 'C',
+  project_create: 'A',
+  project_update: 'A',
+  worker_memory_write: 'A',
+  recommendation_write: 'A',
+  skill_memory_write: 'A',
+  skill_intake: 'A',
+  contract_create: 'A',
+  contract_update: 'A',
+  contract_delete: 'A',
+  change_request_create: 'A',
+  change_request_update: 'A',
+  change_request_refine: 'A',
+  change_request_status: 'A',
+  change_request_submit: 'C',
+  meeting_room_create: 'A',
+  swarm_plan: 'A',
+  swarm_start: 'A',
+  swarm_cancel: 'A',
+  swarm_memory_write: 'A',
+  // System security mail to the account's own address, carrying a one-time link only.
+  password_reset_email: 'A',
+});
+
+export function capabilityClass(capability: string): PermissionClass {
+  if (classifyProtected({ toolName: capability, capability }).protected) return 'C';
+  return Object.prototype.hasOwnProperty.call(CAPABILITY_CLASSES, capability) ? CAPABILITY_CLASSES[capability] : 'C';
+}
 
 interface PermissionCheckResult {
   allowed: boolean;
   method: 'auto' | 'delegated' | 'requires_confirmation' | 'human_approved';
   reason?: string;
+  /** True when the action is money movement or disclosure of proprietary information. Always Class C. */
+  protected?: boolean;
+  category?: ProtectedCategory;
 }
 
 export async function checkPermission(
   userId: string,
   capability: string,
   permissionClass: PermissionClass,
-  _correlationId?: string
+  _correlationId?: string,
+  /** What the call carries: its parameters, and whether external content has entered the turn. */
+  ctx: { params?: unknown; tainted?: boolean; description?: string } = {}
 ): Promise<PermissionCheckResult> {
+  // Protected actions (money, proprietary egress) are decided first and cannot be lowered by
+  // anything below: not the requested class, autonomy, a delegation row, persona or allow-list.
+  const prot = classifyProtected({ toolName: capability, capability, params: ctx.params, tainted: ctx.tainted, description: ctx.description });
+  if (prot.protected) {
+    const downgrade = permissionClass !== 'C';
+    if (downgrade) {
+      try {
+        await logSecurityEvent(userId, 'protected_action_downgrade_refused', `${capability} requested as Class ${permissionClass}; protected (${prot.category}) actions are always Class C`, _correlationId, 'DENIED');
+      } catch { /* the refusal stands even if the ledger is down */ }
+    }
+    return {
+      allowed: false,
+      method: 'requires_confirmation',
+      protected: true,
+      category: prot.category,
+      reason: downgrade
+        ? `Protected ${prot.category} action: always Class C, a lower class was refused. Owner approval by request id is required.`
+        : `Protected ${prot.category} action: always requires the owner's explicit approval by request id.`,
+    };
+  }
+
   // Get user's autonomy level
   const profile = await prisma.userProfile.findUnique({ where: { userId } });
   const autonomyLevel = profile?.autonomyLevel ?? 1;

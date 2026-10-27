@@ -1,0 +1,376 @@
+{
+  "_comment": "Built-in connector catalog. Data only. Status is computed by the server from real evidence (env, database row, reachable service), never from this file. Every connector defaults to Class C; only WHINK-side config can lower a class.",
+  "connectors": [
+    {
+      "id": "gmail",
+      "name": "Gmail",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "oauth",
+      "capabilities": [
+        "email_read",
+        "email_send"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [
+        "gmail.readonly",
+        "gmail.send"
+      ],
+      "description": "Read and send email. No WHINK adapter yet.",
+      "evidence": {
+        "type": "none"
+      }
+    },
+    {
+      "id": "google_calendar",
+      "name": "Google Calendar",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "oauth",
+      "capabilities": [
+        "calendar_read",
+        "calendar_write"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [
+        "calendar.readonly",
+        "calendar.events"
+      ],
+      "description": "No WHINK adapter yet. The built-in calendar is local.",
+      "evidence": {
+        "type": "none"
+      }
+    },
+    {
+      "id": "google_drive",
+      "name": "Google Drive",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "oauth",
+      "capabilities": [
+        "files_read"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [
+        "drive.readonly"
+      ],
+      "description": "No WHINK adapter yet.",
+      "evidence": {
+        "type": "none"
+      }
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "mcp",
+      "capabilities": [
+        "chat_read",
+        "chat_send"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "Through the MCP gateway once a Slack MCP server is added to its config.",
+      "evidence": {
+        "type": "gateway_platform",
+        "platform": "slack"
+      }
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "mcp",
+      "capabilities": [
+        "repo_read",
+        "issue_write"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "Through the MCP gateway once a GitHub MCP server is added to its config.",
+      "evidence": {
+        "type": "gateway_platform",
+        "platform": "github"
+      }
+    },
+    {
+      "id": "twilio",
+      "name": "Twilio (SMS and voice)",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "native",
+      "capabilities": [
+        "sms_send",
+        "voice_call"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "Credentials are read from the environment. Delivery code is a stub until the Twilio send is built.",
+      "evidence": {
+        "type": "env",
+        "vars": [
+          "TWILIO_ACCOUNT_SID",
+          "TWILIO_AUTH_TOKEN",
+          "TWILIO_FROM_NUMBER"
+        ]
+      }
+    },
+    {
+      "id": "telegram",
+      "name": "Telegram",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "native",
+      "capabilities": [
+        "telegram_send"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "Bot token from the environment. Delivery code is a stub.",
+      "evidence": {
+        "type": "env",
+        "vars": [
+          "TELEGRAM_BOT_TOKEN"
+        ]
+      }
+    },
+    {
+      "id": "whatsapp",
+      "name": "WhatsApp (Twilio)",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "native",
+      "capabilities": [
+        "whatsapp_send"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "Delivery code is a stub.",
+      "evidence": {
+        "type": "env",
+        "vars": [
+          "TWILIO_ACCOUNT_SID",
+          "TWILIO_AUTH_TOKEN",
+          "TWILIO_WHATSAPP_FROM"
+        ]
+      }
+    },
+    {
+      "id": "x",
+      "name": "X",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "oauth",
+      "capabilities": [
+        "social_read",
+        "social_post"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "description": "Per-user OAuth. Posting always needs your approval.",
+      "evidence": {
+        "type": "social",
+        "platform": "x"
+      }
+    },
+    {
+      "id": "instagram",
+      "name": "Instagram",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "oauth",
+      "capabilities": [
+        "social_read",
+        "social_post"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "Per-user OAuth. Posting always needs your approval.",
+      "evidence": {
+        "type": "social",
+        "platform": "instagram"
+      }
+    },
+    {
+      "id": "tiktok",
+      "name": "TikTok",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "oauth",
+      "capabilities": [
+        "social_read",
+        "social_post"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "Per-user OAuth. No DM tools.",
+      "evidence": {
+        "type": "social",
+        "platform": "tiktok"
+      }
+    },
+    {
+      "id": "figma",
+      "name": "Figma",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "mcp",
+      "capabilities": [
+        "design_read"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "Through the MCP gateway once a Figma MCP server is added.",
+      "evidence": {
+        "type": "gateway_platform",
+        "platform": "figma"
+      }
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "mcp",
+      "capabilities": [
+        "notes_read",
+        "notes_write"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "Through the MCP gateway once a Notion MCP server is added.",
+      "evidence": {
+        "type": "gateway_platform",
+        "platform": "notion"
+      }
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "mcp",
+      "capabilities": [
+        "issues_read",
+        "issues_write"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "Through the MCP gateway once a Linear MCP server is added.",
+      "evidence": {
+        "type": "gateway_platform",
+        "platform": "linear"
+      }
+    },
+    {
+      "id": "stripe_readonly",
+      "name": "Stripe (read only)",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "mcp",
+      "capabilities": [
+        "payments_read"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "Read-only restricted key, through the MCP gateway.",
+      "evidence": {
+        "type": "gateway_platform",
+        "platform": "stripe"
+      }
+    },
+    {
+      "id": "ollama",
+      "name": "Local Ollama",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "native",
+      "capabilities": [
+        "local_models",
+        "embeddings"
+      ],
+      "permissionClass": "A",
+      "endpoints": [
+        "http://localhost:11434"
+      ],
+      "scopes": [],
+      "description": "Local models. Connected only when the server answers.",
+      "evidence": {
+        "type": "ollama"
+      }
+    },
+    {
+      "id": "anythingllm",
+      "name": "AnythingLLM",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "native",
+      "capabilities": [
+        "document_recall"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "Document recall. Connected when configured and you have a workspace.",
+      "evidence": {
+        "type": "anythingllm"
+      }
+    },
+    {
+      "id": "openclaw",
+      "name": "OpenClaw MCP gateway",
+      "version": "1.0.0",
+      "publisher": "WHINK Apps",
+      "license": "MIT",
+      "kind": "mcp",
+      "capabilities": [
+        "mcp_tools"
+      ],
+      "permissionClass": "C",
+      "endpoints": [],
+      "scopes": [],
+      "description": "WHINK's own MCP gateway. Connected only when it answers.",
+      "evidence": {
+        "type": "gateway"
+      }
+    }
+  ]
+}

@@ -89,73 +89,46 @@ describe('schedule', () => {
   });
 });
 
-describe('runBriefingTick', () => {
-  const recordActionSafe = vi.fn();
-  const countByCorrelation = vi.fn();
-  const checkPermission = vi.fn();
+describe('runBriefingTick (automated path never sends)', () => {
+  const surfaceBriefingWaiting = vi.fn();
+  const fetchSpy = vi.fn();
   beforeEach(() => {
     vi.resetModules();
-    recordActionSafe.mockReset().mockResolvedValue({ id: 'a' });
-    countByCorrelation.mockReset().mockResolvedValue(0);
-    checkPermission.mockReset().mockResolvedValue({ allowed: true, method: 'delegated' });
-    vi.doMock('@/lib/ledger', () => ({ recordActionSafe, countByCorrelation }));
-    vi.doMock('@/lib/permission-engine', () => ({ checkPermission }));
-  });
-  const deps = (send: any) => ({ env, send, loadReports: async () => [] });
-
-  it('does nothing and sends nothing when disabled', async () => {
-    const { runBriefingTick } = await import('../sms-briefing');
-    const send = vi.fn();
-    expect(await runBriefingTick(DUE, { ...deps(send), env: { ...env, BRIEFING_SMS_ENABLED: 'false' } })).toBe('skipped_disabled');
-    expect(send).not.toHaveBeenCalled();
-    expect(recordActionSafe).not.toHaveBeenCalled();
+    surfaceBriefingWaiting.mockReset().mockResolvedValue('created');
+    fetchSpy.mockReset();
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.doMock('@/lib/briefing/sms', () => ({ surfaceBriefingWaiting }));
   });
 
-  it('sends once, checks permission first, and ledgers with a masked number', async () => {
+  it('does nothing when disabled', async () => {
     const { runBriefingTick } = await import('../sms-briefing');
-    const send = vi.fn().mockResolvedValue({ ok: true, sid: MSID, status: 'queued' });
-    expect(await runBriefingTick(DUE, deps(send))).toBe('sent');
-    expect(checkPermission).toHaveBeenCalledWith('u1', 'sms_briefing_send', 'B', 'sms-briefing:2026-10-20');
-    expect(send).toHaveBeenCalledTimes(1);
-    const row = recordActionSafe.mock.calls[0][0];
-    expect(row).toMatchObject({ userId: 'u1', initiator: 'automation', status: 'VALIDATED', tool: 'sms_briefing_send' });
-    expect(JSON.stringify(row)).not.toContain('4035550123');
-    expect(JSON.stringify(row)).not.toContain('secret-token');
+    expect(await runBriefingTick(DUE, { env: { ...env, BRIEFING_SMS_ENABLED: 'false' } })).toBe('skipped_disabled');
+    expect(surfaceBriefingWaiting).not.toHaveBeenCalled();
   });
 
-  it('does not send a second time the same day', async () => {
+  it('only surfaces a waiting-for-approval reminder and never calls fetch', async () => {
     const { runBriefingTick } = await import('../sms-briefing');
-    countByCorrelation.mockImplementation(async (_u: string, _t: string, _c: string, s: string[]) => (s.includes('VALIDATED') ? 1 : 0));
-    const send = vi.fn();
-    expect(await runBriefingTick(DUE, deps(send))).toBe('skipped_done');
-    expect(send).not.toHaveBeenCalled();
+    expect(await runBriefingTick(DUE, { env })).toBe('waiting_for_approval');
+    expect(surfaceBriefingWaiting).toHaveBeenCalledWith('u1', '2026-10-20');
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('does not send when the permission engine refuses, and ledgers DENIED', async () => {
+  it('reports skipped_done when the reminder already exists today', async () => {
     const { runBriefingTick } = await import('../sms-briefing');
-    checkPermission.mockResolvedValue({ allowed: false, method: 'requires_confirmation', reason: 'no delegation' });
-    const send = vi.fn();
-    expect(await runBriefingTick(DUE, deps(send))).toBe('denied');
-    expect(send).not.toHaveBeenCalled();
-    expect(recordActionSafe.mock.calls[0][0].status).toBe('DENIED');
+    surfaceBriefingWaiting.mockResolvedValue('already');
+    expect(await runBriefingTick(DUE, { env })).toBe('skipped_done');
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('survives a Twilio outage: no throw, FAILED ledger row, spaced retry', async () => {
+  it('refuses to run with missing config', async () => {
     const { runBriefingTick } = await import('../sms-briefing');
-    const send = vi.fn().mockResolvedValue({ ok: false, reason: 'network', message: 'Twilio could not be reached' });
-    expect(await runBriefingTick(DUE, deps(send))).toBe('failed');
-    expect(recordActionSafe.mock.calls[0][0].status).toBe('FAILED');
-    countByCorrelation.mockImplementation(async (_u: string, _t: string, _c: string, s: string[]) => (s.includes('FAILED') ? 1 : 0));
-    expect(await runBriefingTick(new Date(DUE.getTime() + 60_000), deps(send))).toBe('skipped_spacing');
-    expect(await runBriefingTick(new Date(DUE.getTime() + 6 * 60_000), deps(send))).toBe('failed');
-    countByCorrelation.mockImplementation(async (_u: string, _t: string, _c: string, s: string[]) => (s.includes('FAILED') ? 3 : 0));
-    expect(await runBriefingTick(new Date(DUE.getTime() + 20 * 60_000), deps(send))).toBe('skipped_done');
+    expect(await runBriefingTick(DUE, { env: { ...env, TWILIO_AUTH_TOKEN: '' } })).toBe('skipped_config');
+    expect(surfaceBriefingWaiting).not.toHaveBeenCalled();
   });
 
-  it('refuses to run with missing config and calls nothing', async () => {
+  it('a failing reminder write does not throw', async () => {
     const { runBriefingTick } = await import('../sms-briefing');
-    const send = vi.fn();
-    expect(await runBriefingTick(DUE, { ...deps(send), env: { ...env, TWILIO_AUTH_TOKEN: '' } })).toBe('skipped_config');
-    expect(send).not.toHaveBeenCalled();
+    surfaceBriefingWaiting.mockRejectedValue(new Error('db down'));
+    expect(await runBriefingTick(DUE, { env })).toBe('failed');
   });
 });

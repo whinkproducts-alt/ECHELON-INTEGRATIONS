@@ -2,6 +2,125 @@
 
 Newest first. Each entry: date, decision, alternatives, reason.
 
+## 2026-10-25  Phase 3d assurance — security and compliance fixes
+
+### D1 Security findings applied (H1–H5, M5, M7)
+
+**H1 — Cross-tenant document delete and missing Document model.**
+Decision: add `Document` table (migration `20261025030000`) with one row per uploaded file.
+`DELETE /api/documents/[id]` now: (a) awaits `params` (Next 16 Promise API), (b) looks up the `Document` row filtered by `{ id, userId }`, (c) returns 404 + security ledger event if the caller does not own it.
+`POST /api/documents/upload` now writes a `Document` record after a successful upload.
+Alternative considered: trust AnythingLLM's own ID space — rejected because WHINK must enforce tenant isolation independently.
+
+**H2 — `isSensitive()` missed most categories.**
+Decision: rewrote `SENSITIVE_PATTERNS` in `auto-memory.ts` with broader lexicons covering ADHD/autism, medications, family relations (named and unnamed via "my wife/daughter/etc."), legal/criminal terms, street address patterns, SIN, and income amounts.
+Alternative: rely on the LLM to classify — rejected because the permission check must happen before the model sees the candidate.
+
+**H3 — `isSecret()` bypassed by natural language and common key prefixes.**
+Decision: rewrote `isSecret()` with NFKC normalisation (strips zero-width homoglyphs), vendor key prefixes (sk-ant-, ghp_, AKIA, xoxb-, AIza), JWT pattern, Luhn check for card numbers, and natural-language passphrase patterns.
+Also: skip the entire turn for auto extraction if the raw user message itself contains a secret.
+
+**H4 — Document chunks from AnythingLLM entered model context without injection scan.**
+Decision: apply both `filterToolResult` and `scanForInjectionPatterns` to `documentName` and `text` before placing in context. If either fires, log `document_injection_blocked` and skip the chunk. `documentName` is now inside the `<untrusted>` envelope, not outside it. `document_recall_unavailable` is now only logged on a caught exception, not on an empty result set (which is a valid no-match). Added `externalContentThisTurn: boolean` to `RetrievedContext`.
+
+**H5 — Paid cloud embedding fallback + no dimension validation + no error handling.**
+Decision: removed branch 3 from `embed()` (the `OPENAI_API_KEY`-alone path to `text-embedding-3-small`). All three fetch branches are now wrapped in `try/catch` returning null. Added `validateEmbedding()` which checks `Array.isArray`, `length === EMBEDDING_DIM` (from `EMBEDDING_DIM` env, default 768), and `Number.isFinite` on every element.
+`searchMemory()` vector queries are now wrapped in `try/catch`; a dimension mismatch falls through to full-text, then text-match, with `searchMode` in the return value.
+Alternative: keep the fallback with a feature flag — rejected to eliminate silent cost and data breach risk.
+
+**M5 — Upload and delete bypass permission engine.**
+Decision: `POST /api/documents/upload` now calls `checkPermission(userId, 'document_upload', 'A')` before proceeding. Class A always passes, but the check is wired so a future policy change takes effect without touching the route.
+
+**M7 — MAMBA persona check was case-sensitive.**
+Decision: compare `persona.toUpperCase() === 'MAMBA'` throughout `auto-memory.ts`.
+
+### D6 Compliance findings applied (PIPEDA / Alberta PIPA)
+
+**PIPEDA Q2 (blocker) — No memory list API.**
+Decision: added `GET /api/memory` with cursor pagination. Returns one memory type per call (semantic / episodic / hypothesis / procedural), scoped by `userId`. Combines with the existing `DELETE /api/memory/[id]` to satisfy the access-and-deletion right.
+
+**PIPEDA Q3 (blocker) — No document inventory.**
+Decision: `GET /api/documents` now reads from the new `Document` table as the primary inventory (not AnythingLLM). AnythingLLM's list is supplementary. Cursor-paginated, scoped by `userId`.
+
+**PIPEDA Q4 (pre-launch gap) — No privacy notice, no consent flow.**
+Decision: deferred to Phase 6 (onboarding). The Connected Apps OAuth flow must present scope and purpose before the first token exchange. Recorded here so it is not forgotten.
+
+**PIPEDA Q5 (pre-launch gap) — No retention or deletion schedule.**
+Decision: deferred to Phase 6. A background job that respects a per-user retention policy must exist before public launch. Memory rows have `createdAt`; the job will filter by that.
+
+**Licence notes (D6 compliance-checker).**
+- AnythingLLM: MIT licence. Confirmed.
+- `mapbox-gl`: BSL 1.1 in v2+; pin to v1.x (Apache 2.0) until a libre alternative (`maplibre-gl`, Apache 2.0) is evaluated. No current usage found in `apps/web` — note recorded to block any future addition of v2+.
+- All new dependencies added in Phase 3a–3c are MIT, Apache 2.0 or BSD. Compliance-checker confirmed.
+
+## 2026-10-25  Phase 3 learnings sync
+
+Summary of what was built in Phase 3a and the early 3b/3c work, as observed in code on 2026-10-25.
+
+### New schema tables and fields
+- `DocumentWorkspace`: one row per user, holds their AnythingLLM workspace slug. The shared `ANYTHINGLLM_WORKSPACE_SLUG` env fallback is present in `.env.example` for migration but should not be used in new code. `document_workspaces` is the authoritative source. `@@unique([userId, workspaceSlug])` enforces one workspace per user.
+- `embeddingModel String?` on both `MemoryEpisode` and `MemorySemantic`: records the model that produced the row's embedding. Vector search filters by this field so mixed-model comparisons never happen.
+- `vector(768)` column on both tables (down from `vector(1536)`): matches `nomic-embed-text` output dimension. HNSW cosine index (`vector_cosine_ops`, `m=16`, `ef_construction=64`) added by migration `20261025000000_phase3a_embeddings`.
+
+### Embedding model rationale
+Default: `ollama/nomic-embed-text` (768-dim, Apache 2.0, runs locally via Ollama, nothing leaves the Mac). Configured via `EMBEDDING_MODEL=ollama/nomic-embed-text`. Changing to an OpenAI model (e.g. `openai/text-embedding-3-small`, 1536-dim) requires a new migration to resize the vector column and a `pnpm memory:reembed` run to backfill existing rows. Choosing a paid default needs Victor's approval first.
+
+### AnythingLLM version — NOT yet bumped (status 2026-10-25)
+The compose file is pinned to `1.7.4`. The earlier decision entry (2026-10-25, "AnythingLLM version bump: pinned to 1.18.0") recorded the intent; the 3c agent did not execute the bump because `1.7.4` lacks a pure retrieval endpoint. `lib/anythingllm-client.ts` uses `/api/v1/workspace/:slug/chat` with `mode: "query"` and discards the `textResponse` (LLM output), using only the `sources` array. This is a workaround. The TODO in the client reads: "upgrade to AnythingLLM 2.x for a pure retrieval endpoint". The version bump is an open task for devops-engineer.
+
+### Auto memory permission split (lib/auto-memory.ts)
+`lib/auto-memory.ts` is the single extraction path. It classifies each candidate:
+- **Class A** (`memory_auto_write`): routine facts — preferences, work context, procedural notes.
+- **Class B** (`memory_auto_write_sensitive`): health, money and account numbers, legal, family and relationships, home address, identity documents, third-party personal facts. Requires a delegation row or sufficient autonomy level. Ledger row records category but never the statement text on denial.
+- **Dropped before any permission check**: credentials matching password/key/token/card-number patterns. Ledger row is `memory_secret_dropped` with no content.
+Confidence capped at 0.8 for inferred memories. MAMBA turns produce `hypothesis` rows, confidence capped at 0.4. Daily cap: 200 writes per user per day (configurable via `MEMORY_DAILY_CAP`). At most 5 candidates per turn. Extraction starts as a detached promise — never awaited, failures never surface to the user.
+
+### Context engine blending strategy
+`context-engine.ts` (or the context assembly path) returns memory and document recall results in one ranked list, each tagged `type: "memory" | "document"`. Both fit within the existing token budget. Document chunks carry citation fields: `title`, `chunkId`, `page`, `score`. All citation fields and chunk text are wrapped as untrusted before entering model context. A chunk whose text contains injection-pattern content is dropped and ledgered as `document_chunk_blocked`.
+
+### New env vars added in Phase 3 (not previously in .env.example)
+- `MEMORY_DAILY_CAP` (auto-memory.ts, B12): integer, default 200. Per-user daily write limit for auto extraction.
+- `DOCUMENT_MAX_SIZE_MB` (upload route, C6): integer, default 25. Maximum document upload size in megabytes.
+
+## 2026-10-25  AnythingLLM memory budget and external drive storage
+Decision: AnythingLLM container is capped at 4 GB RAM in compose. Storage uses a named Docker volume for now. When Victor moves to the 2TB external drive, devops-engineer remaps the volume mount to `/Volumes/<drive>/whink-data/anythingllm` in `services/anythingllm/docker-compose.yml` — one-line change, no rebuild needed. Logged as a Phase 6 devops task.
+Alternatives: set no memory cap (risk of Mac Mini OOM under heavy document load); use a bind mount path immediately (requires the drive to be present on every dev machine).
+Reason: 4 GB is generous for a Node.js + SQLite AnythingLLM instance with no local LLM (WHINK uses it for retrieval only). The named-volume approach keeps the compose portable across machines until the drive is the permanent home.
+
+## 2026-10-25  AnythingLLM version bump: pinned to 1.18.0, use /query endpoint
+Decision: bump the AnythingLLM pinned image from 1.7.4 to 1.18.0 (latest stable semver tag as of 2026-10-25, verified on hub.docker.com/r/mintplexlabs/anythingllm/tags). Switch the adapter from `/api/v1/workspace/:slug/chat` to `/api/v1/workspace/:slug/query` (retrieval-only, no model call). The adapter is updated in `lib/anythingllm-client.ts`; the compose is updated in `services/anythingllm/docker-compose.yml`.
+Alternatives: keep 1.7.4 and work around the missing endpoint; switch to a different retrieval service.
+Reason: the `/chat` endpoint runs AnythingLLM's own embedded model outside the WHINK model router (violates non-negotiable 8). The `/query` endpoint returns ranked chunks with source metadata and makes no model call. Version 1.18.0 is a stable 1.x release; the interface is compatible with the existing workspace API.
+
+<!-- Phase 3 entries below: lead-architect plan, 2026-10-25. Proposed, not yet confirmed by Victor. Phase 3 starts after Victor passes the Phase 2 checklist. -->
+
+## 2026-10-25  Phase 3: AnythingLLM in its own hardened compose, retrieval only
+Decision: AnythingLLM stays in `services/anythingllm/docker-compose.yml`, separate from the gateway's compose. It gets the same hardening as `services/openclaw`: pinned image, 127.0.0.1 only, memory limit, token required. WHINK uses it for retrieval only. It never runs AnythingLLM's own LLM on the recall path, and its embedder is local. `lib/anythingllm-client.ts` is the only code that knows the transport. `document_workspaces` is the only source of a user's workspace. The shared env slug fallback is removed.
+Alternatives: add AnythingLLM as a second service in the OpenClaw compose file; add it to the root compose with Postgres; keep the `/chat` query-mode endpoint and discard its text.
+Reason: one compose per swappable service means a recall swap does not touch the gateway, which matches the 2026-10-03 gateway decision. The `/chat` endpoint runs a model outside the model router (non-negotiable 8) and may call a paid provider configured inside AnythingLLM without WHINK knowing. A shared env workspace lets two tenants read one document store (non-negotiable 2).
+Open for Victor: if the pinned 1.7.4 image has no retrieval-only endpoint, the builder bumps the pinned version. That is a version change, not a vendor change, but it will be logged.
+
+## 2026-10-25  Phase 3: document citations are untrusted, every field
+Decision: every recall result from AnythingLLM carries a citation (document name, chunk id or index, page when available, score). The chunk text and every citation field are stripped of fake envelope tags, injection-scanned, capped and wrapped as untrusted before model context. A flagged chunk is dropped and ledgered. Reading documents marks the turn as having external content, so auto memory skips that turn.
+Alternatives: wrap only the chunk text and trust the metadata; treat user-uploaded documents as trusted because the user chose them.
+Reason: a document the user uploads can still be written by someone else (a contract from the other side, a forwarded PDF). File names and page labels are attacker-controllable too. Non-negotiable 6 makes no exception for content the user carried in. Skipping auto memory on those turns stops a planted document from becoming a "fact" WHINK repeats later.
+
+## 2026-10-25  Phase 3: auto memory is Class A routine, Class B sensitive, secrets never
+Decision: every auto-extracted memory goes through `checkPermission` before it is written. Routine facts use capability `memory_auto_write` (Class A). Sensitive facts use `memory_auto_write_sensitive` (Class B), which needs a delegation or the autonomy level. Sensitive covers health, money and account numbers, legal, family and relationships, location, identity documents and third-party personal facts. WHINK classifies them, not the extractor's own label alone. Credentials and secrets are dropped before the permission check at any class. Every candidate, written or not, is one ledger row, and denied rows hold the category only, never the text. MAMBA turns produce hypotheses only (confidence at most 0.4). Auto memories are INFERRED with confidence capped at 0.8 until the user confirms them.
+Alternatives: write everything as Class A (the inherited behaviour, with no permission check at all); make all auto memory Class C; queue sensitive facts for review instead of dropping them.
+Reason: remembering is an action, so it goes through the engine and the ledger like any other (non-negotiables 4 and 5). Class C on every turn would bury Victor in approval cards and kill the feature. Class B lets Victor grant sensitive memory once, by delegation. Secrets have no safe class. A review queue is more scope than Phase 3 needs, so it is left for later if Victor asks.
+
+## 2026-10-25  Phase 3: embeddings go through the model router, model stamped per row
+Decision: the model router gets an `embed()` function, and it is the only code that calls an embeddings endpoint. The embedding model is config. There is no hardcoded fallback to a paid provider. Each row records the model that embedded it. Search only compares rows from the current model, and a resumable, per-user backfill re-embeds the rest. The vector column size matches the configured model, and vectors of the wrong size are rejected, not written. HNSW cosine indexes replace sequential scans. Semantic dedup on write uses cosine similarity (default threshold 0.92) and updates the existing row instead of inserting a duplicate.
+Alternatives: keep `lib/embedding-service.ts` calling providers directly (the inherited behaviour); pad or truncate vectors to one fixed size; store one column per model.
+Reason: non-negotiable 8 covers every model call, embeddings included. The inherited silent OpenAI fallback sends memory text to a paid vendor because a key happens to be set. Padding vectors gives wrong similarity scores. One column per model adds schema churn every time a model changes. Stamping the model on each row plus a backfill keeps the swap a config change.
+Open for Victor: which embedding model is the default, which sets the column size. The plan recommends local Ollama `nomic-embed-text` (768, Apache 2.0, free, nothing leaves the Mac). The alternative is OpenAI `text-embedding-3-small` (1536, paid service). Choosing a paid default needs his approval.
+
+## 2026-10-25  --destructive is a separate token from --denial
+Decision: `--destructive` (`0 72% 51%`) remains a distinct CSS token for generic UI errors (form validation, destructive button variants). It is not aliased to `--denial` (`356 77% 59%`).
+Alternatives: alias `--destructive` to `--denial` so one colour covers all error states.
+Reason: the two tokens carry different semantic weight. `--denial` signals a security or permission event (access denied, security block) and appears in the ledger, Neural Link, and approval UI. `--destructive` is a neutral UI affordance for irreversible actions and form errors — using the denial colour there would train the eye to ignore it in actual denial contexts.
+
 <!-- Entries 2026-10-03 below: approved by Victor, relayed to lead-architect by the WHINK orchestrator on 2026-10-03. Victor confirms them by running the Phase 2 checklist. -->
 
 ## 2026-10-03  Suspicious user input is blocked, ledgered and surfaced
@@ -94,3 +213,174 @@ Limits: nonce cache, rate limiter and HOLO bridge are in memory, correct for one
 Added directUrl = env("DIRECT_URL") to the Prisma datasource. App traffic uses DATABASE_URL (Neon pooled host). Migrations use DIRECT_URL (non-pooled host), because PgBouncer transaction mode breaks Prisma migrate advisory locks. Locally both point at the same Docker Postgres.
 Steps for Neon: create the project with Postgres 16, run CREATE EXTENSION vector (migration 20261002083522 already does this), copy both connection strings into the untracked .env, then run npx prisma migrate deploy. If connections fail, remove channel_binding=require from the URL. Do not use the current password: it is being rotated, and it must never enter git.
 No init_schema migration was created. The repo already has 20 migrations including 20261002045845_init, and a second baseline would conflict with them. Fresh Neon databases get the full history from migrate deploy.
+
+## 2026-10-25  Dynamic model routing in model-router.ts
+Decision: `selectModel()` added to `lib/model-router.ts`. It scores messages using keyword patterns and selects Haiku 5.5 (score 3 or less), Sonnet 5.5 (4 to 6) or Opus 5.5 (7 or more). MAMBA always routes to Opus. Large output (over 2000 tokens) bumps the tier. Callers pass `ModelSelectionHints`; `forceTier` overrides scoring. Routing stays inside the model router, so no route picks a provider or model directly.
+Alternatives: one fixed model per persona; let each route choose its own model.
+Reason: cost efficiency without sacrificing quality for complex tasks.
+
+## 2026-10-25  Persona switch route now ledgers every switch (A2, L-1)
+Decision: `POST /api/persona/switch` and the orchestrator persona-switch path both call `recordActionSafe` after a successful upsert.
+Alternatives: ledger only the route path and leave the orchestrator path silent (the previous behaviour).
+Reason: non-negotiable 5. Every action lands in the ledger.
+
+## 2026-10-25  Cross-turn taint propagation (M-1)
+Decision: when `externalContentThisTurn` is true after a tool loop run, the taint flag `__taint__:<conversationId>` is written and awaited. Previously it was set only on injection-blocked user messages. Turn 2 reads this flag and sets `conversationTainted: true`.
+Alternatives: taint only on blocked user messages (the previous behaviour); fire-and-forget the flag write.
+Reason: external content injected in turn 1 could survive in assistant text and replay as trusted context in turn 2. The write is awaited so turn 2 cannot race ahead of it.
+
+## 2026-10-25  memory_read and calendar_list added to EXTERNAL_TOOLS (M-2)
+Decision: `memory_read` and `calendar_list` now go through the full sanitise, NFKC, injection-scan, wrapAsUntrusted pipeline and set `externalContentThisTurn = true`.
+Alternatives: treat stored memory and calendar data as trusted internal content (the previous behaviour).
+Reason: stored memory can contain content that originated outside WHINK (pasted emails, auto-extracted facts). Treating it as trusted violated non-negotiable 6.
+
+## 2026-10-25  correlationId, persona, initiator required on OAuth and autonomy ledger rows (M-3)
+Decision: `social_connect_failed`, `social_connected`, `social_connection_expired`, `social_disconnected` and `autonomy_level_change` ledger rows now carry `correlationId` (randomUUID per request), `persona` and `initiator`.
+Alternatives: leave these fields optional for non-tool events.
+Reason: A2 requires all seven fields on every ledger write. Missing fields made incident tracing impossible.
+
+## 2026-10-25  Tool limit clamped to 1 to 20 (L-4)
+Decision: `memory_read` and `document_search` clamp `params.limit` to `Math.min(Math.max(1, floor(limit)), 20)`.
+Alternatives: trust the model-supplied limit (the previous behaviour); reject out-of-range values with an error.
+Reason: unbounded model-supplied limits could pull excessive data into context and strain the database. Clamping keeps the tool usable when the model asks for too much.
+
+## 2026-10-25  --primary and --ring remapped to WHINK accent (E7)
+Decision: `--primary: 204 100% 61%` (WHINK accent #38B6FF) in `:root` and `.dark`. `--ring` follows.
+Alternatives: keep the previous green value (`160 84% 39%`).
+Reason: the green had no basis in the WHINK design token palette and conflicted with the product identity. Follows the 2026-09-23 decision that the accent is azure #38B6FF.
+
+## 2026-10-25  CASL deferred to Phase 6
+Decision: social write tools (post, reply, DM, schedule, delete, follow, unfollow) stay Class C at all autonomy levels. CASL compliance (consent and unsubscribe for commercial messages) is required before white-labelling. Victor's personal use proceeds now. Canadian counsel to be engaged before Phase 6 (billing).
+Alternatives: build consent and unsubscribe handling now, before any personal use.
+Reason: with one user approving every send by hand, nothing goes out as unsolicited commercial messaging on WHINK's initiative. Paying customers change that, so the work is tied to the product shell phase.
+
+## 2026-10-25  Human names for every role
+Decision: the five Innovation & Opportunity seats now have invented human first and last names (Amara Okafor, Mateo Restrepo, Priya Raghunathan, Soren O'Connell, Mei-Ling Tan). `StaffMember.kind` is `'human'` for Victor and Marcus and `'agent'` for the five personas. Emails come from one function, `staffEmail()`: lowercase ascii, accents folded, apostrophes dropped, hyphens kept. Role and title stay as job description fields. Only the directorate table in CLAUDE.md changed.
+Alternatives: keep role-based addresses such as innovation.lead@; leave names out of the table.
+Reason: Victor wants every role to read as a person. Marking agents as `agent` keeps it honest that they are personas, not staff.
+
+## 2026-10-25  Board data comes only from Victor
+Decision: `apps/web/config/board.json` is the board roster. Only people Victor named are in it: Victor, Marcus, Anthony Igboekwe, Dr Tinaye, Barrister Genevieve, Juliet Igboekwe. Where he gave no surname, seat or email, those fields are null and `needsDetails` is true so the UI can show "details pending". The honorific is its own field. Nothing is guessed, including the emails of Anthony and Juliet (surnames known, seat and confirmation not). `scripts/import-board.ts` loads the rest from a folder on Victor's Mac: dry run by default, `--write` to apply, photos checked by magic bytes and capped at 5 MB, image URLs limited to same-origin `/board/*`. The roster is tenant-level config; board meetings are per user in `board_meetings`. Minutes are untrusted on read.
+Alternatives: seed plausible directors; store the roster in the database.
+Reason: inventing board members would put false people in a governance screen. A file is easy for Victor to review.
+
+## 2026-10-25  Connector licence gate and honest status
+Decision: plugin manifests are validated by a zod schema. Licence must be MIT, Apache-2.0, BSD-*, ISC or 0BSD (CLAUDE.md rule 7); anything else, including "MIT OR AGPL", is rejected. Manifest `permissionClass` is advisory: third-party connectors are always Class C. Endpoints must be https (or loopback http), with no credentials and no stdio commands. Tool descriptions are stripped, injection-scanned, rejected if suspicious, and capped at 300 characters. Validation never executes code or contacts an endpoint. Status (`available | connected | needs_config | unavailable`) is computed from evidence only (env vars, a database row, a service that answers), never from the catalog. Install and uninstall are the Class B capability `connector_manage`. `CAPABILITY_CLASSES` in the permission engine is the registry; an unregistered capability is Class C and a caller asking for a lower class than registered is refused.
+Alternatives: trust the manifest class; mark catalog entries connected by default.
+Reason: a plugin must not grant itself power, and the connectors screen must not claim a connection that does not exist.
+
+## 2026-10-25  Offline fallback is off by default
+Decision: `WHINK_OFFLINE_FALLBACK=true` turns on local-model routing in the tool loop. Default is off, so current behaviour is unchanged. When on, an unreachable cloud provider (probe of the host the router is configured for, cached 10 s) or a hit hard budget switches the call to `WHINK_LOCAL_MODEL` (default llama3.1:8b) if Ollama answers, writes a `model_fallback_local` ledger row with the reason, and drops any per-user cloud API key so it is never sent to the local endpoint. Usage is recorded fire-and-forget into `usage_events` from the tool loop. Monthly budget lives on `user_preferences`, with `WHINK_MONTHLY_TOKEN_BUDGET`, `WHINK_BUDGET_SOFT_PCT` and `WHINK_BUDGET_HARD_PCT` as tenant defaults. Cost is 0 unless `WHINK_MODEL_PRICES` is set; prices are not guessed.
+Gap: plain `streamChat` and `chatOnce` calls are not yet usage-recorded (they do not carry a userId).
+Alternatives: switch on by default; hardcode provider URLs for the probe.
+Reason: silently changing which model answers is a behaviour change Victor should choose.
+
+## 2026-10-25  Contact messages and calls reuse the Class C approval flow
+Decision: `POST /api/contacts/[id]/message` and `/call` call `createApproval` (kind `tool_call`, tools `contact_message` and `contact_call`, Class C). They return the approval id. On approval, the existing `decide` and `executeApprovedTool` run the handler, which re-reads the contact (scoped by user), checks the destination still matches the approved one, then calls `lib/comms/delivery.ts`. `comms_requests` only links a contact to its approval. No parallel approval code exists. If WHINK has no earlier comms record for the contact, the approval payload carries `casl: 'review_consent'`. Telegram needs a chat id, kept as a contact tag `telegram:<id>`.
+Alternatives: a separate comms approval table.
+Reason: one approval path means one set of guarantees (30 s expiry, id-bound, hash lock, atomic, ledgered).
+
+## 2026-10-25  What is stubbed
+- Sending: `sendToContact` and `placeCall` return `{sent:false, reason:'not_configured'}` without provider env, and even with env the Twilio, SMTP and Telegram sends are not built. An approved send therefore ends FAILED with "not sent: ...", which is the truth.
+- Connectors: Gmail, Google Calendar and Google Drive have no WHINK adapter and show `unavailable`. Slack, GitHub, Figma, Notion, Linear and Stripe appear only as gateway platforms and show `connected` only when the gateway exposes their tools.
+- Rate limiter is in memory (per process); the store interface is ready for Redis.
+- GitHub settings (branch protection, push protection, 2FA, signed commits) cannot be set from code. See docs/security.md.
+
+## 2026-10-25  middleware.ts renamed to proxy.ts
+Decision: Next 16 deprecates the `middleware` file name. The file is now `apps/web/proxy.ts` with the same default export. It adds the full security header set (HSTS only for https deployments, COOP/CORP same-origin, camera and microphone for self only) and rate-limits sign-in and sign-up by client address.
+Alternatives: keep the deprecated name.
+Reason: avoids a deprecation warning and a future break.
+
+## 2026-10-25  Security review fixes (rate limits, owner-only facts, budget cap, local fallback)
+Decision: `X-Forwarded-For` is trusted only when `TRUSTED_PROXY_HOPS` is set (Nth address from the right); otherwise sign-in and sign-up use a looser per-route bucket plus a per-account bucket. Body caps are enforced while streaming. The tenant token cap is a ceiling users cannot remove (`monthlyTokenBudget` is now BIGINT). The local fallback targets `OLLAMA_URL` explicitly, refuses a non-local URL, and never forwards a cloud key. The board roster and operator-credential status are visible only to `WHINK_OWNER_EMAILS` accounts; unset means nobody.
+Alternatives: trust XFF always; one shared "unknown" bucket; first-user-is-owner.
+Reason: client-controlled headers must not set a security key, one global bucket lets an attacker lock the owner out, and a new signup must not see operator data.
+
+## 2026-10-26 Subsidiaries and project assignment
+
+- The WHINK Group has five subsidiaries: consult, real-estate, trades, apps, frontliners. Their static facts (intro, about, services, directors) live in `apps/web/config/subsidiaries.json`, read through `lib/subsidiaries.ts` and validated by zod. Facts come from Victor's own Group website, read 2026-10-25. Nothing beyond those facts is added.
+- `projects.subsidiary` is a nullable string with an index on (ownerId, subsidiary). Null means unassigned, which covers every legacy project. There is no database enum: the five ids are validated against the config in code, so adding a subsidiary is a config change, not a migration.
+- Reassigning is its own action. A change through PATCH or PUT on a project is ledgered as `project_subsidiary_set` with the before and after ids, written through `lib/ledger.ts`.
+- API: `GET /api/projects` is additively enriched to ProjectCard, `GET /api/subsidiaries`, `GET /api/subsidiaries/[id]/projects` (id `unassigned` allowed) and `GET /api/projects/[id]/report`. All are Class A reads, scoped to projects the user owns or is a member of, with aggregates done by groupBy so the query count does not grow with the number of projects.
+- Contracts are not modelled. No Contract model exists in the schema, and Victor has not said what a contract is (its fields, its life cycle, how it relates to a project). Until he does, only projects carry a subsidiary. Nothing is invented.
+
+## 2026-10-26 Strict rule: money and proprietary information always need Victor's approval
+Decision: Victor set a strict rule. No money transfer and no sharing of proprietary secrets or information happens without an approval from him. It is non-negotiable 10 and the "Protected actions" section in `CLAUDE.md`. Protected actions are always Class C at every autonomy level, with or without a delegation, under every persona, and a gateway, plugin manifest or allow-list cannot lower them. Approval is by request id from the account owner, inside the 30 second window, hash-locked and exactly once. No standing approval, no approve-all, no agent approves for him. Unclear cases are treated as protected. Sending the user's data to the configured model providers in normal chat is not covered.
+Alternatives: leave it to per-tool Class C choices; allow delegation for small amounts.
+Reason: money and secrets cannot be recalled once they leave, and a rule that depends on each builder remembering it will eventually fail.
+
+## 2026-10-26 Project memory lives in the repo
+Decision: long-term project knowledge is written to `docs/learnings.md`, `docs/decisions.md` and `docs/daily-syncs/`. The account-level memory file named in `CLAUDE.md` cannot be reached from a cloud session, so the end-of-day sync should copy from these files.
+Alternatives: keep knowledge only in chat history.
+Reason: sessions end and containers are ephemeral; the repo is the only store every session reads.
+
+## 2026-10-26 Type errors now fail the build
+Decision: `npx tsc --noEmit` is clean and `typescript.ignoreBuildErrors` is removed from `next.config.js`; `pnpm typecheck` runs `tsc --noEmit`. Root causes were fixed with correct types: route `params` is a Promise in Next 16, the memory list now selects real columns (`sourceType`, `category`, `details`; the old `source` and `steps` selects would have thrown at runtime) and keeps the `source` response field, `initiator` is typed `'user' | 'system' | 'automation'`.
+Alternatives: keep ignoring errors because the Prisma engine download was blocked in CI.
+Reason: the ignore flag hid real runtime bugs. Next 16 has no eslint-in-build option, so lint is enforced by `pnpm lint` in CI only.
+
+## 2026-10-26 Durable rate limiter in Postgres
+Decision: `PostgresRateLimitStore` (`lib/rate-limit-postgres.ts`) behind the existing `RateLimitStore` interface; table `rate_limit_buckets (key, windowStart, count)`; fixed window via one `INSERT ... ON CONFLICT DO UPDATE ... RETURNING count`. Proxy runs on the Node.js runtime in Next 16, so Prisma works there and the limit stays in `proxy.ts`. Rejected hits also count (harmless: the window is short). Cleanup is opportunistic, at most once a minute per process. Memory fallback only when the database errors, with one warning a minute. Loaded lazily so `lib/rate-limit.ts` has no Prisma import.
+Alternatives: Redis store (another service to run); keep memory only.
+Reason: memory counters reset on restart and are not shared across workers, which weakens login throttling.
+
+## 2026-10-26 Staff mail routes to one mailbox
+Decision: Victor's instruction, all `*@whinkgroup.com` email is delivered to `whinkproducts@gmail.com` (config in `config/mail-routing.json`, code in `lib/comms/mail-routing.ts`, used by the EMAIL channel). Exact domain match, ASCII validation, `X-Original-To` kept, UI addresses unchanged, sending stays Class C. Provider-side inbound routing is a manual step (docs/security.md).
+Alternatives: per-person mailboxes.
+Reason: one inbox for a one-person owner during build-out.
+
+## 2026-10-26 SIGNUP_ENABLED switch
+Decision: env `SIGNUP_ENABLED=false` makes `POST /api/signup` return 403; default stays open. Blocked attempts are security-logged, not ledgered (no user id exists).
+Reason: owner matching trusts the email string and signup does not verify mailbox ownership; closing signup after the owner registers removes the takeover path.
+
+
+## 2026-10-26 Browser end-to-end tests live in a separate `e2e/` package (needs Victor's OK)
+Decision: Playwright Test (Apache-2.0) is installed only in `/e2e` (own `package.json` and `package-lock.json`, not in the pnpm workspace, not a dependency of `apps/web`). CI runs it against the built app (`pnpm --filter app start`) and a real `pgvector/pgvector:pg16` database, with two seeded test users (`apps/web/scripts/e2e-seed.ts`, test-only `@example.test` emails, refuses to run on a database whose name lacks test/e2e/ci/scratch).
+Interpretation to confirm: Phase 2 acceptance item D9 says "gateway and app dependencies include no scraping or browser automation library (for example puppeteer, playwright or selenium)". We read D9 as being about what ships in the product (app and gateway dependency graphs and images). A test-only package that drives our own app in CI, is never imported by app code and is never in a production image, is outside that. If Victor disagrees, delete `/e2e` and `scripts/ci/e2e-local.sh`; nothing else depends on them.
+Alternatives: no browser tests (what existed before); Cypress (MIT, but also browser automation and heavier); manual QA only.
+Reason: the app had only mocked unit tests, so UI wiring, the auth proxy, CSP and real SQL were untested.
+
+## 2026-10-27 Skill uploads (untrusted reference pipeline)
+Uploaded skills are outsider-written data. Pipeline: deterministic scan, security agent (org-kit, Cybersecurity & Resilience), 3-director committee, then reference memory (`memory_semantic`, sourceType `skill_upload`, INFERRED, confidence at most 0.6). They never register tools, change permissions or autonomy, approve anything, or enter the org-kit executed skill registry. Capabilities `skill_memory_write` and `skill_intake` are Class A and not protected (data stays in the account). Raw content in `skill_submissions.content` is AES-256-GCM encrypted via `lib/key-encryption.ts` when the encryption key is configured (`enc:` prefix), otherwise stored as plain text (`raw:`). YAML is shape-checked (no tags, anchors, aliases) because no YAML parser dependency was approved.
+
+## 2026-10-27 Change requests, contracts, finance, meetings
+- Change requests: Victor's words are stored as untrusted data; refine goes through the model router into a strict zod spec. Submit sends the spec (source code and strategy) to GitHub, outside the account, so `change_request_submit` is a protected (proprietary) Class C tool: id-bound, 30 s, hash-locked, exactly once, showing the exact issue. The issue is built from the stored spec, never re-generated. With no GitHub env, no approval is created and the owner downloads the markdown instead. Status after SENT is set by hand through `POST /api/change-requests/[id]/status`; a GitHub webhook to automate IN_PROGRESS, PR_OPENED and MERGED is future work.
+- Contracts are records only (Class A `contract_create`/`contract_update`/`contract_delete`); a contract value never moves money. Field set is an assumption pending Victor's definition.
+- Finance is read-only (`GET /api/finance/summary`): sums come from the database per currency, combined in integer cents. Spend per subsidiary is omitted because usage events carry no project link.
+- Meetings: `MEETING_PROVIDER_BASE_URL` (self-hosted, https or localhost). Unconfigured means no room and no outside call.
+
+## 2026-10-26 Real SMS sending, approval-gated
+- Victor asked for the ability to send SMS. `lib/comms/delivery.ts` now sends SMS for real through the Twilio REST API with plain `fetch` (no new dependency). It makes one attempt with a 10 s timeout and never retries, because a retry after a timeout could double-send. WhatsApp, Telegram, email and calls stay stubs.
+- Sending stays protected (Class C, proprietary, approval by request id). The briefing is sent on demand: `POST /api/briefing/sms` builds a short text without financial figures or counterparty names, creates the approval for `sms_briefing_send`, and the Today card shows it. The old automated daily path (`lib/sms-briefing.ts`) no longer sends; it only surfaces a "briefing ready" reminder once a day. The ledger and approval summary carry a masked number only; the exact content lives in the approval row.
+- Not decided: whether Victor wants a standing approval or an own-number exemption for his daily briefing. None was added. Victor will be asked separately.
+
+## 2026-10-27 Password reset (forgot password)
+- `POST /api/auth/password/forgot` always returns 200 `{ok:true}`; token creation and mail run after the response, so neither body nor timing reveals whether an account exists. `POST /api/auth/password/reset` returns 200, 400 `invalid_or_expired` (one generic error for bad, expired or used tokens), 400 `weak_password`, or 429.
+- Token: 32 random bytes, only the SHA-256 is stored (`password_reset_tokens`), 30 minute life, single use by an atomic conditional update inside the same transaction that sets the password. A new token retires earlier unused ones. Success calls `bumpSessionVersion`, so every old session dies.
+- Mail is the account's own security mail: capability `password_reset_email`, Class A, in LOCAL_SAFE_REGISTRY (not protected: recipient is the owner's own address, content is a one-time link, no account data). Link base is `AUTH_URL` (fallback `NEXTAUTH_URL`). `deliver()` email is still a stub in `lib/comms/delivery.ts`, so no mail leaves until SMTP sending is built; the route logs one line without address or link.
+- Signup had no server password rule (form minLength 6). `lib/auth/password-policy.ts` (min 8, max 72 bytes for bcrypt) is the new server policy; signup is not yet wired to it.
+- `proxy.ts` public exact paths added: `/`, `/terms`, `/privacy`, `/forgot-password`, `/reset-password`, and the two password API routes (already under the public `/api/auth` prefix).
+
+## 2026-10-27: Dependency security upgrade before merging to main
+
+The new `pnpm audit` job (security.yml) had never run: it failed at setup because pnpm had no pinned version. With the pin added, the audit found 31 known vulnerabilities in production dependencies, 4 critical and 9 high.
+
+- Next.js 16.3.3 had three critical remote-code-execution advisories (image optimisation, `next/og`, `use cache`), fixed in 16.4.1. Upgraded `next` and `eslint-config-next` to 16.4.3 (same MIT licence). Build, type check and all tests pass on it.
+- Removed unused dependencies `plotly.js`, `react-plotly.js`, their type packages, `lodash` and `react-use` (no imports anywhere in the repo). This also removed the critical `maplibre-gl` and the `js-cookie` findings.
+- Upgraded `postcss` 8.5.32 and `autoprefixer` 10.6.1. Added pnpm overrides (pnpm-workspace.yaml) for transitive packages with patch-level fixes: body-parser, lodash (via formik), source-map-js, ip-address, fast-uri.
+- Upgraded `zod` 3.25.76 to 4.6.7 (high: memory exhaustion on oversized collections). The upgrade changed one behaviour that matters: `.partial()` now keeps a field's `.default()`, which would have reset a contact's tags on every update that did not mention them. The contact schemas now keep the default on the create schema only, with a regression test. No other `.partial()` exists in the codebase.
+- Result: audit exits clean at the high threshold; 3 low or moderate findings remain (csv-parse needs a major upgrade; tracked in pending tasks).
+
+## 2026-10-27: External agent review, findings checked against the code
+
+An outside agent scanned the branch and reported six findings. Each was checked in the code before any change.
+
+- F1 (gateway cache misattributes audit log and gives the owner Class C tools): the class claim is wrong. A tool's class comes from the reviewed allow-list, the definition hash and the protected-action check, never from the calling user. One smaller real gap: a non-owner request that triggered registration first marked an owner-only definition-change event as reported, so the owner's ledger never got it. Fixed with a separate log-only marker, with a test.
+- F2 (no rate limit on /api/tools/execute): real. Added a per-user bucket (60 per minute) and a 400 for non-JSON bodies. No in-app caller exists.
+- F3 (any model name reaches the operator's provider key): real. New lib/model-policy.ts: a requested or saved model must be on the allow-list (WHINK_ALLOWED_MODELS, else the picker's list plus DEFAULT_MODEL) or the user must hold their own key for that provider; otherwise the default is used and model_not_allowed is ledgered. Tested against the real chat route.
+- F4 (API key deletion unlogged, provider unvalidated): real, and storing a key was equally unlogged. Both now validate the provider and write a ledger row with the provider only, never key material.
+- F5 (history query not user-scoped): defence in depth, not a live bug (ownership is checked earlier). Scoped anyway; tested.
+- F6 (skill text stored in plaintext without ENCRYPTION_KEY): wrong. Storage throws unless the key is configured or SKILL_ALLOW_PLAINTEXT=true is set explicitly.
+
+Also noted: the report listed COEP among the security headers; the app sets COOP and CORP but not COEP.
+

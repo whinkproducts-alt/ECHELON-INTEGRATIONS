@@ -1,11 +1,12 @@
 import { prisma } from '@/lib/db';
 import { generateCorrelationId } from '@/lib/logger';
-import { assembleContext, formatContextForPrompt } from '@/lib/context-engine';
+import { assembleContext, formatContextForPrompt, type BlendedItem } from '@/lib/context-engine';
 import { buildSystemPrompt } from '@/prompts/build-prompt';
 import { checkMetaAuthorization, logSecurityEvent } from '@/lib/permission-engine';
 import { scanUserInput, scanForInjectionPatterns } from '@/lib/content-isolation';
 import { normaliseMambaMode } from '@/lib/types';
 import { readContext, writeDebrief } from '@/lib/agent-memory';
+import { recordActionSafe } from '@/lib/ledger';
 
 const PERSONA_SWITCH_PATTERNS: Array<{ regex: RegExp; persona: string; mode?: string }> = [
   { regex: /^\/?mamba\b/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
@@ -53,6 +54,9 @@ export interface OrchestratorResult {
   /** True when the message tried to grant itself authorisation; must not reach the model. */
   metaAuthBlocked: boolean;
   injectionPatterns: string[];
+  /** Recalled document chunks entered the prompt: the turn is tainted from the first tool call. */
+  externalContentThisTurn?: boolean;
+  blendedItems?: BlendedItem[];
 }
 
 export async function processInput(input: OrchestratorInput): Promise<OrchestratorResult> {
@@ -133,6 +137,16 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
           activationSource: 'user',
         },
       });
+      await recordActionSafe({
+        userId,
+        action: 'persona_switch',
+        persona: newPersona,
+        mambaMode: newMambaMode ?? undefined,
+        status: 'SUBMITTED',
+        permissionClass: 'A',
+        initiator: 'system',
+        correlationId,
+      });
       break;
     }
   }
@@ -206,6 +220,9 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
     injectionBlocked: false,
     metaAuthBlocked: false,
     injectionPatterns: [],
+    /** Blended recall items — document entries carry citation metadata (C10). */
+    blendedItems: context.blendedItems as BlendedItem[],
+    externalContentThisTurn: context.externalContentThisTurn === true,
   };
 }
 

@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { checkCsrf } from '@/lib/csrf';
 import { buildCsp, generateNonce, isHttpsDeployment } from '@/lib/csp';
+import { applySecurityHeaders } from '@/lib/security-headers';
+import { limitAuthRequest } from '@/lib/rate-limit';
 
 export default auth(async function middleware(req: NextRequest & { auth: any }) {
   const nonce = generateNonce();
@@ -11,8 +13,10 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
     isDev: process.env.NODE_ENV === 'development',
     upgradeInsecure: isHttpsDeployment(process.env.AUTH_URL ?? process.env.NEXTAUTH_URL),
   });
+  const https = isHttpsDeployment(process.env.AUTH_URL ?? process.env.NEXTAUTH_URL);
   const res = await handle(req, nonce, csp);
   res.headers.set('Content-Security-Policy', csp);
+  applySecurityHeaders(res, { https, pathname: req.nextUrl.pathname });
   return res;
 });
 
@@ -41,11 +45,33 @@ async function handle(req: NextRequest & { auth: any }, nonce: string, csp: stri
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // Rate limit credential endpoints by client address before any other work.
+  if (req.method === 'POST' && (pathname.startsWith('/api/auth') || pathname === '/api/signup')) {
+    let account: string | null = null;
+    if (pathname.startsWith('/api/auth/callback/credentials')) {
+      try {
+        const v = (await req.clone().formData()).get('email');
+        if (typeof v === 'string') account = v;
+      } catch { /* not a form post: address bucket still applies */ }
+    }
+    const limited = await limitAuthRequest(pathname === '/api/signup' ? 'signup' : 'auth', req.headers, account);
+    if (limited) return new NextResponse(limited.body, { status: 429, headers: limited.headers });
+  }
+
   // Public paths — no redirect
-  const publicPaths = ['/login', '/signup', '/api/auth'];
+  const publicPaths = ['/login', '/signup', '/api/auth', '/manifest.webmanifest'];
   // Exact public API endpoints (no prefix match).
-  const publicExact = ['/api/signup'];
+  const publicExact = [
+    '/api/signup', '/api/signup/status',
+    '/', '/terms', '/privacy', '/forgot-password', '/reset-password',
+    '/api/auth/password/forgot', '/api/auth/password/reset',
+  ];
   if (publicExact.includes(pathname) || publicPaths.some((p) => pathname.startsWith(p))) {
+    return passThrough();
+  }
+
+  // Dev-only preview harness. Never matches outside `next dev`; production keeps the auth wall.
+  if (process.env.NODE_ENV === 'development' && (pathname === '/dev-preview' || pathname.startsWith('/dev-preview/'))) {
     return passThrough();
   }
 

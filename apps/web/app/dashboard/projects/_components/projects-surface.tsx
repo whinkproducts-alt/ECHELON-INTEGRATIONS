@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { FolderKanban, Plus, ArrowRight } from 'lucide-react';
+import { SubsidiaryChip } from '@/components/subsidiaries/subsidiary-chip';
+import { getSubsidiaryList } from '@/components/subsidiaries/subsidiary-map';
 
 
 interface Project {
@@ -11,6 +14,8 @@ interface Project {
   goal: string | null;
   description: string | null;
   status: string;
+  subsidiary?: string | null;
+  progress?: { tasksTotal: number; tasksDone: number; percent: number };
   openTaskCount: number;
   createdAt: string;
   updatedAt: string;
@@ -24,6 +29,8 @@ export function ProjectsSurface() {
   const [newName, setNewName] = useState('');
   const [newGoal, setNewGoal] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [newSub, setNewSub] = useState('');
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/projects').then(r => r.json()).then(d => { setProjects(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false));
@@ -31,14 +38,17 @@ export function ProjectsSurface() {
 
   const createProject = async () => {
     if (!newName.trim()) return;
+    if (!newSub) { setCreateError('Choose a subsidiary for this project.'); return; }
+    setCreateError(null);
     const res = await fetch('/api/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName, goal: newGoal || null, description: newDesc || null }),
+      body: JSON.stringify({ name: newName, goal: newGoal || null, description: newDesc || null, subsidiary: newSub }),
     });
     const p = await res.json();
+    if (!res.ok) { setCreateError(typeof p?.error === 'string' ? p.error : 'Could not create the project.'); return; }
     setProjects(prev => [{ ...p, openTaskCount: 0 }, ...(prev ?? [])]);
-    setNewName(''); setNewGoal(''); setNewDesc(''); setShowCreate(false);
+    setNewName(''); setNewGoal(''); setNewDesc(''); setNewSub(''); setShowCreate(false);
   };
 
   return (
@@ -58,6 +68,19 @@ export function ProjectsSurface() {
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Project name" className="w-full px-3 py-2 bg-secondary rounded-md border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
           <input value={newGoal} onChange={e => setNewGoal(e.target.value)} placeholder="Goal (optional)" className="w-full px-3 py-2 bg-secondary rounded-md border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
           <textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Description (optional)" rows={2} className="w-full px-3 py-2 bg-secondary rounded-md border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none" />
+          <fieldset>
+            <legend className="text-xs text-muted-foreground mb-2">Subsidiary (required)</legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+              {getSubsidiaryList().map((sub) => (
+                <label key={sub.id} className={`flex items-center gap-2 rounded-md border p-2 text-sm cursor-pointer ${newSub === sub.id ? 'border-primary bg-primary/10' : 'border-border bg-secondary/50 hover:border-primary/40'}`}>
+                  <input type="radio" name="subsidiary" value={sub.id} checked={newSub === sub.id} onChange={() => { setNewSub(sub.id); setCreateError(null); }} className="sr-only" />
+                  <Image src={sub.logo} alt="" width={32} height={32} className="h-8 w-8 shrink-0 rounded-md object-cover" />
+                  <span className="min-w-0 truncate text-foreground">{sub.name}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {createError && <p role="alert" className="text-xs text-foreground">{createError}</p>}
           <div className="flex gap-2">
             <button onClick={createProject} className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:opacity-90">Create</button>
             <button onClick={() => setShowCreate(false)} className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md text-sm hover:bg-accent">Cancel</button>
@@ -86,6 +109,7 @@ export function ProjectsSurface() {
                   <div>
                     <h3 className="font-medium text-foreground">{p.name}</h3>
                     {p.goal && <p className="text-xs text-muted-foreground mt-0.5">{p.goal}</p>}
+                    <div className="mt-1.5"><SubsidiaryChip id={p.subsidiary ?? null} /></div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">

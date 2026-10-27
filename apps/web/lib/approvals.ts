@@ -15,6 +15,8 @@ import { logger } from '@/lib/logger';
 import { recordAction, recordActionSafe, type LedgerStatus } from '@/lib/ledger';
 import { checkApprovedAction, logSecurityEvent } from '@/lib/permission-engine';
 import { approvalContentHash } from '@/lib/canonical-json';
+import { approvalConfirmationCode, verifyConfirmationCode } from '@/lib/approval-code';
+import { classifyProtected, type ProtectedCategory } from '@/lib/protected-actions';
 import { buildDispatchMessage } from '@/lib/approval-handler';
 import type { ExecutionAuthorizationRequest } from '@whink/org-kit';
 
@@ -34,11 +36,16 @@ export interface ApprovalView {
   params: Record<string, unknown> | null;
   contentHash: string;
   permissionClass: string;
+  /** True for money movement and disclosure of proprietary information. */
+  protected: boolean;
+  category: ProtectedCategory | null;
+  /** Code a spoken approval must repeat. Null when the server has no code secret. Shown on the owner's card only. */
+  confirmationCode: string | null;
   createdAt: string;
   expiresAt: string;
 }
 
-export type DecisionStatus = 'EXECUTED' | 'DENIED' | 'EXPIRED' | 'ALREADY_DECIDED' | 'FAILED' | 'NOT_FOUND';
+export type DecisionStatus = 'EXECUTED' | 'DENIED' | 'EXPIRED' | 'ALREADY_DECIDED' | 'FAILED' | 'NOT_FOUND' | 'CODE_REJECTED';
 
 export interface ApprovalResult {
   success: boolean;
@@ -71,6 +78,25 @@ interface ApprovalRow {
 
 const systemClock: Clock = () => new Date();
 
+/** Protected-action metadata for an approval row. Derived from the stored tool, never from a request. */
+function protectedOf(row: { kind: string; tool: string | null; params?: unknown }): { protected: boolean; category: ProtectedCategory | null } {
+  if (row.kind === 'scheduled_post') return { protected: true, category: 'proprietary' };
+  if (row.kind === 'ear') {
+    const objective = (row.params as { objective?: unknown } | null)?.objective;
+    const c = classifyProtected({ toolName: 'ear_objective', description: typeof objective === 'string' ? objective : '' });
+    return { protected: c.protected, category: c.category ?? null };
+  }
+  if (row.kind !== 'tool_call' || !row.tool) return { protected: false, category: null };
+  const c = classifyProtected({ toolName: row.tool, capability: row.tool, params: row.params });
+  return { protected: c.protected, category: c.category ?? null };
+}
+
+/** Bulk or wildcard ids ("all", "*", lists) are never an approval of anything. */
+export function isBulkApprovalId(id: string): boolean {
+  const t = id.trim().toLowerCase();
+  return t === '' || t === 'all' || t === 'any' || t === 'everything' || t === '*' || /[\s,;*]/.test(t);
+}
+
 function toView(r: ApprovalRow): ApprovalView {
   const params = r.params && typeof r.params === 'object' && !Array.isArray(r.params)
     ? (r.params as Record<string, unknown>)
@@ -83,6 +109,8 @@ function toView(r: ApprovalRow): ApprovalView {
     params,
     contentHash: r.contentHash,
     permissionClass: r.permissionClass,
+    ...protectedOf(r),
+    confirmationCode: approvalConfirmationCode(r.userId, r.id, r.contentHash),
     createdAt: r.createdAt.toISOString(),
     expiresAt: r.expiresAt.toISOString(),
   };
@@ -102,8 +130,13 @@ function summarise(kind: ApprovalKind, tool: string | null, params: unknown): st
   return `Run ${tool ?? 'tool'} ${json}`.substring(0, 300);
 }
 
+function protectedMetaOf(row: { kind?: string; tool: string | null; params?: unknown }): { protected?: true; category?: ProtectedCategory } {
+  const p = protectedOf({ kind: row.kind ?? 'tool_call', tool: row.tool, params: row.params });
+  return p.protected && p.category ? { protected: true, category: p.category } : {};
+}
+
 async function ledger(
-  row: Pick<ApprovalRow, 'id' | 'userId' | 'tool' | 'permissionClass' | 'correlationId' | 'persona'>,
+  row: Pick<ApprovalRow, 'id' | 'userId' | 'tool' | 'permissionClass' | 'correlationId' | 'persona'> & { kind?: string; params?: unknown },
   action: string,
   status: LedgerStatus,
   extra: { outputSummary?: string; confirmationMethod?: string; strict?: boolean } = {},
@@ -120,7 +153,8 @@ async function ledger(
     status,
     confirmationMethod: extra.confirmationMethod,
     outputSummary: extra.outputSummary,
-    validationResult: JSON.stringify({ approvalId: row.id }),
+    validationResult: JSON.stringify({ approvalId: row.id, ...protectedMetaOf(row) }),
+    protectedCategory: protectedMetaOf(row).category,
     correlationId: row.correlationId,
   });
 }
@@ -186,7 +220,8 @@ export async function createApproval(input: CreateApprovalInput): Promise<Approv
       permissionClass,
       status: 'AWAITING_APPROVAL',
       inputSummary: row.summary,
-      validationResult: JSON.stringify({ approvalId: row.id, contentHash }),
+      validationResult: JSON.stringify({ approvalId: row.id, contentHash, ...protectedMetaOf({ kind, tool, params }) }),
+      protectedCategory: protectedMetaOf({ kind, tool, params }).category,
       correlationId: input.correlationId,
     });
   } catch (e) {
@@ -354,9 +389,14 @@ export async function decide(
   userId: string,
   id: string,
   decision: 'approve' | 'deny',
-  deps: { now?: Clock } = {},
+  deps: { now?: Clock; voice?: { code?: unknown } } = {},
 ): Promise<DecisionOutcome> {
   const clock = deps.now ?? systemClock;
+  if (isBulkApprovalId(id)) {
+    // No "approve all": a decision names exactly one request id.
+    await logSecurityEvent(userId, 'bulk_approval_refused', 'Decision attempted without a single request id');
+    return { id, status: 'NOT_FOUND', result: null };
+  }
   const now = clock();
   await sweepQuietly(userId, now);
 
@@ -380,6 +420,16 @@ export async function decide(
     const row = await prisma.approvalRequest.findFirst({ where: { id, userId } }) as ApprovalRow | null;
     if (row) await ledger(row, 'approval_denied', 'DENIED', { confirmationMethod: 'user_denied' });
     return { id, status: 'DENIED', result: null };
+  }
+
+  // Spoken approval: the server checks the confirmation code before anything changes state.
+  if (deps.voice) {
+    const pending = await prisma.approvalRequest.findFirst({ where: { id, userId, status: 'PENDING', expiresAt: { gt: now } } }) as ApprovalRow | null;
+    if (!pending) return explainLoss(userId, id);
+    if (!verifyConfirmationCode(approvalConfirmationCode(userId, id, pending.contentHash), deps.voice.code)) {
+      await logSecurityEvent(userId, 'voice_approval_code_rejected', `Spoken approval for ${id.substring(0, 64)} had a missing or wrong confirmation code; nothing approved`, pending.correlationId, 'DENIED');
+      return { id, status: 'CODE_REJECTED', result: null };
+    }
   }
 
   // B5: single atomic winner. No read before this write.

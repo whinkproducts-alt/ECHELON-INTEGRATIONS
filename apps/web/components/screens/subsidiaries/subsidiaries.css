@@ -1,0 +1,42 @@
+/* Subsidiaries screens. --sub-c (HSL triplet) is set per subsidiary on the screen root by accent.ts.
+   Motion is transform/opacity only and switched off for reduced motion. */
+.sub-scope .holo-panel { --holo-c: var(--sub-c, var(--whink-accent)); }
+.sub-scope .holo-btn { --holo-c: var(--sub-c, var(--whink-accent)); }
+.sub-scope .holo-badge { --holo-c: var(--sub-c, var(--whink-accent)); }
+.sub-scope .holo-badge.holo-tone-ember { --holo-c: var(--ember); }
+.sub-scope .holo-badge.holo-tone-deep { --holo-c: var(--deep); }
+.sub-scope .holo-badge.holo-tone-neutral { --holo-c: var(--muted-foreground); }
+.sub-scope .holo-panel.holo-tone-neutral { --holo-c: var(--muted-foreground); }
+.sub-scope .holo-panel.holo-tone-ember { --holo-c: var(--ember); }
+
+.sub-aura { position: absolute; inset: -20% -10% auto -10%; height: 28rem; pointer-events: none; z-index: 0;
+  background: radial-gradient(60% 60% at 30% 20%, hsl(var(--sub-c) / 0.22), transparent 70%), radial-gradient(40% 50% at 80% 10%, hsl(var(--sub-c) / 0.1), transparent 70%); }
+.sub-logo { border: 1px solid hsl(var(--sub-c) / 0.35); box-shadow: 0 0 40px -8px hsl(var(--sub-c) / 0.55), inset 0 0 0 1px hsl(var(--foreground) / 0.05); background: hsl(var(--base)); }
+.sub-card-link { display: block; border-radius: 1rem; outline-offset: 4px; }
+.sub-card-link:focus-visible { outline: 2px solid hsl(var(--ring)); }
+.sub-hairline { height: 1px; background: linear-gradient(90deg, transparent, hsl(var(--sub-c) / 0.6), transparent); }
+.sub-chip { display: inline-flex; align-items: center; gap: 0.375rem; border-radius: 999px; padding: 0.25rem 0.75rem; font-size: 0.75rem; border: 1px solid hsl(var(--sub-c) / 0.4); background: hsl(var(--sub-c) / 0.1); color: hsl(var(--foreground)); }
+.sub-chip[aria-pressed='true'] { background: hsl(var(--sub-c) / 0.28); border-color: hsl(var(--sub-c) / 0.8); }
+.sub-chip:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.sub-select { border: 1px solid hsl(var(--border)); background: hsl(var(--base)); color: hsl(var(--foreground)); border-radius: 0.5rem; padding: 0.375rem 0.625rem; font-size: 0.8125rem; }
+.sub-select:focus-visible { outline: 2px solid hsl(var(--ring)); }
+.sub-timeline { position: relative; border-left: 1px solid hsl(var(--sub-c) / 0.35); margin-left: 0.5rem; }
+.sub-timeline > li { position: relative; padding-left: 1.5rem; }
+.sub-timeline > li::before { content: ''; position: absolute; left: -0.34rem; top: 0.45rem; width: 0.6rem; height: 0.6rem; border-radius: 999px; background: hsl(var(--base)); border: 2px solid hsl(var(--sub-c)); }
+.sub-timeline > li[data-done='true']::before { background: hsl(var(--sub-c)); box-shadow: 0 0 8px hsl(var(--sub-c) / 0.8); }
+.sub-rise { animation: sub-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes sub-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.sub-shimmer { animation: sub-pulse 1.6s ease-in-out infinite; background: hsl(var(--sub-c, var(--whink-accent)) / 0.1); border-radius: 0.75rem; }
+@keyframes sub-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sub-rise, .sub-shimmer { animation: none; } }
+
+@media print {
+  body * { visibility: hidden !important; }
+  .sub-report, .sub-report * { visibility: visible !important; }
+  .sub-report { position: absolute; left: 0; top: 0; width: 100%; background: canvas; color: canvastext; padding: 0 !important; }
+  .sub-report .no-print, .sub-report .holo-edge, .sub-report .holo-bracket, .sub-aura { display: none !important; visibility: hidden !important; }
+  .sub-report .holo-panel { background: canvas !important; color: canvastext; border: 1px solid GrayText !important; box-shadow: none !important; backdrop-filter: none !important; animation: none !important; break-inside: avoid; }
+  .sub-report *, .sub-report .text-foreground, .sub-report .text-muted-foreground { color: canvastext !important; text-shadow: none !important; animation: none !important; }
+  .sub-report .sub-logo { box-shadow: none; }
+  .sub-report section { break-inside: auto; }
+}

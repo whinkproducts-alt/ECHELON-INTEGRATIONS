@@ -22,6 +22,10 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  passkeys          PasskeyCredential[]
+  passwordResetTokens PasswordResetToken[]
+  passkeyChallenges PasskeyChallenge[]
+  sessionVersion    Int       @default(0)
   accounts          Account[]
   sessions          Session[]
   profile           UserProfile?
@@ -38,9 +42,24 @@ model User {
   calendarEvents    CalendarEvent[]
   notes             Note[]
   approvalRequests  ApprovalRequest[]
-  socialConnections SocialConnection[]
-  oauthStates       OAuthState[]
-  scheduledPosts    ScheduledPost[]
+  socialConnections  SocialConnection[]
+  skillSubmissions   SkillSubmission[]
+  oauthStates        OAuthState[]
+  scheduledPosts     ScheduledPost[]
+  documentWorkspaces       DocumentWorkspace[]
+  documents                Document[]
+  notificationPreferences  NotificationPreference[]
+  boardMeetings            BoardMeeting[]
+  connectorInstalls        ConnectorInstall[]
+  usageEvents              UsageEvent[]
+  contacts                 Contact[]
+  changeRequests           ChangeRequest[]
+  contracts                Contract[]
+  commsRequests            CommsRequest[]
+  swarmRuns                SwarmRun[]
+  agentJobs                AgentJob[]
+  recommendations          Recommendation[]
+  newsSeen                 NewsSeen[]
 
   @@map("users")
 }
@@ -109,7 +128,9 @@ model UserPreference {
   defaultFunctionalMode String?
   executionProfile      String   @default("BALANCED")
   preferredModel        String? // e.g. "claude-sonnet-4-5", "gpt-4o", "llama3.1:8b"
-  anythingllmWorkspace  String? // per-user AnythingLLM workspace slug; null falls back to env
+  monthlyTokenBudget    BigInt? // null = use tenant/env default; 0 = unlimited
+  budgetSoftPct         Int? // null = default 80
+  budgetHardPct         Int? // null = default 100
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -196,6 +217,7 @@ model Project {
   goal        String?
   description String?
   status      String   @default("ACTIVE")
+  subsidiary  String? // WHINK Group subsidiary id (validated against config/subsidiaries.json); null = unassigned
   ownerId     String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -212,8 +234,10 @@ model Project {
   memorySemantic MemorySemantic[]
   entityEdges    EntityEdge[]
   hypotheses     Hypothesis[]
+  contracts      Contract[]
 
   @@index([ownerId])
+  @@index([ownerId, subsidiary])
   @@map("projects")
 }
 
@@ -317,19 +341,23 @@ model ProjectOpenQuestion {
 // ── Memory Engine ───────────────────────────────────────────────
 
 model MemoryEpisode {
-  id           String                       @id @default(cuid())
-  userId       String
-  projectId    String?
-  eventType    String // decision_made, meeting_completed, correction, mamba_insight, etc.
-  entities     String? // JSON array of entity references
-  summary      String
-  source       String // conversation, tool, integration
-  confidence   Float                        @default(0.8)
-  importance   Float                        @default(0.5)
-  privacyClass String                       @default("PERSONAL")
-  supersededBy String? // ID of newer episode
-  embedding    Unsupported("vector(1536)")?
-  createdAt    DateTime                     @default(now())
+  id             String                      @id @default(cuid())
+  userId         String
+  projectId      String?
+  eventType      String // decision_made, meeting_completed, correction, mamba_insight, etc.
+  entities       String? // JSON array of entity references
+  summary        String
+  source         String // conversation, tool, integration, auto
+  eventDate      DateTime? // absolute event date (B8 — resolved from relative dates)
+  messageId      String? // id of the message that triggered auto-extraction (B9)
+  extractorModel String? // LLM model used for extraction, distinct from embeddingModel (B9)
+  confidence     Float                       @default(0.8)
+  importance     Float                       @default(0.5)
+  privacyClass   String                      @default("PERSONAL")
+  supersededBy   String? // ID of newer episode
+  embedding      Unsupported("vector(768)")?
+  embeddingModel String? // e.g. "ollama/nomic-embed-text"
+  createdAt      DateTime                    @default(now())
 
   project Project? @relation(fields: [projectId], references: [id])
 
@@ -339,28 +367,46 @@ model MemoryEpisode {
 }
 
 model MemorySemantic {
-  id              String                       @id @default(cuid())
+  id              String                      @id @default(cuid())
   userId          String
   projectId       String?
   statement       String
-  sourceType      String // user, conversation, integration, mamba
+  sourceType      String // user, conversation, integration, mamba, auto
   sourceId        String? // reference to source conversation/message
-  confidence      Float                        @default(0.8)
+  messageId       String? // id of the message that triggered auto-extraction (B9)
+  extractorModel  String? // LLM model used for extraction, distinct from embeddingModel (B9)
+  confidence      Float                       @default(0.8)
   epistemicStatus String // KNOWN, INFERRED, HYPOTHESIS, UNVERIFIED
   supersededBy    String? // ID of newer semantic memory
   retrievedAt     DateTime?
-  scope           String?                      @default("general")
-  validFrom       DateTime                     @default(now())
+  scope           String?                     @default("general")
+  validFrom       DateTime                    @default(now())
   supersededAt    DateTime?
-  embedding       Unsupported("vector(1536)")?
-  createdAt       DateTime                     @default(now())
-  updatedAt       DateTime                     @updatedAt
+  embedding       Unsupported("vector(768)")?
+  embeddingModel  String? // e.g. "ollama/nomic-embed-text"
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
 
   project Project? @relation(fields: [projectId], references: [id])
 
   @@index([userId, createdAt])
   @@index([projectId])
   @@map("memory_semantic")
+}
+
+// ── Auto Memory Daily Cap (B12) ─────────────────────────────────
+
+model MemoryDailyCap {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String // YYYY-MM-DD
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("memory_daily_cap")
 }
 
 model MemoryProcedural {
@@ -693,14 +739,37 @@ model TaskHandoff {
 
 model DocumentWorkspace {
   id            String   @id @default(cuid())
-  userId        String
-  workspaceSlug String
-  displayName   String?
+  userId        String   @unique
+  workspaceSlug String   @unique
   createdAt     DateTime @default(now())
 
-  @@unique([userId, workspaceSlug])
-  @@index([userId])
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents Document[]
+
   @@map("document_workspaces")
+}
+
+// ── Per-file document ownership record (H1 / C6 / PIPEDA Q3) ────
+// One row per uploaded file; anythingllmDocId is the ID AnythingLLM assigned.
+// Ownership is enforced here — no userId means no access.
+
+model Document {
+  id               String   @id @default(cuid())
+  userId           String
+  workspaceId      String
+  anythingllmDocId String
+  filename         String
+  mimeType         String
+  sizeBytes        Int
+  sha256           String
+  uploadedAt       DateTime @default(now())
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace DocumentWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, anythingllmDocId])
+  @@index([userId])
+  @@map("documents")
 }
 
 // ── Compound Agent Intelligence ─────────────────────────────────
@@ -745,7 +814,8 @@ model ApprovalRequest {
   executedAt      DateTime?
   result          Json?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commsRequest CommsRequest?
 
   @@index([userId, status, expiresAt])
   @@map("approval_requests")
@@ -811,4 +881,447 @@ model ScheduledPost {
   @@index([status, sendAt])
   @@index([userId, status])
   @@map("scheduled_posts")
+}
+
+// ── Notification Preferences ─────────────────────────────────────
+
+model NotificationPreference {
+  id       String  @id @default(cuid())
+  userId   String
+  channel  String  // EMAIL | WHATSAPP | SMS | TELEGRAM | PHONE_CALL
+  enabled  Boolean @default(false)
+  address  String? // email, phone E.164, or Telegram chat ID
+  schedule String  @default("DAILY") // DAILY | IMMEDIATE | WEEKLY
+  time     String  @default("08:00") // HH:MM in user's local time
+  timeZone String  @default("America/Edmonton")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel])
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+// ── Board meetings ───────────────────────────────────────────────
+// Per-user. Minutes are free text and are untrusted data on read.
+
+model BoardMeeting {
+  id           String    @id @default(cuid())
+  userId       String
+  title        String
+  scheduledFor DateTime
+  agenda       String[]
+  attendees    String[]
+  status       String    @default("SCHEDULED") // SCHEDULED | HELD | CANCELLED
+  minutes      String?
+  minutesAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, scheduledFor])
+  @@map("board_meetings")
+}
+
+// ── Connectors ───────────────────────────────────────────────────
+// config holds non-secret settings only. Tokens live in their own encrypted tables.
+
+model ConnectorInstall {
+  id          String   @id @default(cuid())
+  userId      String
+  connectorId String
+  enabled     Boolean  @default(true)
+  config      Json?
+  installedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, connectorId])
+  @@index([userId])
+  @@map("connector_installs")
+}
+
+// ── Usage ────────────────────────────────────────────────────────
+
+model UsageEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  provider   String
+  model      String
+  tokensIn   Int      @default(0)
+  tokensOut  Int      @default(0)
+  costMicros Int      @default(0)
+  kind       String   @default("chat") // chat | tool_loop | embed | other
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("usage_events")
+}
+
+// ── Contacts and outbound comms ──────────────────────────────────
+
+model Contact {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  email     String?
+  phone     String? // E.164
+  company   String?
+  tags      String[]
+  source    String   @default("manual") // manual | vcard | google
+  notes     String?
+  createdAt DateTime @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commsRequests CommsRequest[]
+
+  @@index([userId])
+  @@index([userId, phone])
+  @@index([userId, email])
+  @@map("contacts")
+}
+
+// Links one outbound message or call to its approval request. Content lives on the approval row.
+model CommsRequest {
+  id         String   @id @default(cuid())
+  userId     String
+  contactId  String
+  approvalId String   @unique
+  kind       String // message | call
+  channel    String // SMS | WHATSAPP | TELEGRAM | EMAIL | PHONE_CALL
+  createdAt  DateTime @default(now())
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contact  Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  approval ApprovalRequest @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  @@index([userId, contactId])
+  @@map("comms_requests")
+}
+
+// ── Change requests and contracts ────────────────────────────────
+
+model ChangeRequest {
+  id                String   @id @default(cuid())
+  userId            String
+  title             String
+  body              String
+  status            String   @default("DRAFT") // DRAFT | REFINED | AWAITING_APPROVAL | SENT | IN_PROGRESS | PR_OPENED | MERGED | REJECTED | FAILED
+  spec              Json?
+  risk              String?
+  approvalId        String?
+  githubIssueUrl    String?
+  githubIssueNumber Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@map("change_requests")
+}
+
+model Contract {
+  id           String    @id @default(cuid())
+  userId       String
+  title        String
+  counterparty String
+  subsidiary   String?
+  projectId    String?
+  valueAmount  Decimal?  @db.Decimal(14, 2)
+  currency     String    @default("CAD")
+  status       String    @default("DRAFT") // DRAFT | ACTIVE | COMPLETED | TERMINATED
+  startDate    DateTime?
+  endDate      DateTime?
+  renewalDate  DateTime?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([userId, subsidiary])
+  @@index([userId, projectId])
+  @@index([userId, createdAt, id])
+  @@map("contracts")
+}
+
+// ── Skill uploads (untrusted reference knowledge pipeline) ──────────
+// An uploaded skill is outsider-written data. It can become reference memory; it never
+// registers tools, changes permissions, or enters the org-kit executed skill registry.
+
+model SkillSubmission {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  filename    String
+  sha256      String
+  sizeBytes   Int
+  status      String   @default("QUEUED") // QUEUED | SCANNING | REJECTED_SECURITY | ASSESSING | ACCEPTED | REJECTED_VALUE | WAITING_MODEL | FAILED
+  content     String // raw upload, encrypted at rest when ENCRYPTION_KEY is configured ("enc:" prefix), else "raw:"
+  scanReport  Json?
+  committee   Json?
+  decision    String?
+  reason      String?
+  memoryIds   String[]
+  attempts    Int      @default(0)
+  leaseOwner  String?
+  leaseUntil  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sha256])
+  @@index([userId, createdAt])
+  @@index([status, updatedAt])
+  @@map("skill_submissions")
+}
+
+model PasskeyCredential {
+  id           String    @id @default(cuid())
+  userId       String
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      BigInt    @default(0)
+  transports   String[]
+  deviceName   String
+  backedUp     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("passkey_credentials")
+}
+
+// Single-use WebAuthn challenges and 60 second login tickets. Consumed by a conditional update.
+model PasskeyChallenge {
+  id        String    @id @default(cuid())
+  userId    String?
+  challenge String
+  purpose   String
+  remember  Boolean   @default(false)
+  clientKey String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([clientKey, purpose])
+  @@map("passkey_challenges")
+}
+
+// ── Standing roster worker (24/7 organisation) ──────────────────
+
+// One row per (job, user). Claimed with an atomic conditional update; see lib/worker/scheduler.ts.
+model AgentJob {
+  id                  String    @id @default(cuid())
+  jobKey              String
+  userId              String
+  nextRunAt           DateTime
+  lastRunAt           DateTime?
+  lastStatus          String? // OK | FAILED | SKIPPED | TIMEOUT
+  lastError           String? // short reason code, never content
+  leaseUntil          DateTime?
+  leaseOwner          String?
+  runs                Int       @default(0)
+  consecutiveFailures Int       @default(0)
+  createdAt           DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([jobKey, userId])
+  @@index([nextRunAt])
+  @@index([userId])
+  @@map("agent_jobs")
+}
+
+// Process-level facts only (no user data).
+model AgentHeartbeat {
+  workerId  String   @id
+  startedAt DateTime
+  lastSeenAt DateTime
+  version   String
+
+  @@map("agent_heartbeats")
+}
+
+// What the news desk has already seen, so the same link is never scored twice. Pruned after 14 days.
+model NewsSeen {
+  id        String   @id @default(cuid())
+  userId    String
+  linkHash  String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, linkHash])
+  @@index([createdAt])
+  @@map("news_seen")
+}
+
+// Suggestions from the standing roster, shown in the "WHINK recommends" column.
+model Recommendation {
+  id          String    @id @default(cuid())
+  userId      String
+  source      String // agent name
+  kind        String
+  title       String
+  body        String
+  link        String?
+  severity    String    @default("info") // info | warning | critical
+  dedupeKey   String?
+  createdAt   DateTime  @default(now())
+  dismissedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, dismissedAt, createdAt])
+  @@map("recommendations")
+}
+
+// ── Swarm: many agents, one initiative, no overlap ───────────────
+
+model SwarmRun {
+  id              String    @id @default(cuid())
+  userId          String
+  projectId       String?
+  subsidiary      String?
+  title           String
+  initiative      String // untrusted user text, always wrapped before model use
+  status          String    @default("PLANNED") // PLANNED | RUNNING | FINALIZING | DONE | FAILED | CANCELLED
+  minAgents       Int
+  agentCount      Int
+  estimate        Json
+  tokenCap        Int
+  tokensUsed      Int       @default(0)
+  cancelRequested Boolean   @default(false)
+  stopReason      String?
+  result          String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks     SwarmTask[]
+  claims    SwarmClaim[]
+  learnings SwarmLearning[]
+
+  @@index([userId, createdAt])
+  @@map("swarm_runs")
+}
+
+model SwarmTask {
+  id             String    @id @default(cuid())
+  runId          String
+  userId         String
+  lane           String // exclusive scope key
+  role           String // lead | integrator | redteam | reviewer | worker
+  agentId        String // real org-kit agent_id
+  fit            String // matched | generalist
+  title          String
+  objective      String
+  deliverable    String
+  requiredSkills String[]
+  covers         String[] // lanes this task reviews, challenges or integrates
+  dependsOn      String[] // lanes
+  estimatedCalls Int       @default(1)
+  status         String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED | SKIPPED
+  attempts       Int       @default(0)
+  output         Json?
+  error          String?
+  tokensIn       Int       @default(0)
+  tokensOut      Int       @default(0)
+  claimOwner     String? // engine instance holding the lane claim; every write after acquire checks it
+  startedAt      DateTime?
+  heartbeatAt    DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  run SwarmRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, lane])
+  @@index([runId, status])
+  @@index([userId])
+  @@map("swarm_tasks")
+}
+
+// DB-level exclusive claim on a lane. The unique key is what makes two engines unable to run one lane.
+model SwarmClaim {
+  id        String   @id @default(cuid())
+  runId     String
+  userId    String
+  lane      String
+  taskId    String
+  owner     String
+  createdAt DateTime @default(now())
+
+  run SwarmRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, lane])
+  @@index([userId])
+  @@map("swarm_claims")
+}
+
+model SwarmLearning {
+  id         String   @id @default(cuid())
+  runId      String
+  userId     String
+  agentId    String
+  lane       String
+  text       String
+  sha256     String
+  confidence Float    @default(0.5)
+  createdAt  DateTime @default(now())
+
+  run SwarmRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, sha256])
+  @@index([runId, createdAt])
+  @@index([userId])
+  @@map("swarm_learnings")
+}
+
+// ── Durable rate limiter (fixed-window counters, shared across workers/restarts) ──
+// Keys are "<bucket>:<subject>" (subject is a client address or sign-in account, hashed or
+// plain); this table holds no user content and is not tenant data.
+
+model RateLimitBucket {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+  @@map("rate_limit_buckets")
+}
+
+// ── Password reset (only the SHA-256 of the token is stored; single use; 30 minute life) ──
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }

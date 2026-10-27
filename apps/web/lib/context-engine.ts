@@ -1,8 +1,10 @@
+import { isTaintingSourceType, semanticEnvelopeSource } from '@/lib/skills/labels';
 import { prisma } from '@/lib/db';
 import { listWorkingMemory } from '@/lib/working-memory';
-import { filterToolResult, stripFakeUntrustedTags, wrapUntrustedContent } from '@/lib/content-isolation';
+import { filterToolResult, scanForInjectionPatterns, stripFakeUntrustedTags, wrapUntrustedContent } from '@/lib/content-isolation';
 import { searchMemory } from '@/lib/memory-engine';
-import { searchDocuments } from '@/lib/anythingllm-client';
+import { queryDocuments } from '@/lib/anythingllm-client';
+import { recordActionSafe } from '@/lib/ledger';
 
 
 const MAX_CONTEXT_TOKENS = 80000;
@@ -16,6 +18,18 @@ function cleanProjectField(value: unknown): string {
   return filterToolResult(stripFakeUntrustedTags(text));
 }
 
+/** A single item in the blended ranked recall list (C9). */
+export interface BlendedItem {
+  type: 'memory' | 'document';
+  content: string;
+  /** For memory items: the memory id. For document items: the chunk id. */
+  id?: string;
+  /** For document items: the document name, page, and score for citation. */
+  documentName?: string;
+  page?: number | null;
+  score?: number | null;
+}
+
 export interface RetrievedContext {
   workingMemory: string[];
   projectContext: string | null;
@@ -24,6 +38,10 @@ export interface RetrievedContext {
   entityContext: string[];
   hypotheses: string[];
   documentCitations: string[];
+  /** Blended ranked list of memory and document items (C9). */
+  blendedItems: BlendedItem[];
+  /** True when any document chunk was placed in context this turn (sets externalContentThisTurn). */
+  externalContentThisTurn: boolean;
   totalChars: number;
 }
 
@@ -42,6 +60,8 @@ export async function assembleContext(
     entityContext: [],
     hypotheses: [],
     documentCitations: [],
+    blendedItems: [],
+    externalContentThisTurn: false,
     totalChars: 0,
   };
 
@@ -96,9 +116,10 @@ export async function assembleContext(
     for (const mem of searchResults.semantics ?? []) {
       const cleanStatement = stripFakeUntrustedTags(mem.statement);
       const raw = `[${mem.epistemicStatus}] ${cleanStatement} (confidence: ${mem.confidence})`;
-      const entry = wrapUntrustedContent(raw, 'memory_semantic', mem.id);
+      const entry = wrapUntrustedContent(raw, semanticEnvelopeSource((mem as { sourceType?: string | null }).sourceType), mem.id);
       if (budget - entry.length > 0) {
         result.semanticMemories.push(entry);
+        if (isTaintingSourceType((mem as { sourceType?: string | null }).sourceType)) result.externalContentThisTurn = true;
         budget -= entry.length;
       }
     }
@@ -108,6 +129,7 @@ export async function assembleContext(
       const entry = wrapUntrustedContent(raw, 'memory_episode', ep.id);
       if (budget - entry.length > 0) {
         result.episodicMemories.push(entry);
+        if (isTaintingSourceType((ep as { source?: string | null }).source)) result.externalContentThisTurn = true;
         budget -= entry.length;
       }
     }
@@ -117,38 +139,79 @@ export async function assembleContext(
       const entry = wrapUntrustedContent(raw, 'hypothesis', h.id);
       if (budget - entry.length > 0) {
         result.hypotheses.push(entry);
+        if (isTaintingSourceType((h as { source?: string | null }).source)) result.externalContentThisTurn = true;
         budget -= entry.length;
       }
     }
 
-    // Document citations from AnythingLLM — non-blocking, already untrusted-wrapped by the client
+    // Document citations from AnythingLLM — non-blocking; resolves workspace from
+    // DocumentWorkspace table only (no env fallback — C4 tenant isolation requirement).
     try {
-      // Resolve per-user workspace slug; fall back to env; skip entirely if neither is set.
-      const userPref = await prisma.userPreference.findUnique({ where: { userId } });
-      const workspaceSlug =
-        userPref?.anythingllmWorkspace ?? process.env.ANYTHINGLLM_WORKSPACE_SLUG ?? null;
-      if (!workspaceSlug) {
-        // AnythingLLM not configured for this user — skip to avoid shared-workspace isolation risk.
-        console.warn('[context-engine] AnythingLLM workspace slug not set — skipping document search');
+      const ws = await prisma.documentWorkspace.findUnique({ where: { userId } });
+      if (!ws) {
+        // User has no workspace configured — skip silently (not an error).
       } else {
-        // E5: cap AnythingLLM to 500 ms so a slow instance cannot hold up context assembly
-        const ANYTHINGLLM_TIMEOUT_MS = 500;
-        const docs = await Promise.race([
-          searchDocuments(query, userId, workspaceSlug, 5),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('AnythingLLM timeout')), ANYTHINGLLM_TIMEOUT_MS)
-          ),
-        ]);
-        for (const doc of docs) {
-          const citation = `[${doc.title}] ${doc.content}`;
-          if (budget - citation.length > 0) {
-            result.documentCitations.push(citation);
-            budget -= citation.length;
+        // queryDocuments has a 500 ms internal timeout (C11).
+        const chunks = await queryDocuments(userId, ws.workspaceSlug, query, 5);
+
+        for (const chunk of chunks) {
+          const cleanName = filterToolResult(stripFakeUntrustedTags(chunk.documentName ?? ''));
+          const cleanText = filterToolResult(stripFakeUntrustedTags(chunk.text ?? ''));
+
+          // H4 fix: scan both name and content for injection before placing in model context.
+          const nameScan = scanForInjectionPatterns(cleanName);
+          const textScan = scanForInjectionPatterns(cleanText);
+          if (nameScan.suspicious || textScan.suspicious) {
+            await recordActionSafe({
+              userId,
+              action: 'document_injection_blocked',
+              permissionClass: 'A',
+              status: 'DENIED',
+              tool: 'context_engine',
+              inputSummary: `chunkId=${String(chunk.chunkId ?? '').slice(0, 200)} patterns=${[...nameScan.patterns, ...textScan.patterns].join(',')}`,
+            });
+            result.externalContentThisTurn = true;
+            continue;
+          }
+
+          // documentName goes inside the untrusted envelope so it cannot escape sanitisation.
+          const wrappedText = wrapUntrustedContent(`[doc:${cleanName}] ${cleanText}`, 'document', chunk.chunkId ?? cleanName);
+          if (budget - wrappedText.length > 0) {
+            result.documentCitations.push(wrappedText);
+            result.externalContentThisTurn = true;
+            // C9: add to blended list with citation metadata
+            result.blendedItems.push({
+              type: 'document',
+              content: wrappedText,
+              id: chunk.chunkId,
+              documentName: cleanName,
+              page: chunk.page,
+              score: chunk.score,
+            });
+            budget -= wrappedText.length;
           }
         }
       }
     } catch {
-      // AnythingLLM is optional — failure and timeout must not break context assembly
+      // AnythingLLM is optional — failure must not break context assembly (C11).
+      await recordActionSafe({
+        userId,
+        action: 'document_recall_unavailable',
+        permissionClass: 'A',
+        status: 'FAILED',
+        tool: 'context_engine',
+        inputSummary: `query=${query.slice(0, 200)}`,
+      });
+    }
+
+    // C9: build blended memory items from already-assembled semanticMemories and episodicMemories
+    for (const entry of result.semanticMemories) {
+      if (result.blendedItems.some((i) => i.content === entry && i.type === 'memory')) continue;
+      result.blendedItems.push({ type: 'memory', content: entry });
+    }
+    for (const entry of result.episodicMemories) {
+      if (result.blendedItems.some((i) => i.content === entry && i.type === 'memory')) continue;
+      result.blendedItems.push({ type: 'memory', content: entry });
     }
   } else {
     // Recency fallback when no query is available
@@ -162,9 +225,10 @@ export async function assembleContext(
     for (const mem of semantics ?? []) {
       const cleanStatement = stripFakeUntrustedTags(mem.statement);
       const raw = `[${mem.epistemicStatus}] ${cleanStatement} (confidence: ${mem.confidence})`;
-      const entry = wrapUntrustedContent(raw, 'memory_semantic', mem.id);
+      const entry = wrapUntrustedContent(raw, semanticEnvelopeSource((mem as { sourceType?: string | null }).sourceType), mem.id);
       if (budget - entry.length > 0) {
         result.semanticMemories.push(entry);
+        if (isTaintingSourceType((mem as { sourceType?: string | null }).sourceType)) result.externalContentThisTurn = true;
         budget -= entry.length;
       }
     }
@@ -182,6 +246,7 @@ export async function assembleContext(
       const entry = wrapUntrustedContent(raw, 'memory_episode', ep.id);
       if (budget - entry.length > 0) {
         result.episodicMemories.push(entry);
+        if (isTaintingSourceType((ep as { source?: string | null }).source)) result.externalContentThisTurn = true;
         budget -= entry.length;
       }
     }
@@ -218,6 +283,7 @@ export async function assembleContext(
       const entry = wrapUntrustedContent(raw, 'hypothesis', h.id);
       if (budget - entry.length > 0) {
         result.hypotheses.push(entry);
+        if (isTaintingSourceType((h as { source?: string | null }).source)) result.externalContentThisTurn = true;
         budget -= entry.length;
       }
     }

@@ -58,9 +58,8 @@ describe('searchMemory — LIKE fallback (embedding unavailable)', () => {
     const { searchMemory } = await import('../memory-engine');
     const results = await searchMemory('user-a', 'CEO');
 
-    // Should not have called the raw SQL vector path
-    expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
-    // Should have called findMany (LIKE path)
+    // Raw SQL may be called for the full-text fallback path (3a A10) before reaching findMany
+    // Should have called findMany (text-match path)
     expect(mockSemanticFindMany).toHaveBeenCalledOnce();
     expect(results.semantics).toHaveLength(1);
     expect(results.semantics[0].statement).toBe('Victor is CEO');

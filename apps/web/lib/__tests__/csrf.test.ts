@@ -18,8 +18,22 @@ describe('checkCsrf', () => {
     for (const method of ['GET', 'HEAD', 'OPTIONS']) expect(run({ method }).ok).toBe(true);
   });
 
+  it('cannot be dodged with an encoded, doubled-slash or trailing-slash path', () => {
+    for (const pathname of ['/api/auth/%70asskey/login/options', '/api//auth/password/reset', '/api/auth/password/reset/', '/api/auth/%70assword/forgot']) {
+      expect(run({ pathname, secFetchSite: 'cross-site' }).ok).toBe(false);
+    }
+  });
+
   it('ignores non-api paths', () => {
     expect(run({ pathname: '/dashboard' }).ok).toBe(true);
+  });
+
+  it('checks passkey and password routes but leaves NextAuth alone', () => {
+    for (const pathname of ['/api/auth/password/forgot', '/api/auth/password/reset', '/api/auth/passkey/login']) {
+      expect(run({ pathname, secFetchSite: 'cross-site' }).ok).toBe(false);
+      expect(run({ pathname, secFetchSite: 'same-origin' }).ok).toBe(true);
+    }
+    expect(run({ pathname: '/api/auth/callback/credentials', secFetchSite: 'cross-site' }).ok).toBe(true);
   });
 
   it('leaves /api/auth/** to NextAuth', () => {

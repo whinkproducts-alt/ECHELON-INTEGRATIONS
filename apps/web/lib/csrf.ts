@@ -2,7 +2,7 @@
  * CSRF guard for state-changing API calls. Pure and edge-safe (no Node imports) so the
  * middleware can use it and tests can call it directly.
  *
- * Rules for POST, PUT, PATCH, DELETE on /api/** (NextAuth's own /api/auth/** is left to NextAuth):
+ * Rules for POST, PUT, PATCH, DELETE on /api/** (NextAuth's own catch-all under /api/auth is left to NextAuth; /api/auth/passkey and /api/auth/password are checked):
  * 1. Sec-Fetch-Site present: must be exactly "same-origin" (not "none", "same-site", "cross-site").
  * 2. Else Origin present: must equal one of the app's own origins.
  * 3. Else (neither header): rejected. Every legitimate browser fetch sends at least one.
@@ -40,9 +40,14 @@ function originOf(url: string | null): string | null {
 export function checkCsrf(input: CsrfInput): CsrfResult {
   const method = input.method.toUpperCase();
   if (!STATE_CHANGING_METHODS.has(method)) return { ok: true };
-  const p = input.pathname;
+  // Match on the decoded, normalised path so an encoded segment cannot dodge the checks below.
+  let p = input.pathname;
+  try { p = decodeURIComponent(p); } catch { /* an undecodable path is checked as written, which is the stricter side */ }
+  p = p.replace(/\/{2,}/g, '/');
   if (p !== '/api' && !p.startsWith('/api/')) return { ok: true };
-  if (p === '/api/auth' || p.startsWith('/api/auth/')) return { ok: true };
+  // Only NextAuth's own catch-all is left to NextAuth (it has its own CSRF token). Our passkey and
+  // password routes are plain fetches from our pages, which always send Sec-Fetch-Site or Origin.
+  if ((p === '/api/auth' || p.startsWith('/api/auth/')) && !p.startsWith('/api/auth/passkey') && !p.startsWith('/api/auth/password')) return { ok: true };
 
   if (input.secFetchSite !== null) {
     return input.secFetchSite.toLowerCase() === 'same-origin'

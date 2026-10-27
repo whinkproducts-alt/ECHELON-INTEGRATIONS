@@ -1,0 +1,8 @@
+# Security-critical paths need review from the owner.
+# Enforced only when branch protection "Require review from Code Owners" is switched on in GitHub.
+/apps/web/lib/permission-engine.ts   @whinkproducts-alt
+/apps/web/lib/ledger.ts              @whinkproducts-alt
+/apps/web/lib/key-encryption.ts      @whinkproducts-alt
+/apps/web/prisma/                    @whinkproducts-alt
+/.github/                            @whinkproducts-alt
+/services/                           @whinkproducts-alt

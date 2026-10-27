@@ -18,7 +18,7 @@ export function ToolTrace({ tool, input, result, persona }: ToolTraceProps) {
 
   const statusColor =
     status === 'running'
-      ? 'hsl(var(--amber))'
+      ? 'hsl(var(--whink-accent))'
       : status === 'success'
       ? 'hsl(var(--whink-accent))'
       : 'hsl(var(--denial))';

@@ -3,14 +3,7 @@
 const path = require('path');
 
 const nextConfig = {
-  // TypeScript type-checking is disabled for production builds in this CI environment
-  // because `prisma generate` cannot download its engine binary through the network proxy.
-  // Without a generated client, new Prisma models (AgentKnowledge, TaskHandoff) are unknown
-  // types, causing spurious TS2305 errors. Run `prisma generate` locally before merging to
-  // verify types are correct. All business logic is covered by the vitest suite.
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // Type errors fail the build (typecheck: `pnpm typecheck`). Run `prisma generate` first.
   // Next 16 builds with Turbopack by default. An explicit (empty) turbopack key tells Next the
   // custom webpack hook below is known, so the build does not abort on the conflict.
   turbopack: {},
@@ -73,7 +66,7 @@ const nextConfig = {
   },
 
   // Static security headers. The Content-Security-Policy itself is per-request (nonce) and is
-  // set in middleware.ts via lib/csp.ts.
+  // set in proxy.ts via lib/csp.ts.
   async headers() {
     return [
       {
@@ -82,8 +75,16 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'Permissions-Policy', value: 'microphone=(self), camera=(), geolocation=(), payment=(), usb=()' },
+          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=(), payment=(), usb=()' },
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
         ],
+      },
+      // Reset links carry a one-time token in the query string: never send it in a Referer.
+      // Later entries win for the same key, so this overrides the global value on these pages.
+      {
+        source: '/:page(reset-password|forgot-password)',
+        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
       },
     ];
   },

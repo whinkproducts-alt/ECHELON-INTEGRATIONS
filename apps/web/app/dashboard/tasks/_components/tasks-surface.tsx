@@ -85,7 +85,7 @@ export function TasksSurface() {
               </div>
               <span className={`text-xs px-2 py-0.5 rounded font-mono ${
                 task.priority === 'HIGH' || task.priority === 'URGENT' ? 'bg-destructive/10 text-destructive' :
-                task.priority === 'MEDIUM' ? 'bg-amber-400/10 text-amber-400' :
+                task.priority === 'MEDIUM' ? 'bg-muted/50 text-muted-foreground' :
                 'bg-secondary text-muted-foreground'
               }`}>{task.priority}</span>
             </div>

@@ -9,7 +9,7 @@
  * - The redirect URI is built server-side and must be on the allow-list.
  */
 
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { recordActionSafe } from '@/lib/ledger';
@@ -168,15 +168,17 @@ export type CallbackErrorCode =
 
 export type CallbackResult = { ok: true } | { ok: false; error: CallbackErrorCode };
 
-async function fail(userId: string, platform: SocialPlatform, error: CallbackErrorCode): Promise<CallbackResult> {
+async function fail(userId: string, platform: SocialPlatform, error: CallbackErrorCode, correlationId?: string): Promise<CallbackResult> {
   await recordActionSafe({
     userId,
     initiator: 'user',
+    persona: 'WHINK',
     action: 'social_connect_failed',
     tool: `social:${platform}`,
     permissionClass: 'A',
     status: 'FAILED',
     outputSummary: error,
+    correlationId: correlationId ?? randomUUID(),
   });
   return { ok: false, error };
 }
@@ -187,8 +189,9 @@ export async function completeCallback(
   params: { code?: string | null; state?: string | null; error?: string | null },
 ): Promise<CallbackResult> {
   if (!userId) throw new Error('social: userId is required');
+  const correlationId = randomUUID();
   const { code, state } = params;
-  if (!state || state.length > 200) return fail(userId, platform, 'missing_params');
+  if (!state || state.length > 200) return fail(userId, platform, 'missing_params', correlationId);
 
   // Single atomic claim: bound to this user and platform, unused, unexpired. Exactly one caller wins.
   const stateHash = hashState(state);
@@ -197,23 +200,23 @@ export async function completeCallback(
     where: { stateHash, userId, platform, usedAt: null, expiresAt: { gt: now } },
     data: { usedAt: now },
   });
-  if (claimed.count !== 1) return fail(userId, platform, 'invalid_state');
+  if (claimed.count !== 1) return fail(userId, platform, 'invalid_state', correlationId);
   const row = await prisma.oAuthState.findFirst({ where: { stateHash, userId, platform } });
-  if (!row) return fail(userId, platform, 'invalid_state');
+  if (!row) return fail(userId, platform, 'invalid_state', correlationId);
   // Single use is already enforced by the claim above. Drop the row now so the encrypted PKCE
   // verifier does not outlive the one callback that needs it (row is held in memory).
   await prisma.oAuthState.deleteMany({ where: { id: row.id, userId } });
 
-  if (params.error) return fail(userId, platform, 'denied');
-  if (!code || code.length > 2000) return fail(userId, platform, 'missing_params');
+  if (params.error) return fail(userId, platform, 'denied', correlationId);
+  if (!code || code.length > 2000) return fail(userId, platform, 'missing_params', correlationId);
 
   // The redirect URI must still be what the server would build now, and on the allow-list.
   const redirectUri = buildRedirectUri(platform);
   if (!redirectUri || redirectUri !== row.redirectUri || !isRedirectAllowed(redirectUri)) {
-    return fail(userId, platform, 'redirect_not_allowed');
+    return fail(userId, platform, 'redirect_not_allowed', correlationId);
   }
-  if (!clientCredentials(platform)) return fail(userId, platform, 'platform_not_configured');
-  if (!isEncryptionConfigured()) return fail(userId, platform, 'storage_failed');
+  if (!clientCredentials(platform)) return fail(userId, platform, 'platform_not_configured', correlationId);
+  if (!isEncryptionConfigured()) return fail(userId, platform, 'storage_failed', correlationId);
 
   let tokens: TokenSet;
   try {
@@ -257,17 +260,19 @@ export async function completeCallback(
     }
   } catch {
     logger.error('social connection store failed', { userId, platform });
-    return fail(userId, platform, 'storage_failed');
+    return fail(userId, platform, 'storage_failed', correlationId);
   }
 
   await recordActionSafe({
     userId,
     initiator: 'user',
+    persona: 'WHINK',
     action: 'social_connected',
     tool: `social:${platform}`,
     permissionClass: 'A',
     status: 'VALIDATED',
     outputSummary: `connected ${platform}${identity.handle ? ` as @${identity.handle}` : ''}`,
+    correlationId,
   });
   return { ok: true };
 }

@@ -122,8 +122,7 @@ describe('searchMemory — hybrid RRF merge', () => {
     expect(episodes).toHaveLength(1);
     expect(episodes[0].id).toBe('e-like');
 
-    // Raw SQL should NOT have been called (no embedding available)
-    expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
+    // Raw SQL may be called for the full-text path (3a A10 fallback chain) before reaching findMany
   });
 
   it('scopes results to the given userId (tenant isolation)', async () => {

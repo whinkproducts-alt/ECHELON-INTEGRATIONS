@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { ShieldAlert, Check, X, Mic, Volume2 } from 'lucide-react';
+import { HoloBadge } from '@/components/ui/holo';
 import { useDecisionListener } from '@/lib/hooks/useDecisionListener';
 import {
   type ApprovalView, type CardState, formatParams, isTerminal, secondsRemaining,
@@ -12,9 +13,8 @@ interface ApprovalCardProps {
   state: CardState;
   /** Called every second with seconds left so the owner can expire the card. */
   onTick: (secondsLeft: number) => void;
-  onDecide: (decision: 'approve' | 'deny') => void;
-  /** 4-digit confirmation code, generated client-side. Never sent to the server or the model. */
-  code: string;
+  /** A spoken approve passes the server's confirmation code as `voice`; card clicks and deny pass nothing. */
+  onDecide: (decision: 'approve' | 'deny', voice?: { code: string }) => void;
   /** Layout override. Defaults to the inline conversation layout. */
   className?: string;
   /** Dock mode: the voice controls start collapsed. The exact content is always shown. */
@@ -30,7 +30,7 @@ function statusLabel(state: CardState): { text: string; color: string } | null {
     case 'executed': return { text: `Executed${state.detail ? `: ${state.detail}` : ''}`, color: ACCENT };
     case 'denied': return { text: 'Denied. Nothing ran.', color: DENIAL };
     case 'already_decided': return { text: 'Already decided. Nothing ran from this card.', color: 'hsl(var(--muted-foreground))' };
-    case 'failed': return { text: `Failed${state.detail ? `: ${state.detail}` : ''}`, color: DENIAL };
+    case 'failed': return { text: `Failed${state.detail ? `: ${state.detail}` : ''}`, color: 'hsl(var(--destructive))' };
     case 'expired': return { text: 'Expired — nothing ran', color: 'hsl(var(--muted-foreground))' };
     default: return null;
   }
@@ -61,7 +61,7 @@ async function ttsReadAloud(text: string) {
   }
 }
 
-export function ApprovalCard({ approval, state, onTick, onDecide, code, className, compact = false }: ApprovalCardProps) {
+export function ApprovalCard({ approval, state, onTick, onDecide, className, compact = false }: ApprovalCardProps) {
   // null until the first tick: Date.now() in a state initializer breaks SSR hydration (eslint.ssr.config.mjs).
   const [now, setNow] = useState<number | null>(null);
   const terminal = isTerminal(state.phase);
@@ -86,7 +86,13 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code, classNam
   const busy = state.phase === 'submitting';
   const disabled = busy || terminal;
   const status = statusLabel(state);
-  const voice = useDecisionListener({ code, onDecision: onDecide, disabled });
+  // Server-derived only. Null when the server has no 16+ char secret: voice approval is then unavailable.
+  const code = approval.confirmationCode ?? null;
+  const onSpoken = useCallback((d: 'approve' | 'deny') => {
+    if (d === 'approve' && code) onDecide('approve', { code });
+    else if (d === 'deny') onDecide('deny');
+  }, [code, onDecide]);
+  const voice = useDecisionListener({ code: code ?? '', onDecision: onSpoken, disabled: disabled || !code });
   const title = approval.tool ?? (approval.kind === 'ear' ? 'external action request' : 'action');
 
   return (
@@ -140,6 +146,15 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code, classNam
         </div>
       )}
 
+      {approval.protected && (
+        <div className="space-y-1" data-testid="protected-approval">
+          <HoloBadge tone="amber">
+            {approval.category === 'money' ? 'Protected: money' : 'Protected: proprietary information'}
+          </HoloBadge>
+          <p className="text-xs text-muted-foreground">Needs your approval every time. It cannot be delegated.</p>
+        </div>
+      )}
+
       <p className="text-sm text-foreground whitespace-pre-wrap break-words">{approval.summary}</p>
 
       <div>
@@ -159,12 +174,16 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code, classNam
         </p>
       )}
       {state.requestError && !terminal && (
-        <p className="text-xs font-mono" style={{ color: DENIAL }} role="alert">
+        <p className="text-xs font-mono" style={{ color: 'hsl(var(--destructive))' }} role="alert">
           {state.requestError}. Nothing was decided; you can try again.
         </p>
       )}
 
-      {!terminal && (
+      {!terminal && !code && (
+        <p className="text-xs text-muted-foreground">Voice approval is unavailable. Use the Approve button.</p>
+      )}
+
+      {!terminal && code && (
         <details open={!compact} className="space-y-1.5 rounded-md border border-border p-2">
           <summary className={compact ? 'cursor-pointer text-xs text-muted-foreground' : 'hidden'}>Voice approval</summary>
           <p className="text-xs text-muted-foreground">
@@ -219,7 +238,7 @@ export function ApprovalCard({ approval, state, onTick, onDecide, code, classNam
           disabled={disabled}
           aria-label={`Approve ${title}`}
           className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-opacity disabled:opacity-40"
-          style={{ color: AMBER, borderColor: AMBER }}
+          style={{ color: ACCENT, borderColor: ACCENT }}
         >
           <Check className="h-3 w-3" aria-hidden /> Approve
         </button>

@@ -207,6 +207,7 @@ describe('POST /api/persona/switch — A3 MAMBA Obsidian-only', () => {
       const actual = await vi.importActual<typeof import('../types')>('../types');
       return actual;
     });
+    vi.doMock('@/lib/ledger', () => ({ recordActionSafe: vi.fn().mockResolvedValue({ id: 'led1' }) }));
   });
 
   it('accepts mambaMode: OBSIDIAN', async () => {
@@ -247,5 +248,24 @@ describe('POST /api/persona/switch — A3 MAMBA Obsidian-only', () => {
     const { POST } = await import('../../app/api/persona/switch/route');
     await POST(req({ persona: 'MAMBA', mambaMode: 'WHITE' }));
     expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('E3 Gap 2: successful persona switch ledgers action=persona_switch with correct fields', async () => {
+    // The persona switch route MUST call recordActionSafe with action='persona_switch',
+    // the correct userId, persona='MAMBA', and mambaMode='OBSIDIAN' on a successful switch.
+    // If this test fails, the builder must add the ledger call to apps/web/app/api/persona/switch/route.ts.
+    const recordActionSafe = vi.fn().mockResolvedValue({ id: 'led1' });
+    vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
+    const { POST } = await import('../../app/api/persona/switch/route');
+    const res = await POST(req({ persona: 'MAMBA', mambaMode: 'OBSIDIAN' }));
+    expect(res.status).toBe(200);
+    expect(recordActionSafe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'u1',
+        action: 'persona_switch',
+        persona: 'MAMBA',
+        mambaMode: 'OBSIDIAN',
+      })
+    );
   });
 });

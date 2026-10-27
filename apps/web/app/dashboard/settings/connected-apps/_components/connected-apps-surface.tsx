@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, Link2, ShieldCheck, AlertTriangle, CheckCircle, Loader2, Clock } from 'lucide-react';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import {
-  PLATFORM_LABELS, PLATFORM_NOTES, SOCIAL_PLATFORMS, parseConnections, statusLabel,
+  SOCIAL_PLATFORMS, parseConnections, statusLabel,
   connectButtonLabel, interpretConnectResponse, errorMessage, consentText, DAILY_LIMITS_NOTE,
   type SocialConnectionView, type SocialPlatform, type CallbackNotice,
 } from '@/lib/social-ui';
@@ -92,7 +92,7 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
       .then((r) => {
         if (!r.ok) throw new Error('disconnect_failed');
         setConfirming(null);
-        setNotice({ kind: 'connected', text: `${PLATFORM_LABELS[platform]} disconnected.` });
+        setNotice({ kind: 'connected', text: `${config.platformLabels[platform]} disconnected.` });
         return load();
       })
       .catch(() => setNotice({ kind: 'error', text: errorMessage('server_error') }))
@@ -128,7 +128,7 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
           role={notice.kind === 'error' ? 'alert' : 'status'}
           className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${
             notice.kind === 'error'
-              ? 'border-[hsl(var(--denial))] text-[hsl(var(--denial))]'
+              ? 'border-[hsl(var(--destructive))] text-[hsl(var(--destructive))]'
               : 'border-border text-foreground bg-card'
           }`}
         >
@@ -168,8 +168,8 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
       )}
 
       {state === 'error' && (
-        <div role="alert" className="bg-card border border-[hsl(var(--denial))] rounded-lg p-5 space-y-3">
-          <p className="text-sm text-[hsl(var(--denial))]">Error: could not load your connected apps.</p>
+        <div role="alert" className="bg-card border border-[hsl(var(--destructive))] rounded-lg p-5 space-y-3">
+          <p className="text-sm text-[hsl(var(--destructive))]">Error: could not load your connected apps.</p>
           <button
             onClick={() => {
               setState('loading');
@@ -193,12 +193,12 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="space-y-1">
                     <h2 className="text-sm font-medium flex items-center gap-2">
-                      <Link2 className="h-4 w-4" /> {PLATFORM_LABELS[row.platform]}
+                      <Link2 className="h-4 w-4" /> {config.platformLabels[row.platform]}
                     </h2>
                     <span
                       className={`inline-block text-xs font-mono font-medium px-2 py-0.5 rounded border ${
                         row.status === 'expired'
-                          ? 'border-[hsl(var(--denial))] text-[hsl(var(--denial))]'
+                          ? 'border-border text-muted-foreground'
                           : row.status === 'connected'
                             ? 'border-[var(--tenant-accent,hsl(var(--whink-accent)))] text-[var(--tenant-accent,hsl(var(--whink-accent)))]'
                             : 'border-border text-muted-foreground'
@@ -236,10 +236,10 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
                 {row.status !== 'connected' && consenting === row.platform && (
                   <div
                     role="group"
-                    aria-label={`Consent to connect ${PLATFORM_LABELS[row.platform]}`}
+                    aria-label={`Consent to connect ${config.platformLabels[row.platform]}`}
                     className="border border-border rounded-md p-3 space-y-3"
                   >
-                    <p className="text-sm font-medium">What connecting {PLATFORM_LABELS[row.platform]} allows</p>
+                    <p className="text-sm font-medium">What connecting {config.platformLabels[row.platform]} allows</p>
                     {consentText(row.platform, productName).map((t) => (
                       <p key={t} className="text-sm text-muted-foreground">{t}</p>
                     ))}
@@ -276,15 +276,15 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
                 )}
 
                 {connected && confirming === row.platform && (
-                  <div role="alertdialog" aria-label={`Confirm disconnect ${PLATFORM_LABELS[row.platform]}`} className="flex items-center justify-between gap-3 flex-wrap border border-[hsl(var(--denial))] rounded-md p-3">
+                  <div role="alertdialog" aria-label={`Confirm disconnect ${config.platformLabels[row.platform]}`} className="flex items-center justify-between gap-3 flex-wrap border border-border rounded-md p-3">
                     <p className="text-sm">
-                      Disconnect {PLATFORM_LABELS[row.platform]}? Stored access is deleted and this is logged.
+                      Disconnect {config.platformLabels[row.platform]}? Stored access is deleted and this is logged.
                     </p>
                     <div className="flex gap-2">
                       <button
                         onClick={() => disconnect(row.platform)}
                         disabled={busy !== null}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[hsl(var(--denial))] text-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
                       >
                         {isBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                         Confirm disconnect
@@ -317,7 +317,7 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
                   </dl>
                 )}
 
-                {PLATFORM_NOTES[row.platform].map((n) => (
+                {config.platformNotes[row.platform].map((n) => (
                   <p key={n} className="text-xs text-muted-foreground">{n}</p>
                 ))}
               </li>

@@ -31,6 +31,8 @@ describe('tool loop taint (M3)', () => {
     vi.doMock('@/lib/tool-registry', () => ({ executeTool }));
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe: vi.fn() }));
     vi.spyOn(globalThis, 'fetch')
+      // M-2: memory_read is now an external tool. After its result is processed, tainted flips to true,
+      // so openclaw__x__read_dms and memory_write receive tainted:true in the same iteration.
       .mockResolvedValueOnce(jsonRes({ choices: [{ finish_reason: 'tool_calls', message: { content: null, tool_calls: [call('1', 'memory_read'), call('2', 'openclaw__x__read_dms'), call('3', 'memory_write')] } }] }))
       .mockResolvedValueOnce(jsonRes({ choices: [{ finish_reason: 'tool_calls', message: { content: null, tool_calls: [call('4', 'web_fetch')] } }] }))
       .mockResolvedValueOnce(jsonRes({ choices: [{ finish_reason: 'stop', message: { content: 'done' } }] }));
@@ -38,19 +40,20 @@ describe('tool loop taint (M3)', () => {
     await drain(await runToolLoop({ messages: [{ role: 'user', content: 'hi' }], tools: TOOLS, userId: 'u1', model: 'llama3.1:8b', correlationId: 'c' }));
     const taintedByCall = executeTool.mock.calls.map((c) => [c[1], (c[6] as { tainted: boolean }).tainted]);
     expect(taintedByCall).toEqual([
-      ['memory_read', false],
-      ['openclaw__x__read_dms', false],
+      ['memory_read', false],      // memory_read itself is called before its result taints the run
+      ['openclaw__x__read_dms', true], // memory_read result already processed → tainted
       ['memory_write', true],
       ['web_fetch', true],
     ]);
   });
 
-  it('a run with no external tool never taints', async () => {
+  it('a run with only non-external tools never taints', async () => {
     const executeTool = vi.fn().mockResolvedValue(ok({ hits: 1 }));
     vi.doMock('@/lib/tool-registry', () => ({ executeTool }));
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe: vi.fn() }));
     vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(jsonRes({ choices: [{ finish_reason: 'tool_calls', message: { content: null, tool_calls: [call('1', 'memory_read'), call('2', 'memory_write')] } }] }))
+      // memory_write is not an external tool, so tainted stays false throughout.
+      .mockResolvedValueOnce(jsonRes({ choices: [{ finish_reason: 'tool_calls', message: { content: null, tool_calls: [call('1', 'memory_write')] } }] }))
       .mockResolvedValueOnce(jsonRes({ choices: [{ finish_reason: 'stop', message: { content: 'done' } }] }));
     const { runToolLoop } = await import('../tool-loop');
     await drain(await runToolLoop({ messages: [{ role: 'user', content: 'hi' }], tools: TOOLS, userId: 'u1', model: 'llama3.1:8b', correlationId: 'c' }));

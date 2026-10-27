@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { BillingSurface } from '../billing/_components/billing-surface';
 import { AutonomyApprovalPanel } from './autonomy-approval-panel';
+import { PasskeysPanel } from './passkeys-panel';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import {
   interpretPatchResponse, pickPendingAutonomy, resolveDecision, type AutonomyApproval,
@@ -277,7 +278,7 @@ export function SettingsSurface() {
                 <p
                   id="autonomy-notice"
                   role={resolution.tone === 'error' ? 'alert' : 'status'}
-                  className={`mt-2 text-xs font-mono ${resolution.tone === 'error' ? 'text-[hsl(var(--denial))]' : 'text-foreground'}`}
+                  className={`mt-2 text-xs font-mono ${resolution.tone === 'error' ? 'text-[hsl(var(--destructive))]' : 'text-foreground'}`}
                 >
                   {resolution.tone === 'error' ? 'Error: ' : ''}{resolution.message}
                 </p>
@@ -339,6 +340,7 @@ export function SettingsSurface() {
           <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50">
             <Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Settings'}
           </button>
+          <PasskeysPanel />
         </>
       )}
 
@@ -427,7 +429,7 @@ function ApiKeysSurface() {
             <label className="text-sm font-medium text-muted-foreground">Anthropic (Claude)</label>
             {storedKey('anthropic') && (
               <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 text-xs text-green-500 font-mono">
+                <span className="flex items-center gap-1 text-xs text-[hsl(var(--whink-accent))] font-mono">
                   <CheckCircle className="h-3 w-3" />
                   ····{storedKey('anthropic')!.keyHint}
                 </span>
@@ -474,7 +476,7 @@ function ApiKeysSurface() {
             <label className="text-sm font-medium text-muted-foreground">OpenAI (GPT / o-series)</label>
             {storedKey('openai') && (
               <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 text-xs text-green-500 font-mono">
+                <span className="flex items-center gap-1 text-xs text-[hsl(var(--whink-accent))] font-mono">
                   <CheckCircle className="h-3 w-3" />
                   ····{storedKey('openai')!.keyHint}
                 </span>

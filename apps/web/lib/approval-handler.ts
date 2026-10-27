@@ -22,9 +22,18 @@ const APPROVAL_PATTERNS: RegExp[] = [
   /^(yes|yep|yeah),?\s*go\.?$/i,
 ];
 
+/** "Approve all", "always approve", "approve everything": blanket or standing approvals do not exist. */
+const BULK_APPROVAL_PATTERNS: RegExp[] = [
+  /^(please\s+)?(approve|approved|authori[sz]e|authori[sz]ed)\s+(all|both|everything|every request|them all|all of them|all requests|all pending)\b/i,
+  /^(yes|yep|yeah|ok|okay|sure)[\s,]+(to\s+)?(all|both|everything|them all)\s*[.!]?$/i,
+  /^(always|auto|automatically)[\s-]+(approve|authori[sz]e)\b/i,
+  /^(approve|authori[sz]e)\b.{0,20}\b(from now on|going forward|in future|every time)\b/i,
+];
+
 /** Detection only. A match approves nothing. */
 export function isApprovalMessage(message: string): boolean {
-  return APPROVAL_PATTERNS.some((re) => re.test(message.trim()));
+  const m = message.trim();
+  return APPROVAL_PATTERNS.some((re) => re.test(m)) || (BULK_APPROVAL_PATTERNS.some((re) => re.test(m)));
 }
 
 export const BARE_APPROVAL_REPLY =

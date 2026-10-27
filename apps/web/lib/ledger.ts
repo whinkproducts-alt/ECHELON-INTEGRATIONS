@@ -8,12 +8,14 @@
 
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { classifyProtected, type ProtectedCategory } from '@/lib/protected-actions';
 
 export const SUMMARY_CAP = 2000;
 
 export type LedgerStatus =
   | 'SUBMITTED'
   | 'VALIDATED'
+  | 'EXECUTED'
   | 'FAILED'
   | 'UNVERIFIED'
   | 'AWAITING_APPROVAL'
@@ -34,6 +36,14 @@ export interface LedgerEntry {
   latencyMs?: number | null;
   confirmationMethod?: string | null;
   validationResult?: string | null;
+  /** Category of a protected action (money or proprietary) judged by the caller, who may know the parameters. */
+  protectedCategory?: ProtectedCategory;
+}
+
+/** Convenience alias used in API routes. metadata is serialised to inputSummary. */
+export interface WriteLedgerEntry extends Omit<LedgerEntry, 'inputSummary'> {
+  metadata?: Record<string, unknown> | null;
+  inputSummary?: string | null;
 }
 
 export interface LedgerPatch {
@@ -51,6 +61,30 @@ function cap(v: string | null | undefined): string | null | undefined {
 }
 
 /** Awaitable write. Throws on failure. Returns the new row id. */
+/**
+ * Every row for a protected action carries `protected` and `category` in validationResult, whoever
+ * writes it. The caller may pass the category (it knows the parameters); otherwise it is judged on
+ * the tool name. Existing validationResult text is kept.
+ */
+function withProtectedMeta(entry: LedgerEntry): string | undefined {
+  let category = entry.protectedCategory;
+  if (!category && entry.tool) {
+    const c = classifyProtected({ toolName: entry.tool, capability: entry.tool });
+    if (c.protected) category = c.category;
+  }
+  if (!category) return entry.validationResult ?? undefined;
+  let base: Record<string, unknown> = {};
+  if (entry.validationResult) {
+    try {
+      const parsed: unknown = JSON.parse(entry.validationResult);
+      base = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : { detail: entry.validationResult };
+    } catch {
+      base = { detail: entry.validationResult };
+    }
+  }
+  return JSON.stringify({ ...base, protected: true, category });
+}
+
 export async function recordAction(entry: LedgerEntry): Promise<{ id: string }> {
   if (!entry.userId) throw new Error('ledger: userId is required');
   const row = await prisma.action.create({
@@ -66,7 +100,7 @@ export async function recordAction(entry: LedgerEntry): Promise<{ id: string }> 
       status: entry.status,
       inputSummary: cap(entry.inputSummary) ?? undefined,
       outputSummary: cap(entry.outputSummary) ?? undefined,
-      validationResult: entry.validationResult ?? undefined,
+      validationResult: withProtectedMeta(entry),
       correlationId: entry.correlationId ?? undefined,
       latencyMs: entry.latencyMs ?? undefined,
     },
@@ -110,6 +144,17 @@ export async function updateActionStatus(
 }
 
 /**
+ * Convenience write used by API routes. Serialises metadata into inputSummary.
+ * Falls back to recordActionSafe (never throws).
+ */
+export async function writeLedger(entry: WriteLedgerEntry): Promise<{ id: string } | null> {
+  const { metadata, ...rest } = entry;
+  const inputSummary =
+    rest.inputSummary ?? (metadata ? JSON.stringify(metadata) : undefined) ?? null;
+  return recordActionSafe({ ...rest, inputSummary });
+}
+
+/**
  * Count this user's ledger rows for the given tools since a time, optionally until a time.
  * Read-only and scoped by userId. Used for daily caps; never returns row content.
  */
@@ -147,4 +192,20 @@ export async function countByCorrelation(
   return prisma.action.count({
     where: { userId, tool, correlationId, status: { in: statuses } },
   });
+}
+
+/**
+ * Count this user's security-event ledger rows since a time, grouped by event name.
+ * Read-only, scoped by userId, returns names and counts only (never row content).
+ */
+export async function countSecurityEvents(userId: string, since: Date): Promise<Record<string, number>> {
+  if (!userId) throw new Error('ledger: userId is required');
+  const rows = await prisma.action.groupBy({
+    by: ['action'],
+    where: { userId, action: { startsWith: 'SECURITY_EVENT:' }, createdAt: { gte: since } },
+    _count: { _all: true },
+  });
+  const out: Record<string, number> = {};
+  for (const r of rows) out[r.action.replace(/^SECURITY_EVENT:\s*/, '')] = r._count._all;
+  return out;
 }

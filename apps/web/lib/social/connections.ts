@@ -4,6 +4,7 @@
  * never returned by any list or status function.
  */
 
+import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { recordActionSafe } from '@/lib/ledger';
@@ -73,11 +74,13 @@ async function markExpired(userId: string, platform: SocialPlatform): Promise<vo
     await recordActionSafe({
       userId,
       initiator: 'system',
+      persona: 'WHINK',
       action: 'social_connection_expired',
       tool: `social:${platform}`,
       permissionClass: 'A',
       status: 'FAILED',
       outputSummary: 'Token expired and could not be refreshed',
+      correlationId: randomUUID(),
     });
   }
 }
@@ -202,11 +205,13 @@ export async function disconnect(userId: string, platform: SocialPlatform): Prom
   await recordActionSafe({
     userId,
     initiator: 'user',
+    persona: 'WHINK',
     action: 'social_disconnected',
     tool: `social:${platform}`,
     permissionClass: 'A',
     status: 'VALIDATED',
     outputSummary: `disconnected ${platform}; ${res.count} connection(s) removed, ${removedScheduled} scheduled post(s) deleted`,
+    correlationId: randomUUID(),
   });
   return { deleted: res.count > 0 };
 }

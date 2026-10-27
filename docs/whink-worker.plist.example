@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- EXAMPLE ONLY. Copy to ~/Library/LaunchAgents/com.whink.worker.plist, edit the paths, then
+     `launchctl load ~/Library/LaunchAgents/com.whink.worker.plist`. Nothing in this repo installs or runs it.
+     Secrets stay in apps/web/.env (loaded by the worker with dotenv); do not put them in this file. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.whink.worker</string>
+  <key>WorkingDirectory</key><string>/Users/victor/KAMSI-PRIME/apps/web</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/pnpm</string>
+    <string>worker</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>WORKER_ENABLED</key><string>true</string>
+    <key>WORKER_CONCURRENCY</key><string>3</string>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>ExitTimeOut</key><integer>40</integer>
+  <key>StandardOutPath</key><string>/Users/victor/Library/Logs/whink-worker.log</string>
+  <key>StandardErrorPath</key><string>/Users/victor/Library/Logs/whink-worker.err.log</string>
+</dict>
+</plist>

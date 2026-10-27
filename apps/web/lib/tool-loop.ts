@@ -14,11 +14,13 @@
 import { executeTool } from '@/lib/tool-registry';
 import { wrapUntrustedContent, stripFakeUntrustedTags, scanForInjectionPatterns, filterToolResult } from '@/lib/content-isolation';
 import { recordActionSafe } from '@/lib/ledger';
-import { chatWithTools, ToolsUnsupportedError, redactForLog, type NeutralMessage } from '@/lib/model-router-tools';
+import { chatWithTools, ToolsUnsupportedError, redactForLog, providerFor, type NeutralMessage } from '@/lib/model-router-tools';
+import { recordUsage } from '@/lib/usage';
+import { applyOfflineFallback } from '@/lib/offline';
 import { logger } from '@/lib/logger';
 import { streamChat } from '@/lib/model-router';
 
-const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search', 'document_search']);
+const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search', 'document_search', 'memory_read', 'calendar_list']);
 export const isExternalTool = (name: string) => EXTERNAL_TOOLS.has(name) || name.startsWith('openclaw__');
 
 export interface ToolDefinition {
@@ -44,17 +46,32 @@ export interface ToolLoopOptions {
    * Class C for the entire run, matching the within-turn taint behaviour.
    */
   conversationTainted?: boolean;
+  /**
+   * External content (recalled document chunks) is already in the prompt, so the run is tainted from
+   * the first tool call: Class B and outbound tools need a human, and web_fetch is protected.
+   */
+  initialTaint?: boolean;
 }
 
 const MAX_TOOL_ITERATIONS = 5;
 export const MAX_TOOL_CALLS_PER_TURN = 8;
 
 export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream<Uint8Array>> {
-  const model = opts.model ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+  // Flag-guarded (WHINK_OFFLINE_FALLBACK=true): offline or over the hard budget, prefer the local model.
+  const fallback = await applyOfflineFallback({
+    userId: opts.userId,
+    model: opts.model ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b',
+    apiKey: opts.apiKey,
+    persona: opts.persona,
+    correlationId: opts.correlationId,
+  });
+  const model = fallback.model;
+  const apiKey = fallback.apiKey;
+  const baseUrl = fallback.baseUrl;
   const encoder = new TextEncoder();
 
   // Fail fast (before streaming starts) when the Anthropic key is missing, as before.
-  if (model.startsWith('claude') && !(opts.apiKey ?? process.env.ANTHROPIC_API_KEY)) {
+  if (model.startsWith('claude') && !(apiKey ?? process.env.ANTHROPIC_API_KEY)) {
     throw new Error('ANTHROPIC_API_KEY not set');
   }
 
@@ -75,7 +92,7 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
         // M1/M3: set once any external read result has entered this run, OR when the conversation
         // was pre-tainted by a prior injection-blocked turn. From then on Class B and
         // outbound/persisting tools need a human (see executeTool).
-        let tainted = opts.conversationTainted === true;
+        let tainted = opts.conversationTainted === true || opts.initialTaint === true;
 
         for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
           let response;
@@ -84,7 +101,8 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
               messages: history,
               model,
               tools: opts.tools,
-              apiKey: opts.apiKey,
+              apiKey,
+              baseUrl,
               maxTokens: opts.maxTokens,
             });
           } catch (err) {
@@ -103,7 +121,7 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
                 outputSummary: `model_does_not_support_tools: ${model}`,
                 latencyMs: 0,
               });
-              const plain = await streamChat({ messages: opts.messages, model, maxTokens: opts.maxTokens, apiKey: opts.apiKey });
+              const plain = await streamChat({ messages: opts.messages, model, maxTokens: opts.maxTokens, apiKey, baseUrl });
               const reader = plain.getReader();
               while (true) {
                 const { done, value } = await reader.read();
@@ -113,6 +131,11 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
               return;
             }
             throw err;
+          }
+
+          // Fire-and-forget usage record (never awaited, never throws).
+          if (response.usage) {
+            recordUsage({ userId: opts.userId, provider: providerFor(model), model, tokensIn: response.usage.tokensIn, tokensOut: response.usage.tokensOut, kind: 'tool_loop' });
           }
 
           if (response.text) send({ type: 'text', content: response.text });

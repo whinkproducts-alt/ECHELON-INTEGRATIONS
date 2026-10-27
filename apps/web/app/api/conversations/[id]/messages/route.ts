@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+import { isModelAllowed, isModelNameShape } from '@/lib/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
@@ -6,11 +7,9 @@ import { processInput, debriefTurn } from '@/lib/orchestrator';
 import { runToolLoop, STANDARD_TOOLS, isExternalTool } from '@/lib/tool-loop';
 import { logger, generateCorrelationId } from '@/lib/logger';
 import { runTaskGate } from '@/lib/task-gate';
-import { scanForInjectionPatterns } from '@/lib/content-isolation';
 import { isApprovalMessage, BARE_APPROVAL_REPLY } from '@/lib/approval-handler';
 import { createApproval } from '@/lib/approvals';
-import { writeMemory } from '@/lib/memory-engine';
-import { chatOnce } from '@/lib/model-router';
+import { extractAndStoreMemories } from '@/lib/auto-memory';
 import { decryptKey } from '@/lib/key-encryption';
 import { recordActionSafe } from '@/lib/ledger';
 import { resolveChatTools } from '@/lib/gateway-chat';
@@ -49,7 +48,7 @@ export async function POST(
     const body = await req.json();
     const userMessage = body?.message ?? '';
     const rawProjectId = body?.projectId ?? null;
-    const requestedModel = body?.model as string | undefined;
+    const requestedModel = isModelNameShape(body?.model) ? body.model : undefined;
 
     // Verify conversation ownership
     const conv = await prisma.conversation.findFirst({
@@ -124,12 +123,12 @@ export async function POST(
     // Handle persona switch announcement
     let switchAnnouncement = '';
     if (orchResult.personaSwitched) {
-      switchAnnouncement = orchResult.newPersona === 'MAMBA' ? 'MAMBA active.' : 'WHINK active.';
+      switchAnnouncement = orchResult.newPersona === 'MAMBA' ? 'MAMBA active.' : 'Assistant active.';
     }
 
     // Get conversation history for context — most recent 50, in chronological order
     const history = (await prisma.message.findMany({
-      where: { conversationId },
+      where: { conversationId, conversation: { userId: session.user.id } },
       orderBy: { createdAt: 'desc' },
       take: 50,
     })).reverse();
@@ -257,7 +256,8 @@ export async function POST(
 
     // Resolve model: request body > user preference > env default
     const userPrefs = await prisma.userPreference.findUnique({ where: { userId: session.user.id } });
-    const resolvedModel = requestedModel ?? userPrefs?.preferredModel ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+    const defaultModel = process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+    let resolvedModel = requestedModel ?? userPrefs?.preferredModel ?? defaultModel;
 
     // Load BYOK key for the resolved provider, if one is stored
     let byokApiKey: string | undefined;
@@ -272,6 +272,18 @@ export async function POST(
         if (storedKey) byokApiKey = decryptKey(storedKey.encryptedKey);
       }
     } catch { /* non-blocking — fall back to server key */ }
+
+    // A model the user asked for (or saved as a preference) is used only if it is on the operator's
+    // allow-list or the user pays for it with their own key. Otherwise use the operator's default.
+    if (resolvedModel !== defaultModel && !isModelAllowed(resolvedModel, { hasOwnKey: Boolean(byokApiKey) })) {
+      await recordActionSafe({
+        userId: session.user.id, initiator: 'user', persona: orchResult.newPersona ?? 'WHINK',
+        action: 'model_not_allowed', tool: 'model_policy', permissionClass: 'A', status: 'DENIED',
+        correlationId, inputSummary: `requested model ${String(resolvedModel).slice(0, 100)} is not on the allow-list; using the default`,
+      });
+      resolvedModel = defaultModel;
+      byokApiKey = undefined;
+    }
 
     // M1: Check if a prior injection-blocked turn left a taint flag for this conversation.
     let conversationTainted = false;
@@ -299,6 +311,7 @@ export async function POST(
         apiKey: byokApiKey,
         correlationId,
         conversationTainted,
+        initialTaint: orchResult.externalContentThisTurn === true,
       });
     } catch (err: any) {
       logger.error('Model router error', { correlationId, error: err?.message });
@@ -312,7 +325,7 @@ export async function POST(
     let memoryWriteCalledInLoop = false;
     let toolRanThisTurn = false;
     // M3: any external read this turn (web, documents, any gateway tool incl. social DMs and feeds).
-    let externalContentThisTurn = false;
+    let externalContentThisTurn = orchResult.externalContentThisTurn === true;
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -322,6 +335,12 @@ export async function POST(
           // Send switch announcement first if present
           if (switchAnnouncement) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', content: switchAnnouncement + '\n\n', persona: activePersona, mambaMode: activeMambaMode })}\n\n`));
+          }
+
+          // Emit citation events for document blended items (C10)
+          const docItems = (orchResult.blendedItems ?? []).filter((it: any) => it.type === 'document' && it.documentName);
+          for (const item of docItems) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'citation', documentName: item.documentName, page: item.page ?? null, chunkId: item.id ?? null, score: item.score ?? null })}\n\n`));
           }
 
           const reader = routerStream.getReader();
@@ -365,8 +384,17 @@ export async function POST(
             }
           }
 
+          // M1: If external content was read this turn, persist the taint flag so the next
+          // turn upgrades Class A/B tools to C, just as the injection-block path does.
+          // Awaited (not fire-and-forget) so the flag is durable before the response closes.
+          if (externalContentThisTurn) {
+            try {
+              await setWorkingMemory(session.user.id, taintKey(conversationId), Date.now().toString(), TAINT_TTL_SECONDS);
+            } catch { /* non-blocking — taint write failure is not fatal */ }
+          }
+
           // Save assistant message
-          await prisma.message.create({
+          const assistantMessage = await prisma.message.create({
             data: {
               conversationId,
               role: 'assistant',
@@ -377,69 +405,20 @@ export async function POST(
             },
           });
 
-          // Auto memory extraction (detached — does not block the response)
-          // Skipped when external content was read: the assistant text may restate it, and auto-saved
-          // memory from an injected page or DM would be a persistence channel for the attacker.
+          // B1 — Auto memory extraction (detached — does not block the response).
+          // Skipped when a tool wrote memory, a tool ran, or external content was read this turn.
           if (!memoryWriteCalledInLoop && !toolRanThisTurn && !externalContentThisTurn && fullContent.length > 100) {
-            const autoMemoryUserId = session.user.id;
-            const autoMemoryConvId = conversationId;
-            const autoMemoryContent = fullContent;
-            const autoMemoryUserMsg = userMessage;
-            void (async () => {
-              try {
-                const extractModel = process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
-
-                // Fetch 5 most recent semantic memories to help the model skip duplicates
-                const recentMemories = await prisma.memorySemantic.findMany({
-                  where: { userId: autoMemoryUserId, supersededBy: null },
-                  orderBy: { createdAt: 'desc' },
-                  take: 5,
-                  select: { statement: true },
-                });
-                const recentStatements = recentMemories.map((m) => `- ${m.statement}`).join('\n');
-                const dedupeHint = recentStatements
-                  ? `\n\nAlready stored (skip if similar):\n${recentStatements}`
-                  : '';
-
-                const extractPrompt = `You are a Memory Extraction Agent. Extract memories into these categories:
-- episodic: time-bound events with dates
-- semantic: timeless facts about Victor or his work
-- procedural: how-tos, preferences, standing instructions
-Return JSON array: [{ "type": "episodic"|"semantic"|"procedural", "statement": string, "confidence": number }]. Rules: one fact per memory, atomic, from Victor's perspective, normalize relative dates to absolute, return [] if nothing worth storing.${dedupeHint}
-
-User: ${autoMemoryUserMsg}
-Assistant: ${autoMemoryContent}`;
-
-                const result = await chatOnce({
-                  messages: [{ role: 'user', content: extractPrompt }],
-                  model: extractModel,
-                  maxTokens: 512,
-                  temperature: 0,
-                });
-                let items: Array<{ type: string; statement: string; confidence?: number }> = [];
-                try {
-                  const trimmed = result.trim().replace(/^```json\n?|```$/g, '').trim();
-                  items = JSON.parse(trimmed);
-                } catch { /* ignore parse error */ }
-                if (!Array.isArray(items)) return;
-                for (const item of items.slice(0, 3)) {
-                  if (!item || typeof item.statement !== 'string' || item.statement.length < 5) continue;
-                  // Scan each extracted fact before persisting
-                  const factScan = scanForInjectionPatterns(item.statement);
-                  if (factScan.suspicious) continue;
-                  const memType = ['episodic', 'procedural'].includes(item.type) ? item.type as 'episodic' | 'procedural' : 'semantic';
-                  await writeMemory({
-                    userId: autoMemoryUserId,
-                    type: memType,
-                    statement: item.statement,
-                    source: 'conversation',
-                    sourceId: autoMemoryConvId,
-                    confidence: typeof item.confidence === 'number' ? Math.min(Math.max(item.confidence, 0), 1) : 0.75,
-                    epistemicStatus: 'INFERRED',
-                  });
-                }
-              } catch { /* non-blocking — never surface */ }
-            })();
+            void extractAndStoreMemories({
+              userId: session.user.id,
+              conversationId,
+              messageId: assistantMessage.id,
+              userMessage,
+              assistantReply: fullContent,
+              persona: activePersona,
+              correlationId,
+              conversationTainted,
+              injectionBlocked: false,
+            }).catch(() => { /* detached — never surface */ });
           }
 
           // CAI auto-debrief (fire-and-forget)
