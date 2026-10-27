@@ -912,6 +912,7 @@ const MODEL_OPTIONS = [
   { value: 'claude-sonnet-4-5', label: 'Claude Sonnet', hint: 'Balanced' },
   { value: 'claude-opus-5-5', label: 'Claude Opus', hint: 'Advanced' },
   { value: 'gpt-4o', label: 'GPT-4o', hint: 'OpenAI' },
+  { value: 'wink-qwen3.5-9b-8k', label: 'Qwen 3.5 9B', hint: 'Local' },
   { value: 'llama3.1:8b', label: 'Llama 3.1 8B', hint: 'Local' },
 ];
 

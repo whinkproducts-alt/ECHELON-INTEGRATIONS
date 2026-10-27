@@ -129,7 +129,7 @@ export async function streamChat(opts: StreamChatOptions): Promise<ReadableStrea
     opts.model ??
     (opts.hints ? selectModel(opts.messages, opts.hints) : null) ??
     process.env.DEFAULT_MODEL ??
-    'llama3.1:8b';
+    'wink-qwen3.5-9b-8k';
   const maxTokens = opts.maxTokens ?? 4000;
   const temperature = opts.temperature ?? 0.7;
 

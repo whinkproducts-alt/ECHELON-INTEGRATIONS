@@ -127,7 +127,7 @@ model UserPreference {
   mambaPreference       String   @default("ON_REQUEST")
   defaultFunctionalMode String?
   executionProfile      String   @default("BALANCED")
-  preferredModel        String? // e.g. "claude-sonnet-4-5", "gpt-4o", "llama3.1:8b"
+  preferredModel        String? // e.g. "claude-sonnet-4-5", "gpt-4o", "wink-qwen3.5-9b-8k"
   monthlyTokenBudget    BigInt? // null = use tenant/env default; 0 = unlimited
   budgetSoftPct         Int? // null = default 80
   budgetHardPct         Int? // null = default 100

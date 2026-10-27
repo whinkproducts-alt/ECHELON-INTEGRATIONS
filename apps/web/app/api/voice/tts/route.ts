@@ -6,6 +6,7 @@ const MAX_TEXT_LENGTH = 2000;
 
 // L3: only these voice identifiers are forwarded to providers; anything else is rejected.
 const ALLOWED_VOICES_OPENAI = new Set(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']);
+const ALLOWED_VOICES_KOKORO = new Set(['af_heart', 'af_bella', 'af_sky', 'af_nova', 'am_adam', 'am_michael']);
 // Deepgram Aura voice models
 const ALLOWED_VOICES_DEEPGRAM = new Set([
   'aura-asteria-en', 'aura-luna-en', 'aura-stella-en', 'aura-athena-en',
@@ -39,11 +40,16 @@ export async function POST(req: NextRequest) {
   const rawVoice =
     typeof body.voice === 'string' && body.voice.trim()
       ? body.voice.trim()
-      : (process.env.TTS_VOICE?.trim() ?? (provider === 'deepgram' ? 'aura-asteria-en' : 'alloy'));
+      : (process.env.TTS_VOICE?.trim() ?? (provider === 'deepgram' ? 'aura-asteria-en' : provider === 'kokoro' ? 'af_heart' : 'alloy'));
 
   // L3: validate voice against provider allow-list before forwarding
-  const allowedVoices = provider === 'deepgram' ? ALLOWED_VOICES_DEEPGRAM : ALLOWED_VOICES_OPENAI;
-  const voice = allowedVoices.has(rawVoice) ? rawVoice : (provider === 'deepgram' ? 'aura-asteria-en' : 'alloy');
+  const allowedVoices = provider === 'deepgram'
+    ? ALLOWED_VOICES_DEEPGRAM
+    : provider === 'kokoro'
+      ? ALLOWED_VOICES_KOKORO
+      : ALLOWED_VOICES_OPENAI;
+  const fallbackVoice = provider === 'deepgram' ? 'aura-asteria-en' : provider === 'kokoro' ? 'af_heart' : 'alloy';
+  const voice = allowedVoices.has(rawVoice) ? rawVoice : fallbackVoice;
 
   // ── OpenAI TTS direct ─────────────────────────────────────────────────────
   if (provider === 'openai') {
@@ -93,13 +99,15 @@ export async function POST(req: NextRequest) {
 
   let upstreamRes: Response;
   try {
-    // L4: ADA V2 uses /tts; OpenAI-compatible shims typically use /audio/speech.
-    // Prefer /tts when TTS_URL is set (ADA V2 / local service); the provider
-    // env var is already handled in the openai branch above.
-    upstreamRes = await fetch(`${ttsUrl}/tts`, {
+    // Kokoro-FastAPI exposes the OpenAI-compatible /audio/speech route.
+    // ADA V2 and existing local shims keep using /tts.
+    const isKokoro = provider === 'kokoro';
+    upstreamRes = await fetch(`${ttsUrl}${isKokoro ? '/audio/speech' : '/tts'}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'tts-1', input: text, voice }),
+      body: JSON.stringify(isKokoro
+        ? { model: 'kokoro', input: text, voice, response_format: 'mp3' }
+        : { model: 'tts-1', input: text, voice }),
     });
   } catch {
     // L1: do not leak internal network details to the client

@@ -79,7 +79,7 @@ export function offlineFallbackEnabled(): boolean {
 }
 
 export function localModelName(): string {
-  return process.env.WHINK_LOCAL_MODEL?.trim() || 'llama3.1:8b';
+  return process.env.WHINK_LOCAL_MODEL?.trim() || 'wink-qwen3.5-9b-8k';
 }
 
 export interface FallbackInput {

@@ -374,7 +374,7 @@ export async function extractAndStoreMemories(
 
   // B2 — Load extraction model from env (no provider SDK here)
   const extractorModel =
-    process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+    process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k';
 
   // B8 — Fetch user timezone for relative-date resolution
   let timezone = 'UTC';

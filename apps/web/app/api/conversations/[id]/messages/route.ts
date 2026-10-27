@@ -256,7 +256,7 @@ export async function POST(
 
     // Resolve model: request body > user preference > env default
     const userPrefs = await prisma.userPreference.findUnique({ where: { userId: session.user.id } });
-    const defaultModel = process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+    const defaultModel = process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k';
     let resolvedModel = requestedModel ?? userPrefs?.preferredModel ?? defaultModel;
 
     // Load BYOK key for the resolved provider, if one is stored

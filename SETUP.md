@@ -12,6 +12,17 @@ git clone https://github.com/whinkproducts-alt/KAMSI-PRIME.git
 cd KAMSI-PRIME
 pnpm install
 
+## Local Ollama Model
+
+Wink Ultimate defaults to a local Qwen 3.5 9B Q4 model profile with an 8K context. On a 16 GB Mac, this keeps inference local while leaving memory for macOS and the app. From the repository root, install the base model and create the profile:
+
+```sh
+ollama pull qwen3.5:9b-q4_K_M
+ollama create wink-qwen3.5-9b-8k -f apps/web/ollama/Modelfile
+```
+
+The app uses `wink-qwen3.5-9b-8k` for chat, memory tasks, and specialist work by default. This does not enable Ollama-to-cloud escalation; cloud routing remains a separate, explicitly configured provider path.
+
 ## Database Setup
 cd apps/web
 npx prisma generate

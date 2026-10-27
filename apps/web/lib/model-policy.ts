@@ -13,6 +13,7 @@ export const DEFAULT_SELECTABLE_MODELS: readonly string[] = [
   'claude-sonnet-4-5',
   'claude-opus-5-5',
   'gpt-4o',
+  'wink-qwen3.5-9b-8k',
   'llama3.1:8b',
 ];
 

@@ -16,7 +16,7 @@ export const approxTokens = (s: string): number => Math.ceil(s.length / 4);
 export interface Decomposition { title: string; packages: unknown[]; tokensIn: number; tokensOut: number; model: string }
 
 export function swarmModel(): string {
-  return swarmConfig().model ?? process.env.SWARM_MODEL ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+  return swarmConfig().model ?? process.env.SWARM_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k';
 }
 
 export async function decomposeInitiative(initiative: string, workers: number): Promise<Decomposition> {

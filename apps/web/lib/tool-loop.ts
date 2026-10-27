@@ -60,7 +60,7 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
   // Flag-guarded (WHINK_OFFLINE_FALLBACK=true): offline or over the hard budget, prefer the local model.
   const fallback = await applyOfflineFallback({
     userId: opts.userId,
-    model: opts.model ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b',
+    model: opts.model ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k',
     apiKey: opts.apiKey,
     persona: opts.persona,
     correlationId: opts.correlationId,

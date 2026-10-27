@@ -274,7 +274,7 @@ export function debriefTurn(params: {
 
       const raw = await chatOnce({
         messages: [{ role: 'user', content: prompt }],
-        model: process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'llama3.1:8b',
+        model: process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k',
         maxTokens: 256,
         temperature: 0,
       });
