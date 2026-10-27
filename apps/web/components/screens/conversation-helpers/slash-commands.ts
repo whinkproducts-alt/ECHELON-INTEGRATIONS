@@ -2,7 +2,7 @@
 // ?prompt= handling and the Options disclosure flag. No React, no DOM, easy to test.
 //
 // Behaviour of each command is taken from lib/orchestrator.ts:
-//  - /whink, /mamba, /peter, /paul, /micah, /nandi and /scout switch the active persona (MAMBA is Obsidian only).
+//  - /whink, /mamba, /peter, /paul, /micah, /nandi, /scout and /registration switch the active persona (MAMBA is Obsidian only; registration is founder-only).
 //  - /brief /deep /plan /status set a response style (functional mode) that stays on
 //    until another style command replaces it. Switching minds or styles never changes permissions.
 
@@ -26,6 +26,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: 'micah', describe: () => 'Switch to the principal product auditor for evidence-backed product and market strategy.' },
   { name: 'nandi', describe: () => 'Switch to the growth, marketing, conversion and revenue strategist.' },
   { name: 'scout', describe: () => 'Switch to Michael Carrick, the master researcher who finds public market signals and opportunity leads for the team.' },
+  { name: 'registration', describe: () => 'Switch to the founder-only website registration specialist for free-account signup planning.' },
   { name: 'brief', describe: () => 'Short, direct answers with no padding. Stays on until you pick another style.' },
   { name: 'deep', describe: () => 'Thorough analysis from several angles, including second-order effects.' },
   { name: 'plan', describe: () => 'Break a goal into steps with dependencies, risks and blockers.' },

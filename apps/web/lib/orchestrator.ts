@@ -7,6 +7,7 @@ import { scanUserInput, scanForInjectionPatterns } from '@/lib/content-isolation
 import { normaliseMambaMode } from '@/lib/types';
 import { readContext, writeDebrief } from '@/lib/agent-memory';
 import { recordActionSafe } from '@/lib/ledger';
+import { isOwnerEmail } from '@/lib/owner';
 
 const PERSONA_SWITCH_PATTERNS: Array<{ regex: RegExp; persona: string; mode?: string }> = [
   { regex: /^\/?mamba\b/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
@@ -15,6 +16,7 @@ const PERSONA_SWITCH_PATTERNS: Array<{ regex: RegExp; persona: string; mode?: st
   { regex: /^\/?micah\b/i, persona: 'MICAH' },
   { regex: /^\/?nandi\b/i, persona: 'NANDI' },
   { regex: /^\/?scout\b/i, persona: 'SCOUT' },
+  { regex: /^\/?registration\b/i, persona: 'REGISTRATION' },
   { regex: /mamba mode/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
   { regex: /activate mamba/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
   { regex: /switch to mamba/i, persona: 'MAMBA', mode: 'OBSIDIAN' },
@@ -123,6 +125,10 @@ export async function processInput(input: OrchestratorInput): Promise<Orchestrat
 
   for (const pattern of PERSONA_SWITCH_PATTERNS) {
     if (pattern.regex.test(message)) {
+      if (pattern.persona === 'REGISTRATION') {
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+        if (!isOwnerEmail(user?.email)) continue;
+      }
       personaSwitched = true;
       newPersona = pattern.persona;
       newMambaMode = normaliseMambaMode(pattern.mode, pattern.persona);

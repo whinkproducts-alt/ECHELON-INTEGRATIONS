@@ -122,7 +122,23 @@ describe('provider routing', () => {
     expect(fetchSpy).toHaveBeenCalledOnce();
     const [url] = fetchSpy.mock.calls[0] as [string, ...unknown[]];
     expect(url).toContain('/chat/completions');
+    const request = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
+    expect(request.reasoning_effort).toBe('none');
     expect(lines.find((l) => l.type === 'done')).toBeDefined();
+  });
+
+  it('does not send the local reasoning option to a remote OpenAI-compatible endpoint', async () => {
+    const encoder = new TextEncoder();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      body: new ReadableStream({ start(controller) { controller.enqueue(encoder.encode('data: [DONE]\n\n')); controller.close(); } }),
+    } as any);
+    process.env.OPENAI_COMPATIBLE_BASE_URL = 'https://api.example.test/v1';
+    const { streamChat } = await import('../model-router');
+    await streamChat({ messages: [{ role: 'user', content: 'hi' }], model: 'gpt-4o' });
+    const request = JSON.parse((vi.mocked(globalThis.fetch).mock.calls[0][1] as RequestInit).body as string);
+    expect(request.reasoning_effort).toBeUndefined();
+    delete process.env.OPENAI_COMPATIBLE_BASE_URL;
   });
 });
 

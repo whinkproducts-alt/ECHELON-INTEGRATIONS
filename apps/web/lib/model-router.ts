@@ -115,6 +115,17 @@ export interface StreamChatOptions {
 }
 
 /**
+ * Ollama's OpenAI-compatible /v1 endpoint uses reasoning_effort to control
+ * Qwen thinking. The native /api/chat endpoint accepts think:false, but the
+ * OpenAI-compatible endpoint ignores that field on current Ollama releases.
+ * Keep this policy local-only so cloud OpenAI-compatible providers are never
+ * sent an Ollama-specific option.
+ */
+export function localReasoningEffort(baseUrl: string): 'none' | undefined {
+  return isLocalUrl(baseUrl) ? 'none' : undefined;
+}
+
+/**
  * Returns a ReadableStream of SSE lines.
  * Each chunk is a line in the format:
  *   data: {"type":"text","content":"..."}
@@ -230,7 +241,14 @@ async function chatOnceOpenAICompatible(
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, messages, stream: false, max_tokens: maxTokens, temperature }),
+    body: JSON.stringify({
+      model,
+      messages,
+      stream: false,
+      max_tokens: maxTokens,
+      temperature,
+      ...(localReasoningEffort(baseUrl) ? { reasoning_effort: localReasoningEffort(baseUrl) } : {}),
+    }),
   });
   if (!response.ok) {
     const errText = await response.text().catch(() => 'Unknown error');
@@ -491,6 +509,7 @@ async function streamOpenAICompatible(
       stream: true,
       max_tokens: maxTokens,
       temperature,
+      ...(localReasoningEffort(baseUrl) ? { reasoning_effort: localReasoningEffort(baseUrl) } : {}),
     }),
   });
 

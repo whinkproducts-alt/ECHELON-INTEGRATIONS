@@ -13,6 +13,7 @@
  */
 
 import { logger } from '@/lib/logger';
+import { localReasoningEffort } from '@/lib/model-router';
 
 export interface ToolSpec {
   name: string;
@@ -209,6 +210,8 @@ async function openAICompatibleWithTools(opts: ChatWithToolsOptions): Promise<Ch
     stream: false,
     max_tokens: opts.maxTokens ?? 4000,
   };
+  const reasoningEffort = localReasoningEffort(baseUrl);
+  if (reasoningEffort) body.reasoning_effort = reasoningEffort;
   if (opts.tools.length > 0) {
     body.tools = opts.tools.map((t) => ({
       type: 'function',

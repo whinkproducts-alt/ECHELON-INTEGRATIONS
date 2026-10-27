@@ -44,6 +44,7 @@ describe('tool loop on OpenAI-compatible endpoints', () => {
     expect(events.map((e) => e.type)).toEqual(['tool_call', 'tool_result', 'text', 'done']);
 
     const first = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
+    expect(first.reasoning_effort).toBe('none');
     expect(first.tools[0]).toEqual({ type: 'function', function: expect.objectContaining({ name: 'memory_read' }) });
     expect(first.tools.map((t: any) => t.function.name)).toContain('openclaw__send_mail');
     const second = JSON.parse(fetchSpy.mock.calls[1][1]!.body as string);

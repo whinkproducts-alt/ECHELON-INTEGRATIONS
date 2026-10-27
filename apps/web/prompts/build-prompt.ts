@@ -7,6 +7,7 @@ import { PAUL_PERSONA } from './persona-paul';
 import { MICAH_PERSONA } from './persona-micah';
 import { NANDI_PERSONA } from './persona-nandi';
 import { SCOUT_PERSONA } from './persona-scout';
+import { REGISTRATION_PERSONA } from './persona-registration';
 import { MAMBA_MODES } from './mamba-modes';
 import { FUNCTIONAL_MODES } from './functional-modes';
 
@@ -43,6 +44,7 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     MICAH: MICAH_PERSONA,
     NANDI: NANDI_PERSONA,
     SCOUT: SCOUT_PERSONA,
+    REGISTRATION: REGISTRATION_PERSONA,
   };
   layers.push(personaPrompts[ctx.persona] ?? WHINK_PERSONA);
 

@@ -25,8 +25,8 @@ import {
   approvalReducer, initialCardState, normalizeApproval, postDecision, secondsRemaining,
 } from '@/lib/hooks/approval-state';
 
-type SelectablePersona = 'WHINK' | 'MAMBA' | 'PETER' | 'PAUL' | 'MICAH' | 'NANDI' | 'SCOUT';
-const SELECTABLE_PERSONAS: readonly SelectablePersona[] = ['WHINK', 'MAMBA', 'PETER', 'PAUL', 'MICAH', 'NANDI', 'SCOUT'];
+type SelectablePersona = 'WHINK' | 'MAMBA' | 'PETER' | 'PAUL' | 'MICAH' | 'NANDI' | 'SCOUT' | 'REGISTRATION';
+const SELECTABLE_PERSONAS: readonly SelectablePersona[] = ['WHINK', 'MAMBA', 'PETER', 'PAUL', 'MICAH', 'NANDI', 'SCOUT', 'REGISTRATION'];
 function isSelectablePersona(value: unknown): value is SelectablePersona {
   return typeof value === 'string' && SELECTABLE_PERSONAS.some((persona) => persona === value);
 }
@@ -88,6 +88,7 @@ export function ConversationSurface({ initialPrompt = '' }: { initialPrompt?: st
   const [streamPersona, setStreamPersona] = useState<SelectablePersona>('WHINK');
   const [streamMambaMode, setStreamMambaMode] = useState<string | null>(null);
   const [activePersona, setActivePersona] = useState<SelectablePersona>('WHINK');
+  const [isFounder, setIsFounder] = useState(false);
   const [switchingPersona, setSwitchingPersona] = useState(false);
   const [activeMambaMode, setActiveMambaMode] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -134,6 +135,7 @@ export function ConversationSurface({ initialPrompt = '' }: { initialPrompt?: st
     fetch('/api/persona/state')
       .then((r) => r.json())
       .then((data) => {
+        if (!cancelled) setIsFounder(data?.isFounder === true);
         if (cancelled || !isSelectablePersona(data?.activePersona)) return;
         setActivePersona(data.activePersona);
         setActiveMambaMode(data.activePersona === 'MAMBA' ? data.mambaMode ?? 'OBSIDIAN' : null);
@@ -547,6 +549,7 @@ export function ConversationSurface({ initialPrompt = '' }: { initialPrompt?: st
                 <option value="MICAH">MICAH · Product audit</option>
                 <option value="NANDI">NANDI · Growth &amp; marketing</option>
                 <option value="SCOUT">Michael Carrick · Research &amp; opportunities</option>
+                {isFounder && <option value="REGISTRATION">Website Registration · Founder only</option>}
               </select>
               <span
                 className="text-xs font-mono font-medium px-1.5 py-0.5 rounded"

@@ -3,7 +3,7 @@
 import Image from 'next/image';
 
 export interface AvatarRendererProps {
-  persona: 'WHINK' | 'MAMBA' | 'PETER' | 'PAUL' | 'MICAH' | 'NANDI' | 'SCOUT';
+  persona: 'WHINK' | 'MAMBA' | 'PETER' | 'PAUL' | 'MICAH' | 'NANDI' | 'SCOUT' | 'REGISTRATION';
   mambaMode?: string | null;
   isSpeaking: boolean;
   isListening: boolean;

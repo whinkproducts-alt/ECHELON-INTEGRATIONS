@@ -17,6 +17,7 @@ const SPECIALISTS: Specialist[] = [
   { id: 'MICAH', name: 'Micah', role: 'Product audit & strategy', handoff: 'User value, risk, and product decisions', accent: 'border-amber-500/30' },
   { id: 'NANDI', name: 'Nandi', role: 'Growth, marketing & revenue', handoff: 'Distribution and monetisation opportunities', accent: 'border-emerald-500/30' },
   { id: 'SCOUT', name: 'Michael Carrick', role: 'Market research & opportunity scouting', handoff: 'Sources, signals, and opportunity leads', accent: 'border-rose-500/30' },
+  { id: 'REGISTRATION', name: 'Website Registration', role: 'Founder-only free-account setup planning', handoff: 'Signup checklist and account status; no password handling', accent: 'border-cyan-500/30' },
 ];
 
 export function KillTeamScreen({ founder }: { founder: boolean }) {
@@ -66,6 +67,11 @@ export function KillTeamScreen({ founder }: { founder: boolean }) {
       <section aria-labelledby="guardrails-heading" className="grid gap-3 md:grid-cols-2">
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4"><h2 id="guardrails-heading" className="flex items-center gap-2 text-sm font-semibold text-foreground"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Allowed without another approval</h2><p className="mt-2 text-xs leading-5 text-muted-foreground">Research, analysis, evidence gathering, planning, drafts, code proposals, and testable implementation work within existing access boundaries.</p></div>
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4"><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><AlertTriangle className="h-4 w-4 text-amber-500" /> Always requires your approval</h2><p className="mt-2 text-xs leading-5 text-muted-foreground">Spending money, sending external communications, publishing, deleting data, changing production systems, or any other destructive or irreversible action.</p></div>
+      </section>
+
+      <section aria-labelledby="registration-limits-heading" className="rounded-xl border border-border bg-card p-4">
+        <h2 id="registration-limits-heading" className="text-sm font-semibold text-foreground">Website Registration capability</h2>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">This specialist can prepare and track a signup for you. Gmail and password-manager connections are not implemented, and arbitrary-site browser automation is disabled by project policy. Complete signup, email verification, and password saving in the site and your password manager. The agent must stop if a card, auto-renewing trial, payment, or unclear pricing appears.</p>
       </section>
 
       <p className="flex items-center gap-2 text-xs text-muted-foreground"><CheckCircle2 className="h-3.5 w-3.5 text-primary" /> Every specialist shares the app&apos;s existing audit and permission controls. The Kill Team does not bypass them.</p>
