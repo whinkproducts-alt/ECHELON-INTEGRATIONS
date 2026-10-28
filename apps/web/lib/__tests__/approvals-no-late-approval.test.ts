@@ -156,6 +156,18 @@ describe('approvals: no late approval, no revival', () => {
     expect(approvals.decide.length).toBeLessThanOrEqual(4);
   });
 
+  it('expiry ledger rows (sweep and decide) are written by the system, not the user', async () => {
+    const approvals = await setup();
+    await mk(approvals, 'memory_read');
+    await approvals.sweepApprovals(at(40_000)(), 'u1');
+    const b = await mk(approvals, 'usage_read');
+    rows.find((r) => r.id === b.id)!.status = 'PENDING';
+    await approvals.decide('u1', b.id, 'approve', { now: at(60_000) });
+    const expiry = ledgerRows.filter((l) => l.action === 'approval_expired');
+    expect(expiry.length).toBeGreaterThanOrEqual(2);
+    for (const l of expiry) expect(l.initiator).toBe('system');
+  });
+
   it('no ledger row ever carries a council or consensus action or confirmation method', async () => {
     const approvals = await setup();
     const a = await mk(approvals, 'memory_read');

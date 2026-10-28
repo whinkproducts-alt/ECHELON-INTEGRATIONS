@@ -240,6 +240,79 @@ describe('completed work records (recordCompletedTurn follows the same 3b rules)
   });
 });
 
+describe('input size and pattern cost (ReDoS)', () => {
+  beforeEach(() => { vi.resetModules(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  const inputs: Array<[string, (n: number) => string]> = [
+    ['repeated words', (n) => 'word '.repeat(Math.ceil(n / 5))],
+    ['repeated capitalised words', (n) => 'Alice Smith '.repeat(Math.ceil(n / 12))],
+    ['digits', (n) => '1'.repeat(n)],
+    ['mixed punctuation', (n) => 'key = a.b-c_d/e+f '.repeat(Math.ceil(n / 18))],
+    ['spaces after key', (n) => 'key' + ' '.repeat(n)],
+    ['eyJ repeats', (n) => 'eyJ'.repeat(Math.ceil(n / 3))],
+  ];
+
+  for (const size of [40_000, 200_000]) {
+    for (const [name, make] of inputs) {
+      it(`recordCompletedTurn finishes fast and stores at most the cap: ${name}, ${size} chars`, async () => {
+        const { writeMemory, recordActionSafe } = buildMocks();
+        const { recordCompletedTurn, MAX_STATEMENT_CHARS } = await import('../auto-memory');
+        const text = make(size);
+        const t0 = Date.now();
+        await recordCompletedTurn({ userId: 'u1', conversationId: 'c1', messageId: 'm1', userMessage: text, assistantReply: 'ok', persona: 'WHINK', correlationId: 'k' });
+        expect(Date.now() - t0).toBeLessThan(1000);
+        for (const c of writeMemory.mock.calls) expect(c[0].statement.length).toBeLessThanOrEqual(MAX_STATEMENT_CHARS);
+        expect(JSON.stringify(recordActionSafe.mock.calls)).not.toContain(text.slice(0, 200));
+      });
+
+      it(`extractAndStoreMemories finishes fast and sends at most the cap to the model: ${name}, ${size} chars`, async () => {
+        const { chatOnce } = buildMocks();
+        (chatOnce as any).mockResolvedValue(JSON.stringify([{ type: 'semantic', statement: make(size), confidence: 0.5 }]));
+        const { extractAndStoreMemories, MAX_STATEMENT_CHARS } = await import('../auto-memory');
+        const t0 = Date.now();
+        await extractAndStoreMemories({ userId: 'u1', conversationId: 'c1', userMessage: make(size), assistantReply: make(size), persona: 'WHINK', correlationId: 'k' });
+        expect(Date.now() - t0).toBeLessThan(1000);
+        const prompt = (chatOnce as any).mock.calls[0]?.[0].messages[1].content as string | undefined;
+        if (prompt) expect(prompt.length).toBeLessThan(MAX_STATEMENT_CHARS * 2 + 1000);
+      });
+    }
+  }
+
+  it('isSensitive and isSecret stay linear on huge input and still detect', async () => {
+    buildMocks();
+    const { isSensitive, isSecret } = await import('../auto-memory');
+    const big = 'Alice Smith '.repeat(30_000);
+    const t0 = Date.now();
+    isSensitive(big); isSecret(big);
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(isSensitive('Alice Smith has a new address')).toBe(true);
+    expect(isSensitive('alice smith has a new address')).toBe(false);
+    expect(isSensitive('my wife has cancer')).toBe(true);
+    expect(isSensitive('I live at 12 Main Street')).toBe(true);
+    expect(isSecret('x '.repeat(5000) + 'my password is hunter2hunter2')).toBe(true);
+  });
+
+  it('records only that the turn was truncated, never the text', async () => {
+    const { recordActionSafe } = buildMocks();
+    const { recordCompletedTurn } = await import('../auto-memory');
+    await recordCompletedTurn({ userId: 'u1', conversationId: 'c1', messageId: 'm1', userMessage: 'plan '.repeat(2000), assistantReply: 'ok', persona: 'WHINK', correlationId: 'k' });
+    const row = recordActionSafe.mock.calls.map((c) => c[0]).find((r) => r.action === 'memory_auto_written');
+    expect(row.inputSummary).toContain('truncated');
+    expect(JSON.stringify(row)).not.toContain('plan plan');
+  });
+
+  it('fails closed when the daily count cannot be read: no write, memory_auto_skipped cap_check_failed', async () => {
+    const { writeMemory, recordActionSafe } = buildMocks({
+      '@/lib/db': { prisma: { memoryDailyCap: { findUnique: vi.fn().mockRejectedValue(new Error('db')), upsert: vi.fn() } } },
+    });
+    const { recordCompletedTurn } = await import('../auto-memory');
+    await recordCompletedTurn({ userId: 'u1', conversationId: 'c1', messageId: 'm1', userMessage: 'hello there', assistantReply: 'ok', persona: 'WHINK', correlationId: 'k' });
+    expect(writeMemory).not.toHaveBeenCalled();
+    expect(recordActionSafe).toHaveBeenCalledWith(expect.objectContaining({ action: 'memory_auto_skipped', inputSummary: 'reason: cap_check_failed' }));
+  });
+});
+
 // ── B2 — Model router only ────────────────────────────────────────────────────
 
 describe('B2 — uses chatOnce from model router, not provider SDK', () => {

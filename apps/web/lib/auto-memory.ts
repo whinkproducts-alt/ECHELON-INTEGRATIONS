@@ -59,13 +59,13 @@ const SECRET_PATTERNS: RegExp[] = [
   // Natural-language password phrases ("password is X", "my password: X")
   /\b(password|passwd|passcode|pwd|pin|unlock\s*code)\b.{0,30}\S/i,
   // Key/token/secret assignments (strict or natural)
-  /(key|token|secret|api[_-]?key)\s*[:=\s]\s*[A-Za-z0-9_\-]{16,}/i,
+  /(key|token|secret|api[_-]?key)\s{0,3}[:=\s]\s{0,3}[A-Za-z0-9_\-]{16,256}/i,
   // Vendor key prefixes
   /\b(sk-[A-Za-z0-9]{20,}|sk-ant-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|xox[bp]-[A-Za-z0-9\-]{20,}|AIza[A-Za-z0-9_\-]{35})/,
   // JWT (three base64url segments separated by dots)
-  /eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/,
+  /eyJ[A-Za-z0-9_\-]{1,512}\.[A-Za-z0-9_\-]{1,512}\.[A-Za-z0-9_\-]{1,512}/,
   // High-entropy random tokens (24+ alphanum/special chars)
-  /[A-Za-z0-9+/]{24,}={0,2}(?!\w)/,
+  /[A-Za-z0-9+/]{24,256}={0,2}(?!\w)/,
   // Card numbers — strip separators first (see normalised check below)
   /\b\d{4}[-.\s]?\d{4}[-.\s]?\d{4}[-.\s]?\d{4}\b/,
   // Amex 4-6-5
@@ -85,6 +85,12 @@ function luhn(digits: string): boolean {
 }
 
 export function isSecret(raw: string): boolean {
+  // Fail closed on enormous input rather than scanning it all; windows() bounds the work per pattern.
+  if (raw.length > CLASSIFY_WINDOW * 64) return true;
+  return windows(raw).some(isSecretWindow);
+}
+
+function isSecretWindow(raw: string): boolean {
   // NFKC normalise and strip zero-width / format characters before matching
   const statement = raw.normalize('NFKC').replace(/[­​-‏‪-‮﻿]/g, '');
 
@@ -105,21 +111,50 @@ const SENSITIVE_PATTERNS: RegExp[] = [
   // Health / medical (broadened — H2 fix)
   /\b(health|medical|diagnosis|medication|doctor|hospital|surgery|illness|disease|mental\s*health|therap(?:y|ist|ies)|cancer|diabetes|prescription|treatment|symptom|chronic\s+condition|ADHD|autism|depression|anxiety|dementia|schizophrenia|bipolar|drug|adderall|ritalin|prozac|antidepressant|antipsychotic|HIV|AIDS|disorder|syndrome|pregnant|pregnancy|disability|rehab|addiction)\b/i,
   // Financial (word-bounded to avoid "balance sheet")
-  /(\$[\d,]+(?:\.\d{2})?|\b\d{5,}\s*(?:dollars?|usd|cad)\b|\baccount\s*number\b|\brouting\s*number\b|\bsalary\b|\bincome\b|\bearns?\b|\bowes?\b|\bnet\s*worth\b|\bdebt\b|\bloan\b|\bmortgage\b|\bcredit\s*card\b|\bbank\s*account\b|\biban\b|\bswift\s*code\b|\b\d+k\b)/i,
+  /(\$[\d,]+(?:\.\d{2})?|\b\d{5,15}\s{0,3}(?:dollars?|usd|cad)\b|\baccount\s*number\b|\brouting\s*number\b|\bsalary\b|\bincome\b|\bearns?\b|\bowes?\b|\bnet\s*worth\b|\bdebt\b|\bloan\b|\bmortgage\b|\bcredit\s*card\b|\bbank\s*account\b|\biban\b|\bswift\s*code\b|\b\d+k\b)/i,
   // Legal matters
   /\b(lawsuit|attorney|lawyer|legal\s*matter|court|settlement|liability|dispute|litigation|NDA|non-disclosure|sued|suing|arrested|arrest|criminal|conviction|parole|probation|charges?)\b/i,
   // Family / relationships (broadened — H2 fix)
   /\b(marriage|married|divorced?|separation|romantic\s*relationship|spouse|boyfriend|girlfriend|custody|wife|husband|partner|son|daughter|mother|father|parent|sibling|brother|sister|kids?|children|family|relative|grandparent|grandchild|niece|nephew|uncle|aunt)\b/i,
   // Location / home address (broadened — H2 fix)
-  /\b(home\s*address|street\s*address|zip\s*code|postal\s*code|lives?\s*at|located\s*at|\bresidence\b|home\s*location|\d+\s+[A-Za-z]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Boulevard|Blvd|Lane|Ln|Court|Ct|Way|Place|Pl)\b)/i,
+  /\b(home\s*address|street\s*address|zip\s*code|postal\s*code|lives?\s*at|located\s*at|\bresidence\b|home\s*location|\b\d{1,6}\s{1,3}[A-Za-z]{1,30}\s{1,3}(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Boulevard|Blvd|Lane|Ln|Court|Ct|Way|Place|Pl)\b)/i,
   // Identity documents (broadened — H2 fix)
   /\b(ssn|social\s*security\s*(?:number)?|passport\s*(?:number)?|driver.?s\s*licen[sc]e|national\s*id|sin\s*(?:number)?|birth\s*certificate|identity\s*document|national\s*insurance)\b/i,
-  // Personal facts about a named third party OR unnamed relative (H2 fix)
-  /\b(?:[A-Z][a-z]+(?: [A-Z][a-z]+)+|(?:my|his|her|their)\s+(?:wife|husband|son|daughter|mother|father|brother|sister|partner|child|parent))\b.{0,50}\b(health|salary|income|debt|diagnosis|treatment|address|arrested|pregnancy|ill|sick|cancer|depression|disorder)\b/i,
+  // Personal facts about an unnamed relative. Named third parties are handled in NAMED_PERSON below
+  // (case-sensitive and bounded, so cost is linear in the input).
+  /\b(?:my|his|her|their)\s{1,3}(?:wife|husband|son|daughter|mother|father|brother|sister|partner|child|parent)\b.{0,50}\b(health|salary|income|debt|diagnosis|treatment|address|arrested|pregnancy|ill|sick|cancer|depression|disorder)\b/i,
 ];
 
+const NAMED_PERSON = /\b[A-Z][a-z]{1,20}(?: [A-Z][a-z]{1,20}){1,3}\b/g;
+const THIRD_PARTY_FACT = /\b(health|salary|income|debt|diagnosis|treatment|address|arrested|pregnancy|ill|sick|cancer|depression|disorder)\b/i;
+
+function namedPersonFact(text: string): boolean {
+  NAMED_PERSON.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  let guard = 0;
+  while ((m = NAMED_PERSON.exec(text)) !== null && guard++ < 500) {
+    const end = m.index + m[0].length;
+    const hit = THIRD_PARTY_FACT.exec(text.slice(end, end + 70));
+    if (hit && hit.index <= 50) return true;
+  }
+  return false;
+}
+
+/** Longest text any pattern sees at once. Longer input is scanned in overlapping windows, so cost is linear. */
+export const CLASSIFY_WINDOW = 4000;
+/** Longest memory statement that is classified or stored. */
+export const MAX_STATEMENT_CHARS = 4000;
+
+function windows(text: string): string[] {
+  if (text.length <= CLASSIFY_WINDOW) return [text];
+  const out: string[] = [];
+  const step = CLASSIFY_WINDOW - 200;
+  for (let i = 0; i < text.length && out.length < 64; i += step) out.push(text.slice(i, i + CLASSIFY_WINDOW));
+  return out;
+}
+
 export function isSensitive(statement: string): boolean {
-  return SENSITIVE_PATTERNS.some((p) => p.test(statement));
+  return windows(statement).some((w) => SENSITIVE_PATTERNS.some((p) => p.test(w)) || namedPersonFact(w));
 }
 
 /**
@@ -166,8 +201,11 @@ async function recordCompletedTurnInner(input: Parameters<typeof recordCompleted
   const { userId, conversationId, messageId, userMessage, assistantReply, persona, projectId, correlationId } = input;
   if (!userId || !conversationId || !messageId) return;
   const isMamba = persona.toUpperCase() === 'MAMBA';
-  const statement = `Completed conversation turn with ${persona}.\nUser request:\n${userMessage}\n\nAssistant result:\n${assistantReply}`;
   if (!userMessage.trim() && !assistantReply.trim()) return;
+  // Cap BEFORE any pattern runs: classification and storage see at most MAX_STATEMENT_CHARS.
+  const half = Math.floor((MAX_STATEMENT_CHARS - 200) / 2);
+  const truncated = userMessage.length > half || assistantReply.length > half;
+  const statement = `Completed conversation turn with ${persona}.\nUser request:\n${userMessage.slice(0, half)}\n\nAssistant result:\n${assistantReply.slice(0, half)}`;
 
   const skip = (reason: string) => recordActionSafe({
     userId, initiator: 'system', persona, action: 'memory_auto_skipped', permissionClass: 'A',
@@ -249,7 +287,7 @@ async function recordCompletedTurnInner(input: Parameters<typeof recordCompleted
       userId, initiator: 'system', persona,
       action: result.deduped ? 'memory_deduplicated' : 'memory_auto_written',
       permissionClass, status: 'VALIDATED',
-      inputSummary: `type:${memType}`, outputSummary: `id:${result.id}`, correlationId,
+      inputSummary: `type:${memType}${truncated ? ' truncated' : ''}`, outputSummary: `id:${result.id}`, correlationId,
     });
   } catch (err) {
     logger.error('auto-memory: completed work record failed', {
@@ -309,7 +347,12 @@ async function dailyCapReached(userId: string, persona: string, correlationId: s
   try {
     currentCount = await getDailyCount(userId);
   } catch {
-    currentCount = 0; // non-fatal: proceed
+    // Fail closed: if the count cannot be read, nothing is written.
+    await recordActionSafe({
+      userId, initiator: 'system', persona, action: 'memory_auto_skipped', permissionClass: 'A',
+      status: 'VALIDATED', inputSummary: 'reason: cap_check_failed', correlationId,
+    });
+    return true;
   }
   if (currentCount < cap) return false;
   try {
@@ -377,13 +420,14 @@ export async function extractAndStoreMemories(
     userId,
     conversationId,
     messageId,
-    userMessage,
-    assistantReply,
     persona,
     correlationId,
     conversationTainted,
     injectionBlocked,
   } = input;
+  // Cap before any pattern runs or any text reaches the model.
+  const userMessage = input.userMessage.slice(0, MAX_STATEMENT_CHARS);
+  const assistantReply = input.assistantReply.slice(0, MAX_STATEMENT_CHARS);
 
   // B11 — Skip if conversation is tainted by external content
   if (conversationTainted) {
@@ -508,7 +552,7 @@ Rules:
       continue;
     }
 
-    const statement = candidate.statement.trim();
+    const statement = candidate.statement.trim().slice(0, MAX_STATEMENT_CHARS);
 
     // B6 — Drop secrets before any ledger content is written
     if (isSecret(statement)) {

@@ -140,13 +140,13 @@ async function ledger(
   row: Pick<ApprovalRow, 'id' | 'userId' | 'tool' | 'permissionClass' | 'correlationId' | 'persona'> & { kind?: string; params?: unknown },
   action: string,
   status: LedgerStatus,
-  extra: { outputSummary?: string; confirmationMethod?: string; strict?: boolean } = {},
+  extra: { outputSummary?: string; confirmationMethod?: string; strict?: boolean; initiator?: 'user' | 'system' } = {},
 ): Promise<void> {
   // strict: throws when the ledger is down, for transitions that must not proceed unrecorded.
   const write = extra.strict ? recordAction : recordActionSafe;
   await write({
     userId: row.userId,
-    initiator: 'user',
+    initiator: extra.initiator ?? 'user',
     persona: row.persona,
     tool: row.tool,
     action,
@@ -259,7 +259,7 @@ export async function sweepApprovals(now: Date, userId: string): Promise<{ expir
     });
     if (won.count !== 1) continue;
     expired++;
-    await ledger(row, 'approval_expired', 'DENIED', { outputSummary: 'Expired before a decision; never revived' });
+    await ledger(row, 'approval_expired', 'DENIED', { outputSummary: 'Expired before a decision; never revived', initiator: 'system' });
   }
 
   const cutoff = new Date(now.getTime() - EXECUTING_STUCK_MS);
@@ -273,7 +273,7 @@ export async function sweepApprovals(now: Date, userId: string): Promise<{ expir
     });
     if (won.count !== 1) continue;
     stuckFailed++;
-    await ledger(row, 'approval_stuck_failed', 'FAILED', { outputSummary: 'Stuck in EXECUTING; failed, never re-run' });
+    await ledger(row, 'approval_stuck_failed', 'FAILED', { outputSummary: 'Stuck in EXECUTING; failed, never re-run', initiator: 'system' });
   }
   return { expired, stuckFailed };
 }
@@ -409,7 +409,7 @@ export async function decide(
   });
   if (expired.count === 1) {
     const row = await prisma.approvalRequest.findFirst({ where: { id, userId } }) as ApprovalRow | null;
-    if (row) await ledger(row, 'approval_expired', 'DENIED', { outputSummary: 'Expired before a decision' });
+    if (row) await ledger(row, 'approval_expired', 'DENIED', { outputSummary: 'Expired before a decision', initiator: 'system' });
     return { id, status: 'EXPIRED', result: null };
   }
 
