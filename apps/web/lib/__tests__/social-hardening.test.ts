@@ -195,7 +195,11 @@ describe('M2 routes return 503 encryption_not_configured', () => {
     vi.doMock('@/lib/db', () => ({ prisma: {} }));
     const { NextRequest } = await import('next/server');
     const { POST } = await import('@/app/api/social/[platform]/connect/route');
-    const res = await POST(new NextRequest('https://app.test/api/social/x/connect', { method: 'POST' }), { params: Promise.resolve({ platform: 'x' }) });
+    const res = await POST(new NextRequest('https://app.test/api/social/x/connect', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ consent: true, consentTextVersion: 'v1' }),
+    }), { params: Promise.resolve({ platform: 'x' }) });
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: 'encryption_not_configured' });
   });

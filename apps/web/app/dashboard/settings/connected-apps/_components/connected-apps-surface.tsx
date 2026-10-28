@@ -64,7 +64,11 @@ export function ConnectedAppsSurface({ initialNotice }: { initialNotice: Callbac
     if (consenting !== platform || !agreed) return;
     setBusy(platform);
     setNotice(null);
-    fetch(`/api/social/${platform}/connect`, { method: 'POST' })
+    fetch(`/api/social/${platform}/connect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ consent: true, consentTextVersion: 'v1' }),
+    })
       .then(async (r) => {
         const body: unknown = await r.json().catch(() => null);
         const outcome = interpretConnectResponse(platform, r.status, body);

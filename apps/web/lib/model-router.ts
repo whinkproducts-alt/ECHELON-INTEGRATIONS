@@ -247,7 +247,7 @@ async function chatOnceOpenAICompatible(
       stream: false,
       max_tokens: maxTokens,
       temperature,
-      ...(localReasoningEffort(baseUrl) ? { reasoning_effort: localReasoningEffort(baseUrl) } : {}),
+      ...(localReasoningEffort(baseUrl) ? { reasoning_effort: localReasoningEffort(baseUrl), think: false } : {}),
     }),
   });
   if (!response.ok) {
@@ -509,7 +509,7 @@ async function streamOpenAICompatible(
       stream: true,
       max_tokens: maxTokens,
       temperature,
-      ...(localReasoningEffort(baseUrl) ? { reasoning_effort: localReasoningEffort(baseUrl) } : {}),
+      ...(localReasoningEffort(baseUrl) ? { reasoning_effort: localReasoningEffort(baseUrl), think: false } : {}),
     }),
   });
 

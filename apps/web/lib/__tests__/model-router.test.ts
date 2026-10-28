@@ -124,6 +124,7 @@ describe('provider routing', () => {
     expect(url).toContain('/chat/completions');
     const request = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
     expect(request.reasoning_effort).toBe('none');
+    expect(request.think).toBe(false);
     expect(lines.find((l) => l.type === 'done')).toBeDefined();
   });
 
@@ -393,7 +394,7 @@ describe('Ollama round-trip (integration)', () => {
 
       expect(lines[lines.length - 1].type).toBe('done');
     },
-    5_000, // 5 s timeout for the integration test
+    30_000, // Allow for a cold local-model load on constrained hardware.
   );
 });
 

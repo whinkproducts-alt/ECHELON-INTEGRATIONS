@@ -44,10 +44,11 @@ export function hashState(state: string): string {
 
 export type StartResult =
   | { ok: true; authorizeUrl: string }
-  | { ok: false; status: 400 | 503; error: 'platform_not_configured' | 'redirect_not_allowed' | 'encryption_not_configured' };
+  | { ok: false; status: 400 | 503; error: 'platform_not_configured' | 'redirect_not_allowed' | 'encryption_not_configured' | 'consent_required' };
 
-export async function startConnect(userId: string, platform: SocialPlatform): Promise<StartResult> {
+export async function startConnect(userId: string, platform: SocialPlatform, consent?: { granted: boolean; textVersion: string }): Promise<StartResult> {
   if (!userId) throw new Error('social: userId is required');
+  if (!consent?.granted || consent.textVersion !== 'v1') return { ok: false, status: 400, error: 'consent_required' };
   if (!isEncryptionConfigured()) return { ok: false, status: 503, error: 'encryption_not_configured' };
   const creds = clientCredentials(platform);
   const redirectUri = buildRedirectUri(platform);
@@ -70,6 +71,8 @@ export async function startConnect(userId: string, platform: SocialPlatform): Pr
       stateHash: hashState(state),
       codeVerifierEnc: encryptKey(verifier),
       redirectUri,
+      consentGrantedAt: now,
+      consentTextVersion: consent.textVersion,
       createdAt: now,
       expiresAt: new Date(now.getTime() + STATE_TTL_MS),
     },
@@ -242,6 +245,8 @@ export async function completeCallback(
     platformUserId: identity.id,
     platformHandle: identity.handle,
     status: 'active',
+    consentGrantedAt: row.consentGrantedAt,
+    consentTextVersion: row.consentTextVersion,
   };
   try {
     const existing = await prisma.socialConnection.findFirst({

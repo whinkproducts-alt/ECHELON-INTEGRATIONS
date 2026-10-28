@@ -211,7 +211,10 @@ async function openAICompatibleWithTools(opts: ChatWithToolsOptions): Promise<Ch
     max_tokens: opts.maxTokens ?? 4000,
   };
   const reasoningEffort = localReasoningEffort(baseUrl);
-  if (reasoningEffort) body.reasoning_effort = reasoningEffort;
+  if (reasoningEffort) {
+    body.reasoning_effort = reasoningEffort;
+    body.think = false;
+  }
   if (opts.tools.length > 0) {
     body.tools = opts.tools.map((t) => ({
       type: 'function',

@@ -1,6 +1,6 @@
 // Communication delivery layer.
 // Each channel requires external credentials configured as env vars.
-// SMS is real (Twilio REST). Email, WhatsApp, Telegram and phone calls are still stubs.
+// SMS is real (Twilio REST). Email is real SMTP; WhatsApp, Telegram and phone calls remain pending provider adapters.
 // Missing credentials return { sent: false, reason: 'not_configured' }.
 // This layer never decides permission: callers run only after the permission engine / an approval
 // (sms, email and call sends are protected, Class C, approved by request id).
@@ -52,10 +52,35 @@ async function deliverEmail(payload: DeliveryPayload): Promise<DeliveryResult> {
   const route = routeRecipient(payload.to, { senderIsOwner: await senderIsOwner(payload.userId) });
   if (!route.valid) return { sent: false, channel: 'EMAIL', reason: 'invalid_recipient' };
   const info = { deliveredTo: route.deliverTo, originalTo: route.original, headers: routingHeaders(route) };
-  if (!process.env.SMTP_HOST) return { sent: false, channel: 'EMAIL', reason: 'not_configured', ...info };
-  // Real implementation: import nodemailer and send to route.deliverTo with
-  // info.headers (X-Original-To). Placeholder returns configured.
-  return { sent: false, channel: 'EMAIL', reason: 'smtp_not_implemented_yet', ...info };
+  const host = process.env.SMTP_HOST?.trim();
+  const from = process.env.SMTP_FROM?.trim();
+  const port = Number.parseInt(process.env.SMTP_PORT ?? '587', 10);
+  if (!host || !from || !Number.isInteger(port) || port < 1 || port > 65535) {
+    return { sent: false, channel: 'EMAIL', reason: 'not_configured', ...info };
+  }
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: process.env.SMTP_SECURE === 'true' || port === 465,
+      auth: process.env.SMTP_USER?.trim()
+        ? { user: process.env.SMTP_USER.trim(), pass: process.env.SMTP_PASS ?? '' }
+        : undefined,
+    });
+    const sent = await transporter.sendMail({
+      from,
+      to: route.deliverTo,
+      subject: payload.subject ?? 'WHINK notification',
+      text: payload.body,
+      headers: info.headers,
+    });
+    return { sent: true, channel: 'EMAIL', messageId: typeof sent.messageId === 'string' ? sent.messageId : undefined, ...info };
+  } catch (error) {
+    logger.warn('smtp email delivery failed', { error: error instanceof Error ? error.name : 'unknown' });
+    return { sent: false, channel: 'EMAIL', reason: 'delivery_failed', ...info };
+  }
 }
 
 // SMS: real, via the Twilio REST API with the global fetch (no SDK, no dependency).

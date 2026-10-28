@@ -832,6 +832,8 @@ model SocialConnection {
   platformUserId  String?
   platformHandle  String?
   status          String    @default("active") // active | expired | revoked
+  consentGrantedAt DateTime?
+  consentTextVersion String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -848,6 +850,8 @@ model OAuthState {
   stateHash       String    @unique // sha256 hex of the state value; the state itself is never stored
   codeVerifierEnc String // PKCE verifier, encrypted
   redirectUri     String
+  consentGrantedAt DateTime?
+  consentTextVersion String?
   createdAt       DateTime  @default(now())
   expiresAt       DateTime
   usedAt          DateTime?
