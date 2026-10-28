@@ -46,32 +46,32 @@ export const NAV_GROUPS: NavGroup[] = [
 
 export const NAV_ITEMS: NavItem[] = [
   { id: 'command', label: 'Command', href: '/dashboard', icon: Command, group: 'command', description: 'Command surface and overview', keywords: ['home', 'dashboard'], status: 'live' },
-  { id: 'today', label: 'Today', href: '/dashboard/today', icon: Sun, group: 'command', description: 'The day at a glance', keywords: ['agenda', 'brief', 'schedule'], status: 'soon' },
+  { id: 'today', label: 'Today', href: '/dashboard/today', icon: Sun, group: 'command', description: 'The day at a glance', keywords: ['agenda', 'brief', 'schedule'], status: 'live' },
   { id: 'conversation', label: 'Conversation', href: '/dashboard/conversation', icon: MessageSquare, group: 'command', description: 'Talk to your chief of staff', keywords: ['chat', 'talk'], status: 'live' },
   { id: 'holo', label: 'Holo', href: '/dashboard/holo', icon: Orbit, group: 'command', description: 'Holographic presence', keywords: ['presence', 'avatar', 'voice'], status: 'live' },
 
   { id: 'memory', label: 'Memory', href: '/dashboard/memory', icon: Brain, group: 'intelligence', description: 'What it remembers, with sources', keywords: ['recall', 'facts'], status: 'live' },
   { id: 'documents', label: 'Documents', href: '/dashboard/documents', icon: FileText, group: 'intelligence', description: 'Uploaded documents and citations', keywords: ['files', 'upload', 'pdf'], status: 'live' },
   { id: 'news', label: 'Intelligence feed', href: '/dashboard/holo/news', icon: Newspaper, group: 'intelligence', description: 'News and market signals', keywords: ['news', 'feed'], status: 'live' },
-  { id: 'anatomy', label: 'Anatomy', href: '/dashboard/anatomy', icon: Network, group: 'intelligence', description: 'How the system is wired', keywords: ['architecture', 'map', 'kernel'], status: 'soon' },
+  { id: 'anatomy', label: 'Anatomy', href: '/dashboard/anatomy', icon: Network, group: 'intelligence', description: 'How the system is wired', keywords: ['architecture', 'map', 'kernel'], status: 'live' },
 
-  { id: 'board', label: 'Board', href: '/dashboard/board', icon: Users, group: 'people', description: 'Board members and advisers', keywords: ['advisers', 'directors'], status: 'soon' },
-  { id: 'directory', label: 'Directory', href: '/dashboard/directory', icon: BookUser, group: 'people', description: 'Staff and agent directory', keywords: ['staff', 'email', 'team'], status: 'soon' },
-  { id: 'contacts', label: 'Contacts', href: '/dashboard/contacts', icon: Contact, group: 'people', description: 'People you deal with', keywords: ['crm', 'people'], status: 'soon' },
-  { id: 'companies', label: 'Companies', href: '/dashboard/companies', icon: Building2, group: 'people', description: 'The group and its companies', keywords: ['group', 'apps', 'subsidiary'], status: 'soon' },
+  { id: 'board', label: 'Board', href: '/dashboard/board', icon: Users, group: 'people', description: 'Board members and advisers', keywords: ['advisers', 'directors'], status: 'live' },
+  { id: 'directory', label: 'Directory', href: '/dashboard/directory', icon: BookUser, group: 'people', description: 'Staff and agent directory', keywords: ['staff', 'email', 'team'], status: 'live' },
+  { id: 'contacts', label: 'Contacts', href: '/dashboard/contacts', icon: Contact, group: 'people', description: 'People you deal with', keywords: ['crm', 'people'], status: 'live' },
+  { id: 'companies', label: 'Companies', href: '/dashboard/companies', icon: Building2, group: 'people', description: 'The group and its companies', keywords: ['group', 'apps', 'subsidiary'], status: 'live' },
 
   { id: 'projects', label: 'Projects', href: '/dashboard/projects', icon: FolderKanban, group: 'operations', description: 'Projects and their status', keywords: ['work'], status: 'live' },
   { id: 'subsidiaries', label: 'Subsidiaries', href: '/dashboard/subsidiaries', icon: Building2, group: 'operations', description: 'The five subsidiaries and their projects', keywords: SUBSIDIARY_KEYWORDS, status: 'live' },
   { id: 'tasks', label: 'Tasks', href: '/dashboard/tasks', icon: CheckSquare, group: 'operations', description: 'Task board', keywords: ['todo'], status: 'live' },
-  { id: 'workforce', label: 'Workforce', href: '/dashboard/workforce', icon: Bot, group: 'operations', description: 'Agents and what they are doing', keywords: ['agents', 'staff'], status: 'soon' },
+  { id: 'workforce', label: 'Workforce', href: '/dashboard/workforce', icon: Bot, group: 'operations', description: 'Agents and what they are doing', keywords: ['agents', 'staff'], status: 'live' },
   { id: 'kill-team', label: 'Kill Team', href: '/dashboard/kill-team', icon: ShieldAlert, group: 'operations', description: 'Founder-controlled specialist team', keywords: ['peter', 'paul', 'micah', 'nandi', 'michael carrick', 'scout', 'research'], status: 'live' },
-  { id: 'connectors', label: 'Connectors', href: '/dashboard/connectors', icon: Plug, group: 'operations', description: 'Connected tools and gateways', keywords: ['mcp', 'integrations', 'gateway'], status: 'soon' },
-  { id: 'usage', label: 'Usage', href: '/dashboard/usage', icon: Gauge, group: 'operations', description: 'Model usage and limits', keywords: ['cost', 'tokens', 'limits'], status: 'soon' },
+  { id: 'connectors', label: 'Connectors', href: '/dashboard/connectors', icon: Plug, group: 'operations', description: 'Connected tools and gateways', keywords: ['mcp', 'integrations', 'gateway'], status: 'live' },
+  { id: 'usage', label: 'Usage', href: '/dashboard/usage', icon: Gauge, group: 'operations', description: 'Model usage and limits', keywords: ['cost', 'tokens', 'limits'], status: 'live' },
   { id: 'contracts', label: 'Contracts', href: '/dashboard/contracts', icon: FileSignature, group: 'operations', description: 'Agreements you hold, with renewals', keywords: ['agreements', 'renewals', 'counterparty', 'legal'], status: 'live' },
   { id: 'finance', label: 'Finance', href: '/dashboard/finance', icon: Landmark, group: 'operations', description: 'Contract value, upcoming dates and model spend (read only)', keywords: ['money', 'spend', 'budget', 'revenue', 'currency'], status: 'live' },
   { id: 'change-requests', label: 'Change requests', href: '/dashboard/change-requests', icon: GitPullRequest, group: 'operations', description: 'Ask for product changes, approve what is sent', keywords: ['feature', 'pull request', 'github', 'issue', 'build'], status: 'live' },
 
-  { id: 'security', label: 'Security', href: '/dashboard/security', icon: ShieldAlert, group: 'security', description: 'Security events, approvals and the ledger', keywords: ['ledger', 'approvals', 'audit'], status: 'soon' },
+  { id: 'security', label: 'Security', href: '/dashboard/security', icon: ShieldAlert, group: 'security', description: 'Security events, approvals and the ledger', keywords: ['ledger', 'approvals', 'audit'], status: 'live' },
 
   { id: 'settings', label: 'Settings', href: '/dashboard/settings', icon: Settings, group: 'settings', description: 'Preferences and profile', keywords: ['preferences', 'install', 'app'], status: 'live' },
   { id: 'connected-apps', label: 'Connected apps', href: '/dashboard/settings/connected-apps', icon: Link2, group: 'settings', description: 'Social platform connections', keywords: ['social', 'x', 'instagram', 'tiktok'], status: 'live' },

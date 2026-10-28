@@ -127,8 +127,8 @@ export function OnboardingStep({ step }: { step: number }) {
   const productName = config.loading ? '...' : config.productName;
 
   return (
-    <div className="min-h-[100dvh] bg-background flex items-center justify-center p-6">
-      <div className="w-full max-w-lg">
+    <div className="min-h-[100dvh] bg-background flex items-center justify-center p-6 sm:p-10">
+      <div className="w-full max-w-xl">
         {/* Progress */}
         <div
           className="flex items-center gap-2 mb-8"
@@ -145,15 +145,16 @@ export function OnboardingStep({ step }: { step: number }) {
               {n < 3 && <div className={`h-px flex-1 w-8 ${n < step ? 'bg-primary' : 'bg-border'}`} />}
             </div>
           ))}
-          <span className="text-xs text-muted-foreground ml-2 font-mono">Step {step} of 3</span>
+          <span className="text-xs text-muted-foreground ml-2">Step {step} of 3</span>
         </div>
 
-        <div className="bg-card border border-border rounded-lg p-8 space-y-6">
+        <div className="bg-card/90 border border-border rounded-2xl p-6 shadow-[0_24px_70px_-45px_hsl(var(--primary)/0.8)] sm:p-9 space-y-7">
           {step === 1 && (
             <>
               <div>
-                <h1 className="text-2xl font-display font-bold tracking-tight">Who are you?</h1>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-sm font-medium tracking-wide text-primary">Let&apos;s make this yours</p>
+                <h1 className="mt-1 text-3xl font-display font-semibold tracking-tight">Who are you?</h1>
+                <p className="text-sm leading-relaxed text-muted-foreground mt-2">
                   {productName} uses this to address you and schedule around your time.
                 </p>
               </div>
@@ -221,7 +222,8 @@ export function OnboardingStep({ step }: { step: number }) {
           {step === 2 && (
             <>
               <div>
-                <h1 className="text-2xl font-display font-bold tracking-tight">How should I work?</h1>
+                <p className="text-sm font-medium tracking-wide text-primary">Set your working style</p>
+                <h1 className="mt-1 text-3xl font-display font-semibold tracking-tight">How should I work?</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   Set how much {productName} can do on your behalf without asking.
                 </p>
@@ -344,7 +346,8 @@ export function OnboardingStep({ step }: { step: number }) {
           {step === 3 && (
             <>
               <div>
-                <h1 className="text-2xl font-display font-bold tracking-tight">You are ready.</h1>
+                <p className="text-sm font-medium tracking-wide text-primary">Your workspace is ready</p>
+                <h1 className="mt-1 text-3xl font-display font-semibold tracking-tight">You are ready.</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   Here is what was set up for your session.
                 </p>

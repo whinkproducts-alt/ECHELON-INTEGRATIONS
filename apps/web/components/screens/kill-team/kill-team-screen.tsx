@@ -35,7 +35,7 @@ export function KillTeamScreen({ founder }: { founder: boolean }) {
         <div>
           <p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-primary">Founder command</p>
           <h1 className="mt-2 flex items-center gap-3 text-2xl font-display font-bold tracking-tight text-foreground"><Radar className="h-6 w-6 text-primary" /> Kill Team</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">A specialist group for research, deconstruction, product decisions, implementation, and growth. Kill Team work is separate from WHINK and MAMBA.</p>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">A specialist group for research, deconstruction, product decisions, implementation, and growth. WHINK and MAMBA remain the executive layer: they retain full authority, set direction, and cascade each request to the right directorate.</p>
         </div>
         <span className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1.5 text-xs font-mono ${founder ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500' : 'border-border bg-secondary text-muted-foreground'}`}>
           <LockKeyhole className="h-3.5 w-3.5" /> {founder ? 'Founder access' : 'View only'}
@@ -47,7 +47,7 @@ export function KillTeamScreen({ founder }: { founder: boolean }) {
           <div className="rounded-lg bg-primary/10 p-2 text-primary"><Send className="h-4 w-4" /></div>
           <div className="min-w-0 flex-1">
             <h2 id="objective-heading" className="text-sm font-semibold text-foreground">Founder objective</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Only the founder can assign the team a direction. This brief is held in the current session until a durable objective workflow is enabled.</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Only the founder can assign the team a direction. WHINK and MAMBA can then decompose the objective, brief the involved directors, and coordinate the specialists without reducing their executive authority.</p>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <input value={objective} onChange={(e) => setObjective(e.target.value)} disabled={!founder} placeholder={founder ? 'What should the Kill Team investigate or build?' : 'Founder access required'} aria-label="Kill Team objective" className="min-h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60" />
               <button type="button" onClick={assignObjective} disabled={!founder || !objective.trim()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"><Send className="h-4 w-4" /> Assign objective</button>

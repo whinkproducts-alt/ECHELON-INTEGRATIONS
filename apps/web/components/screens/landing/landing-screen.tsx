@@ -30,14 +30,14 @@ export function LandingScreen() {
 
       <main>
         <section aria-labelledby="hero-title" className="relative">
-          <HoloOrbBackdrop stars={40} floor={false} className="opacity-30" />
+          <HoloOrbBackdrop stars={40} floor={false} className="opacity-15" />
           <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-12 px-6 pb-16 pt-8 sm:pb-24 lg:min-h-[640px] lg:grid-cols-[1.2fr_1fr] lg:gap-14">
             <div className="flex flex-col gap-6">
-              <p className={cn('font-mono text-xs uppercase tracking-[0.22em] text-muted-foreground', styles.rise)}>{acronymExpansion}</p>
+              <p className={cn('text-sm font-medium tracking-wide text-primary', styles.rise)}>{acronymExpansion}</p>
               <h1 id="hero-title" className={cn('text-balance font-display text-5xl font-semibold leading-[1.04] tracking-tight sm:text-6xl lg:text-[3.25rem] xl:text-[3.5rem]', styles.rise)} style={{ '--d': '80ms' } as React.CSSProperties}>
                 An AI chief of staff that asks first.
               </h1>
-              <p className={cn('max-w-xl text-lg text-secondary-foreground', styles.rise)} style={{ '--d': '160ms' } as React.CSSProperties}>
+              <p className={cn('max-w-xl text-lg leading-relaxed text-secondary-foreground', styles.rise)} style={{ '--d': '160ms' } as React.CSSProperties}>
                 It keeps your projects and decisions moving, and it waits for your approval before it spends money, sends anything out, or shares private information.
               </p>
               <div className={cn('flex flex-col gap-3 sm:flex-row', styles.rise)} style={{ '--d': '240ms' } as React.CSSProperties}>
@@ -50,18 +50,18 @@ export function LandingScreen() {
         </section>
 
         <section aria-labelledby="tour-title" className="mx-auto w-full max-w-6xl px-6 pb-16 sm:pb-24">
-          <div className="mb-10 flex flex-col gap-3">
-            <p className="font-mono text-xs uppercase tracking-[0.22em] text-muted-foreground">Product tour</p>
+          <div className="mb-10 flex flex-col gap-3 border-l-2 border-primary/60 pl-5">
+            <p className="text-sm font-medium tracking-wide text-primary">A clear view of the work</p>
             <h2 id="tour-title" className="max-w-xl text-balance font-display text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">See what it keeps in front of you.</h2>
-            <p className="text-sm text-muted-foreground">Real screens, shown with sample data.</p>
+            <p className="max-w-2xl text-base leading-relaxed text-muted-foreground">Real screens, shown with sample data. The important decisions stay readable; the interface does not make you decode a control room.</p>
           </div>
           <ul className="grid grid-cols-1 gap-x-6 gap-y-10 lg:grid-cols-6">
-            {TOUR.map((t, i) => (
-              <li key={t.id} className={cn('group flex flex-col gap-3', i === 0 ? 'lg:col-span-4' : i === 1 ? 'lg:col-span-2' : 'lg:col-span-3')}>
-                <div className={cn('overflow-hidden rounded-xl border border-border bg-card shadow-[0_24px_60px_-28px_hsl(var(--base)/0.95)] transition-transform duration-300 group-hover:-translate-y-1 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0', i === 1 && 'lg:flex-1')}>
-                  <Image src={t.src} alt={t.alt} width={t.width} height={t.height} sizes={i === 0 ? '(min-width: 1024px) 66vw, 100vw' : i === 1 ? '(min-width: 1024px) 33vw, 100vw' : '(min-width: 1024px) 50vw, 100vw'} className={cn('h-auto w-full', i === 1 && 'lg:h-full lg:origin-[0%_30%] lg:scale-[1.15] lg:object-cover lg:object-[0%_30%]')} />
+            {TOUR.map((t) => (
+              <li key={t.id} className="group flex flex-col gap-3 lg:col-span-3">
+                <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_24px_60px_-28px_hsl(var(--base)/0.95)] transition-transform duration-300 group-hover:-translate-y-1 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
+                  <Image src={t.src} alt={t.alt} width={t.width} height={t.height} sizes="(min-width: 1024px) 50vw, 100vw" className="h-auto w-full" />
                 </div>
-                <p className="max-w-md text-sm text-muted-foreground">{t.caption}</p>
+                <p className="max-w-md text-base leading-relaxed text-muted-foreground">{t.caption}</p>
               </li>
             ))}
           </ul>
@@ -70,7 +70,7 @@ export function LandingScreen() {
         <section aria-labelledby="jobs-title" className="mx-auto w-full max-w-6xl px-6 pb-16 sm:pb-24">
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,20rem)_1fr] lg:gap-20">
             <div className="lg:sticky lg:top-10 lg:self-start">
-              <p className="mb-3 font-mono text-xs uppercase tracking-[0.22em] text-muted-foreground">What it does</p>
+              <p className="mb-3 text-sm font-medium tracking-wide text-primary">What it does</p>
               <h2 id="jobs-title" className="font-display text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">The job of a chief of staff.</h2>
             </div>
             <ol className="flex flex-col divide-y divide-border border-y border-border">
@@ -78,7 +78,7 @@ export function LandingScreen() {
                 <li key={c.id} className="grid grid-cols-1 gap-3 py-8 sm:grid-cols-[3rem_1fr]">
                   <span className="font-mono text-sm text-muted-foreground">{String(i + 1).padStart(2, '0')}</span>
                   <div className="flex flex-col gap-2">
-                    <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">{c.tag}</p>
+                    <p className="text-sm font-medium text-primary">{c.tag}</p>
                     <h3 className="max-w-lg text-balance font-display text-2xl font-semibold tracking-tight sm:text-3xl">{c.title}</h3>
                     <p className="max-w-xl text-base text-muted-foreground">{c.body}</p>
                   </div>
