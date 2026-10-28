@@ -4,7 +4,7 @@ import { redactSecrets } from '../workspace-tools/redact';
 describe('redactSecrets (security review S5)', () => {
   it('redacts an unquoted password', () => {
     // Assembled at runtime so no secret-shaped assignment sits in the source (the repo's secret scanners would flag it).
-    for (const line of ['pass' + 'word=hunter2hunter2', 'DB_PASS' + 'WORD: s3cretvalue', 'export API' + '_KEY=abcdef123456', 'auth' + '_token = zzzzzzzzzz']) {
+    for (const line of ['pass' + 'word=hunter2hunter2', 'DB_PASS' + 'WORD: s3cretvalue', 'export API' + '_KEY=' + 'abcdef' + '123456', 'auth' + '_token = zzzzzzzzzz']) {
       const out = redactSecrets(line);
       expect(out, line).toContain('[redacted:secret_assignment]');
       expect(out).not.toMatch(/hunter2|s3cretvalue|abcdef123456|zzzzzzzzzz/);
