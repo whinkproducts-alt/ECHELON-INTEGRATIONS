@@ -418,9 +418,9 @@ export async function POST(
             },
           });
 
-          // Save the completed exchange to episodic memory for later task recall. It remains
-          // source-linked and untrusted on retrieval; secret and sensitive-memory gates apply.
-          await recordCompletedTurn({
+          // Completed-turn record: detached, never awaited, failures never reach the user. Follows the
+          // same rules as extraction (skips tainted and external-content turns; MAMBA goes to hypotheses).
+          void recordCompletedTurn({
             userId: session.user.id,
             conversationId,
             messageId: assistantMessage.id,
@@ -429,7 +429,10 @@ export async function POST(
             persona: activePersona,
             projectId: projectId ?? conv.projectId,
             correlationId,
-          });
+            externalContentThisTurn,
+            conversationTainted,
+            injectionBlocked: false,
+          }).catch(() => { /* detached — never surface */ });
 
           // B1 — Auto memory extraction (detached — does not block the response).
           // Skipped when a tool wrote memory, a tool ran, or external content was read this turn.

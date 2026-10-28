@@ -123,9 +123,19 @@ export function isSensitive(statement: string): boolean {
 }
 
 /**
- * Store the completed chat exchange as a source-linked episodic record. This is a verbatim
- * work record, not a verified-facts extraction: retrieval wraps it as untrusted content.
- * Secrets are never persisted here; sensitive records still pass the normal Class B gate.
+ * Store the completed chat exchange as a source-linked record. This is a work summary, not a
+ * verified-facts extraction, so it follows the SAME rules as extractAndStoreMemories (3b):
+ * - Must be started detached (`void recordCompletedTurn(...).catch(() => {})`), never awaited in
+ *   the response. It never throws.
+ * - Skipped (ledger memory_auto_skipped, reason only) for tainted or external-content turns and
+ *   injection-blocked messages (B11), and when the daily cap is reached (B12).
+ * - Secrets are dropped before the permission check (B6); sensitive text needs
+ *   memory_auto_write_sensitive (Class B), routine text memory_auto_write (Class A) (B4/B5).
+ * - MAMBA turns are stored only as a hypothesis, confidence at most 0.4, never as fact (B10).
+ * - Rows carry source 'auto', the conversation and message ids, confidence at most 0.8 (B9).
+ *   Episodic rows have no epistemicStatus column; they are INFERRED by construction (source 'auto').
+ * - Identical text for the same user is not stored twice.
+ * - Ledger rows carry ids and counts only, never the text (B7).
  */
 export async function recordCompletedTurn(input: {
   userId: string;
@@ -136,18 +146,49 @@ export async function recordCompletedTurn(input: {
   persona: string;
   projectId?: string | null;
   correlationId: string;
+  /** External content (email, web, files, tool results) was read this turn. */
+  externalContentThisTurn?: boolean;
+  /** The conversation was already tainted by external content. */
+  conversationTainted?: boolean;
+  /** The user message was injection-blocked. */
+  injectionBlocked?: boolean;
 }): Promise<void> {
-  const { userId, conversationId, messageId, userMessage, assistantReply, persona, projectId, correlationId } = input;
-  const statement = `Completed conversation turn with ${persona}.\nUser request:\n${userMessage}\n\nAssistant result:\n${assistantReply}`;
-  if (!userId || !conversationId || !messageId || !statement.trim()) return;
+  try {
+    await recordCompletedTurnInner(input);
+  } catch (err) {
+    logger.error('auto-memory: completed turn record failed', {
+      userId: input.userId, correlationId: input.correlationId, error: (err as Error)?.message,
+    });
+  }
+}
 
+async function recordCompletedTurnInner(input: Parameters<typeof recordCompletedTurn>[0]): Promise<void> {
+  const { userId, conversationId, messageId, userMessage, assistantReply, persona, projectId, correlationId } = input;
+  if (!userId || !conversationId || !messageId) return;
+  const isMamba = persona.toUpperCase() === 'MAMBA';
+  const statement = `Completed conversation turn with ${persona}.\nUser request:\n${userMessage}\n\nAssistant result:\n${assistantReply}`;
+  if (!userMessage.trim() && !assistantReply.trim()) return;
+
+  const skip = (reason: string) => recordActionSafe({
+    userId, initiator: 'system', persona, action: 'memory_auto_skipped', permissionClass: 'A',
+    status: 'VALIDATED', inputSummary: `reason: ${reason}`, correlationId,
+  });
+
+  // B11: external content never becomes memory.
+  if (input.injectionBlocked) { await skip('injection_blocked'); return; }
+  if (input.externalContentThisTurn || input.conversationTainted) { await skip('external_content'); return; }
+
+  // B6: secrets are dropped before the permission check; no content in the row.
   if (isSecret(statement)) {
     await recordActionSafe({
-      userId, initiator: 'system', persona, action: 'memory_task_record_skipped',
-      permissionClass: 'A', status: 'VALIDATED', inputSummary: 'reason: secret_detected', correlationId,
+      userId, initiator: 'system', persona, action: 'memory_secret_dropped', permissionClass: 'A',
+      status: 'VALIDATED', correlationId,
     });
     return;
   }
+
+  // B12: daily cap.
+  if (await dailyCapReached(userId, persona, correlationId)) return;
 
   const sensitive = isSensitive(statement);
   const permissionClass: 'A' | 'B' = sensitive ? 'B' : 'A';
@@ -164,36 +205,58 @@ export async function recordCompletedTurn(input: {
   }
   if (!permission.allowed) {
     await recordActionSafe({
-      userId, initiator: 'system', persona, action: 'memory_task_record_denied',
-      permissionClass, status: 'DENIED', inputSummary: `reason: ${sensitive ? 'sensitive' : 'permission'}`, correlationId,
+      userId, initiator: 'system', persona, action: 'memory_auto_write_denied',
+      permissionClass, status: 'DENIED',
+      inputSummary: `category:${sensitive ? 'sensitive' : 'routine'} reason:${permission.reason ?? 'denied'}`, correlationId,
     });
     return;
   }
 
+  // Identical text for this user is never stored twice (userId-scoped).
   try {
-    await writeMemory({
+    const existing = isMamba
+      ? await prisma.hypothesis.findFirst({ where: { userId, statement }, select: { id: true } })
+      : await prisma.memoryEpisode.findFirst({ where: { userId, summary: statement }, select: { id: true } });
+    if (existing) {
+      await recordActionSafe({
+        userId, initiator: 'system', persona, action: 'memory_deduplicated', permissionClass,
+        status: 'VALIDATED', inputSummary: `type:${isMamba ? 'hypothesis' : 'episodic'}`, outputSummary: `id:${existing.id}`, correlationId,
+      });
+      return;
+    }
+  } catch { /* dedup lookup failure is not fatal; fall through to the write */ }
+
+  try {
+    const memType = isMamba ? 'hypothesis' : 'episodic';
+    const result = await writeMemory({
       userId,
-      type: 'episodic',
+      type: memType,
       statement,
       projectId: projectId ?? null,
-      source: 'conversation',
+      source: 'auto',
       sourceId: conversationId,
       messageId,
-      extractorModel: 'verbatim_exchange',
+      extractorModel: 'turn_summary',
       eventType: 'completed_work',
-      confidence: 1,
+      confidence: isMamba ? 0.4 : 0.8,
       importance: 0.7,
+      epistemicStatus: 'INFERRED',
+      entities: [`conversation:${conversationId}`],
+      ...(isMamba ? { mambaMode: 'OBSIDIAN' } : {}),
     });
+    try { await incrementDailyCount(userId); } catch { /* non-fatal */ }
     await recordActionSafe({
-      userId, initiator: 'system', persona, action: 'memory_task_recorded',
-      permissionClass, status: 'VALIDATED', inputSummary: 'type: completed_work', correlationId,
+      userId, initiator: 'system', persona,
+      action: result.deduped ? 'memory_deduplicated' : 'memory_auto_written',
+      permissionClass, status: 'VALIDATED',
+      inputSummary: `type:${memType}`, outputSummary: `id:${result.id}`, correlationId,
     });
   } catch (err) {
     logger.error('auto-memory: completed work record failed', {
       userId, correlationId, error: (err as Error)?.message,
     });
     await recordActionSafe({
-      userId, initiator: 'system', persona, action: 'memory_task_record_failed',
+      userId, initiator: 'system', persona, action: 'memory_auto_written',
       permissionClass, status: 'FAILED', inputSummary: 'type: completed_work', correlationId,
     });
   }
@@ -237,6 +300,27 @@ async function hasTodayCapLedgerRow(userId: string): Promise<boolean> {
     },
   });
   return count > 0;
+}
+
+/** True when the user's daily auto-memory cap is reached; ledgers memory_cap_reached once per day. */
+async function dailyCapReached(userId: string, persona: string, correlationId: string): Promise<boolean> {
+  const cap = Math.max(1, parseInt(process.env.MEMORY_DAILY_CAP ?? `${DEFAULT_DAILY_CAP}`, 10));
+  let currentCount: number;
+  try {
+    currentCount = await getDailyCount(userId);
+  } catch {
+    currentCount = 0; // non-fatal: proceed
+  }
+  if (currentCount < cap) return false;
+  try {
+    if (!(await hasTodayCapLedgerRow(userId))) {
+      await recordActionSafe({
+        userId, initiator: 'system', persona, action: 'memory_cap_reached', permissionClass: 'A',
+        status: 'VALIDATED', inputSummary: `Daily cap of ${cap} reached`, correlationId,
+      });
+    }
+  } catch { /* non-blocking */ }
+  return true;
 }
 
 // ── B8 — Relative date resolver ───────────────────────────────────────────────
@@ -347,31 +431,7 @@ export async function extractAndStoreMemories(
   }
 
   // B12 — Daily cap check (before any model call)
-  const cap = Math.max(1, parseInt(process.env.MEMORY_DAILY_CAP ?? `${DEFAULT_DAILY_CAP}`, 10));
-  let currentCount: number;
-  try {
-    currentCount = await getDailyCount(userId);
-  } catch {
-    currentCount = 0; // non-fatal: proceed with extraction
-  }
-  if (currentCount >= cap) {
-    try {
-      const alreadyLogged = await hasTodayCapLedgerRow(userId);
-      if (!alreadyLogged) {
-        await recordActionSafe({
-          userId,
-          initiator: 'system',
-          persona,
-          action: 'memory_cap_reached',
-          permissionClass: 'A',
-          status: 'VALIDATED',
-          inputSummary: `Daily cap of ${cap} reached`,
-          correlationId,
-        });
-      }
-    } catch { /* non-blocking */ }
-    return;
-  }
+  if (await dailyCapReached(userId, persona, correlationId)) return;
 
   // B2 — Load extraction model from env (no provider SDK here)
   const extractorModel = localOnlyModel(

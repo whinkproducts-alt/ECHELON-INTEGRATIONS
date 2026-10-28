@@ -5,6 +5,8 @@
  * No provider SDK is imported or called directly.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -103,48 +105,138 @@ describe('B1 — detached execution', () => {
   });
 });
 
-describe('completed work records', () => {
+describe('completed work records (recordCompletedTurn follows the same 3b rules)', () => {
   beforeEach(() => { vi.resetModules(); });
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
-  it('stores the completed exchange as a source-linked episodic record', async () => {
-    const { writeMemory, checkPermission } = buildMocks();
+  const base = {
+    userId: 'u1', conversationId: 'c1', messageId: 'm1',
+    userMessage: 'Build the feature', assistantReply: 'Implemented the feature.',
+    persona: 'WHINK', projectId: 'p1', correlationId: 'corr-retro',
+  };
+  const actions = (fn: { mock: { calls: any[][] } }) => fn.mock.calls.map((c) => c[0].action);
+
+  // Changed: old test expected source 'conversation' and confidence 1 (stored as fact). Now source 'auto',
+  // INFERRED, confidence capped at 0.8, ledgered as memory_auto_written with ids only.
+  it('stores the completed exchange as an INFERRED, source-linked auto record capped at 0.8', async () => {
+    const { writeMemory, checkPermission, recordActionSafe } = buildMocks();
     const { recordCompletedTurn } = await import('../auto-memory');
-    await recordCompletedTurn({
-      userId: 'u1', conversationId: 'c1', messageId: 'm1',
-      userMessage: 'Build the feature', assistantReply: 'Implemented the feature.',
-      persona: 'MICAH', projectId: 'p1', correlationId: 'corr-retro',
-    });
+    await recordCompletedTurn(base);
     expect(checkPermission).toHaveBeenCalledWith('u1', 'memory_auto_write', 'A', 'corr-retro');
     expect(writeMemory).toHaveBeenCalledWith(expect.objectContaining({
-      userId: 'u1', type: 'episodic', projectId: 'p1', source: 'conversation',
-      sourceId: 'c1', messageId: 'm1', eventType: 'completed_work', confidence: 1,
+      userId: 'u1', type: 'episodic', projectId: 'p1', source: 'auto', sourceId: 'c1', messageId: 'm1',
+      eventType: 'completed_work', epistemicStatus: 'INFERRED', confidence: 0.8,
+      entities: ['conversation:c1'],
     }));
+    expect(writeMemory.mock.calls[0][0].confidence).toBeLessThanOrEqual(0.8);
     expect(writeMemory.mock.calls[0][0].statement).toContain('Implemented the feature.');
+    const row = recordActionSafe.mock.calls.map((c) => c[0]).find((r) => r.action === 'memory_auto_written');
+    expect(row).toMatchObject({ initiator: 'system', status: 'VALIDATED', correlationId: 'corr-retro', outputSummary: 'id:mem-1' });
+    expect(JSON.stringify(row)).not.toContain('Implemented the feature');
   });
 
-  it('does not persist a completed exchange that contains a detected secret', async () => {
-    const { writeMemory, recordActionSafe } = buildMocks();
+  it('never throws to the caller, even when everything fails', async () => {
+    buildMocks({ '@/lib/memory-engine': { writeMemory: vi.fn().mockRejectedValue(new Error('db down')) } });
     const { recordCompletedTurn } = await import('../auto-memory');
-    await recordCompletedTurn({
-      userId: 'u1', conversationId: 'c1', messageId: 'm1',
-      userMessage: 'My password is definitely secret123', assistantReply: 'Understood.',
-      persona: 'WHINK', correlationId: 'corr-secret',
-    });
-    expect(writeMemory).not.toHaveBeenCalled();
-    expect(recordActionSafe).toHaveBeenCalledWith(expect.objectContaining({ action: 'memory_task_record_skipped' }));
+    await expect(recordCompletedTurn(base)).resolves.toBeUndefined();
   });
 
-  it('uses the sensitive-memory permission class before storing sensitive content', async () => {
+  // B11: skip flags
+  it.each([
+    ['externalContentThisTurn', 'external_content'],
+    ['conversationTainted', 'external_content'],
+    ['injectionBlocked', 'injection_blocked'],
+  ])('%s skips the record and ledgers memory_auto_skipped with the reason only', async (flag, reason) => {
+    const { writeMemory, checkPermission, recordActionSafe } = buildMocks();
+    const { recordCompletedTurn } = await import('../auto-memory');
+    await recordCompletedTurn({ ...base, [flag]: true });
+    expect(writeMemory).not.toHaveBeenCalled();
+    expect(checkPermission).not.toHaveBeenCalled();
+    const row = recordActionSafe.mock.calls[0][0];
+    expect(row).toMatchObject({ action: 'memory_auto_skipped', inputSummary: `reason: ${reason}` });
+    expect(JSON.stringify(row)).not.toContain('Build the feature');
+  });
+
+  // B10
+  it('MAMBA turns go to the hypothesis store with confidence at most 0.4, never episodic or semantic', async () => {
+    const { writeMemory } = buildMocks();
+    const { recordCompletedTurn } = await import('../auto-memory');
+    await recordCompletedTurn({ ...base, persona: 'MAMBA' });
+    expect(writeMemory).toHaveBeenCalledTimes(1);
+    const arg = writeMemory.mock.calls[0][0];
+    expect(arg.type).toBe('hypothesis');
+    expect(arg.confidence).toBeLessThanOrEqual(0.4);
+    expect(arg.source).toBe('auto');
+    expect(arg.mambaMode).toBe('OBSIDIAN');
+  });
+
+  // Changed: ledger action renamed from memory_task_record_skipped to the standard memory_secret_dropped (B6).
+  it('does not persist a completed exchange that contains a detected secret, and ledgers no content', async () => {
+    const { writeMemory, checkPermission, recordActionSafe } = buildMocks();
+    const { recordCompletedTurn } = await import('../auto-memory');
+    await recordCompletedTurn({ ...base, userMessage: 'My password is definitely secret123', assistantReply: 'Understood.' });
+    expect(writeMemory).not.toHaveBeenCalled();
+    expect(checkPermission).not.toHaveBeenCalled();
+    expect(recordActionSafe).toHaveBeenCalledWith(expect.objectContaining({ action: 'memory_secret_dropped' }));
+    expect(JSON.stringify(recordActionSafe.mock.calls)).not.toContain('secret123');
+  });
+
+  it('uses the sensitive-memory permission class and writes when permitted', async () => {
     const { writeMemory, checkPermission } = buildMocks();
     const { recordCompletedTurn } = await import('../auto-memory');
-    await recordCompletedTurn({
-      userId: 'u1', conversationId: 'c1', messageId: 'm1',
-      userMessage: 'I need to review my salary with my manager.', assistantReply: 'Here is a draft.',
-      persona: 'WHINK', correlationId: 'corr-sensitive',
-    });
+    await recordCompletedTurn({ ...base, userMessage: 'I need to review my salary with my manager.', assistantReply: 'Here is a draft.', correlationId: 'corr-sensitive' });
     expect(checkPermission).toHaveBeenCalledWith('u1', 'memory_auto_write_sensitive', 'B', 'corr-sensitive');
     expect(writeMemory).toHaveBeenCalledTimes(1);
+  });
+
+  it('sensitive turn without permission is not written; ledger has category and denial, not the text', async () => {
+    const { writeMemory, recordActionSafe } = buildMocks({
+      '@/lib/permission-engine': { checkPermission: vi.fn().mockResolvedValue({ allowed: false, method: 'requires_confirmation', reason: 'no delegation' }) },
+    });
+    const { recordCompletedTurn } = await import('../auto-memory');
+    await recordCompletedTurn({ ...base, userMessage: 'My diagnosis is chronic.', assistantReply: 'Noted.' });
+    expect(writeMemory).not.toHaveBeenCalled();
+    const row = recordActionSafe.mock.calls[0][0];
+    expect(row).toMatchObject({ action: 'memory_auto_write_denied', status: 'DENIED' });
+    expect(JSON.stringify(row)).not.toContain('diagnosis');
+  });
+
+  it('identical text already stored for the user is not written again (memory_deduplicated)', async () => {
+    const findFirst = vi.fn().mockResolvedValue({ id: 'ep-old' });
+    const { writeMemory, recordActionSafe } = buildMocks({ '@/lib/db': { prisma: { memoryEpisode: { findFirst } } } });
+    const { recordCompletedTurn } = await import('../auto-memory');
+    await recordCompletedTurn(base);
+    expect(findFirst.mock.calls[0][0].where.userId).toBe('u1');
+    expect(writeMemory).not.toHaveBeenCalled();
+    expect(actions(recordActionSafe)).toContain('memory_deduplicated');
+  });
+
+  it('honours the daily cap: no write, memory_cap_reached ledgered once', async () => {
+    vi.stubEnv('MEMORY_DAILY_CAP', '3');
+    const { writeMemory, recordActionSafe } = buildMocks({
+      '@/lib/db': { prisma: { memoryDailyCap: { findUnique: vi.fn().mockResolvedValue({ count: 3 }), upsert: vi.fn() } } },
+    });
+    const { recordCompletedTurn } = await import('../auto-memory');
+    await recordCompletedTurn(base);
+    expect(writeMemory).not.toHaveBeenCalled();
+    expect(actions(recordActionSafe)).toEqual(['memory_cap_reached']);
+  });
+
+  it('counts a successful write against the daily cap', async () => {
+    const upsert = vi.fn().mockResolvedValue({ count: 1 });
+    buildMocks({ '@/lib/db': { prisma: { memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert } } } });
+    const { recordCompletedTurn } = await import('../auto-memory');
+    await recordCompletedTurn(base);
+    expect(upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('the route starts it detached (void, not awaited) and passes the taint flags', () => {
+    const src = readFileSync(join(__dirname, '..', '..', 'app/api/conversations/[id]/messages/route.ts'), 'utf8');
+    expect(src).toMatch(/void recordCompletedTurn\(/);
+    expect(src).not.toMatch(/await recordCompletedTurn/);
+    const call = src.slice(src.indexOf('void recordCompletedTurn('));
+    expect(call.slice(0, 700)).toMatch(/externalContentThisTurn/);
+    expect(call.slice(0, 700)).toMatch(/conversationTainted/);
   });
 });
 
