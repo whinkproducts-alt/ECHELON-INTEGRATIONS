@@ -19,9 +19,12 @@ import { recordUsage } from '@/lib/usage';
 import { applyOfflineFallback } from '@/lib/offline';
 import { logger } from '@/lib/logger';
 import { streamChat } from '@/lib/model-router';
+import { ProviderUserError } from '@/lib/provider-errors';
 
 const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search', 'document_search', 'memory_read', 'calendar_list']);
-export const isExternalTool = (name: string) => EXTERNAL_TOOLS.has(name) || name.startsWith('openclaw__');
+// Workspace tools read local files and git output: untrusted data, so a turn that used one is tainted.
+const WORKSPACE_EXTERNAL_TOOLS = new Set(['get_cwd', 'read_file', 'list_files', 'search_files', 'git_status', 'git_diff', 'git_log']);
+export const isExternalTool = (name: string) => EXTERNAL_TOOLS.has(name) || WORKSPACE_EXTERNAL_TOOLS.has(name) || name.startsWith('openclaw__');
 
 export interface ToolDefinition {
   name: string;
@@ -266,7 +269,8 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
         // Never forward provider/upstream error text to the client.
         logger.error('tool loop failed', { userId: opts.userId, error: redactForLog(String(err?.message ?? err)) });
         const status = /\b([1-5]\d\d)\b/.exec(String(err?.message ?? ''))?.[1];
-        send({ type: 'error', error: status ? `Model provider error (${status})` : 'Model provider error' });
+        // A ProviderUserError carries a message written to be shown (no upstream body, no path).
+        send({ type: 'error', error: err instanceof ProviderUserError ? err.userMessage : status ? `Model provider error (${status})` : 'Model provider error' });
       } finally {
         close();
       }

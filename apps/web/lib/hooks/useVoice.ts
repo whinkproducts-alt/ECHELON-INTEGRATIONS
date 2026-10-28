@@ -27,21 +27,32 @@ export interface UseVoiceReturn {
   supported: VoiceSupport;
   /** 0–1 amplitude derived from live AnalyserNode on TTS audio, 0 when not speaking */
   lipSyncAmplitude: number;
+  /** Set when speech is switched off on purpose (Local-Only mode), to show the user why. */
+  voiceNotice?: string | null;
 }
+
+/**
+ * Local-Only mode (NEXT_PUBLIC_WHINK_LOCAL_ONLY, set together with WHINK_LOCAL_ONLY). Browser speech recognition
+ * (for example Chrome's webkitSpeechRecognition) sends audio to a vendor's servers and some browser voices are
+ * network voices, so neither is used. Speech then goes only through the server routes, which allow a loopback service.
+ */
+const LOCAL_ONLY_CLIENT = process.env.NEXT_PUBLIC_WHINK_LOCAL_ONLY === 'true';
+export const SPEECH_NOTICE = 'Speech is not available in Local-Only mode';
 
 export function useVoice(): UseVoiceReturn {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [lipSyncAmplitude, setLipSyncAmplitude] = useState(0);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
 
   const [supported] = useState<VoiceSupport>(() => {
     if (typeof window === 'undefined') return { stt: false, tts: false, serverStt: false };
-    const hasSpeechRecognition =
+    const hasSpeechRecognition = !LOCAL_ONLY_CLIENT && (
       typeof window.SpeechRecognition !== 'undefined' ||
-      typeof window.webkitSpeechRecognition !== 'undefined';
+      typeof window.webkitSpeechRecognition !== 'undefined');
     const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
-    const hasSpeechSynthesis = typeof window.speechSynthesis !== 'undefined';
+    const hasSpeechSynthesis = LOCAL_ONLY_CLIENT || typeof window.speechSynthesis !== 'undefined';
     return {
       stt: hasSpeechRecognition || hasMediaRecorder,
       tts: hasSpeechSynthesis,
@@ -184,6 +195,8 @@ export function useVoice(): UseVoiceReturn {
           if (res.ok) {
             const data = await res.json();
             text = data.text ?? '';
+          } else if (res.status === 503 && LOCAL_ONLY_CLIENT) {
+            setVoiceNotice(SPEECH_NOTICE);
           }
         } catch { /* non-blocking */ }
 
@@ -279,6 +292,8 @@ export function useVoice(): UseVoiceReturn {
       // Fall through to browser synthesis
     }
 
+    // Local-Only: no browser synthesis fallback.
+    if (LOCAL_ONLY_CLIENT) { setVoiceNotice(SPEECH_NOTICE); return; }
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
@@ -314,5 +329,5 @@ export function useVoice(): UseVoiceReturn {
     }
   }, [speakInner]);
 
-  return { startListening, stopListening, speak, isListening, isSpeaking, transcript, supported, lipSyncAmplitude };
+  return { startListening, stopListening, speak, isListening, isSpeaking, transcript, supported, lipSyncAmplitude, voiceNotice };
 }

@@ -4,6 +4,11 @@
  * based on the model string. Never import a provider SDK from a route; use this instead.
  */
 
+import { assertLocalOnly, isLocalOnlyMode, isLoopbackUrl, redirectOpt } from '@/lib/local-only';
+import { redactForLog } from '@/lib/redact-log';
+import { ollamaStatusError } from '@/lib/provider-errors';
+import { logger } from '@/lib/logger';
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -143,6 +148,7 @@ export async function streamChat(opts: StreamChatOptions): Promise<ReadableStrea
     'wink-qwen3.5-9b-8k';
   const maxTokens = opts.maxTokens ?? 4000;
   const temperature = opts.temperature ?? 0.7;
+  assertLocalOnly(model, { apiKey: opts.apiKey, baseUrl: opts.baseUrl });
 
   if (model.startsWith('claude')) {
     return streamAnthropic(opts.messages, model, maxTokens, temperature, opts.apiKey);
@@ -166,12 +172,16 @@ export async function chatOnce(opts: StreamChatOptions): Promise<string> {
     'llama3.1:8b';
   const maxTokens = opts.maxTokens ?? 512;
   const temperature = opts.temperature ?? 0.0;
+  assertLocalOnly(model, { apiKey: opts.apiKey, baseUrl: opts.baseUrl });
 
   if (model.startsWith('claude')) {
     return chatOnceAnthropic(opts.messages, model, maxTokens, temperature, opts.apiKey);
   }
   if (model.startsWith('gemini')) {
     return chatOnceGemini(opts.messages, model, maxTokens, temperature);
+  }
+  if (isNativeOllamaModel(model, opts.baseUrl)) {
+    return chatOnceNativeOllama(opts.messages, model, maxTokens, temperature);
   }
   return chatOnceOpenAICompatible(opts.messages, model, maxTokens, temperature, opts.apiKey, opts.baseUrl);
 }
@@ -237,9 +247,10 @@ async function chatOnceOpenAICompatible(
   explicitBaseUrl?: string,
 ): Promise<string> {
   const baseUrl = (explicitBaseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
-  const apiKey = explicitBaseUrl ? 'ollama' : (userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
+  const apiKey = explicitBaseUrl || isLocalOnlyMode() ? 'ollama' : (userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
+    ...redirectOpt(baseUrl),
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model,
@@ -393,6 +404,16 @@ async function streamGemini(
  * dimension/finiteness validation.
  */
 export async function embed(opts: { text: string }): Promise<number[] | null> {
+  // Local-Only: embeddings may only go to a loopback endpoint (never EMBEDDINGS_URL off-machine, never OpenAI).
+  // embed() never throws by contract, so a violation is logged and answered with null.
+  if (isLocalOnlyMode()) {
+    const target = process.env.EMBEDDINGS_URL ? process.env.EMBEDDINGS_URL
+      : (process.env.EMBEDDING_MODEL ?? '').startsWith('ollama/') ? (process.env.OLLAMA_URL ?? 'http://localhost:11434') : null;
+    if (!target || !isLoopbackUrl(target)) {
+      logger.warn('embed refused: Local-Only mode allows only a loopback embeddings endpoint');
+      return null;
+    }
+  }
   const embeddingsUrl = process.env.EMBEDDINGS_URL;
   const openaiApiKey = process.env.OPENAI_API_KEY;
   const embeddingModel = process.env.EMBEDDING_MODEL;
@@ -408,6 +429,7 @@ export async function embed(opts: { text: string }): Promise<number[] | null> {
         method: 'POST',
         headers,
         body: JSON.stringify({ model, input: opts.text }),
+        ...redirectOpt(embeddingsUrl),
         signal: AbortSignal.timeout(10_000),
       });
       if (!res.ok) return null;
@@ -431,7 +453,8 @@ export async function embed(opts: { text: string }): Promise<number[] | null> {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model, prompt: opts.text }),
-          signal: AbortSignal.timeout(10_000),
+          ...redirectOpt(ollamaBase),
+        signal: AbortSignal.timeout(10_000),
         });
         if (!res.ok) return null;
         const json = await res.json();
@@ -448,7 +471,7 @@ export async function embed(opts: { text: string }): Promise<number[] | null> {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiApiKey}` },
           body: JSON.stringify({ model, input: opts.text }),
-          signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(10_000),
         });
         if (!res.ok) return null;
         const json = await res.json();
@@ -495,10 +518,11 @@ async function streamOpenAICompatible(
   explicitBaseUrl?: string,
 ): Promise<ReadableStream<Uint8Array>> {
   const baseUrl = (explicitBaseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
-  const apiKey = explicitBaseUrl ? 'ollama' : (userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
+  const apiKey = explicitBaseUrl || isLocalOnlyMode() ? 'ollama' : (userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
+    ...redirectOpt(baseUrl),
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
@@ -611,6 +635,82 @@ export function configuredCloudModels(): string[] {
 /** The Ollama base URL (no path). */
 export function ollamaBaseUrl(): string {
   return (process.env.OLLAMA_URL ?? 'http://localhost:11434').replace(/\/$/, '');
+}
+
+/** Exact loopback host check on a parsed hostname. No prefix or suffix matching. */
+export function isLoopbackHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  return h === 'localhost' || h === '127.0.0.1' || h === '::1';
+}
+
+/**
+ * Native Ollama /api/chat endpoint, or null when the Ollama target is not loopback.
+ * Native transport never leaves the machine, so no credential is ever sent to it.
+ */
+export function nativeOllamaUrl(): string | null {
+  let u: URL;
+  try { u = new URL(ollamaBaseUrl()); } catch { return null; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+  if (!isLoopbackHost(u.hostname)) return null;
+  return ollamaBaseUrl() + '/api/chat';
+}
+
+/**
+ * True when the model should use Ollama's native /api/chat: its name starts with one of the
+ * WHINK_OLLAMA_NATIVE_MODELS prefixes (default 'gemma', empty string disables), it is not a
+ * claude* or gemini* model, and OLLAMA_URL is loopback.
+ */
+export function isNativeOllamaModel(model: string, baseUrl?: string): boolean {
+  const lower = model.toLowerCase();
+  if (lower.startsWith('claude') || lower.startsWith('gemini')) return false;
+  const raw = process.env.WHINK_OLLAMA_NATIVE_MODELS ?? 'gemma';
+  const prefixes = raw.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean);
+  if (!prefixes.some((p) => lower.startsWith(p))) return false;
+  if (nativeOllamaUrl() === null) return false;
+  // Native only when the effective target IS the loopback Ollama: an explicit base URL, or a configured
+  // OPENAI_COMPATIBLE_BASE_URL, that points anywhere else wins and is never silently ignored.
+  const effective = baseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL;
+  if (effective) {
+    try { return new URL(effective).origin === new URL(ollamaBaseUrl()).origin; } catch { return false; }
+  }
+  return true;
+}
+
+/** Native Ollama request timeout. WHINK_OLLAMA_TIMEOUT_MS overrides the 120 s default (a cold 9B model can be slow). */
+export function nativeTimeoutMs(): number {
+  const n = Number(process.env.WHINK_OLLAMA_TIMEOUT_MS);
+  return Number.isFinite(n) && n >= 10 ? Math.floor(n) : 120_000;
+}
+
+async function chatOnceNativeOllama(
+  messages: ChatMessage[],
+  model: string,
+  maxTokens: number,
+  temperature: number,
+): Promise<string> {
+  const url = nativeOllamaUrl();
+  if (!url) throw new Error('Ollama native endpoint unavailable');
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      stream: false,
+      think: false,
+      options: { num_predict: maxTokens, temperature, num_ctx: Number(process.env.WHINK_OLLAMA_NUM_CTX) || 8192 },
+      keep_alive: process.env.WHINK_OLLAMA_KEEP_ALIVE || '30m',
+    }),
+    redirect: 'error',
+    signal: AbortSignal.timeout(nativeTimeoutMs()),
+  });
+  if (!response.ok) {
+    const errText = await response.text().catch(() => 'Unknown error');
+    logger.error('model provider error', { provider: 'ollama-native', status: response.status, body: redactForLog(errText) });
+    throw ollamaStatusError(response.status, errText, model) ?? new Error(`Ollama native endpoint error ${response.status}`);
+  }
+  const json = await response.json();
+  return typeof json?.message?.content === 'string' ? json.message.content : '';
 }
 
 export function ollamaProbeUrl(): string {

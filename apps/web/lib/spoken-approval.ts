@@ -2,6 +2,8 @@
 
 import { beginSpeech, endSpeech, isSpeechActive } from '@/lib/hooks/speech-activity';
 
+const SPEECH_LOCAL_ONLY = process.env.NEXT_PUBLIC_WHINK_LOCAL_ONLY === 'true';
+
 export interface ApprovalRequest {
   /** Server approval id. The caller must act on exactly this id with the decision endpoint. */
   id: string;
@@ -109,6 +111,7 @@ async function speakServer(text: string): Promise<void> {
       if (res.status !== 501) throw new Error(`TTS ${res.status}`);
     } catch { /* fall through to browser synthesis */ }
 
+    if (SPEECH_LOCAL_ONLY) return; // Local-Only: no browser synthesis (may use network voices)
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
@@ -143,7 +146,8 @@ export function startDecisionCapture(expectedCode: string): DecisionCapture | nu
   if (typeof window === 'undefined' || isSpeechActive()) return null;
 
   const w = window as Window & typeof globalThis & { webkitSpeechRecognition?: SpeechRecognitionConstructor };
-  const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+  // Local-Only: browser recognition sends audio to a vendor, so it is not used.
+  const Ctor = SPEECH_LOCAL_ONLY ? undefined : (w.SpeechRecognition ?? w.webkitSpeechRecognition);
 
   if (Ctor) return captureWebSpeech(new Ctor(), expectedCode);
   if (typeof MediaRecorder !== 'undefined' && navigator.mediaDevices) return captureServerStt(expectedCode);

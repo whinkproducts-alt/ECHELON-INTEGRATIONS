@@ -49,3 +49,11 @@ Source of truth for what is open. Update it when something is done or decided. R
 - The standalone `openclaw-jarvis` repo (a copy of the open-source OpenClaw) has no approval step for posting; it defaults to exec security `full`, ask `off`. Keep social logins and credentials away from it, or route posting through WHINK's gateway.
 - Remaining dependency audit findings (below the high gate): csv-parse (moderate, needs a major version bump of the `csv` package) and two low. Revisit with the next dependency pass. Keep `pnpm audit --prod --audit-level=high` green.
 
+## G. Local Gemma agent (added 2026-10-28)
+Built and independently reviewed, never run against a real Ollama or on the owner's Mac. All behind flags; nothing runs unless WHINK_LOCAL_AGENT_TOOLS=true and WHINK_WORKSPACE_ROOT is set, and only for owner accounts.
+- Try it on the Mac: ollama pull the Gemma model, set DEFAULT_MODEL to it (or WHINK_LOCAL_MODEL with WHINK_LOCAL_ONLY=true), confirm the 3 to 4 second tool round trip Victor measured. Report timings and any Ollama error text (the 'does not support tools' wording and the malformed-tool-call response are unverified).
+- Not built yet, by design: apply_patch and run_test (need approvals plus another independent security review). git_commit, git_push, rm, network, messaging, money and production tools stay unavailable.
+- streamChat (plain streamed replies without tools) still uses the OpenAI-compatible /v1 path for Gemma; only the tool loop and one-shot chat use native /api/chat.
+- Local-Only mode: spoken approvals in approval-card.tsx still use browser speech (set NEXT_PUBLIC_WHINK_LOCAL_ONLY=true for the voice hook); owner emails are not verified (open signup lets a stranger register a listed owner email that has no account yet; keep SIGNUP_ENABLED false); a hardlink to a secret file is refused only when its link count is above 1; the 50 ms settle in project-access.test.ts works around an in-flight import race in that test file.
+- Apple git 2.39 (Xcode tools) lacks GIT_ATTR_SOURCE; the hostile-config refusal still applies and a warning is logged.
+

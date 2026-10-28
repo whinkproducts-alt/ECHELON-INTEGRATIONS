@@ -1,4 +1,6 @@
 export const dynamic = 'force-dynamic';
+import { isLocalOnlyMode, localOnlyBlocksUrl, redirectOpt, SPEECH_UNAVAILABLE } from '@/lib/local-only';
+import { ledgerLocalOnlyBlock } from '@/lib/local-only-guard';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 
@@ -11,6 +13,13 @@ export async function POST(req: NextRequest) {
   }
 
   const provider = (process.env.STT_PROVIDER ?? '').toLowerCase().trim();
+
+  // Local-Only: speech is available only through a loopback service (STT_URL). No browser fallback: browser
+  // recognition (for example Chrome's) sends audio to a vendor's servers.
+  if (isLocalOnlyMode() && (provider === 'deepgram' || localOnlyBlocksUrl(process.env.STT_URL?.trim()))) {
+    await ledgerLocalOnlyBlock(session.user.id, 'voice_stt', `provider=${provider || 'generic'}`);
+    return NextResponse.json({ error: SPEECH_UNAVAILABLE }, { status: 503 });
+  }
 
   // ── Deepgram ─────────────────────────────────────────────────────────────
   if (provider === 'deepgram') {
@@ -111,6 +120,7 @@ export async function POST(req: NextRequest) {
   try {
     upstreamRes = await fetch(`${sttUrl}/audio/transcriptions`, {
       method: 'POST',
+      ...redirectOpt(sttUrl),
       body: upstream,
     });
   } catch {

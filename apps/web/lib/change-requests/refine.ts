@@ -2,6 +2,7 @@
  * Refine a change request into a strict spec through the model router.
  * The request text is untrusted: it is wrapped as data and the model is told never to follow it.
  */
+import { localOnlyModel } from '@/lib/local-only';
 import { chatOnce } from '@/lib/model-router';
 import { stripFakeUntrustedTags, wrapUntrustedContent } from '@/lib/content-isolation';
 import { SpecSchema, type Spec } from '@/lib/change-requests/schema';
@@ -35,7 +36,7 @@ function extractJson(raw: string): unknown {
 export async function refineChangeRequest(input: { title: string; body: string }): Promise<RefineOutcome> {
   if (!modelConfigured()) return { ok: false, reason: 'no_model', error: 'No model configured' };
   const text = stripFakeUntrustedTags(`Title: ${input.title}\n\n${input.body}`);
-  const model = process.env.CHANGE_REQUEST_MODEL || process.env.DEFAULT_MODEL || undefined;
+  const model = process.env.CHANGE_REQUEST_MODEL || process.env.DEFAULT_MODEL ? localOnlyModel(process.env.CHANGE_REQUEST_MODEL || process.env.DEFAULT_MODEL) : undefined;
   let raw: string;
   try {
     raw = await chatOnce({

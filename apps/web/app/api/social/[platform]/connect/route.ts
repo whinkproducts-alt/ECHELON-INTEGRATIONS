@@ -1,4 +1,6 @@
 export const dynamic = 'force-dynamic';
+import { isLocalOnlyMode, LOCAL_ONLY_UNAVAILABLE } from '@/lib/local-only';
+import { ledgerLocalOnlyBlock } from '@/lib/local-only-guard';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { isSocialPlatform } from '@/lib/social/platforms';
@@ -10,6 +12,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pla
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { platform } = await params;
   if (!isSocialPlatform(platform)) return NextResponse.json({ error: 'Unknown platform' }, { status: 400 });
+  if (isLocalOnlyMode()) {
+    await ledgerLocalOnlyBlock(session.user.id, `social_connect_${platform}`, 'social OAuth needs the platform network');
+    return NextResponse.json({ error: LOCAL_ONLY_UNAVAILABLE }, { status: 503 });
+  }
 
   const body = await req.json().catch(() => null) as { consent?: unknown; consentTextVersion?: unknown } | null;
   const consent = body?.consent === true && body.consentTextVersion === 'v1'

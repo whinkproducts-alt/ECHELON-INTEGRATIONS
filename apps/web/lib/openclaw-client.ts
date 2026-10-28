@@ -8,6 +8,7 @@
  * permission class: WHINK assigns classes from config/tool-classes.json.
  */
 
+import { assertLoopbackWhenLocalOnly, redirectOpt } from '@/lib/local-only';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { ToolDefinition } from '@/lib/tool-loop';
@@ -53,6 +54,7 @@ function endpoint(): URL {
   if (!configured) throw new GatewayError('OpenClaw gateway is disabled (OPENCLAW_URL is not set)');
   const base = configured.replace(/\/+$/, '');
   const url = new URL(base.endsWith('/mcp') ? base : `${base}/mcp`);
+  assertLoopbackWhenLocalOnly(url.href, 'OpenClaw gateway');
   // L7: a bearer token must never cross the network in clear text.
   if (!LOCAL_HOSTNAMES.has(url.hostname) && url.protocol !== 'https:') {
     throw new GatewayError('OpenClaw endpoint must use https for non-local hosts');
@@ -114,7 +116,7 @@ async function getPooledClient(url: URL, token: string | undefined, timeoutMs: n
   }
   const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
   const transport = new StreamableHTTPClientTransport(url, {
-    requestInit: { headers, signal: AbortSignal.timeout(timeoutMs) },
+    requestInit: { headers, signal: AbortSignal.timeout(timeoutMs), ...redirectOpt(url.href) },
   });
   const client = new Client({ name: 'whink', version: '1.0.0' }, { capabilities: {} });
   try {

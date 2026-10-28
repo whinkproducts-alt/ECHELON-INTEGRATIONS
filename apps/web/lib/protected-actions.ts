@@ -88,6 +88,10 @@ export const LOCAL_SAFE_REGISTRY: ReadonlySet<string> = new Set([
   'swarm_plan', 'swarm_start', 'swarm_cancel', 'swarm_memory_write',
   // Security mail to the account owner's own address with a one-time link; no account data leaves.
   'password_reset_email',
+  // Read-only workspace tools: read the local checkout, nothing leaves the machine.
+  'get_cwd', 'read_file', 'list_files', 'search_files', 'git_status', 'git_diff', 'git_log',
+  'workspace_get_cwd', 'workspace_read_file', 'workspace_list_files', 'workspace_search_files',
+  'workspace_git_status', 'workspace_git_diff', 'workspace_git_log',
   'autonomy_change', 'ear',
   'gesture_open_thread', 'gesture_request_brief', 'gesture_propose_task', 'gesture_select', 'gesture_dismiss',
   'gesture_toggle_overview', 'gesture_pause', 'gesture_wake', 'gesture_next', 'gesture_refresh',
@@ -115,7 +119,7 @@ const EGRESS_VERBS = new Set([
   'share', 'shares', 'publish', 'export', 'exports', 'upload', 'uploads', 'forward', 'forwards', 'send', 'sends',
   'disclose', 'broadcast', 'tweet', 'retweet', 'quote', 'reply', 'follow', 'unfollow', 'dial', 'sync', 'replicate',
   'backup', 'mirror', 'copy', 'move', 'attach', 'deliver', 'emails', 'posts', 'execute', 'fill', 'submit', 'confirm',
-  'place', 'commit', 'release', 'authorize', 'authorise',
+  'place', 'commit', 'release', 'authorize', 'authorise', 'push',
 ]);
 // A gateway tool runs on someone else's system: any mutation of it is egress.
 const EXTERNAL_MUTATION_TOKENS = new Set([

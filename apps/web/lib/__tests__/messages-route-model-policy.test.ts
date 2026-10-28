@@ -10,7 +10,7 @@
  * taint key, then asserts runToolLoop is called with { conversationTainted: true }.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 describe('messages route: requested model is checked against the allow-list', () => {
   const runToolLoop = vi.fn();
@@ -135,6 +135,11 @@ describe('messages route: requested model is checked against the allow-list', ()
     return runToolLoop.mock.calls[0][0];
   }
 
+  const savedEnv = { DEFAULT_MODEL: process.env.DEFAULT_MODEL, WHINK_ALLOWED_MODELS: process.env.WHINK_ALLOWED_MODELS };
+  afterEach(() => {
+    for (const [k, v] of Object.entries(savedEnv)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  });
+
   beforeEach(() => {
     process.env.DEFAULT_MODEL = 'llama3.1:8b';
     delete process.env.WHINK_ALLOWED_MODELS;
@@ -173,5 +178,32 @@ describe('messages route: requested model is checked against the allow-list', ()
     expect(messageFindMany).toHaveBeenCalled();
     const where = messageFindMany.mock.calls[0][0].where;
     expect(where).toMatchObject({ conversationId: 'c1', conversation: { userId: 'u1' } });
+  });
+
+  it('Local-Only: a cloud model (even with the user key) is replaced by the local model and ledgered with reason local_only', async () => {
+    process.env.WHINK_LOCAL_ONLY = 'true';
+    process.env.WHINK_LOCAL_MODEL = 'gemma3:4b';
+    userApiKeyFind.mockResolvedValue({ encryptedKey: 'enc' });
+    try {
+      const args = await run({ model: 'claude-future-model' });
+      expect(args.model).toBe('gemma3:4b');
+      expect(args.apiKey).toBeUndefined();
+      const rows = recordActionSafe.mock.calls.map((c) => c[0]);
+      expect(rows.some((r) => r.action === 'model_not_allowed' && r.status === 'DENIED' && /local_only/.test(r.inputSummary))).toBe(true);
+    } finally {
+      delete process.env.WHINK_LOCAL_ONLY;
+      delete process.env.WHINK_LOCAL_MODEL;
+    }
+  });
+
+  it('Local-Only: a local model is used as asked and nothing is ledgered', async () => {
+    process.env.WHINK_LOCAL_ONLY = 'true';
+    try {
+      const args = await run({ model: 'llama3.1:8b' });
+      expect(args.model).toBe('llama3.1:8b');
+      expect(recordActionSafe.mock.calls.some((c) => c[0].action === 'model_not_allowed')).toBe(false);
+    } finally {
+      delete process.env.WHINK_LOCAL_ONLY;
+    }
   });
 });

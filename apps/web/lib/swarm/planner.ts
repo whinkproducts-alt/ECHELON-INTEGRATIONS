@@ -1,4 +1,5 @@
 /** Planner call: the initiative is untrusted data. The model only ever returns JSON that zod then filters. */
+import { localOnlyModel } from '@/lib/local-only';
 import { chatOnce } from '@/lib/model-router';
 import { wrapUntrustedContent, stripFakeUntrustedTags } from '@/lib/content-isolation';
 import { swarmConfig } from './config';
@@ -16,7 +17,7 @@ export const approxTokens = (s: string): number => Math.ceil(s.length / 4);
 export interface Decomposition { title: string; packages: unknown[]; tokensIn: number; tokensOut: number; model: string }
 
 export function swarmModel(): string {
-  return swarmConfig().model ?? process.env.SWARM_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k';
+  return localOnlyModel(swarmConfig().model ?? process.env.SWARM_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k');
 }
 
 export async function decomposeInitiative(initiative: string, workers: number): Promise<Decomposition> {

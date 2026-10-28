@@ -393,3 +393,28 @@ Victor's first install on his Mac (pnpm 12.5.1) failed with ERR_PNPM_MINIMUM_REL
 - Lesson: when bumping dependencies, check the publish date of each new version against pnpm 12's 24 hour rule, and test with the pnpm version the owner actually uses (12.x), not only the one CI pins.
 - The age rule is a supply-chain protection and stays on; it was not relaxed.
 
+
+## 2026-10-28 Native Ollama transport for Gemma (model router)
+- Decision: models whose name starts with a prefix in WHINK_OLLAMA_NATIVE_MODELS (default `gemma`, empty disables) are called through Ollama's native POST /api/chat with `think:false`, in chatWithTools and chatOnce. streamChat is unchanged and still uses /v1.
+- Reason: Victor measured the native path as fast with genuine structured tool calls, while /v1/chat/completions ignores think:false and was slow.
+- Guard: only when the model is not claude*/gemini* and OLLAMA_URL parses to hostname localhost, 127.0.0.1 or ::1 (exact match). No Authorization header and no cloud or per-user key is ever sent. Otherwise behaviour is unchanged. The code stays inside lib/model-router.ts and lib/model-router-tools.ts.
+
+## 2026-10-28 Read-only workspace tools and Local-Only mode
+- Decision: a small local model (Gemma via Ollama) can inspect a code workspace through seven read-only tools: get_cwd, read_file, list_files, search_files, git_status, git_diff, git_log. The model never executes anything. It names a tool with structured arguments, WHINK validates, runs a fixed implementation and returns the result as untrusted content. Code: lib/workspace-tools/.
+- Registration: only when WHINK_LOCAL_AGENT_TOOLS is exactly "true" and WHINK_WORKSPACE_ROOT is an absolute path to an existing directory. Otherwise they are not offered and executeTool answers "not configured" and ledgers it.
+- Permissions: capabilities workspace_* are Class A. The tool names are in the local-safe registry. "push" was added to the protected egress verbs so git_push style names are protected, not merely unknown. Dangerous names (apply_patch, run_test, git_commit, git_push, rm, network, messaging, money, production, permission change) are NOT registered and are denied and ledgered by the unknown-tool path (A7).
+- Sandbox: realpath containment with a segment-safe comparison, deny list (env files, keys, credentials, .ssh, .aws, .git, node_modules, .next), caps on size, entries, matches and files scanned. Git runs with execFile, fixed arguments, a minimal environment and config-driven code execution switched off on the command line. Secret-shaped strings are redacted from output. The ledger records tool, relative path or pattern and sizes only.
+- Local-Only mode (WHINK_LOCAL_ONLY="true"): resolveChatTools offers only the local allow-list and executeTool / executeApprovedTool deny everything else by name (DENIED, local_only_mode). A test requires every registered tool to be in exactly one of LOCAL_ONLY_ALLOWED or LOCAL_ONLY_DENIED.
+- Not in this stage: patching, running tests, commits. A later stage adds them through approvals after an independent security review.
+
+## 2026-10-28 Security review fixes for workspace tools and Local-Only (decision made for Victor, reversible)
+- Owner only: workspace tools are for owner accounts (WHINK_OWNER_EMAILS) only, in the chat tool set and in executeTool. No new env var. Reason: the env flag alone let any signed-up account read the operator's checkout.
+- No regex search. The conservative regex screen was bypassable (`a*a*...b` hung for 20 s+); literal substring search cannot backtrack.
+- Deny list widened, and git-ignored files are invisible in a work tree. Git output is redacted. Repos with filter/include config or a non-empty .git/info/attributes are refused before any git command runs.
+- Local-Only now also means local models only (reversible: remove the assertLocalOnly calls or unset WHINK_LOCAL_ONLY). The chat route falls back to WHINK_LOCAL_MODEL instead of failing the turn; background callers use the local model; embed returns null rather than throwing.
+- Native Ollama transport is used only when the effective target is the loopback Ollama origin; its errors are labelled correctly and never echo the upstream body.
+
+## 2026-10-28 Second review round (workspace tools, Local-Only, Ollama)
+- Fail closed: a refused repository refuses the file tools as well. Local-Only now covers voice, news, social connect, document recall, outbound messages, GitHub, gateway and probes, not only models and chat tools (see docs/security.md for the audit).
+- Ollama: num_ctx 8192 and keep_alive 30m are sent by default (matches apps/web/ollama/Modelfile); tool results are capped at 16000 characters. Reversible by env.
+- Unconfirmed: the exact Ollama 400 text for a model without tool support ("... does not support tools") is recalled from Ollama's source, not verified here; detection matches any 400 that mentions tool or function.

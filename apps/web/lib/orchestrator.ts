@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { localOnlyModel } from '@/lib/local-only';
 import { generateCorrelationId } from '@/lib/logger';
 import { assembleContext, formatContextForPrompt, type BlendedItem } from '@/lib/context-engine';
 import { buildSystemPrompt } from '@/prompts/build-prompt';
@@ -280,7 +281,7 @@ export function debriefTurn(params: {
 
       const raw = await chatOnce({
         messages: [{ role: 'user', content: prompt }],
-        model: process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k',
+        model: localOnlyModel(process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k'),
         maxTokens: 256,
         temperature: 0,
       });

@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+import { localOnlyViolation, localModelNameForLocalOnly } from '@/lib/local-only';
 import { isModelAllowed, isModelNameShape } from '@/lib/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
@@ -282,6 +283,18 @@ export async function POST(
         correlationId, inputSummary: `requested model ${String(resolvedModel).slice(0, 100)} is not on the allow-list; using the default`,
       });
       resolvedModel = defaultModel;
+      byokApiKey = undefined;
+    }
+
+    // Local-Only mode: model calls may only go to a model on this machine. A cloud model, a per-user
+    // key or a non-loopback endpoint is replaced by the local default and the swap is ledgered.
+    if (localOnlyViolation(resolvedModel, { apiKey: byokApiKey })) {
+      await recordActionSafe({
+        userId: session.user.id, initiator: 'user', persona: orchResult.newPersona ?? 'WHINK',
+        action: 'model_not_allowed', tool: 'model_policy', permissionClass: 'A', status: 'DENIED',
+        correlationId, inputSummary: `reason=local_only requested model ${String(resolvedModel).slice(0, 100)} is not local; using the local model`,
+      });
+      resolvedModel = localModelNameForLocalOnly();
       byokApiKey = undefined;
     }
 

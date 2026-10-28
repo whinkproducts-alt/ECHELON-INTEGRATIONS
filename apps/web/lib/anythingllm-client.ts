@@ -16,6 +16,8 @@
 // ── grep sentinel: ANYTHINGLLM_URL ANYTHINGLLM_API_KEY /api/v1/workspace ──────
 // These strings must appear only in this file and its tests.
 
+import { assertLoopbackWhenLocalOnly, redirectOpt } from '@/lib/local-only';
+
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
 
 /** 500 ms hard cap on queryDocuments per C11. */
@@ -28,6 +30,8 @@ const QUERY_TIMEOUT_MS = 500;
 function resolveBaseUrl(): string | null {
   const raw = process.env.ANYTHINGLLM_URL?.trim();
   if (!raw) return null;
+  // Local-Only: a recall service that is not on this machine is never queried (callers treat the throw as unavailable).
+  assertLoopbackWhenLocalOnly(raw, 'document service');
   return raw.replace(/\/$/, '');
 }
 
@@ -109,6 +113,7 @@ export async function queryDocuments(
   let res: Response;
   try {
     res = await fetch(url, {
+      ...redirectOpt(url),
       method: 'POST',
       headers: buildHeaders(),
       body: JSON.stringify({ query, limit: cappedLimit }),
@@ -190,6 +195,7 @@ export async function uploadDocument(
   let res: Response;
   try {
     res = await fetch(uploadUrl, {
+      ...redirectOpt(uploadUrl),
       method: 'POST',
       headers,
       body: formData,
@@ -220,6 +226,7 @@ export async function uploadDocument(
   try {
     const addHeaders = buildHeaders();
     await fetch(addUrl, {
+      ...redirectOpt(addUrl),
       method: 'POST',
       headers: addHeaders,
       body: JSON.stringify({ adds: [json?.documents?.[0]?.location ?? docId], deletes: [] }),
@@ -253,6 +260,7 @@ export async function deleteDocument(
   try {
     const headers = buildHeaders();
     res = await fetch(url, {
+      ...redirectOpt(url),
       method: 'DELETE',
       headers,
       signal: AbortSignal.timeout(10_000),
@@ -281,6 +289,7 @@ export async function listWorkspaces(): Promise<Workspace[]> {
   let res: Response;
   try {
     res = await fetch(`${base}/api/v1/workspaces`, {
+      ...redirectOpt(`${base}/api/v1/workspaces`),
       headers: buildHeaders(),
       signal: AbortSignal.timeout(10_000),
     });
@@ -364,6 +373,7 @@ export async function listDocuments(
   let res: Response;
   try {
     res = await fetch(`${base}/api/v1/workspace/${slug}`, {
+      ...redirectOpt(`${base}/api/v1/workspace/${slug}`),
       headers: buildHeaders(),
       signal: AbortSignal.timeout(5_000),
     });
@@ -395,5 +405,5 @@ export async function listDocuments(
 
 /** True when a recall service URL is configured. No network call. */
 export function isAnythingLlmConfigured(): boolean {
-  return resolveBaseUrl() !== null;
+  try { return resolveBaseUrl() !== null; } catch { return false; }
 }

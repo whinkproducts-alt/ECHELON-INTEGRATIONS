@@ -5,6 +5,7 @@
 // This layer never decides permission: callers run only after the permission engine / an approval
 // (sms, email and call sends are protected, Class C, approved by request id).
 
+import { isLocalOnlyMode } from '@/lib/local-only';
 import { routeRecipient, routingHeaders } from './mail-routing';
 import { isOwnerEmail } from '@/lib/owner';
 import { logger } from '@/lib/logger';
@@ -188,6 +189,8 @@ async function deliverTelegram(payload: DeliveryPayload): Promise<DeliveryResult
 }
 
 export async function deliver(payload: DeliveryPayload): Promise<DeliveryResult> {
+  // Local-Only: email, SMS, WhatsApp, Telegram and calls all leave the machine.
+  if (isLocalOnlyMode()) return { sent: false, channel: payload.channel, reason: 'local_only' };
   switch (payload.channel) {
     case 'EMAIL':
       return deliverEmail(payload);

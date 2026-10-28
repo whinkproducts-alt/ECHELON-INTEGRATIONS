@@ -4,6 +4,7 @@
  * (keeps the dependency list MIT/Apache only). Everything parsed here is untrusted text.
  */
 
+import { isLocalOnlyMode, LocalOnlyViolationError } from '@/lib/local-only';
 import { htmlToText } from '@/lib/html-text';
 
 export interface NewsItem { title: string; link: string; pubDate: string; source: string; excerpt: string }
@@ -70,6 +71,7 @@ export type FeedTextFetcher = (url: string) => Promise<string>;
 
 /** Route fetcher: plain fetch with the 5 minute cache hint the route always used. */
 export const routeFetcher: FeedTextFetcher = async (url) => {
+  if (isLocalOnlyMode()) throw new LocalOnlyViolationError('news feeds are external');
   const res = await fetch(url, {
     headers: { 'User-Agent': 'IntelligenceFeed/1.0' },
     next: { revalidate: 300 }, // 5-min cache
@@ -85,6 +87,7 @@ export const WORKER_FEED_TIMEOUT_MS = 10_000;
  * size caps. Loaded lazily so the route does not pull in the tool registry.
  */
 export const safeFetcher: FeedTextFetcher = async (url) => {
+  if (isLocalOnlyMode()) throw new LocalOnlyViolationError('news feeds are external');
   const { assertSafeUrl } = await import('@/lib/tool-registry');
   await assertSafeUrl(url);
   const res = await fetch(url, {

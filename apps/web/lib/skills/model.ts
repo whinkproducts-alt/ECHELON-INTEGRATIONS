@@ -1,4 +1,5 @@
 /** Model-assisted stages. All calls go through the model router; the skill is always untrusted data. */
+import { localOnlyModel } from '@/lib/local-only';
 import { z } from 'zod';
 import { chatOnce } from '@/lib/model-router';
 import { stripFakeUntrustedTags, wrapUntrustedContent } from '@/lib/content-isolation';
@@ -25,7 +26,8 @@ export class ModelStageError extends Error {
 
 /** The model for this pipeline, or null when none is configured (the submission then waits). */
 export function pipelineModel(): string | null {
-  return process.env.SKILL_PIPELINE_MODEL || process.env.DEFAULT_MODEL || null;
+  const m = process.env.SKILL_PIPELINE_MODEL || process.env.DEFAULT_MODEL || null;
+  return m ? localOnlyModel(m) : null;
 }
 
 export function extractJson(raw: string): unknown {

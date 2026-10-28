@@ -1,4 +1,6 @@
 export const dynamic = 'force-dynamic';
+import { isLocalOnlyMode, localOnlyBlocksUrl, redirectOpt, SPEECH_UNAVAILABLE } from '@/lib/local-only';
+import { ledgerLocalOnlyBlock } from '@/lib/local-only-guard';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 
@@ -36,6 +38,13 @@ export async function POST(req: NextRequest) {
   }
 
   const provider = (process.env.TTS_PROVIDER ?? '').toLowerCase().trim();
+
+  // Local-Only: speech is available only through a loopback service (TTS_URL). There is no browser fallback:
+  // browser speech engines may send text to a vendor's servers, which Local-Only forbids.
+  if (isLocalOnlyMode() && (provider === 'openai' || provider === 'deepgram' || localOnlyBlocksUrl(process.env.TTS_URL?.trim()))) {
+    await ledgerLocalOnlyBlock(session.user.id, 'voice_tts', `provider=${provider || 'generic'}`);
+    return NextResponse.json({ error: SPEECH_UNAVAILABLE }, { status: 503 });
+  }
 
   const rawVoice =
     typeof body.voice === 'string' && body.voice.trim()
@@ -104,6 +113,7 @@ export async function POST(req: NextRequest) {
     const isKokoro = provider === 'kokoro';
     upstreamRes = await fetch(`${ttsUrl}${isKokoro ? '/audio/speech' : '/tts'}`, {
       method: 'POST',
+      ...redirectOpt(ttsUrl),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(isKokoro
         ? { model: 'kokoro', input: text, voice, response_format: 'mp3' }

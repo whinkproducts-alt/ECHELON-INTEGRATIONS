@@ -17,6 +17,7 @@
  * - Daily cap enforced before extraction; at most one cap-reached row per user per day (B12).
  */
 
+import { localOnlyModel } from '@/lib/local-only';
 import { chatOnce } from '@/lib/model-router';
 import { writeMemory } from '@/lib/memory-engine';
 import { checkPermission } from '@/lib/permission-engine';
@@ -373,8 +374,8 @@ export async function extractAndStoreMemories(
   }
 
   // B2 — Load extraction model from env (no provider SDK here)
-  const extractorModel =
-    process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k';
+  const extractorModel = localOnlyModel(
+    process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k');
 
   // B8 — Fetch user timezone for relative-date resolution
   let timezone = 'UTC';

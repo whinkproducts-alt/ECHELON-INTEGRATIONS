@@ -13,7 +13,11 @@
  */
 
 import { logger } from '@/lib/logger';
-import { localReasoningEffort } from '@/lib/model-router';
+import { localReasoningEffort, isNativeOllamaModel, nativeOllamaUrl, nativeTimeoutMs } from '@/lib/model-router';
+import { assertLocalOnly, isLocalOnlyMode, redirectOpt } from '@/lib/local-only';
+import { redactForLog } from '@/lib/redact-log';
+import { ProviderUserError, ollamaStatusError } from '@/lib/provider-errors';
+export { redactForLog };
 
 export interface ToolSpec {
   name: string;
@@ -61,15 +65,6 @@ export class ToolsUnsupportedError extends Error {
   }
 }
 
-/** Redact token-like substrings (sk-..., Bearer ...) and truncate for server-side logs. */
-export function redactForLog(body: string, max = 300): string {
-  return body
-    .replace(/Bearer\s+[A-Za-z0-9._~+\/=-]+/gi, 'Bearer [redacted]')
-    .replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]')
-    .replace(/AIza[0-9A-Za-z_-]{35}/g, '[redacted]')
-    .substring(0, max);
-}
-
 /**
  * Build the error for a non-OK provider response. The thrown message carries only provider + status;
  * the (redacted, truncated) body is logged server-side. Tools-unsupported is detected from the body here.
@@ -92,6 +87,7 @@ export function providerFor(model: string): 'anthropic' | 'gemini' | 'openai-com
 }
 
 export async function chatWithTools(opts: ChatWithToolsOptions): Promise<ChatWithToolsResult> {
+  assertLocalOnly(opts.model, { apiKey: opts.apiKey, baseUrl: opts.baseUrl });
   const provider = providerFor(opts.model);
   if (provider === 'anthropic') return anthropicWithTools(opts);
   // Providers that restrict function names: names pass through unchanged, but a name
@@ -102,7 +98,92 @@ export async function chatWithTools(opts: ChatWithToolsOptions): Promise<ChatWit
     return false;
   });
   if (provider === 'gemini') return geminiWithTools({ ...opts, tools });
+  if (isNativeOllamaModel(opts.model, opts.baseUrl)) return nativeOllamaWithTools({ ...opts, tools });
   return openAICompatibleWithTools({ ...opts, tools });
+}
+
+// ── Native Ollama (/api/chat) ────────────────────────────────────────────────
+
+let nativeCallSeq = 0;
+
+/** Loopback-only, no Authorization header, no cloud or per-user key ever sent here. */
+async function nativeOllamaWithTools(opts: ChatWithToolsOptions): Promise<ChatWithToolsResult> {
+  const url = nativeOllamaUrl();
+  if (!url) throw new Error('Ollama native endpoint unavailable');
+
+  const callNames = new Map<string, string>();
+  const messages = opts.messages.map((m) => {
+    if (m.role === 'assistant') {
+      if (m.toolCalls?.length) {
+        for (const tc of m.toolCalls) callNames.set(tc.id, tc.name);
+        return {
+          role: 'assistant',
+          content: m.content,
+          tool_calls: m.toolCalls.map((tc) => ({ function: { name: tc.name, arguments: tc.input } })),
+        };
+      }
+      return { role: 'assistant', content: m.content };
+    }
+    if (m.role === 'tool') {
+      return { role: 'tool', content: m.content, tool_name: callNames.get(m.toolCallId) ?? m.name };
+    }
+    return { role: m.role, content: m.content };
+  });
+
+  const body: Record<string, unknown> = {
+    model: opts.model,
+    messages,
+    stream: false,
+    think: false,
+    // Ollama's default context is 4k on < 24 GiB machines and silently drops the oldest tokens.
+    options: { num_predict: opts.maxTokens ?? 4000, num_ctx: Number(process.env.WHINK_OLLAMA_NUM_CTX) || 8192 },
+    keep_alive: process.env.WHINK_OLLAMA_KEEP_ALIVE || '30m',
+  };
+  if (opts.tools.length > 0) {
+    body.tools = opts.tools.map((t) => ({
+      type: 'function',
+      function: { name: t.name, description: t.description, parameters: t.inputSchema },
+    }));
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      // A redirect would forward the request body (the whole conversation) to another host.
+      redirect: 'error',
+      signal: AbortSignal.timeout(nativeTimeoutMs()),
+    });
+  } catch (e) {
+    if ((e as Error)?.name === 'TimeoutError' || (e as Error)?.name === 'AbortError') throw e; // callers see the real timeout
+    throw new ProviderUserError('Ollama is not reachable. Is it running?');
+  }
+  if (!response.ok) {
+    const errText = await response.text().catch(() => 'Unknown error');
+    const friendly = ollamaStatusError(response.status, errText, opts.model);
+    if (friendly) { logger.error('model provider error', { provider: 'Ollama', status: response.status, body: redactForLog(errText) }); throw friendly; }
+    throw providerHttpError('Ollama', response.status, errText);
+  }
+  const json: any = await response.json();
+  const msg = json?.message ?? {};
+  const toolCalls: ToolCall[] = (Array.isArray(msg.tool_calls) ? msg.tool_calls : [])
+    .filter((tc: any) => tc?.function?.name)
+    .map((tc: any) => ({
+      // Unique across the whole run: a counter, not just the index within this reply.
+      id: `call_${nativeCallSeq++}`,
+      name: tc.function.name,
+      input: parseArgs(tc.function.arguments),
+    }));
+  const stopReason: StopReason =
+    toolCalls.length > 0 ? 'tool_use' : json?.done_reason === 'length' ? 'max_tokens' : 'end';
+  return {
+    text: typeof msg.content === 'string' ? msg.content : '',
+    toolCalls,
+    stopReason,
+    usage: { tokensIn: Number(json?.prompt_eval_count) || 0, tokensOut: Number(json?.eval_count) || 0 },
+  };
 }
 
 // ── Anthropic ────────────────────────────────────────────────────────────────
@@ -181,7 +262,7 @@ function parseArgs(raw: unknown): Record<string, unknown> {
 
 async function openAICompatibleWithTools(opts: ChatWithToolsOptions): Promise<ChatWithToolsResult> {
   const baseUrl = (opts.baseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
-  const apiKey = opts.baseUrl ? 'ollama' : (opts.apiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
+  const apiKey = opts.baseUrl || isLocalOnlyMode() ? 'ollama' : (opts.apiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
 
   const messages = opts.messages.map((m) => {
     if (m.role === 'assistant') {
@@ -226,6 +307,7 @@ async function openAICompatibleWithTools(opts: ChatWithToolsOptions): Promise<Ch
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify(body),
+    ...redirectOpt(baseUrl),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!response.ok) {

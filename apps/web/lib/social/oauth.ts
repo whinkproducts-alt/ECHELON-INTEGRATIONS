@@ -9,6 +9,7 @@
  * - The redirect URI is built server-side and must be on the allow-list.
  */
 
+import { isLocalOnlyMode, LocalOnlyViolationError } from '@/lib/local-only';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -98,6 +99,7 @@ export interface TokenSet {
 
 /** POST to a platform token endpoint. Throws a fixed-message error: upstream bodies are never surfaced. */
 export async function postTokenRequest(platform: SocialPlatform, form: Record<string, string>): Promise<TokenSet> {
+  if (isLocalOnlyMode()) throw new LocalOnlyViolationError('social platforms are external');
   const cfg = PLATFORM_CONFIG[platform];
   const creds = clientCredentials(platform);
   if (!creds) throw new Error('token_request_failed');
@@ -142,6 +144,7 @@ export async function postTokenRequest(platform: SocialPlatform, form: Record<st
  */
 async function lookupIdentity(platform: SocialPlatform, accessToken: string): Promise<{ id: string | null; handle: string | null } | null> {
   if (platform !== 'x') return { id: null, handle: null };
+  if (isLocalOnlyMode()) return null;
   try {
     const res = await fetch('https://api.x.com/2/users/me', {
       headers: { Authorization: `Bearer ${accessToken}` },

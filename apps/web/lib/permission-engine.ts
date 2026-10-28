@@ -43,6 +43,14 @@ export const CAPABILITY_CLASSES: Readonly<Record<string, PermissionClass>> = Obj
   swarm_memory_write: 'A',
   // System security mail to the account's own address, carrying a one-time link only.
   password_reset_email: 'A',
+  // Read-only local workspace tools (lib/workspace-tools). No patch, run, commit, push or delete capability exists.
+  workspace_get_cwd: 'A',
+  workspace_read_file: 'A',
+  workspace_list_files: 'A',
+  workspace_search_files: 'A',
+  workspace_git_status: 'A',
+  workspace_git_diff: 'A',
+  workspace_git_log: 'A',
 });
 
 export function capabilityClass(capability: string): PermissionClass {

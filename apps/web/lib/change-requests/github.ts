@@ -26,6 +26,7 @@ export type CreateIssueResult =
 export async function createIssue(input: { title: string; body: string; expectRepo?: string }, env: Record<string, string | undefined> = process.env): Promise<CreateIssueResult> {
   const cfg = githubConfig(env);
   if (!cfg) return { ok: false, reason: 'not_configured', error: NOT_CONFIGURED };
+  if (env.WHINK_LOCAL_ONLY === 'true') return { ok: false, reason: 'not_configured', error: 'Not available in Local-Only mode' };
   // The approval named a destination; if the configured one differs now, send nothing.
   if (input.expectRepo && input.expectRepo !== cfg.repo) return { ok: false, reason: 'repo_changed', error: 'Destination repository changed since approval; not sent' };
   const token = (env.CHANGE_REQUEST_GITHUB_TOKEN ?? '').trim();

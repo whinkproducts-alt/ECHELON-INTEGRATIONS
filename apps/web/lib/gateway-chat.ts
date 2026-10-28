@@ -13,6 +13,9 @@ import { canUseGateway } from '@/lib/gateway-access';
 import { hasActiveConnection } from '@/lib/social/connections';
 import { recordActionSafe } from '@/lib/ledger';
 import { SOCIAL_SCHEDULE_TOOL, type ToolDefinition } from '@/lib/tool-loop';
+import { workspaceToolDefinitions } from '@/lib/workspace-tools';
+import { canUseWorkspaceTools } from '@/lib/workspace-tools/access';
+import { isAllowedInLocalOnly, isLocalOnly } from '@/lib/workspace-tools/local-only';
 
 export async function resolveChatTools(opts: {
   userId: string;
@@ -20,6 +23,14 @@ export async function resolveChatTools(opts: {
   persona: string;
   correlationId: string;
 }): Promise<ToolDefinition[]> {
+  // Local-Only mode: only local tools, no gateway, no connection lookups, no network.
+  if (isLocalOnly()) {
+    const wsDefs = workspaceToolDefinitions();
+    const ws = wsDefs.length > 0 && (await canUseWorkspaceTools(opts.userId)) ? wsDefs : [];
+    const local = [...opts.standardTools, ...ws].filter((t) => isAllowedInLocalOnly(t.name));
+    return local.filter((t, i) => local.findIndex((u) => u.name === t.name) === i);
+  }
+
   // The scheduling tool is offered only to a user with an active X connection.
   let base = opts.standardTools;
   try {
@@ -28,6 +39,13 @@ export async function resolveChatTools(opts: {
     }
   } catch {
     base = opts.standardTools;
+  }
+  // Read-only workspace tools exist only when WHINK_LOCAL_AGENT_TOOLS and WHINK_WORKSPACE_ROOT are set.
+  {
+    const taken = new Set(base.map((t) => t.name));
+    const wsDefs = workspaceToolDefinitions().filter((t) => !taken.has(t.name));
+    const ws = wsDefs.length > 0 && (await canUseWorkspaceTools(opts.userId)) ? wsDefs : [];
+    if (ws.length) base = [...base, ...ws];
   }
 
   // H1: owner-only gateway tools stay owner-only. Everyone else gets at most the social platforms,

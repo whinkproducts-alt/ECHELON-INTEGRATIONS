@@ -8,6 +8,7 @@
  *    run is ledgered once through lib/ledger.ts with counts only (initiator system, persona WHINK).
  *  - Model calls go through the model router only, never with tools, and the text sent is untrusted-wrapped by the job.
  */
+import { localOnlyModel } from '@/lib/local-only';
 import { checkPermission } from '@/lib/permission-engine';
 import { classifyProtected } from '@/lib/protected-actions';
 import { recordActionSafe } from '@/lib/ledger';
@@ -142,6 +143,7 @@ export async function workerAsk(ctx: JobContext, messages: ChatMessage[]): Promi
   const tier = ctx.entry?.modelTier ?? 'fast';
   const maxTokens = Math.max(200, Math.floor((ctx.entry?.maxTokensPerRun ?? 2000) * 0.4));
   let model = tierModel(tier);
+  if (model) model = localOnlyModel(model);
   let baseUrl: string | undefined;
   if (model) {
     const fb = await applyOfflineFallback({ userId: ctx.userId, model, persona: 'WHINK', correlationId: ctx.correlationId });

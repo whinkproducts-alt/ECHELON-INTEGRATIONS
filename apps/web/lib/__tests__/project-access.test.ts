@@ -199,11 +199,17 @@ describe('tool handlers verify project ownership', () => {
 });
 
 describe('context engine wraps project record as untrusted data', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Earlier tests start fire-and-forget work (postmortem imports). Let it settle before the module registry is
+    // reset, otherwise an in-flight import can hand this test a module wired to an older mock set.
+    await new Promise((r) => setTimeout(r, 50));
     vi.resetModules();
     vi.doMock('@/lib/working-memory', () => ({ listWorkingMemory: vi.fn().mockResolvedValue([]) }));
     vi.doMock('@/lib/db', () => ({
       prisma: {
+        // If the real working-memory module is ever loaded instead of the mock above, it needs this table.
+        workingMemory: { findMany: vi.fn().mockResolvedValue([]) },
+        documentWorkspace: { findUnique: vi.fn().mockResolvedValue(null) },
         project: {
           findFirst: vi.fn().mockResolvedValue({
             id: 'p1',

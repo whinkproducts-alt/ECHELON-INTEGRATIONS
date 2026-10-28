@@ -4,6 +4,7 @@
  * never returned by any list or status function.
  */
 
+import { isLocalOnlyMode } from '@/lib/local-only';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -178,6 +179,8 @@ async function revokeAtPlatform(platform: SocialPlatform, accessToken: string): 
       body.set('client_secret', secret);
       body.set('token', accessToken);
     }
+    // Local-Only: the stored tokens are still deleted by the caller; the remote revoke call is not made.
+    if (isLocalOnlyMode()) return;
     await fetch(cfg.revokeUrl, {
       method: 'POST',
       headers,

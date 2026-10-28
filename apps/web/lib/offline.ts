@@ -12,6 +12,7 @@
  * local model it writes a 'model_fallback_local' ledger row with the reason, and drops any
  * per-user cloud API key so a cloud key is never sent to a local endpoint.
  */
+import { localOnlyBlocksUrl } from '@/lib/local-only';
 import { configuredCloudModels, isCloudModel, isLocalUrl, ollamaBaseUrl, ollamaProbeUrl, providerProbeUrl } from '@/lib/model-router';
 import { budgetState, type BudgetState } from '@/lib/budget';
 import { recordActionSafe } from '@/lib/ledger';
@@ -40,6 +41,8 @@ async function probe(url: string, now: number): Promise<ProbeResult> {
   if (hit && now - hit.at < PROBE_TTL_MS) return hit.value;
   const started = Date.now();
   let value: ProbeResult;
+  // Local-Only: no connectivity probe leaves the machine; a non-loopback target counts as unreachable.
+  if (localOnlyBlocksUrl(url)) return { reachable: false, latencyMs: 0 };
   try {
     // Any HTTP answer, even 401 or 404, proves the host is reachable.
     await fetchImpl(url, { method: 'GET', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
