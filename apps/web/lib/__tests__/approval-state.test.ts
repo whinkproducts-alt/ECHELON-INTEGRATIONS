@@ -21,6 +21,13 @@ describe('secondsRemaining', () => {
 });
 
 describe('approvalReducer', () => {
+  it('queue admission is shown as queued, never as completed execution', () => {
+    const result = approvalReducer({ ...initialCardState, phase: 'submitting' }, {
+      type: 'response', response: resp('EXECUTED', { success: true, data: { executionId: 'exec-id', status: 'QUEUED', scope: 'internal_analysis' } }),
+    });
+    expect(result).toMatchObject({ phase: 'queued', executionId: 'exec-id' });
+    expect(result.detail).toContain('not yet completed');
+  });
   it('submit moves pending to submitting once', () => {
     const s = approvalReducer(initialCardState, { type: 'submit' });
     expect(s.phase).toBe('submitting');

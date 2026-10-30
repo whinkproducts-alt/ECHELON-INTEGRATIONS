@@ -218,6 +218,7 @@ export function HoloSurface() {
           style={glassPanel}
         >
           {/* Logo + product name — name always from tenant config */}
+          <span className="text-xs text-muted-foreground" role="status">DEMO agent activity</span>
           <Link href="/dashboard/holo" className="flex items-center gap-2 shrink-0" aria-label={`${productName} home`}>
             <WhinkLogoMark />
             <span className="font-display font-bold text-sm tracking-widest uppercase" style={{ color: 'hsl(var(--whink-accent))' }}>

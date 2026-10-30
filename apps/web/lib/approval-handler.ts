@@ -42,8 +42,8 @@ export const BARE_APPROVAL_REPLY =
 export function buildDispatchMessage(ear: ExecutionAuthorizationRequest, persona: string = "WHINK"): string {
   const header =
     persona === "MAMBA"
-      ? "🐍 **MAMBA — TEAM DISPATCHED**"
-      : "⚡ **WHINK — TEAM DISPATCHED**";
+      ? "🐍 **MAMBA — ANALYSIS QUEUED**"
+      : "⚡ **WHINK — ANALYSIS QUEUED**";
 
   const supportingLine =
     ear.supporting_agents.length > 0
@@ -64,7 +64,7 @@ export function buildDispatchMessage(ear: ExecutionAuthorizationRequest, persona
 
 ---
 
-Team is active. I'll report milestones, surface blockers, and request your input before any irreversible action. You can say **"Stand down"** at any point to pause execution.`;
+The approved internal analysis is persisted for the worker. Queued does not mean running or completed. No tools, outbound actions or paid inference are authorized. Execution status and cancellation are available on the execution receipt.`;
 
   return dispatchMessage;
 }

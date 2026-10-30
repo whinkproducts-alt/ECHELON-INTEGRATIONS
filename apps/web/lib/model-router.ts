@@ -112,6 +112,8 @@ export interface StreamChatOptions {
    * no env or per-user key is sent (a placeholder is used), so a cloud key can never reach it.
    */
   baseUrl?: string;
+  /** Cancellation for bounded background inference. */
+  signal?: AbortSignal;
   /**
    * When model is omitted, these hints drive automatic model selection
    * via selectModel(). If both model and hints are provided, model wins.
@@ -181,9 +183,25 @@ export async function chatOnce(opts: StreamChatOptions): Promise<string> {
     return chatOnceGemini(opts.messages, model, maxTokens, temperature);
   }
   if (isNativeOllamaModel(model, opts.baseUrl)) {
-    return chatOnceNativeOllama(opts.messages, model, maxTokens, temperature);
+    return chatOnceNativeOllama(opts.messages, model, maxTokens, temperature, opts.signal);
   }
-  return chatOnceOpenAICompatible(opts.messages, model, maxTokens, temperature, opts.apiKey, opts.baseUrl);
+  return chatOnceOpenAICompatible(opts.messages, model, maxTokens, temperature, opts.apiKey, opts.baseUrl, opts.signal);
+}
+
+/** Metadata-only admission for M1 background analysis. A generic loopback proxy is insufficient. */
+export async function verifyLocalAnalysisModel(model: string, baseUrl: string): Promise<boolean> {
+  if (!isLoopbackUrl(baseUrl) || /^(claude|gemini)/i.test(model) || /(^|[:/.-])cloud($|[:/.-])/i.test(model)) return false;
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/v1\/?$/, '')}/api/show`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }),
+      redirect: 'error', signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) return false;
+    const meta = await response.json();
+    // Remote Ollama models have no local weight tensors. Unknown metadata fails closed.
+    return !meta.remote_host && !meta.remote_model && Number(meta.model_info?.['general.parameter_count']) > 0 &&
+      Array.isArray(meta.tensors) && meta.tensors.length > 0;
+  } catch { return false; }
 }
 
 async function chatOnceAnthropic(
@@ -245,10 +263,12 @@ async function chatOnceOpenAICompatible(
   temperature: number,
   userApiKey?: string,
   explicitBaseUrl?: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const baseUrl = (explicitBaseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
   const apiKey = explicitBaseUrl || isLocalOnlyMode() ? 'ollama' : (userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
   const response = await fetch(`${baseUrl}/chat/completions`, {
+    signal,
     method: 'POST',
     ...redirectOpt(baseUrl),
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
@@ -687,6 +707,7 @@ async function chatOnceNativeOllama(
   model: string,
   maxTokens: number,
   temperature: number,
+  signal?: AbortSignal,
 ): Promise<string> {
   const url = nativeOllamaUrl();
   if (!url) throw new Error('Ollama native endpoint unavailable');
@@ -702,7 +723,7 @@ async function chatOnceNativeOllama(
       keep_alive: process.env.WHINK_OLLAMA_KEEP_ALIVE || '30m',
     }),
     redirect: 'error',
-    signal: AbortSignal.timeout(nativeTimeoutMs()),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(nativeTimeoutMs())]) : AbortSignal.timeout(nativeTimeoutMs()),
   });
   if (!response.ok) {
     const errText = await response.text().catch(() => 'Unknown error');

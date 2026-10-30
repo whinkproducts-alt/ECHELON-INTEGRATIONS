@@ -59,7 +59,7 @@ export async function ensureJobs(userId: string, now = new Date()): Promise<numb
   return res.count;
 }
 
-export interface ClaimedJob { id: string; jobKey: string; userId: string; consecutiveFailures: number; runs: number }
+export interface ClaimedJob { id: string; jobKey: string; userId: string; consecutiveFailures: number; runs: number; leaseUntil?: Date }
 
 export async function claimDueJobs(workerId: string, limit: number, now = new Date()): Promise<ClaimedJob[]> {
   if (limit <= 0) return [];
@@ -69,11 +69,12 @@ export async function claimDueJobs(workerId: string, limit: number, now = new Da
     WHERE id IN (
       SELECT id FROM agent_jobs
       WHERE "nextRunAt" <= ${now} AND ("leaseUntil" IS NULL OR "leaseUntil" < ${now})
+        AND ("jobKey" NOT LIKE 'ear:%' OR "lastStatus" IS NULL OR "lastStatus" = 'RETRY_SCHEDULED')
       ORDER BY "nextRunAt" ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
     )
-    RETURNING id, "jobKey", "userId", "consecutiveFailures", runs`;
+    RETURNING id, "jobKey", "userId", "consecutiveFailures", runs, "leaseUntil"`;
 }
 
 export type JobOutcome = 'OK' | 'FAILED' | 'SKIPPED' | 'TIMEOUT';

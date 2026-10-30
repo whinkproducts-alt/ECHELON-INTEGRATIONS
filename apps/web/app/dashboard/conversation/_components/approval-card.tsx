@@ -27,6 +27,7 @@ const ACCENT = 'hsl(var(--whink-accent))';
 
 function statusLabel(state: CardState): { text: string; color: string } | null {
   switch (state.phase) {
+    case 'queued': return { text: 'Approved for internal analysis. Queued, not completed.', color: ACCENT };
     case 'executed': return { text: `Executed${state.detail ? `: ${state.detail}` : ''}`, color: ACCENT };
     case 'denied': return { text: 'Denied. Nothing ran.', color: DENIAL };
     case 'already_decided': return { text: 'Already decided. Nothing ran from this card.', color: 'hsl(var(--muted-foreground))' };
@@ -102,6 +103,7 @@ export function ApprovalCard({ approval, state, onTick, onDecide, className, com
       className={`${className ?? 'ml-10 max-w-2xl'} rounded-lg border bg-card p-3 space-y-2 ${expired ? 'opacity-50' : ''}`}
       style={{ borderColor: expired ? undefined : (state.phase === 'pending' || busy ? AMBER : undefined) }}
     >
+      {state.executionId && <ExecutionReceipt id={state.executionId} />}
       <div className="flex items-center gap-2 text-xs">
         <ShieldAlert className="h-3.5 w-3.5 flex-shrink-0" style={{ color: terminal ? undefined : AMBER }} aria-hidden />
         <span className="font-medium" style={{ color: terminal ? undefined : AMBER }}>
@@ -256,4 +258,39 @@ export function ApprovalCard({ approval, state, onTick, onDecide, className, com
       </div>
     </div>
   );
+}
+
+/** Displays only server-persisted state; approval success never implies execution success. */
+function ExecutionReceipt({ id }: { id: string }) {
+  const [execution, setExecution] = useState<{ status: string; reason?: string; output?: unknown } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const url = `/api/executions/${encodeURIComponent(id)}`;
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Execution status unavailable');
+      const body = await res.json();
+      setExecution(body.execution); setError(null);
+    } catch { setError('Execution status unavailable. No completion is confirmed.'); }
+  }, [url]);
+  const terminal = !!execution && ['SUCCEEDED', 'FAILED', 'CANCELLED', 'BLOCKED_POLICY', 'BLOCKED_COST'].includes(execution.status);
+  useEffect(() => {
+    const first = setTimeout(() => { void refresh(); }, 0);
+    const poll = terminal ? undefined : setInterval(() => { void refresh(); }, 2000);
+    return () => { clearTimeout(first); if (poll) clearInterval(poll); };
+  }, [refresh, terminal]);
+  const cancel = async () => {
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cancel' }) });
+      if (!res.ok) throw new Error('cancel failed');
+      await refresh();
+    } catch { setError('Cancellation was not confirmed. Check execution status before retrying.'); }
+  };
+  return <section aria-label="Execution receipt" className="space-y-2 text-xs">
+    <p role="status">Internal analysis: {execution?.status ?? 'Loading persisted status'}</p>
+    {execution?.reason && <p>{execution.reason}</p>}
+    {error && <p role="alert">{error}</p>}
+    {execution?.output != null && <pre className="max-h-64 overflow-auto whitespace-pre-wrap">{JSON.stringify(execution.output, null, 2)}</pre>}
+    {!terminal && <button type="button" className="underline" onClick={() => { void cancel(); }}>Cancel analysis</button>}
+  </section>;
 }

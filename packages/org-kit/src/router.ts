@@ -40,6 +40,8 @@ export interface Agent {
 }
 
 export interface ExecutionAuthorizationRequest {
+  /** Explicitly approved execution boundary; legacy requests are not executable. */
+  execution_scope?: 'internal_analysis';
   status: "AWAITING_HUMAN_APPROVAL";
   objective: string;
   owning_directorate: string | null;

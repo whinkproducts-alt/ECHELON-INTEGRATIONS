@@ -72,7 +72,7 @@ jobs:
         run: pnpm --filter app exec prisma db seed
 
       - name: Unit tests
-        run: pnpm --filter app test
+        run: M1_EXECUTION_DATABASE_URL="$DATABASE_URL" pnpm --filter app test
 
       - name: Build
         run: pnpm --filter app build

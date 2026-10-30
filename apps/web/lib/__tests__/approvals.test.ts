@@ -138,13 +138,13 @@ describe('approvals', () => {
     expect(rows[0].status).toBe('EXECUTED');
   });
 
-  it('ear approval is executed through the engine and returns the dispatch message', async () => {
+  it('legacy EAR cannot report dispatched without an executable approved scope', async () => {
     const { approvals } = await setup();
     const ear = { objective: 'Ship it', lead_agent: 'A', supporting_agents: [], team_size: 1, capability_gaps: [] };
     const a = await approvals.createApproval({ userId: 'u1', kind: 'ear', params: ear, correlationId: 'c', now: () => T0 });
     const out = await approvals.decide('u1', a.id, 'approve', { now: at(5000) });
-    expect(out.status).toBe('EXECUTED');
-    expect(String(out.result?.data)).toContain('TEAM DISPATCHED');
+    expect(out.status).toBe('FAILED');
+    expect(String(out.result?.data)).not.toContain('TEAM DISPATCHED');
   });
 
   it('B3: permission engine refusal means an approved request does not run', async () => {

@@ -166,6 +166,21 @@ export async function checkApprovedAction(
   return { allowed: true, method: 'human_approved' };
 }
 
+/** Re-admission for a queued EAR: activation was consumed once, authority never expands. */
+export async function checkQueuedEar(userId: string, approvalId: string, contentHash: string): Promise<PermissionCheckResult> {
+  const deny = (reason: string): PermissionCheckResult => ({ allowed: false, method: 'requires_confirmation', reason });
+  if (!userId || !approvalId) return deny('Approval required');
+  const row = await prisma.approvalRequest.findFirst({ where: { id: approvalId, userId } });
+  if (!row || row.kind !== 'ear' || row.tool !== null || row.status !== 'EXECUTED' || !row.executedAt) return deny('EAR was not admitted');
+  // As for scheduled sends, the TTL limits the human decision, not later worker execution.
+  if (!row.decidedAt || row.decidedAt >= row.expiresAt) return deny('Approval decision expired');
+  try {
+    if (row.contentHash !== contentHash || approvalContentHash({ kind: row.kind, tool: row.tool, params: row.params }) !== contentHash) return deny('Approved content changed');
+  } catch { return deny('Approved content changed'); }
+  if ((row.params as { execution_scope?: unknown } | null)?.execution_scope !== 'internal_analysis') return deny('Analysis scope not approved');
+  return { allowed: true, method: 'human_approved' };
+}
+
 /**
  * Permission check for the moment a human-approved scheduled post is sent. The approval
  * was consumed (EXECUTED) when the schedule was created, so this is a separate, narrower

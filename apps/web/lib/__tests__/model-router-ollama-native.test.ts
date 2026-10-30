@@ -142,4 +142,30 @@ describe('native Ollama transport', () => {
     expect(await chatOnce({ model: 'qwen3:8b', messages: [{ role: 'user', content: 'x' }] })).toBe('v1');
     expect(fetchMock.mock.calls[1][0]).toBe('http://localhost:11434/v1/chat/completions');
   });
+
+  it.each(['gemma3', 'local-analysis-model'])('chatOnce propagates cancellation to the %s transport', async (model) => {
+    const { chatOnce } = await import('../model-router');
+    const ac = new AbortController();
+    fetchMock.mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
+    }));
+    const pending = chatOnce({ model, messages: [{ role: 'user', content: 'internal draft' }], signal: ac.signal });
+    ac.abort();
+    await expect(pending).rejects.toThrow('cancelled');
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+
+  it('background admission requires local Ollama weights and refuses remote or unknown metadata', async () => {
+    const { verifyLocalAnalysisModel } = await import('../model-router');
+    expect(await verifyLocalAnalysisModel('local', 'https://remote.example/v1')).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockResolvedValue(ok({ model_info: { 'general.parameter_count': 1000 }, tensors: [{ name: 'weights' }] }));
+    expect(await verifyLocalAnalysisModel('local', 'http://localhost:11434/v1')).toBe(true);
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:11434/api/show');
+    expect(fetchMock.mock.calls[0][1].redirect).toBe('error');
+    fetchMock.mockResolvedValue(ok({ remote_host: 'cloud.example', model_info: { 'general.parameter_count': 1000 }, tensors: [] }));
+    expect(await verifyLocalAnalysisModel('local', 'http://localhost:11434/v1')).toBe(false);
+    fetchMock.mockResolvedValue(ok({}));
+    expect(await verifyLocalAnalysisModel('local', 'http://localhost:11434/v1')).toBe(false);
+  });
 });

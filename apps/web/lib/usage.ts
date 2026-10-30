@@ -21,6 +21,17 @@ export interface UsageInput {
   kind?: UsageKind;
 }
 
+/** Durable accounting for background admission boundaries; failure stops further work. */
+export async function recordUsageStrict(input: UsageInput): Promise<void> {
+  if (!input.userId) throw new Error('usage: userId is required');
+  const tokensIn = clampInt(input.tokensIn);
+  const tokensOut = clampInt(input.tokensOut);
+  await prisma.usageEvent.create({ data: {
+    userId: input.userId, provider: input.provider, model: input.model.slice(0, 100),
+    tokensIn, tokensOut, costMicros: estimateCostMicros(input.model, tokensIn, tokensOut), kind: input.kind ?? 'other',
+  } });
+}
+
 function clampInt(n: unknown): number {
   const v = Math.floor(Number(n));
   return Number.isFinite(v) && v > 0 ? Math.min(v, 2_000_000_000) : 0;

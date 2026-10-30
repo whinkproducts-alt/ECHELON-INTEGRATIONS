@@ -29,12 +29,14 @@ export type CardPhase =
   | 'pending'
   | 'submitting'
   | 'executed'
+  | 'queued'
   | 'denied'
   | 'expired'
   | 'already_decided'
   | 'failed';
 
 export interface CardState {
+  executionId?: string;
   phase: CardPhase;
   /** Short human text for the final status (result or error). */
   detail: string | null;
@@ -91,6 +93,11 @@ export function approvalReducer(state: CardState, action: CardAction): CardState
       const { status, result } = action.response;
       switch (status) {
         case 'EXECUTED':
+          if (result?.success && result.data && typeof result.data === 'object' &&
+              'executionId' in result.data && typeof result.data.executionId === 'string' &&
+              'status' in result.data && result.data.status === 'QUEUED') {
+            return { phase: 'queued', detail: 'Internal analysis queued; not yet completed.', executionId: result.data.executionId, requestError: null };
+          }
           return { phase: 'executed', detail: shortResult(result), requestError: null };
         case 'DENIED':
           return { phase: 'denied', detail: null, requestError: null };

@@ -112,6 +112,7 @@ export function runTaskGate(
   const ear = buildAuthorizationRequest(message.substring(0, 300), requiredSkills, {
     maxAgents: 5,
   });
+  ear.execution_scope = 'internal_analysis';
 
   const formattedResponse = formatEAR(ear, persona);
 
@@ -140,6 +141,8 @@ function formatEAR(ear: ExecutionAuthorizationRequest, persona: string): string 
 **Status:** ${ear.status}
 **Objective:** ${ear.objective}
 
+**Execution scope:** Internal analysis and drafts only. No tools, external actions, memory access or paid inference. Work requiring these capabilities remains blocked.
+
 ---
 
 **Proposed Team**
@@ -160,5 +163,5 @@ ${ear.risks.length > 0 ? `**Risks:** ${ear.risks.join("; ")}\n` : ""}
 ---
 
 > 🔐 **Execution is blocked.** This request requires your explicit approval before any agent acts.
-> Reply **"Approved"** to authorize, or specify changes to the team, scope, or schedule.`;
+> Use the **approval card** to authorize this exact scope, or specify changes. A chat reply approves nothing.`;
 }

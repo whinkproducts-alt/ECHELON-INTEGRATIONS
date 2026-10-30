@@ -17,8 +17,6 @@ import { checkApprovedAction, logSecurityEvent } from '@/lib/permission-engine';
 import { approvalContentHash } from '@/lib/canonical-json';
 import { approvalConfirmationCode, verifyConfirmationCode } from '@/lib/approval-code';
 import { classifyProtected, type ProtectedCategory } from '@/lib/protected-actions';
-import { buildDispatchMessage } from '@/lib/approval-handler';
-import type { ExecutionAuthorizationRequest } from '@whink/org-kit';
 
 export const APPROVAL_TTL_MS = 30_000;
 /** An approval stuck in EXECUTING this long is failed by the sweeper and never re-run. */
@@ -491,8 +489,10 @@ export async function decide(
       if (!perm.allowed) {
         return finish(row, 'EXECUTING', 'FAILED', { success: false, error: perm.reason ?? 'Permission denied' }, clock);
       }
-      const ear = row.params as ExecutionAuthorizationRequest;
-      return finish(row, 'EXECUTING', 'EXECUTED', { success: true, data: buildDispatchMessage(ear, row.persona) }, clock);
+      const { enqueueApprovedEar } = await import('@/lib/worker/ear-execution');
+      const receipt = await enqueueApprovedEar(userId, row.id, clock());
+      // EXECUTED here means the approval was consumed for queue admission, not task completion.
+      return { id, status: 'EXECUTED', result: { success: true, data: receipt } };
     }
 
     // Dynamic import: tool-registry imports this module (createApproval).

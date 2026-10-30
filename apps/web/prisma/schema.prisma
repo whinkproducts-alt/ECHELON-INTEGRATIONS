@@ -58,6 +58,7 @@ model User {
   commsRequests            CommsRequest[]
   swarmRuns                SwarmRun[]
   agentJobs                AgentJob[]
+  agentExecutions          AgentExecution[]
   recommendations          Recommendation[]
   newsSeen                 NewsSeen[]
 
@@ -816,6 +817,7 @@ model ApprovalRequest {
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   commsRequest CommsRequest?
+  agentExecution AgentExecution?
 
   @@index([userId, status, expiresAt])
   @@map("approval_requests")
@@ -1152,6 +1154,26 @@ model AgentJob {
 }
 
 // Process-level facts only (no user data).
+model AgentExecution {
+  id           String @id @default(cuid())
+  userId       String
+  approvalId   String @unique
+  contentHash  String
+  agentIds     String[]
+  status       String @default("QUEUED")
+  attempts     Int @default(0)
+  claimToken   String?
+  output       Json?
+  reason       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approval     ApprovalRequest @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("agent_executions")
+}
+
 model AgentHeartbeat {
   workerId  String   @id
   startedAt DateTime

@@ -268,9 +268,12 @@ describe('spoken approval needs the server confirmation code (L1)', () => {
       recordAction: async (e: any) => { ledgerRows.push(e); return { id: 'l' }; },
       recordActionSafe: async (e: any) => { ledgerRows.push(e); return { id: 'l' }; },
     }));
+    // This unit suite exercises confirmation codes, not queue persistence (covered by the M1 DB suite).
+    const enqueue = vi.fn().mockResolvedValue({ executionId: 'unit-queue-receipt', status: 'QUEUED' });
+    vi.doMock('@/lib/worker/ear-execution', () => ({ enqueueApprovedEar: enqueue }));
     const approvals = await import('@/lib/approvals');
     const code = await import('@/lib/approval-code');
-    return { approvals, code };
+    return { approvals, code, enqueue };
   }
   const mk = (approvals: any) => approvals.createApproval({ userId: 'u1', kind: 'ear', params: { objective: 'Draft the weekly plan', lead_agent: 'A', supporting_agents: [], team_size: 1, capability_gaps: [] }, correlationId: 'c', now: () => T0 });
   const at = (ms: number) => () => new Date(T0.getTime() + ms);
@@ -297,12 +300,14 @@ describe('spoken approval needs the server confirmation code (L1)', () => {
   });
 
   it('the right code approves once; a card click needs no code', async () => {
-    const { approvals } = await load();
+    const { approvals, enqueue } = await load();
     const a = await mk(approvals);
     const ok = await approvals.decide('u1', a.id, 'approve', { now: at(1000), voice: { code: a.confirmationCode } });
     expect(ok.status).toBe('EXECUTED');
+    expect((await approvals.decide('u1', a.id, 'approve', { now: at(1000), voice: { code: a.confirmationCode } })).status).toBe('ALREADY_DECIDED');
     const b = await mk(approvals);
     expect((await approvals.decide('u1', b.id, 'approve', { now: at(1000) })).status).toBe('EXECUTED');
+    expect(enqueue).toHaveBeenCalledTimes(2);
   });
 
   it('another user\'s id with any code is not found; no secret configured means voice approval is refused', async () => {

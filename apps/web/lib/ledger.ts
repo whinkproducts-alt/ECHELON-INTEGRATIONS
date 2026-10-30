@@ -85,9 +85,9 @@ function withProtectedMeta(entry: LedgerEntry): string | undefined {
   return JSON.stringify({ ...base, protected: true, category });
 }
 
-export async function recordAction(entry: LedgerEntry): Promise<{ id: string }> {
+export async function recordAction(entry: LedgerEntry, client: Pick<typeof prisma, 'action'> = prisma): Promise<{ id: string }> {
   if (!entry.userId) throw new Error('ledger: userId is required');
-  const row = await prisma.action.create({
+  const row = await client.action.create({
     data: {
       userId: entry.userId,
       initiator: entry.initiator ?? 'system',
