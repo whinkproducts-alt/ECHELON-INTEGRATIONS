@@ -32,20 +32,31 @@ jobs:
   gitleaks:
     name: gitleaks secret scan
     runs-on: ubuntu-latest
-    # The action lists the pull request's commits to scan only the new range, which needs pull-requests: read.
     permissions:
       contents: read
-      pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      # gitleaks-action v2.3.9, pinned by commit SHA. The scanner is MIT licensed.
-      # Repositories owned by a GitHub organisation need a GITLEAKS_LICENSE secret; personal accounts do not.
-      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+      # Direct scan of the full history with the gitleaks CLI (MIT licensed), same version the action ran (8.24.3).
+      # The action scans "<first PR commit>^..<last>", which git cannot resolve when the PR contains a root commit
+      # (the imported WHINK history), so it scanned nothing and failed. A full-history scan is stricter and needs
+      # no commit range. The tarball is verified against the checksums published with the same release; the job
+      # fails if either download or the check fails. --redact keeps secret values out of the log.
+      - name: Install gitleaks 8.24.3 (checksum verified)
+        run: |
+          set -euo pipefail
+          v=8.24.3
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${v}"
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          cd "$RUNNER_TEMP/gitleaks"
+          curl -fsSL -O "${base}/gitleaks_${v}_linux_x64.tar.gz"
+          curl -fsSL -O "${base}/gitleaks_${v}_checksums.txt"
+          grep " gitleaks_${v}_linux_x64.tar.gz\$" "gitleaks_${v}_checksums.txt" | sha256sum -c -
+          tar xzf "gitleaks_${v}_linux_x64.tar.gz" gitleaks
+          echo "$PWD" >> "$GITHUB_PATH"
+      - name: Scan full history
+        run: gitleaks detect --source . --redact --verbose --exit-code 2 --log-level info
 
   codeql:
     name: CodeQL
