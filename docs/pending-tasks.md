@@ -74,3 +74,11 @@ Open engineering items:
 - Phase 3 Recall hardening (section C) is still untouched.
 Qodo review of PR #3, not fixed (details in docs/decisions.md, "Qodo code review"): #9 concurrent discovery race; #13 Hub live feed misses final receipt status; #14 pin the gitleaks tarball hash from a trusted source. Imported-baseline findings to verify and fix separately: approvals sweep vs long-running EXECUTING (#2), services/openclaw DNS rebinding and stale routes after outage (#6, #7), concurrent password-reset links (#8).
 
+## I. Branches and Dependabot (added 2026-11-01)
+Waiting on Victor:
+- Delete the three merged branches (`bootstrap/echelon-foundation-20261030`, `import/kamsi-prime-m1`, `integration/echelon-capability-gateway`) in the GitHub UI or with `git push origin --delete ...` from his Mac; the cloud session gets HTTP 403. Tip SHAs and the recreate command are in docs/daily-syncs/2026-11-01.md. Optional: turn on "Automatically delete head branches" in the repository's General settings.
+- Decide on Dependabot: leave it on (it came with the imported `.github/dependabot.yml`), tune or limit it, or turn it off. Dependabot alerts and the dependency graph are Off in Settings.
+Open engineering:
+- Review the 10+ open Dependabot PRs one at a time: Actions bumps first, major npm bumps last, each with a licence check (CLAUDE.md rule 7). Close #16 (mapbox-gl 1 to 3) after verifying the licence. A Dependabot job for `services/anythingllm` failed.
+- Add the `finish()` terminal-update check from Qodo's `fix/remediation-2a68d1fb-185920` as its own change with a test, after the independent security review; then delete that branch. Do not remove the stuck-approval sweep.
+
