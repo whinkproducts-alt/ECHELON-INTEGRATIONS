@@ -53,7 +53,9 @@ jobs:
 
       # Docs-only pull requests skip the heavy steps below but still finish this job green, so a required check is
       # always satisfied. Only files under docs/ and root-level *.md count as docs (nothing in the app or its tests
-      # reads them). Anything else, a push to main, or any error listing the files runs everything (fail closed).
+      # reads them). Both the new and the previous path of every file are checked, so a rename out of code is code.
+      # Anything else, a push to main, a list of 3000 files or more (the API's cap, so the list may be incomplete), an
+      # empty list, or any error runs everything (fail closed).
       - name: Decide whether the code changed
         id: scope
         env:
@@ -65,12 +67,20 @@ jobs:
           set -uo pipefail
           heavy=true
           if [ "$EVENT" = "pull_request" ]; then
-            if files=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename') && [ -n "$files" ]; then
-              if ! printf '%s\n' "$files" | grep -qvE '^(docs/|[^/]+\.md$)'; then heavy=false; fi
+            if records=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[] | [.filename, (.previous_filename // "")] | @tsv') && [ -n "$records" ]; then
+              total=$(printf '%s\n' "$records" | wc -l)
+              paths=$(printf '%s\n' "$records" | tr '\t' '\n' | sed '/^$/d')
+              if [ "$total" -lt 3000 ]; then
+                # No pipe and no -q: grep reads every path, so nothing can be cut off early. Exit 1 = every path is docs,
+                # 0 = at least one other path, anything else = error.
+                grep -vE '^(docs/|[^/]+\.md$)' <<<"$paths" >/dev/null; rc=$?
+                if [ "$rc" -eq 1 ]; then heavy=false; fi
+              fi
             fi
           fi
           echo "heavy=$heavy" >> "$GITHUB_OUTPUT"
           echo "Heavy checks: $heavy"
+
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         if: ${{ steps.scope.outputs.heavy == 'true' }}
         with:
