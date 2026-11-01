@@ -72,6 +72,18 @@ export interface InvokeDeps extends EgressDeps {
 
 const MAX_TIMEOUT_MS = 120_000;
 
+/**
+ * Close a write-ahead receipt. One retry, then a loud log: the provider call already happened, so the caller still
+ * gets its outcome, but a receipt left in SUBMITTED is visible in the Hub and in the logs, never silent.
+ */
+async function closeReceipt(userId: string, actionId: string, patch: Parameters<typeof updateActionStatus>[2]): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ok = await updateActionStatus(userId, actionId, patch).catch(() => false);
+    if (ok) return;
+  }
+  logger.error('capability receipt could not be closed; it stays SUBMITTED', { userId, actionId, intended: patch.status });
+}
+
 function summarise(v: unknown): string {
   let json = '';
   try { json = JSON.stringify(v) ?? ''; } catch { json = ''; }
@@ -194,13 +206,23 @@ export async function invokeCapability(p: InvokeParams, deps: InvokeDeps = {}, a
     if (reserved !== 1) return deny('AUTHZ_POLICY_DENIED', 'grant exhausted, expired or revoked', { ...ids, grant: grant.id });
   }
 
-  // 6. Write-ahead receipt. If it cannot be written, nothing runs.
-  const receipt = await recordAction({
-    ...base, action: 'capability_invoke', permissionClass: effectiveClass, status: 'SUBMITTED', confirmationMethod: method,
-    inputSummary: summarise(p.args),
-    capabilityId: tool.id, connectorInstallId: connector.id, hostId: connector.hostId, grantId: grant?.id, approvalId: approved?.approvalId,
-    protectedCategory: protectedCall.protected ? protectedCall.category : undefined,
-  });
+  // 6. Write-ahead receipt. If it cannot be written, nothing runs, and the grant slot taken above is given back.
+  let receipt: { id: string };
+  try {
+    receipt = await recordAction({
+      ...base, action: 'capability_invoke', permissionClass: effectiveClass, status: 'SUBMITTED', confirmationMethod: method,
+      inputSummary: summarise(p.args),
+      capabilityId: tool.id, connectorInstallId: connector.id, hostId: connector.hostId, grantId: grant?.id, approvalId: approved?.approvalId,
+      protectedCategory: protectedCall.protected ? protectedCall.category : undefined,
+    });
+  } catch (e) {
+    if (grant) {
+      await prisma.$executeRaw`
+        UPDATE capability_grants SET "invocationCount" = GREATEST("invocationCount" - 1, 0)
+         WHERE id = ${grant.id} AND "userId" = ${p.userId}`.catch(() => 0);
+    }
+    throw e;
+  }
 
   // 7. Execute.
   let output: string;
@@ -212,15 +234,14 @@ export async function invokeCapability(p: InvokeParams, deps: InvokeDeps = {}, a
   } catch (e) {
     const code: CapabilityErrorCode = e instanceof ProviderError ? (e.code === 'EXEC_TIMEOUT' ? 'EXEC_TIMEOUT' : e.code === 'EGRESS_DENIED' ? 'EGRESS_DENIED' : 'EXEC_FAILED') : 'EXEC_FAILED';
     const message = e instanceof ProviderError ? e.message : 'Provider call could not be made';
-    await updateActionStatus(p.userId, receipt.id, { status: 'FAILED', outputSummary: message, errorCode: code, latencyMs: Date.now() - started }).catch(() => false);
+    await closeReceipt(p.userId, receipt.id, { status: 'FAILED', outputSummary: message, errorCode: code, latencyMs: Date.now() - started });
     throw new CapabilityError(code, message, receipt.id);
   }
-  const closed = await updateActionStatus(p.userId, receipt.id, {
+  await closeReceipt(p.userId, receipt.id, {
     status: 'EXECUTED',
     outputSummary: JSON.stringify({ chars: output.length, sha256: createHash('sha256').update(output).digest('hex') }),
     latencyMs: Date.now() - started,
-  }).catch(() => false);
-  if (!closed) logger.error('capability receipt could not be closed', { userId: p.userId, actionId: receipt.id });
+  });
   return { status: 'EXECUTED', output, actionId: receipt.id, untrusted: true };
 }
 

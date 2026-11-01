@@ -112,6 +112,19 @@ describe('data classification (T11b)', () => {
     expect(code(input({ args: { k: 'ghp_' + 'a'.repeat(36) } }))).toBe('DATA_CLASS_DENIED');
     expect(code(input({ args: { pad: 'x'.repeat(5000), k: 'ghp_' + 'a'.repeat(36) } }))).toBe('DATA_CLASS_DENIED');
   });
+  it('unprefixed secrets in JSON are denied: the quote between key and colon, and escaped quotes in text, must not hide them', () => {
+    const v = 'Zx9fQ2mK8vLp3RtYw7NbHc1DsAe6UgJi5OqX4TvB';
+    expect(code(input({ args: { api_key: v } }))).toBe('DATA_CLASS_DENIED');
+    expect(code(input({ args: { password: 'correct horse battery' } }))).toBe('DATA_CLASS_DENIED');
+    expect(code(input({ args: { cfg: { nested: [{ client_secret: v }] } } }))).toBe('DATA_CLASS_DENIED');
+    expect(code(input({ args: { headers: { Authorization: 'Bearer abcdefgh' } } }))).toBe('DATA_CLASS_DENIED');
+    expect(code(input({ args: { text: `api_key = "${v}"` } }))).toBe('DATA_CLASS_DENIED');
+    expect(code(input({ args: { access_token: v } }))).toBe('DATA_CLASS_DENIED');
+  });
+  it('ordinary arguments are not caught by the structural credential check', () => {
+    expect(code(input({ args: { text: 'hello', max_tokens: 100, token_count: 5, query: 'quarterly tokens report', tokenizer: 'gpt' } }))).toBe('ALLOW');
+    expect(code(input({ args: { password: 'x' } }))).toBe('ALLOW'); // too short to be a credential
+  });
   it('oversize arguments are refused', () => expect(code(input({ args: { big: 'x'.repeat(200_000) } }))).toBe('VAL_INPUT_INVALID'));
 });
 

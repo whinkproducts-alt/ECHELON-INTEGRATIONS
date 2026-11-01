@@ -51,7 +51,8 @@ function fail(err: unknown, credential?: string | null): never {
   if (err instanceof ProviderError) throw err;
   const name = (err as { name?: string } | null)?.name;
   const msg = redact(err instanceof Error ? err.message : String(err), credential);
-  logger.warn('capability provider request failed', { detail: msg.slice(0, 300) });
+  // Provider-controlled text can echo the arguments or a fragment of a credential, so it is classified here and never logged.
+  logger.warn('capability provider request failed', { errorName: typeof name === 'string' ? name.slice(0, 40) : 'unknown', messageChars: msg.length });
   if (/Egress denied/.test(msg)) throw new ProviderError('Provider destination is not on the egress allow-list', 'EGRESS_DENIED');
   if (/response too large/i.test(msg)) throw new ProviderError('Provider response too large');
   if (name === 'TimeoutError' || name === 'AbortError' || /timed out|timeout/i.test(msg)) throw new ProviderError('Provider request timed out', 'EXEC_TIMEOUT');
@@ -121,7 +122,7 @@ export async function callProviderTool(
     return fail(e, conn.credential);
   }
   if (res.isError) {
-    logger.warn('capability provider tool reported an error', { detail: redact(res.text, conn.credential).slice(0, 300) });
+    logger.warn('capability provider tool reported an error', { messageChars: res.text.length }); // never the text: it can echo arguments
     throw new ProviderError('Provider tool reported an error');
   }
   return res.text;

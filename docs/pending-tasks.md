@@ -72,4 +72,5 @@ Open engineering items:
 - Accepted for now: CG-9 in-flight owner test call survives a revoke; CG-13 ciphertext in old row versions and backups; CG-14 a bland-named money tool relies on the review.
 - Not built: stdio host agent, plugin formats beyond MCP, OpenClaw capability adapter, network-level egress (pf or container on the Mac), OAuth for providers, key rotation and per-host keys, a scheduled worker job for the host sweep.
 - Phase 3 Recall hardening (section C) is still untouched.
+Qodo review of PR #3, not fixed (details in docs/decisions.md, "Qodo code review"): #9 concurrent discovery race; #13 Hub live feed misses final receipt status; #14 pin the gitleaks tarball hash from a trusted source. Imported-baseline findings to verify and fix separately: approvals sweep vs long-running EXECUTING (#2), services/openclaw DNS rebinding and stale routes after outage (#6, #7), concurrent password-reset links (#8).
 

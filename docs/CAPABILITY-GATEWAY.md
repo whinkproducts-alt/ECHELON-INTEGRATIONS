@@ -101,7 +101,9 @@ Full audit: `ECHELON_CODE_AUDIT_REPORT.txt`. Summary of what was fixed rather th
 - Plugin formats beyond "MCP provider" (manifest-only plugin loader, isolated JS, containers) and the selective OpenClaw capability adapter (FDR-012 matrix first).
 - A network-level egress boundary. The application allow-list is defence in depth. On macOS use `pf` or run MCP servers in a container; Linux `iptables` does not apply to the Mac. Not shipped.
 - OAuth for providers (only a static bearer credential), key rotation, per-host keys. One server key (`ENCRYPTION_KEY`) encrypts credentials.
-- Heartbeat rate limit is per client address (needs `TRUSTED_PROXY_HOPS` behind a proxy) or one shared bucket; it is not per host, on purpose, so a flood cannot lock a real host out.
+- Heartbeat rate limit counts failed attempts only, per client address (needs `TRUSTED_PROXY_HOPS` behind a proxy) or one shared bucket, so a flood cannot lock a real host out. A flood still costs one database read per well-formed request.
+- The credential gate refuses any non-trivial string under a credential-named key (secret, password, api key, token, authorization, ...) and any value matching a secret rule. It errs towards refusing: a field called `password_hint` with a long value is refused.
+- Concurrent discovery of the same provider can deactivate tools (rerun discovery); the Hub live feed shows a call's final status on its next refresh, not instantly.
 - Provider output is flagged untrusted but is not yet wrapped or injection-scanned. Nothing sends it to a model today; that must be added before any agent or chat path uses it (review CG-12).
 - A Founder test call already in flight finishes if the provider is revoked meanwhile (review CG-9). Agent calls are protected by the atomic grant reservation.
 - A money tool with a bland name is not forced to Class C; your review is the only control there (review CG-14).

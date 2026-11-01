@@ -148,7 +148,8 @@ export async function registerProvider(userId: string, input: RegisterInput) {
     endpoint = u.href;
     // The provider's own host is the default destination, and nothing else is, unless the Founder lists it.
     const port = u.port || (u.protocol === 'https:' ? '443' : '80');
-    const self = `${u.hostname.replace(/^\[|\]$/g, '')}:${port}`;
+    const bare = u.hostname.replace(/^\[|\]$/g, '');
+    const self = `${bare.includes(':') ? `[${bare}]` : bare}:${port}`; // an IPv6 literal must be bracketed or the port is read as part of the address
     if (allowlist.length === 0) allowlist = [self];
   } else {
     // stdio is stored for a host agent; the web process never spawns it. A host is mandatory.

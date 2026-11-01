@@ -118,6 +118,33 @@ export function effectiveToolClass(tool: Pick<PolicyTool, 'riskClass' | 'defHash
   return tool.riskClass === 'A' || tool.riskClass === 'B' ? tool.riskClass : 'C';
 }
 
+const CREDENTIAL_KEY = /(secret|passw(?:or)?d|passphrase|api[_-]?key|apikey|credential|private[_-]?key|authorization|bearer|(?:^|[^a-z])token(?:$|[^a-z]))/i;
+
+/**
+ * True when a string value matches a secret rule on its own, when a non-trivial string is stored under a
+ * credential-named key (any depth). Structure too deep or large to walk is refused by the egress gate that follows.
+ */
+export function argsMayContainCredential(args: unknown): boolean {
+  let nodes = 0;
+  const seen = new Set<unknown>();
+  const walk = (v: unknown, depth: number, key: string | null): boolean => {
+    // Too deep or too large: stop here. The egress gate below refuses arguments it cannot scan completely, so the call is denied either way.
+    if (++nodes > 20_000 || depth > 32) return false;
+    if (typeof v === 'string') {
+      if (SECRET_RULES.some((r) => r.re.test(v))) return true;
+      return key !== null && CREDENTIAL_KEY.test(key) && v.length >= 8;
+    }
+    if (Array.isArray(v)) return v.some((x) => walk(x, depth + 1, key));
+    if (v && typeof v === 'object') {
+      if (seen.has(v)) return false;
+      seen.add(v);
+      return Object.entries(v as Record<string, unknown>).some(([k, x]) => walk(x, depth + 1, k));
+    }
+    return false;
+  };
+  return walk(args, 0, null);
+}
+
 export function evaluateGates(p: PolicyInput): PolicyDecision {
   const { tool, connector } = p;
 
@@ -163,6 +190,10 @@ export function evaluateGates(p: PolicyInput): PolicyDecision {
   // SECRET_RULES directly, not scanText: scanText skips lines over 2,000 chars, which a long blob would use to hide a key.
   if (serialised.length > MAX_ARGS_BYTES) return deny('VAL_INPUT_INVALID', `arguments exceed ${MAX_ARGS_BYTES} bytes`);
   if (SECRET_RULES.some((r) => r.re.test(serialised))) return deny('DATA_CLASS_DENIED', 'arguments appear to contain a credential');
+  // JSON hides unprefixed secrets from line-oriented rules ({"api_key":"..."} has a quote between name and colon, and quotes
+  // inside a string are escaped), so the structure is walked: each value is scanned on its own, and a value stored under a
+  // credential-named key is refused whatever it looks like. 
+  if (argsMayContainCredential(p.args)) return deny('DATA_CLASS_DENIED', 'arguments appear to contain a credential');
 
   // 6. Egress: every URL in the arguments must be on the provider's allow-list. Incomplete scan = deny.
   const scan = scanForUrls(p.args);

@@ -525,4 +525,28 @@ describe.skipIf(!enabled)('Capability Gateway: real database, real MCP server', 
       expect(names).toEqual(['fine_tool']);
     } finally { await odd.close(); }
   });
+
+  // ── Code review (Qodo) findings that were verified and fixed ──────────────────────────────────────
+
+  it('QODO-5 a heartbeat without details keeps the host details; only a heartbeat that sends them replaces them', async () => {
+    const h = await createHost(owner, { name: `details-${stamp}` });
+    await recordHeartbeat(h.host.id, h.token, { capabilities: { stdio: true }, metadata: { os: 'macOS' } });
+    await recordHeartbeat(h.host.id, h.token, {});
+    let row = await prisma.host.findUniqueOrThrow({ where: { id: h.host.id } });
+    expect(row.capabilities).toEqual({ stdio: true });
+    expect(row.metadata).toEqual({ os: 'macOS' });
+    await recordHeartbeat(h.host.id, h.token, { metadata: { os: 'macOS 15' } });
+    row = await prisma.host.findUniqueOrThrow({ where: { id: h.host.id } });
+    expect(row.capabilities).toEqual({ stdio: true });
+    expect(row.metadata).toEqual({ os: 'macOS 15' });
+  });
+
+  it('QODO-10 an IPv6 endpoint gets a correct default allow-list entry (bracketed with its port) that matches its own URL', async () => {
+    const { validateAllowlistEntry, hostAllowed } = await import('@/lib/capability/egress');
+    const prov = await registerProvider(owner, { connectorId: `v6-${stamp}`.slice(0, 32), transport: 'streamable-http', endpoint: 'https://[2001:db8::1]/mcp' });
+    expect(prov.egressAllowlist).toEqual(['[2001:db8::1]:443']);
+    expect(validateAllowlistEntry(prov.egressAllowlist[0])).toBeNull();
+    expect(hostAllowed(new URL(prov.endpoint!), prov.egressAllowlist)).toBe(true);
+    expect(hostAllowed(new URL('https://[2001:db8::2]/mcp'), prov.egressAllowlist)).toBe(false); // not an unrelated address
+  });
 });

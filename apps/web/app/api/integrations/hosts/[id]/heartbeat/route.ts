@@ -12,18 +12,22 @@ import { CapabilityInputError } from '@/lib/capability/providers';
  * agent sends an Origin header equal to the app origin (scripts/host-heartbeat.mjs does).
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  // Before any database work: per client address when a trusted proxy gives one, else a looser shared bucket.
-  const addr = clientKey(req.headers);
-  const limited = addr ? await limitOr429('heartbeat', addr) : await limitOr429('heartbeat_route', 'heartbeat');
-  if (limited) return limited;
   const { id } = await params;
   const m = /^Bearer (eh_[A-Za-z0-9_-]{20,100})$/.exec(req.headers.get('authorization') ?? '');
+  // Failures are counted, successes are not: a valid host can never be starved by someone else's bad requests.
+  // Per client address when a trusted proxy gives one, else a looser shared bucket.
+  const addr = clientKey(req.headers);
+  const failed = async (): Promise<Response> =>
+    (addr ? await limitOr429('heartbeat', addr) : await limitOr429('heartbeat_route', 'heartbeat'))
+    ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 }); // one answer for "no such host" and "wrong token"
+  if (!m) return failed();
   const parsed = await readJsonBody(req, 8 * 1024);
-  const body = 'body' in parsed && parsed.body && typeof parsed.body === 'object' ? (parsed.body as { capabilities?: unknown; metadata?: unknown }) : {};
+  // A body that cannot be read is an error, never an empty heartbeat: the host's stored details are left alone.
+  if ('response' in parsed) return parsed.response;
+  const body = parsed.body && typeof parsed.body === 'object' && !Array.isArray(parsed.body) ? (parsed.body as { capabilities?: unknown; metadata?: unknown }) : {};
   try {
-    const out = m ? await recordHeartbeat(id, m[1], body) : { ok: false as const };
-    // One answer for "no such host" and "wrong token".
-    if (!out.ok) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const out = await recordHeartbeat(id, m[1], body);
+    if (!out.ok) return failed();
     return NextResponse.json({ ok: true, status: out.status, receivedAt: out.receivedAt });
   } catch (e) {
     if (e instanceof CapabilityInputError) return NextResponse.json({ error: e.message }, { status: e.status });

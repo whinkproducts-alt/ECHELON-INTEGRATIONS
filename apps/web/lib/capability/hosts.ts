@@ -78,7 +78,12 @@ export async function recordHeartbeat(hostId: string, token: string, body: { cap
   const before = evaluateHostStatus(host.lastHeartbeat, now, cfg);
   await prisma.host.update({
     where: { id: host.id },
-    data: { lastHeartbeat: now, status: 'ONLINE', capabilities: boundedObject(body.capabilities) as object, metadata: boundedObject(body.metadata) as object },
+    // Details are replaced only when the host actually sent them; a heartbeat without them just proves it is alive.
+    data: {
+      lastHeartbeat: now, status: 'ONLINE',
+      ...(body.capabilities !== undefined ? { capabilities: boundedObject(body.capabilities) as object } : {}),
+      ...(body.metadata !== undefined ? { metadata: boundedObject(body.metadata) as object } : {}),
+    },
   });
   if (before !== 'ONLINE') {
     await recordAction({ userId: host.userId, initiator: 'system', action: 'host_online', permissionClass: 'A', status: 'EXECUTED', hostId: host.id, inputSummary: `was ${before}`, correlationId: `host-${host.id}` });
