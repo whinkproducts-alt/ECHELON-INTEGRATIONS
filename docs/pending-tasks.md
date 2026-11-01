@@ -83,3 +83,5 @@ Waiting on Victor:
 Open engineering:
 - Review the 10+ open Dependabot PRs one at a time: Actions bumps first, major npm bumps last, each with a licence check (CLAUDE.md rule 7). Close #16 (mapbox-gl 1 to 3) after verifying the licence. A Dependabot job for `services/anythingllm` failed.
 - Add the `finish()` terminal-update check from Qodo's `fix/remediation-2a68d1fb-185920` as its own change with a test, after the independent security review; then delete that branch. Do not remove the stuck-approval sweep.
+- CI efficiency (2026-11-01): CI now runs once per commit and skips the heavy steps for docs-only PRs. Victor: turn on branch protection with required checks (the CI job, gitleaks, the dependency audit, CodeQL) and allow auto-merge, so green PRs merge without polling. Optional later: cache the Next.js build and the Playwright browser; set Qodo to review once per PR.
+

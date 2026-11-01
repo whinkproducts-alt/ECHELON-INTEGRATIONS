@@ -1,9 +1,11 @@
 name: ci
 
+# Pull requests and pushes to main only. A push trigger on claude/** branches made every PR commit run twice (the two
+# runs have different refs, so they never cancelled each other). A branch without a PR is tested when its PR is opened.
 on:
   pull_request:
   push:
-    branches: [main, 'claude/**']
+    branches: [main]
 
 permissions:
   contents: read
@@ -17,6 +19,9 @@ jobs:
     name: typecheck, lint, migrate, test, build, e2e
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read # the scope step lists the files of a pull request
     services:
       postgres:
         # pgvector/pgvector is PostgreSQL-licensed (permissive) and used in CI only. Same image as docker-compose.yml.
@@ -45,50 +50,83 @@ jobs:
       CI: 'true'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # Docs-only pull requests skip the heavy steps below but still finish this job green, so a required check is
+      # always satisfied. Only files under docs/ and root-level *.md count as docs (nothing in the app or its tests
+      # reads them). Anything else, a push to main, or any error listing the files runs everything (fail closed).
+      - name: Decide whether the code changed
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          heavy=true
+          if [ "$EVENT" = "pull_request" ]; then
+            if files=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename') && [ -n "$files" ]; then
+              if ! printf '%s\n' "$files" | grep -qvE '^(docs/|[^/]+\.md$)'; then heavy=false; fi
+            fi
+          fi
+          echo "heavy=$heavy" >> "$GITHUB_OUTPUT"
+          echo "Heavy checks: $heavy"
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
         with:
           version: 10.28.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
         with:
           node-version: 22
           cache: pnpm
 
       - name: Install
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: pnpm install --frozen-lockfile
 
       - name: Prisma client
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: pnpm --filter app exec prisma generate
 
       - name: Typecheck
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: pnpm --filter app typecheck || pnpm --filter app exec tsc --noEmit
 
       - name: Lint
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: pnpm --filter app lint
 
       - name: Apply every migration to a real PostgreSQL with pgvector
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: pnpm --filter app exec prisma migrate deploy
 
       - name: Seed
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: pnpm --filter app exec prisma db seed
 
       - name: Unit tests
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: M1_EXECUTION_DATABASE_URL="$DATABASE_URL" pnpm --filter app test
 
       - name: Build
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: pnpm --filter app build
 
       - name: Install e2e dependencies and the Chromium browser
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
         working-directory: e2e
         run: |
           npm ci
           npx playwright install --with-deps chromium
 
       - name: E2E (real browser, built app, real database)
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
         working-directory: e2e
         run: npx playwright test
 
       - name: Upload e2e report, traces and failure screenshots
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.scope.outputs.heavy == 'true' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: e2e-report
