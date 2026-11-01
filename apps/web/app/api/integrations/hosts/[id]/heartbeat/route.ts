@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { readJsonBody } from '@/lib/api-helpers';
+import { clientKey, limitOr429 } from '@/lib/rate-limit';
 import { recordHeartbeat } from '@/lib/capability/hosts';
 import { CapabilityInputError } from '@/lib/capability/providers';
 
@@ -11,6 +12,10 @@ import { CapabilityInputError } from '@/lib/capability/providers';
  * agent sends an Origin header equal to the app origin (scripts/host-heartbeat.mjs does).
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // Before any database work: per client address when a trusted proxy gives one, else a looser shared bucket.
+  const addr = clientKey(req.headers);
+  const limited = addr ? await limitOr429('heartbeat', addr) : await limitOr429('heartbeat_route', 'heartbeat');
+  if (limited) return limited;
   const { id } = await params;
   const m = /^Bearer (eh_[A-Za-z0-9_-]{20,100})$/.exec(req.headers.get('authorization') ?? '');
   const parsed = await readJsonBody(req, 8 * 1024);

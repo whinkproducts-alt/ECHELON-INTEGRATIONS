@@ -46,7 +46,7 @@ The migration is additive only. `prisma migrate diff` also reports pre-existing 
 2. Policy gates (`policy.ts`, pure, deny by default, first failure wins): tool belongs to a provider owned by this account; provider `ENABLED` and its reviewed fingerprint still matches (endpoint, allow-list, tool definitions); transport can run here; host `ONLINE` computed now; data class not above the provider's ceiling and never `founder_private`; no credential-looking content; every URL in the arguments is on the allow-list (too deep to inspect = deny); cost class is `FREE`; a grant exists for this subject + this tool + this mission, unexpired, unrevoked, under its cap.
 3. Permission engine: protected money / proprietary actions and Class C always need the Founder; Class B needs a delegation or autonomy 2; Class A runs. Not allowed means an approval request is created and **nothing is sent**.
 4. Atomic grant reservation (concurrent calls cannot exceed the cap), then a write-ahead ledger row (if it cannot be written, nothing runs).
-5. One call over the egress-pinned MCP client. The ledger row is closed with the outcome. Arguments and results are **never stored**: only key names, size and sha256.
+5. One call over the egress-pinned MCP client. The ledger row is closed with the outcome. Arguments and results are **not stored in the ledger**: only key names (credential-like keys redacted), size and sha256. After an approved call, `approval_requests.result` keeps a truncated copy like any other approved tool.
 
 An approved call re-runs steps 1-4 at approval time and also requires the hash-locked approval, so a grant revoked in the 30-second window, a changed tool definition, or a tampered payload all stop it.
 
@@ -101,7 +101,11 @@ Full audit: `ECHELON_CODE_AUDIT_REPORT.txt`. Summary of what was fixed rather th
 - Plugin formats beyond "MCP provider" (manifest-only plugin loader, isolated JS, containers) and the selective OpenClaw capability adapter (FDR-012 matrix first).
 - A network-level egress boundary. The application allow-list is defence in depth. On macOS use `pf` or run MCP servers in a container; Linux `iptables` does not apply to the Mac. Not shipped.
 - OAuth for providers (only a static bearer credential), key rotation, per-host keys. One server key (`ENCRYPTION_KEY`) encrypts credentials.
-- Rate limiting of the heartbeat endpoint (256-bit tokens make guessing infeasible).
+- Heartbeat rate limit is per client address (needs `TRUSTED_PROXY_HOPS` behind a proxy) or one shared bucket; it is not per host, on purpose, so a flood cannot lock a real host out.
+- Provider output is flagged untrusted but is not yet wrapped or injection-scanned. Nothing sends it to a model today; that must be added before any agent or chat path uses it (review CG-12).
+- A Founder test call already in flight finishes if the provider is revoked meanwhile (review CG-9). Agent calls are protected by the atomic grant reservation.
+- A money tool with a bland name is not forced to Class C; your review is the only control there (review CG-14).
+- Revoked credential ciphertext may remain in old Postgres row versions and backups under the same key (review CG-13).
 - A browser (Playwright) test for the Integration Hub page.
 - Host sweep runs when the Hosts list is loaded; there is no scheduled worker job for it. It only refreshes a display cache and writes ledger transitions; the invocation gate never depends on it.
 

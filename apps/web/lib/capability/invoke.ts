@@ -12,8 +12,10 @@
  *   4. atomic grant reservation (invocation cap), then a write-ahead ledger row;
  *   5. one call over the egress-pinned MCP client; the ledger row is closed with the outcome.
  *
- * The ledger never stores arguments or results, only their keys / size / sha256, so a receipt cannot
- * leak what it describes. Results are returned as untrusted text.
+ * The ledger never stores arguments or results, only their key names (credential-like keys are replaced
+ * with "[redacted]"), size and sha256, so a receipt cannot leak what it describes. Results are returned as
+ * untrusted text. One exception, by design of the approval flow: when a call is executed after a Founder
+ * approval, approval_requests.result keeps a truncated copy (4000 characters) like every other approved tool.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { prisma } from '@/lib/db';
@@ -24,6 +26,7 @@ import { createApproval } from '@/lib/approvals';
 import { decryptKey } from '@/lib/key-encryption';
 import { approvalContentHash } from '@/lib/canonical-json';
 import { classifyProtected } from '@/lib/protected-actions';
+import { SECRET_RULES } from '@/lib/secret-scan';
 import { callProviderTool, ProviderError, type ProviderConn } from '@/lib/capability/mcp-http';
 import { evaluateGates, effectiveToolClass, isDataClass, type CapabilityErrorCode, type DataClass } from '@/lib/capability/policy';
 import { loadHeartbeatConfig } from '@/lib/capability/heartbeat';
@@ -72,7 +75,9 @@ const MAX_TIMEOUT_MS = 120_000;
 function summarise(v: unknown): string {
   let json = '';
   try { json = JSON.stringify(v) ?? ''; } catch { json = ''; }
-  const keys = v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v as object).slice(0, 20) : [];
+  // Key names are recorded, but a key that is itself a credential-like string is not.
+  const keys = (v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v as object).slice(0, 20) : [])
+    .map((k) => (k.length > 80 || SECRET_RULES.some((r) => r.re.test(k)) ? '[redacted]' : k));
   return JSON.stringify({ keys, bytes: json.length, sha256: createHash('sha256').update(json).digest('hex') });
 }
 

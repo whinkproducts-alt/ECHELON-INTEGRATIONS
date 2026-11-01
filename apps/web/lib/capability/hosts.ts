@@ -26,6 +26,9 @@ function tokenMatches(token: string, storedHash: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/** A well-formed hash that no token produces. Used only to equalise timing for unknown host ids. */
+const DUMMY_TOKEN_HASH = createHash('sha256').update('echelon-dummy-host-token-not-a-secret').digest('hex');
+
 export function publicHost<T extends { tokenHash?: string }>(h: T): Omit<T, 'tokenHash'> {
   const { tokenHash: _omit, ...rest } = h;
   void _omit;
@@ -65,7 +68,12 @@ export type HeartbeatOutcome = { ok: true; status: HostStatus; receivedAt: strin
 export async function recordHeartbeat(hostId: string, token: string, body: { capabilities?: unknown; metadata?: unknown }, now: Date = new Date()): Promise<HeartbeatOutcome> {
   if (!hostId || !token) return { ok: false };
   const host = await prisma.host.findUnique({ where: { id: hostId } });
-  if (!host || !tokenMatches(token, host.tokenHash)) return { ok: false };
+  if (!host) {
+    // Do the same hashing and comparison work as for a real host, so response time does not reveal whether an id exists.
+    tokenMatches(token, DUMMY_TOKEN_HASH);
+    return { ok: false };
+  }
+  if (!tokenMatches(token, host.tokenHash)) return { ok: false };
   const cfg = loadHeartbeatConfig();
   const before = evaluateHostStatus(host.lastHeartbeat, now, cfg);
   await prisma.host.update({

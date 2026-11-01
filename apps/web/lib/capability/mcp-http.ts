@@ -29,16 +29,19 @@ export interface ProviderConn {
 }
 
 const LIST_TIMEOUT_MS = 10_000;
+/** Byte limits are enforced on the wire (egress.ts), before the MCP SDK buffers or parses anything. */
+const MAX_LIST_RESPONSE_BYTES = 256 * 1024;
+const MAX_CALL_RESPONSE_BYTES = 1024 * 1024;
 const TOOL_NAME_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 
 function redact(text: string, secret?: string | null): string {
   return secret ? text.split(secret).join('[redacted]') : text;
 }
 
-function connFor(conn: ProviderConn, deps: EgressDeps): ExternalMcpConn {
+function connFor(conn: ProviderConn, deps: EgressDeps, maxResponseBytes: number): ExternalMcpConn {
   return {
     endpoint: conn.endpoint,
-    fetch: createAllowlistedFetch({ allowlist: conn.egressAllowlist }, deps),
+    fetch: createAllowlistedFetch({ allowlist: conn.egressAllowlist, maxResponseBytes }, deps),
     headers: conn.credential ? { Authorization: `Bearer ${conn.credential}` } : {},
   };
 }
@@ -50,6 +53,7 @@ function fail(err: unknown, credential?: string | null): never {
   const msg = redact(err instanceof Error ? err.message : String(err), credential);
   logger.warn('capability provider request failed', { detail: msg.slice(0, 300) });
   if (/Egress denied/.test(msg)) throw new ProviderError('Provider destination is not on the egress allow-list', 'EGRESS_DENIED');
+  if (/response too large/i.test(msg)) throw new ProviderError('Provider response too large');
   if (name === 'TimeoutError' || name === 'AbortError' || /timed out|timeout/i.test(msg)) throw new ProviderError('Provider request timed out', 'EXEC_TIMEOUT');
   throw new ProviderError('Provider request failed');
 }
@@ -71,7 +75,7 @@ export interface DiscoveryResult {
 export async function discoverTools(conn: ProviderConn, deps: EgressDeps = {}): Promise<DiscoveryResult> {
   let raw: unknown[];
   try {
-    raw = await listExternalMcpTools(connFor(conn, deps), LIST_TIMEOUT_MS);
+    raw = await listExternalMcpTools(connFor(conn, deps, MAX_LIST_RESPONSE_BYTES), LIST_TIMEOUT_MS);
   } catch (e) {
     return fail(e, conn.credential);
   }
@@ -112,7 +116,7 @@ export async function callProviderTool(
 ): Promise<string> {
   let res: { text: string; isError: boolean };
   try {
-    res = await callExternalMcpTool(connFor(conn, deps), toolName, args, timeoutMs);
+    res = await callExternalMcpTool(connFor(conn, deps, MAX_CALL_RESPONSE_BYTES), toolName, args, timeoutMs);
   } catch (e) {
     return fail(e, conn.credential);
   }

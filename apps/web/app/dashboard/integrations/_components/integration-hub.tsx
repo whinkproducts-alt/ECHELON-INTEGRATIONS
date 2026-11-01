@@ -17,7 +17,7 @@ interface Provider {
 interface Host { id: string; name: string; kind: string; status: string; lastHeartbeat: string | null }
 interface Grant { id: string; subjectType: string; subjectId: string; toolId: string; executionPlanId: string | null; invocationCount: number; maxInvocations: number | null; expiresAt: string; revokedAt: string | null; tool: { name: string; originalName: string | null } }
 interface Receipt { id: string; action: string; status: string; errorCode: string | null; createdAt: string; latencyMs: number | null; tool: string | null; permissionClass: string; approvalId: string | null; hostId: string | null; outputSummary: string | null }
-interface CheckReport { pass: boolean; failures: string[]; summary: { endpoint: string | null; egressAllowlist: string[]; maxDataClass: string; hasCredential: boolean; host: string | null; tools: Array<{ id: string; name: string; originalName: string | null; description: string; riskClass: string; costClass: string; protected: boolean }> } }
+interface CheckReport { pass: boolean; failures: string[]; summary: { fingerprint: string; endpoint: string | null; egressAllowlist: string[]; maxDataClass: string; hasCredential: boolean; host: string | null; tools: Array<{ id: string; name: string; originalName: string | null; description: string; riskClass: string; costClass: string; protected: boolean }> } }
 interface RosterHit { id: string; name: string; title?: string }
 
 const RISK = ['C', 'B', 'A'] as const;
@@ -166,7 +166,7 @@ export function IntegrationHub() {
           </table>
           <div className="flex gap-2">
             <button disabled={!review.report.pass || busy !== ''} className="rounded border border-border bg-background px-3 py-1 text-sm disabled:opacity-50"
-              onClick={() => act('review', async () => { await api(`/providers/${review.provider.id}/review`, { method: 'POST', body: JSON.stringify({ tools: Object.entries(review.picks).map(([toolId, v]) => ({ toolId, ...v })) }) }); setReview(null); }, 'Reviewed. Enable it when you are ready.')}>I have reviewed this: confirm</button>
+              onClick={() => act('review', async () => { await api(`/providers/${review.provider.id}/review`, { method: 'POST', body: JSON.stringify({ fingerprint: review.report.summary.fingerprint, tools: Object.entries(review.picks).map(([toolId, v]) => ({ toolId, ...v })) }) }); setReview(null); }, 'Reviewed. Enable it when you are ready.')}>I have reviewed this: confirm</button>
             <button className="text-sm underline" onClick={() => setReview(null)}>Cancel</button>
           </div>
         </section>

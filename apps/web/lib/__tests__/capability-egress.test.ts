@@ -146,3 +146,100 @@ describe('createAllowlistedFetch (real sockets)', () => {
     await expect(f(`http://127.0.0.1:${port}/`, { signal: ac.signal })).rejects.toBeDefined();
   });
 });
+
+// ── Independent security review fixes ──────────────────────────────────────────────────────────────
+
+describe('CG-4 every IPv6 spelling of a forbidden IPv4 address is forbidden', () => {
+  it.each([
+    '::ffff:169.254.169.254', '::ffff:a9fe:a9fe', '64:ff9b::a9fe:a9fe', '::ffff:0:a9fe:a9fe', '::a9fe:a9fe', '2002:a9fe:a9fe::1',
+    '[::ffff:a9fe:a9fe]', '100.100.100.200', 'fd00:ec2::254', 'fd00:ec2::1', 'fe80::1', 'ff02::1', '::', '0:0:0:0:0:ffff:a9fe:a9fe',
+  ])('forbids %s', (ip) => { expect(isForbiddenAddress(ip)).toBe(true); });
+  it.each(['2606:4700:4700::1111', '::ffff:8.8.8.8', '64:ff9b::808:808', '8.8.8.8', '::1'])('does not forbid %s', (ip) => {
+    expect(isForbiddenAddress(ip)).toBe(false); // loopback is handled by the hostname rule below, not by the never-reachable list
+  });
+  it('a literal metadata URL in IPv6 form is refused even when the Founder lists it', async () => {
+    await expect(resolveAllowedTarget(u('https://[::ffff:169.254.169.254]/'), { allowlist: ['[::ffff:a9fe:a9fe]'] })).rejects.toBeInstanceOf(EgressDeniedError);
+  });
+});
+
+describe('CG-5 a hostname never leads into loopback or private space unless that IP is listed', () => {
+  const to = (address: string) => async () => [{ address, family: address.includes(':') ? 6 : 4 }];
+  it.each(['127.0.0.1', '10.1.2.3', '172.16.5.5', '192.168.1.10', '100.64.0.9', 'fd12:3456::1', '::1', '::ffff:10.0.0.1'])('refuses api.good.test -> %s', async (addr) => {
+    await expect(resolveAllowedTarget(u('https://api.good.test/'), { allowlist: ['api.good.test'] }, { resolve: to(addr) })).rejects.toBeInstanceOf(EgressDeniedError);
+  });
+  it('allows it when the Founder lists that exact IP or CIDR as well', async () => {
+    const t = await resolveAllowedTarget(u('https://api.good.test/'), { allowlist: ['api.good.test', '10.1.2.3'] }, { resolve: to('10.1.2.3') });
+    expect(t.address).toBe('10.1.2.3');
+    const c = await resolveAllowedTarget(u('https://api.good.test/'), { allowlist: ['api.good.test', '10.0.0.0/8'] }, { resolve: to('10.9.9.9') });
+    expect(c.address).toBe('10.9.9.9');
+  });
+  it('a literal IP the Founder listed still works', async () => {
+    const t = await resolveAllowedTarget(u('http://127.0.0.1:3100/mcp'), { allowlist: ['127.0.0.1:3100'] });
+    expect(t.address).toBe('127.0.0.1');
+  });
+  it('"localhost" may reach loopback, and only loopback', async () => {
+    expect((await resolveAllowedTarget(u('http://localhost:3100/'), { allowlist: ['localhost:3100'] }, { resolve: to('127.0.0.1') })).address).toBe('127.0.0.1');
+    await expect(resolveAllowedTarget(u('http://localhost:3100/'), { allowlist: ['localhost:3100'] }, { resolve: to('10.0.0.5') })).rejects.toBeInstanceOf(EgressDeniedError);
+  });
+  it('public addresses are unaffected', async () => {
+    expect((await resolveAllowedTarget(u('https://api.good.test/'), { allowlist: ['api.good.test'] }, { resolve: to('93.184.216.34') })).address).toBe('93.184.216.34');
+  });
+});
+
+describe('CG-6 URL scan finds the spellings a URL parser accepts', () => {
+  const hostsOf = (v: unknown) => scanForUrls(v).urls.map((x) => x.hostname);
+  it.each([
+    'http:\\\\evil.example/x', 'https:evil.example/x', 'https:/evil.example/x', '//evil.example/x', 'see (//evil.example/x)', 'https%3A%2F%2Fevil.example%2Fx', 'HTTPS://EVIL.EXAMPLE/x',
+  ])('finds %s', (text) => {
+    expect(hostsOf({ note: text })).toContain('evil.example');
+  });
+  it('finds them in keys too', () => { expect(hostsOf({ 'https:evil.example/x': 1 })).toContain('evil.example'); });
+  it('still ignores plain text', () => {
+    expect(scanForUrls({ a: 'note:todo', b: '10:30', c: '100% sure', d: '// comment', e: '//usr/bin/env', f: 'http: not a url' }).urls).toEqual([]);
+  });
+  it('documented limit: a bare host with no scheme is not found (the allow-list is the real boundary)', () => {
+    expect(scanForUrls({ a: 'evil.example/x' }).urls).toEqual([]);
+  });
+});
+
+describe('CG-2 response bodies are counted on the wire and cut off at the limit', () => {
+  let server: http.Server;
+  let port = 0;
+  beforeAll(async () => {
+    server = http.createServer((req, res) => {
+      if (req.url === '/declared') { res.setHeader('content-length', String(5 * 1024 * 1024)); res.flushHeaders(); res.end(); return; }
+      if (req.url === '/stream') {
+        // No content-length: chunked, endless-looking. The client must stop reading.
+        res.setHeader('content-type', 'text/plain');
+        const chunk = Buffer.alloc(16 * 1024, 97);
+        let sent = 0;
+        const tick = (): void => { if (res.destroyed || sent > 64 * 1024 * 1024) { res.end(); return; } sent += chunk.length; if (res.write(chunk)) setImmediate(tick); else res.once('drain', tick); };
+        tick();
+        return;
+      }
+      res.end('small');
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    port = (server.address() as AddressInfo).port;
+  });
+  afterAll(async () => { await new Promise<void>((r) => { server.closeAllConnections(); server.close(() => r()); }); });
+
+  it('refuses up front when content-length is over the limit', async () => {
+    const f = createAllowlistedFetch({ allowlist: [`127.0.0.1:${port}`], maxResponseBytes: 1000 });
+    await expect(f(`http://127.0.0.1:${port}/declared`)).rejects.toThrow(/too large/);
+  });
+  it('cuts off a body with no content-length once it passes the limit', async () => {
+    const f = createAllowlistedFetch({ allowlist: [`127.0.0.1:${port}`], maxResponseBytes: 100_000 });
+    const res = await f(`http://127.0.0.1:${port}/stream`);
+    await expect(res.text()).rejects.toThrow(/too large/);
+  });
+  it('a response under the limit is delivered whole', async () => {
+    const f = createAllowlistedFetch({ allowlist: [`127.0.0.1:${port}`], maxResponseBytes: 1000 });
+    expect(await (await f(`http://127.0.0.1:${port}/`)).text()).toBe('small');
+  });
+  it('the default limit is 1 MiB', async () => {
+    const f = createAllowlistedFetch({ allowlist: [`127.0.0.1:${port}`] });
+    const res = await f(`http://127.0.0.1:${port}/stream`);
+    await expect(res.text()).rejects.toThrow(/too large/);
+  });
+});

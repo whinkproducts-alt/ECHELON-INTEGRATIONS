@@ -20,6 +20,7 @@ import { DATA_CLASSES, GRANT_DEFAULT_DAYS, GRANT_MAX_DAYS, isDataClass } from '@
 import { resolveAgent, teamExists, agentMayAct } from '@/lib/capability/roster';
 import { decryptKey } from '@/lib/key-encryption';
 import { isLoopbackUrl } from '@/lib/local-only';
+import catalogJson from '@/config/connectors.catalog.json';
 
 export class CapabilityInputError extends Error {
   constructor(message: string, readonly status = 400) {
@@ -125,6 +126,12 @@ export function validateEndpoint(raw: string): URL {
   return u;
 }
 
+/** Catalog connector ids, read straight from the catalog file (no import of the connector registry). */
+export function isCatalogId(id: string): boolean {
+  const list = (catalogJson as { connectors?: Array<{ id?: unknown }> }).connectors ?? [];
+  return list.some((e) => e.id === id);
+}
+
 export async function registerProvider(userId: string, input: RegisterInput) {
   if (!SLUG_RE.test(input.connectorId ?? '')) throw new CapabilityInputError('connectorId must be 1-32 chars of a-z, 0-9 and hyphen');
   if (input.transport !== 'streamable-http' && input.transport !== 'stdio') throw new CapabilityInputError('transport must be streamable-http or stdio');
@@ -171,6 +178,8 @@ export async function registerProvider(userId: string, input: RegisterInput) {
     credentialHint = c.length >= 16 ? c.slice(-4) : null; // a short secret reveals nothing, not even its tail
   }
 
+  // A provider id may not equal a catalog connector id: both live in one table keyed by (userId, connectorId).
+  if (isCatalogId(input.connectorId)) throw new CapabilityInputError('connectorId is reserved by the connector catalog; choose another id', 409);
   const exists = await prisma.connectorInstall.findFirst({ where: { userId, connectorId: input.connectorId }, select: { id: true } });
   if (exists) throw new CapabilityInputError('a connector with this id already exists', 409);
 
@@ -212,6 +221,7 @@ export async function discoverProvider(userId: string, id: string, deps: EgressD
 
   const names = new Map<string, string>();
   for (const t of kept) {
+    if (!toolSlug(t.originalName)) { rejected.push({ name: t.originalName, reason: 'name has no usable characters' }); continue; }
     const full = namespacedToolName(prov.id, t.originalName);
     if (names.has(full)) { rejected.push({ name: t.originalName, reason: 'name collides after normalisation' }); continue; }
     names.set(full, t.originalName);
@@ -219,6 +229,7 @@ export async function discoverProvider(userId: string, id: string, deps: EgressD
 
   let created = 0, updated = 0, changed = 0;
   for (const t of kept) {
+    if (!toolSlug(t.originalName)) continue;
     const full = namespacedToolName(prov.id, t.originalName);
     if (names.get(full) !== t.originalName) continue;
     const existing = await prisma.tool.findUnique({ where: { name: full } });
@@ -270,6 +281,8 @@ export interface CheckReport {
   failures: string[];
   /** What the Founder is asked to approve, in plain terms. */
   summary: {
+    /** What the Founder is looking at. The review must send this back unchanged, or it is refused (409). */
+    fingerprint: string;
     endpoint: string | null;
     egressAllowlist: string[];
     maxDataClass: string;
@@ -298,6 +311,7 @@ export async function automatedChecks(userId: string, id: string): Promise<Check
     pass: failures.length === 0,
     failures,
     summary: {
+      fingerprint: providerFingerprint(prov, tools),
       endpoint: prov.endpoint,
       egressAllowlist: prov.egressAllowlist,
       maxDataClass: prov.maxDataClass,
@@ -318,6 +332,8 @@ export async function automatedChecks(userId: string, id: string): Promise<Check
 }
 
 export interface ReviewInput {
+  /** The `summary.fingerprint` from the checks the Founder was shown. Required: it pins the review to exactly what was seen. */
+  fingerprint?: string;
   /** The Founder's explicit per-tool decision. Tools not listed stay Class C and cost UNKNOWN. */
   tools?: Array<{ toolId: string; riskClass: 'A' | 'B' | 'C'; costClass: 'FREE' | 'METERED' | 'CLOUD_BILLABLE' | 'UNKNOWN' }>;
 }
@@ -325,6 +341,10 @@ export interface ReviewInput {
 export async function reviewProvider(userId: string, id: string, input: ReviewInput = {}) {
   const report = await automatedChecks(userId, id);
   if (!report.pass) throw new CapabilityInputError(`Automated checks failed: ${report.failures.join('; ')}`, 422);
+  // The review is of the exact definitions the Founder was shown, not of whatever is stored now.
+  if (typeof input.fingerprint !== 'string' || input.fingerprint !== report.summary.fingerprint) {
+    throw new CapabilityInputError('the provider changed since the checks you reviewed (or no fingerprint was sent); reload the checks and review again', 409);
+  }
   const prov = await getProvider(userId, id);
   if (prov.status !== 'REGISTERED' && prov.status !== 'DISABLED' && prov.status !== 'REVIEWED' && prov.status !== 'ENABLED') {
     throw new CapabilityInputError(`cannot review a ${prov.status.toLowerCase()} provider`, 409);
@@ -339,15 +359,17 @@ export async function reviewProvider(userId: string, id: string, input: ReviewIn
     if (!['FREE', 'METERED', 'CLOUD_BILLABLE', 'UNKNOWN'].includes(costClass)) throw new CapabilityInputError('invalid costClass');
     // Protected (money / proprietary egress) tools are Class C, whatever the Founder picks here.
     if (t.protected) riskClass = 'C';
-    await prisma.tool.updateMany({
-      where: { id: t.id, connectorInstallId: prov.id },
+    // Only if the stored definition is still the one that was shown. A concurrent discovery makes this a 409.
+    const stamped = await prisma.tool.updateMany({
+      where: { id: t.id, connectorInstallId: prov.id, defHash: t.defHash },
       data: { riskClass, costClass, reviewedDefHash: t.defHash },
     });
+    if (stamped.count !== 1) throw new CapabilityInputError('a tool definition changed during review; reload the checks and review again', 409);
   }
-  const { fp } = await loadFingerprint(userId, id);
+  // Stamp the fingerprint that was reviewed, not a fresh one: if anything changed meanwhile, enabling is refused.
   const row = await prisma.connectorInstall.update({
     where: { id: prov.id },
-    data: { status: 'REVIEWED', reviewedByUserId: userId, reviewedAt: new Date(), reviewedFingerprint: fp, disabledReason: null },
+    data: { status: 'REVIEWED', reviewedByUserId: userId, reviewedAt: new Date(), reviewedFingerprint: report.summary.fingerprint, disabledReason: null },
   });
   await ledger(userId, 'provider_reviewed', 'EXECUTED', { connectorInstallId: prov.id, summary: `tools=${report.summary.tools.length}` });
   return row;

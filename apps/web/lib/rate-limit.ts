@@ -77,6 +77,9 @@ export const RATE_RULES = {
   signup_bootstrap: { limit: 5, windowMs: 60_000 },
   passkey_reauth: { limit: 5, windowMs: 60_000 },
   recommendations: { limit: 60, windowMs: 60_000 },
+  /** Host heartbeat (token-authenticated, unauthenticated by session): per client address, and a looser shared bucket when no trustworthy address exists. A host sends about 2 a minute. */
+  heartbeat: { limit: 30, windowMs: 60_000 },
+  heartbeat_route: { limit: 600, windowMs: 60_000 },
   /** Read-only history, ledger search and health routes. */
   read: { limit: 120, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;

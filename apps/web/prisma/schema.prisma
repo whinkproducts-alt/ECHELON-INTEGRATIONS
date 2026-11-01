@@ -605,9 +605,10 @@ model Action {
   grantId            String?
 
   user             User              @relation(fields: [userId], references: [id])
-  connectorInstall ConnectorInstall? @relation(fields: [connectorInstallId], references: [id], onDelete: SetNull)
-  capability       Tool?             @relation(fields: [capabilityId], references: [id], onDelete: SetNull)
-  host             Host?             @relation(fields: [hostId], references: [id], onDelete: SetNull)
+  // Receipts are never rewritten after the fact: deleting a provider, tool or host that has receipts is refused (NO ACTION).
+  connectorInstall ConnectorInstall? @relation(fields: [connectorInstallId], references: [id], onDelete: NoAction)
+  capability       Tool?             @relation(fields: [capabilityId], references: [id], onDelete: NoAction)
+  host             Host?             @relation(fields: [hostId], references: [id], onDelete: NoAction)
 
   @@index([userId, createdAt])
   @@index([correlationId])
@@ -1459,7 +1460,7 @@ model CapabilityGrant {
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   tool          Tool           @relation(fields: [toolId], references: [id], onDelete: Cascade)
-  executionPlan ExecutionPlan? @relation(fields: [executionPlanId], references: [id], onDelete: SetNull)
+  executionPlan ExecutionPlan? @relation(fields: [executionPlanId], references: [id], onDelete: Cascade) // a mission-scoped grant must not become unrestricted when its mission is deleted
 
   @@index([userId, subjectType, subjectId])
   @@index([toolId])

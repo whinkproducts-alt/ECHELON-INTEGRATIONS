@@ -15,7 +15,7 @@ import { getOrgKit } from '@/lib/agent-loader';
 import { decide } from '@/lib/approvals';
 import { startForbiddenListener, startMockMcp, type MockMcp } from '@/lib/__tests__/helpers/mock-mcp-server';
 import {
-  createGrant, disableProvider, discoverProvider, enableProvider, getProvider, registerProvider, reviewProvider, revokeProvider, revokeGrant,
+  automatedChecks, createGrant, disableProvider, discoverProvider, enableProvider, getProvider, registerProvider, reviewProvider, revokeProvider, revokeGrant,
   namespacedToolName, CapabilityInputError,
 } from '@/lib/capability/providers';
 import { CapabilityError, invokeCapability } from '@/lib/capability/invoke';
@@ -33,11 +33,17 @@ let agentB = '';
 let dormantAgentTeamMate = '';
 const stamp = Date.now();
 
+/** Review exactly as the Hub does: load the checks, then send back the fingerprint that was shown. */
+async function reviewAsFounder(userId: string, id: string, tools?: Array<{ toolId: string; riskClass: 'A' | 'B' | 'C'; costClass: 'FREE' | 'METERED' | 'CLOUD_BILLABLE' | 'UNKNOWN' }>) {
+  const report = await automatedChecks(userId, id);
+  return reviewProvider(userId, id, { fingerprint: report.summary.fingerprint, tools });
+}
+
 async function setupProvider(userId: string, slug: string, server: MockMcp, review: 'FREE_A' | 'DEFAULT' | 'FREE_C' = 'FREE_A', extra: { hostId?: string; credential?: string } = {}) {
   const prov = await registerProvider(userId, { connectorId: `${slug}-${stamp}`.slice(0, 32), transport: 'streamable-http', endpoint: server.url, credential: extra.credential, hostId: extra.hostId });
   await discoverProvider(userId, prov.id);
   const tools = await prisma.tool.findMany({ where: { connectorInstallId: prov.id } });
-  await reviewProvider(userId, prov.id, review === 'DEFAULT' ? {} : { tools: tools.map((t) => ({ toolId: t.id, riskClass: review === 'FREE_A' ? 'A' : 'C', costClass: 'FREE' })) });
+  await reviewAsFounder(userId, prov.id, review === 'DEFAULT' ? undefined : tools.map((t) => ({ toolId: t.id, riskClass: review === 'FREE_A' ? 'A' as const : 'C' as const, costClass: 'FREE' as const })));
   await enableProvider(userId, prov.id);
   return { prov: await getProvider(userId, prov.id), tool: tools[0] };
 }
@@ -254,7 +260,7 @@ describe.skipIf(!enabled)('Capability Gateway: real database, real MCP server', 
       expect(changing.calls.length).toBe(before);
       // enabling is not enough; only a new review of the new definition turns it back on
       await expect(enableProvider(owner, prov.id)).rejects.toBeInstanceOf(CapabilityInputError);
-      await reviewProvider(owner, prov.id, { tools: [{ toolId: tool.id, riskClass: 'A', costClass: 'FREE' }] });
+      await reviewAsFounder(owner, prov.id, [{ toolId: tool.id, riskClass: 'A', costClass: 'FREE' }]);
       await enableProvider(owner, prov.id);
       expect((await call(owner, agentA, tool.name)).status).toBe('EXECUTED');
     } finally { await changing.close(); }
@@ -445,5 +451,78 @@ describe.skipIf(!enabled)('Capability Gateway: real database, real MCP server', 
     expect(JSON.stringify(shown)).not.toContain('credentialsEnc');
     expect(shown.hasCredential).toBe(true);
     expect(prov.credentialHint).toBe('0123');
+  });
+
+  // ── Independent security review fixes (CG-1, CG-3, CG-7, CG-8, CG-11) ──────────────────────────────
+
+  it('CG-1 a provider id may not equal a catalog connector id, and a provider with receipts cannot be deleted from under them', async () => {
+    const e = await registerProvider(owner, { connectorId: 'github', transport: 'streamable-http', endpoint: mcp.url }).then(() => null, (x) => x);
+    expect(e).toBeInstanceOf(CapabilityInputError);
+    expect((e as CapabilityInputError).status).toBe(409);
+    const { prov, tool } = await setupProvider(owner, 'cg1', mcp);
+    await createGrant(owner, { subjectType: 'AGENT', subjectId: agentA, toolId: tool.id });
+    expect((await call(owner, agentA, tool.name)).status).toBe('EXECUTED');
+    const receipt = await prisma.action.findFirstOrThrow({ where: { userId: owner, action: 'capability_invoke', capabilityId: tool.id } });
+    // NO ACTION foreign keys: the receipts are not rewritten when someone deletes the provider or the tool.
+    await expect(prisma.connectorInstall.delete({ where: { id: prov.id } })).rejects.toBeTruthy();
+    await expect(prisma.tool.delete({ where: { id: tool.id } })).rejects.toBeTruthy();
+    const after = await prisma.action.findUniqueOrThrow({ where: { id: receipt.id } });
+    expect(after.connectorInstallId).toBe(prov.id);
+    expect(after.capabilityId).toBe(tool.id);
+  });
+
+  it('CG-3 the review is pinned to the definitions the Founder was shown: no fingerprint, or a stale one, is refused and nothing is stamped', async () => {
+    const prov = await registerProvider(owner, { connectorId: `cg3-${stamp}`.slice(0, 32), transport: 'streamable-http', endpoint: mcp.url });
+    await discoverProvider(owner, prov.id);
+    const shown = await automatedChecks(owner, prov.id);
+    const tools = await prisma.tool.findMany({ where: { connectorInstallId: prov.id } });
+    const decisions = tools.map((t) => ({ toolId: t.id, riskClass: 'A' as const, costClass: 'FREE' as const }));
+    await expect(reviewProvider(owner, prov.id, { tools: decisions })).rejects.toMatchObject({ status: 409 });
+    // a discovery changes a definition after the Founder loaded the checks
+    await prisma.tool.update({ where: { id: tools[0].id }, data: { defHash: 'definition-the-founder-never-saw' } });
+    await expect(reviewProvider(owner, prov.id, { fingerprint: shown.summary.fingerprint, tools: decisions })).rejects.toMatchObject({ status: 409 });
+    const row = await prisma.tool.findUniqueOrThrow({ where: { id: tools[0].id } });
+    expect(row.reviewedDefHash).toBeNull();
+    expect(row.riskClass).toBe('C');
+    expect(row.costClass).toBe('UNKNOWN');
+    expect((await getProvider(owner, prov.id)).status).toBe('REGISTERED');
+    // reloading the checks and reviewing what is there now works
+    const fresh = await automatedChecks(owner, prov.id);
+    expect(fresh.summary.fingerprint).not.toBe(shown.summary.fingerprint);
+    await reviewProvider(owner, prov.id, { fingerprint: fresh.summary.fingerprint, tools: decisions });
+    expect((await getProvider(owner, prov.id)).status).toBe('REVIEWED');
+  });
+
+  it('CG-7 a credential-like argument KEY is denied and is never written to the receipt', async () => {
+    const { tool } = await setupProvider(owner, 'cg7', mcp);
+    await createGrant(owner, { subjectType: 'AGENT', subjectId: agentA, toolId: tool.id });
+    const secretKey = 'ghp_' + 'b'.repeat(36);
+    const start = await latestCursor(owner);
+    await expectCode(call(owner, agentA, tool.name, { [secretKey]: 'x' }), 'DATA_CLASS_DENIED');
+    const row = await prisma.action.findFirstOrThrow({ where: { userId: owner, action: 'capability_denied', errorCode: 'DATA_CLASS_DENIED', capabilityId: tool.id }, orderBy: { createdAt: 'desc' } });
+    expect(JSON.stringify(row)).not.toContain(secretKey);
+    expect(JSON.parse(row.inputSummary!).keys).toEqual(['[redacted]']);
+    // the live event feed (what the Hub shows and GET /invocations returns) is built from the same row
+    expect(JSON.stringify(await eventsAfter(owner, start))).not.toContain(secretKey);
+  });
+
+  it('CG-8 deleting a mission deletes its grants instead of widening them to every mission', async () => {
+    const { tool } = await setupProvider(owner, 'cg8', mcp);
+    const plan = await prisma.executionPlan.create({ data: { userId: owner, objective: 'cg8 mission' } });
+    const g = await createGrant(owner, { subjectType: 'AGENT', subjectId: agentA, toolId: tool.id, executionPlanId: plan.id });
+    await prisma.executionPlan.delete({ where: { id: plan.id } });
+    expect(await prisma.capabilityGrant.findUnique({ where: { id: g.id } })).toBeNull();
+    await expectCode(call(owner, agentA, tool.name), 'AUTHZ_POLICY_DENIED');
+  });
+
+  it('CG-11 a tool whose name has no usable characters is rejected at discovery and never created', async () => {
+    const odd = await startMockMcp({ tools: [{ name: '---' }, { name: 'fine_tool' }] });
+    try {
+      const prov = await registerProvider(owner, { connectorId: `cg11-${stamp}`.slice(0, 32), transport: 'streamable-http', endpoint: odd.url });
+      const out = await discoverProvider(owner, prov.id);
+      expect(out.rejected.map((r) => r.reason)).toContain('name has no usable characters');
+      const names = (await prisma.tool.findMany({ where: { connectorInstallId: prov.id } })).map((t) => t.originalName);
+      expect(names).toEqual(['fine_tool']);
+    } finally { await odd.close(); }
   });
 });

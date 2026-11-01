@@ -145,7 +145,7 @@ export async function listConnectors(
   const ctx = opts.ctx ?? liveContext(userId, opts.owner === true);
   if (!userId) throw new Error('connectors: userId is required');
   const catalog = loadCatalog();
-  const installs = await prisma.connectorInstall.findMany({ where: { userId }, select: { connectorId: true, enabled: true } });
+  const installs = await prisma.connectorInstall.findMany({ where: { userId, kind: 'CATALOG' }, select: { connectorId: true, enabled: true } });
   const byId = new Map(installs.map((i) => [i.connectorId, i]));
   return Promise.all(
     catalog.map(async (e) => {
@@ -174,6 +174,9 @@ export async function installConnector(userId: string, connectorId: string) {
   return runGuarded(
     { userId, capability: 'connector_manage', permissionClass: 'B', action: 'connector_installed', summary: `connectorId=${connectorId}` },
     async () => {
+      // Catalog rows only. An MCP provider (kind MCP_SERVER) that shares the id is never touched here.
+      const existing = await prisma.connectorInstall.findFirst({ where: { userId, connectorId }, select: { id: true, kind: true } });
+      if (existing && existing.kind !== 'CATALOG') throw new Error('connector id is used by a registered provider');
       await prisma.connectorInstall.upsert({
         where: { userId_connectorId: { userId, connectorId } },
         create: { userId, connectorId, enabled: true },
@@ -190,7 +193,7 @@ export async function uninstallConnector(userId: string, connectorId: string) {
   return runGuarded(
     { userId, capability: 'connector_manage', permissionClass: 'B', action: 'connector_uninstalled', summary: `connectorId=${connectorId}` },
     async () => {
-      const res = await prisma.connectorInstall.deleteMany({ where: { userId, connectorId } });
+      const res = await prisma.connectorInstall.deleteMany({ where: { userId, connectorId, kind: 'CATALOG' } });
       return { id: connectorId, installed: false, removed: res.count };
     },
   );

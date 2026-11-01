@@ -106,13 +106,13 @@ CREATE INDEX "tools_connectorInstallId_idx" ON "tools"("connectorInstallId");
 ALTER TABLE "tools" ADD CONSTRAINT "tools_connectorInstallId_fkey" FOREIGN KEY ("connectorInstallId") REFERENCES "connector_installs"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "actions" ADD CONSTRAINT "actions_connectorInstallId_fkey" FOREIGN KEY ("connectorInstallId") REFERENCES "connector_installs"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "actions" ADD CONSTRAINT "actions_connectorInstallId_fkey" FOREIGN KEY ("connectorInstallId") REFERENCES "connector_installs"("id") ON DELETE NO ACTION ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "actions" ADD CONSTRAINT "actions_capabilityId_fkey" FOREIGN KEY ("capabilityId") REFERENCES "tools"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "actions" ADD CONSTRAINT "actions_capabilityId_fkey" FOREIGN KEY ("capabilityId") REFERENCES "tools"("id") ON DELETE NO ACTION ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "actions" ADD CONSTRAINT "actions_hostId_fkey" FOREIGN KEY ("hostId") REFERENCES "hosts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "actions" ADD CONSTRAINT "actions_hostId_fkey" FOREIGN KEY ("hostId") REFERENCES "hosts"("id") ON DELETE NO ACTION ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "connector_installs" ADD CONSTRAINT "connector_installs_hostId_fkey" FOREIGN KEY ("hostId") REFERENCES "hosts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -127,4 +127,4 @@ ALTER TABLE "capability_grants" ADD CONSTRAINT "capability_grants_userId_fkey" F
 ALTER TABLE "capability_grants" ADD CONSTRAINT "capability_grants_toolId_fkey" FOREIGN KEY ("toolId") REFERENCES "tools"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "capability_grants" ADD CONSTRAINT "capability_grants_executionPlanId_fkey" FOREIGN KEY ("executionPlanId") REFERENCES "execution_plans"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "capability_grants" ADD CONSTRAINT "capability_grants_executionPlanId_fkey" FOREIGN KEY ("executionPlanId") REFERENCES "execution_plans"("id") ON DELETE CASCADE ON UPDATE CASCADE;

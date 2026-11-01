@@ -139,12 +139,20 @@ describe('install and uninstall', () => {
     expect(db.connectorInstall.upsert.mock.calls[0][0].where).toEqual({ userId_connectorId: { userId: 'uA', connectorId: 'twilio' } });
     expect(recordActionSafe).toHaveBeenCalledWith(expect.objectContaining({ action: 'connector_installed', status: 'VALIDATED' }));
   });
+  it('CG-1: installing never touches a registered MCP provider that has the same id', async () => {
+    db.delegation.findFirst.mockResolvedValue({ id: 'd' });
+    db.connectorInstall.findFirst.mockResolvedValue({ id: 'prov1', kind: 'MCP_SERVER' });
+    const res = await installConnector('uA', 'twilio');
+    expect(res && res !== 'unavailable' && res.ok).toBe(false);
+    expect(db.connectorInstall.upsert).not.toHaveBeenCalled();
+  });
   it('at autonomy 2 Class B runs; uninstall is scoped by userId', async () => {
     db.userProfile.findUnique.mockResolvedValue({ autonomyLevel: 2 });
     db.connectorInstall.deleteMany.mockResolvedValue({ count: 1 });
     const res = await uninstallConnector('uA', 'twilio');
     expect(res && res.ok).toBe(true);
-    expect(db.connectorInstall.deleteMany.mock.calls[0][0].where).toEqual({ userId: 'uA', connectorId: 'twilio' });
+    // CG-1: only catalog rows. An MCP provider that shares the id is never deleted from here.
+    expect(db.connectorInstall.deleteMany.mock.calls[0][0].where).toEqual({ userId: 'uA', connectorId: 'twilio', kind: 'CATALOG' });
   });
   it('unknown id is null, no-adapter connector is unavailable', async () => {
     expect(await installConnector('uA', 'nope')).toBeNull();
@@ -154,7 +162,7 @@ describe('install and uninstall', () => {
     db.connectorInstall.findMany.mockResolvedValue([{ connectorId: 'twilio', enabled: true }]);
     db.documentWorkspace.findFirst.mockResolvedValue(null);
     const list = await listConnectors('uA', { owner: true, ctx: { isOwner: true, env: {}, userId: 'uA', hasSocial: async () => false, hasWorkspace: async () => false, gatewayToolNames: async () => null, ollamaUp: async () => false, anythingLlmConfigured: () => false, gatewayConfigured: () => false } });
-    expect(db.connectorInstall.findMany.mock.calls[0][0].where).toEqual({ userId: 'uA' });
+    expect(db.connectorInstall.findMany.mock.calls[0][0].where).toEqual({ userId: 'uA', kind: 'CATALOG' });
     expect(list.find((c) => c.id === 'twilio')).toMatchObject({ installed: true, status: 'needs_config' });
   });
 });
