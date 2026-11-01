@@ -152,4 +152,6 @@ Open items added by this batch:
 - Rate limiting an unauthenticated token endpoint: count FAILED attempts only (including unreadable bodies), per client address or one shared bucket, so nobody can starve a real host.
 - A tool run in CI that the local sandbox cannot download (gitleaks binary) can still be verified through CI: have the workflow verify the release checksums and read the job log.
 - Reviewers and bots find real bugs in code you just fixed. Run the local gates AND the Playwright specs before every push: the first CI failure on this PR was an e2e spec I had not run.
+- The security workflow (gitleaks, audit, CodeQL) runs only on pull requests, pushes to `main` and a weekly schedule, not on pushes to `claude/**` branches. A change to it can only be verified by opening a pull request. Its concurrency group cancels an in-progress run when you push again, so a docs push to the same PR restarts CodeQL.
+- `upload: never` on `github/codeql-action/analyze` is the way to keep a CodeQL analysis without uploading; SARIF then goes to the `output` directory. Verified on `github/codeql-action` v3.39.1 (PR #10): green run, SARIF artifact uploaded with `actions/upload-artifact`.
 

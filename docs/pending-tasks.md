@@ -60,7 +60,7 @@ Built and independently reviewed, never run against a real Ollama or on the owne
 ## H. Capability Gateway / Integration Hub (added 2026-11-01)
 MERGED to `main` on 2026-11-01 from `integration/echelon-capability-gateway` (PR #3, merge commit). Design and limits: docs/CAPABILITY-GATEWAY.md. Review fixes: docs/decisions.md, entry "independent security review".
 Waiting on Victor:
-- CodeQL: GitHub offers no code scanning switch for this private repository (checked 2026-11-01). Victor chose option A (analyse, do not upload); NOT yet implemented, so CodeQL is red on every PR until it is. Buying GitHub Code Security is spend: needs Victor's approval.
+- CodeQL: GitHub offers no code scanning switch for this private repository (checked 2026-11-01). Victor chose option A (analyse, do not upload); DONE and merged (PR #10): CodeQL analyses and keeps a `codeql-sarif` run artifact for 14 days; it is green. Nothing appears in the Security tab. Buying GitHub Code Security is optional spend. Buying GitHub Code Security is spend: needs Victor's approval.
 - Turn on branch protection with required reviews on `main` (item A7).
 - D-1 (hosting for the remote worker) before the physical Mac-off acceptance test E5.
 - Confirm the 12 gitleaks findings allow-listed in `.gitleaksignore` (11 test fixtures, 1 base64 false positive in the master plan). Reviewed from the redacted CI log and file context only.

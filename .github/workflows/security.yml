@@ -61,9 +61,13 @@ jobs:
   codeql:
     name: CodeQL
     runs-on: ubuntu-latest
+    # This repository is private and GitHub offers no code scanning for it (no GitHub Code Security), so uploading results
+    # fails with "Code scanning is not enabled". The analysis still runs on every push and pull request; its report is kept
+    # as a downloadable artifact instead of being uploaded. To use GitHub's Security tab later, enable code scanning in
+    # the repository settings and delete `upload: never` and the artifact step.
     permissions:
       contents: read
-      security-events: write
+      security-events: read
       # CodeQL reads its own workflow run for status reporting; without this it ends in a configuration error.
       actions: read
     steps:
@@ -73,3 +77,14 @@ jobs:
         with:
           languages: javascript-typescript
       - uses: github/codeql-action/analyze@4bfa242aa49c5f7c6770b98670d354a7dfac05f8
+        with:
+          upload: never
+          output: codeql-sarif
+      - name: Keep the CodeQL report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: codeql-sarif
+          path: codeql-sarif/
+          if-no-files-found: error
+          retention-days: 14
