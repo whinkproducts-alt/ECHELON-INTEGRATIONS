@@ -1,38 +1,46 @@
 ===============================================================================
 ECHELON CODE AUDIT REPORT  (READ-ONLY REVIEW - no code was changed)
 Date: 2026-11-01
-Reviewed:
+Reviewed code:
   [PKG-A] deepseek_text_20261101_ea8378.txt  "End-to-End Package" (25 files; E4a, E4b, T8-T10, seed, config)
   [PKG-B] deepseek_text_20261101_18d935.txt  "Complete Code Package v2.0" (36 files; E1 schema delta, egress, FSM, T1-T7, T11, CI)
-Master plan: ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.md  -> NOT REVIEWED (see section 0)
+Master plan: docs/ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.txt (commit 8aee29d) -> REVIEWED (section 0, 6)
+Real repo: origin/import/kamsi-prime-m1 (schema, auth, services/openclaw, CI) -> CHECKED read-only
 ===============================================================================
 
 -------------------------------------------------------------------------------
-0. IMPORTANT LIMITATION - THE MASTER PLAN WAS NOT AVAILABLE
+0. SCOPE, SOURCES AND LIMITS  (UPDATED after the master plan became available)
 -------------------------------------------------------------------------------
-I could not open ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.md.
+UPDATE: The master plan is now read. It was committed to this branch as
+docs/ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.txt (commit 8aee29d).
+I also fetched branch import/kamsi-prime-m1 (the real application source: 67 Prisma
+models, Next.js 16, Prisma 6.7, pnpm workspace, existing CI) so the code packages
+could be checked against the REAL schema and existing services, not only the plan.
 
-What I tried:
-  - Searched this cloud container's whole filesystem for the file name: not found.
-  - The GitHub repo (whinkproducts-alt/echelon-corp) contains only README.md.
-  - Checked connected computers. Your Mac "Victors-MacBook-Air" lists two folders
-    (whink-system, whink-ultimate). Both are reported as "not available" to cloud
-    sessions (typical causes: Mac app needs updating, or hidden/restricted folder).
-    Your Desktop is not in the shared list at all.
+What I read in the plan (396,954 lines; ~5,700 are text, the rest is base64):
+  READ IN FULL:  Parts I-VII (vision, stack, MCP/plugin gateway, service inventory,
+                 frontend, epics, decision ledger), Part XI (final command),
+                 IX-B/IX-G/IX-H architecture-control pack: baseline, system
+                 contracts SC-01..08, governance, roadmap, ADRs, FDR-001..023
+                 register, traceability CSV; VIII-A UI brief sections 1-16.
+  READ IN PART:  VIII-B/C (route inventory + acceptance tests only), IX-A decision
+                 matrix and unresolved list, IX-D OpenClaw forensics (verdict and
+                 findings), forensic architecture audit (findings, timeline,
+                 recommendations), IX-E model evaluation (summary), IX-I..L (headers
+                 and key rules).
+  NOT READ LINE BY LINE: VIII-D/E asset manifest JSON/CSV; VIII-F/G/H HTML mockup
+                 source (design references, the plan itself calls them non-production);
+                 IX-F Qwen advisory (plan labels it unvalidated history); IX-K
+                 conversation transcript. Part X is 65 MB of base64: I decoded it and
+                 listed it (42 files: 27 image masters, briefs, manifests, HTML
+                 exports) but did not open the images or execute any HTML.
 
-CONSEQUENCE: I have NOT compared the code to the master plan, and I will not guess
-what the plan says. Everything in sections 1-5 is verified against the code alone.
-Section 6 lists only the plan references that the code packages THEMSELVES cite
-(D-1, D-10, D-11, D-12, "directive 6", E5, the 326-agent/163-team roster). I have
-not confirmed those references match the plan.
-
-To finish the comparison, either (a) paste/upload the .md here, (b) commit it to
-the repo, or (c) re-share the Desktop folder through Remote Control after updating
-the Claude app on the Mac. I will then do a requirement-by-requirement trace.
-
-Testing done: I ran what I could. Items marked [VERIFIED] were executed or
-reproduced here. Items marked [READING] come from reading the code. Items marked
-[UNVERIFIED] depend on files I was not given (full schema, tsconfig, app package.json).
+Verification labels used below:
+  [VERIFIED]   I executed or reproduced it here.
+  [READING]    From reading the code or the plan.
+  [UNVERIFIED] Depends on files I was not given.
+Real-repo facts I checked directly (git, read-only): schema models/fields, auth
+strategy, package manager, versions, existing services/openclaw gateway, existing CI.
 
 -------------------------------------------------------------------------------
 1. EXECUTIVE SUMMARY
@@ -67,6 +75,29 @@ Top issues, most serious first:
 Positive: schema design is sensible; deny-by-default and audit-on-deny pattern is
 good; token/ticket hashing for SSE tickets is correct; cloud-spend guard exists
 at two layers; test intent (T1-T11) maps well to the controls.
+
+
+Added after comparing with the master plan and the real repo:
+
+ 11. The packages build a parallel system instead of reusing the repo: a second MCP
+     client/gateway (repo already has services/openclaw on the official MCP SDK), a
+     second auth path (repo uses NextAuth JWT + sessionVersion; packages read a DB
+     `sessions` table, so real logins cannot call these APIs), npm/vitest 2 versus
+     the repo's pnpm/vitest 5, and none of ApprovalRequest, AgentExecution, AgentJob
+     or UsageEvent.                                                        [R2-R5]
+ 12. Risk classes: the repo treats any tool not hash-reviewed as Class C (needs a
+     human). Discovery here marks every tool Class A and nothing reads it.   [H-9]
+ 13. Zero-spend rule (FDR-010) can be bypassed: METERED tools are not blocked and
+     discovered tools default to FREE.                                       [N-1]
+ 14. seed.ts invents teams and agent ids, groups Marcus with WHINK/MAMBA, and sets
+     autonomyLevel=3 without the existing approval flow. The plan says do not
+     fabricate roster or mutate autonomy without approval.              [R6, N-2]
+ 15. Missing against the plan's own tests: approval/mission/cost on receipts (SC-01,
+     T6), 326/163 count test, FDR traceability CI, per-agent private-denial test,
+     duplicate/expired-approval denial, SSE replay test.                    [6.4]
+
+Positive (unchanged): deny-by-default pattern, honest T8-T10 labelling, container
+plugins correctly gated, cloud flag defaults false, unresolved D-1 respected.
 
 -------------------------------------------------------------------------------
 2. SEVERITY KEY
@@ -381,8 +412,8 @@ L-6  T8/T9 assert code matches /RES_HOST_UNAVAILABLE|RES_PROVIDER_DISABLED/, so 
 L-7  Dead/unused: `void createHash;` hack in the route, unused OLLAMA_URL (model
      provider stream() is an empty stub for both local and cloud), api() returns
      before checking JSON error bodies for non-JSON responses.
-L-8  package.json "prisma" key for seed is deprecated in newer Prisma releases
-     (version dependent). `__dirname` in seed.ts assumes CommonJS.
+L-8  (Corrected) Real repo is Prisma 6.7 + tsx: the package.json "prisma.seed" key and
+     __dirname in seed.ts are fine there. Not an issue.
 L-9  README known-issue #1 says the import is '@/lib/listener' but the code uses a
      relative path ../../../apps/web/src/lib/listener.js - a package reaching into the
      app directory inverts the dependency; use the onCommitted callback option.
@@ -416,33 +447,189 @@ L-9  README known-issue #1 says the import is '@/lib/listener' but the code uses
  Any Agent/Team/Mission/Task tables (needed for non-capability-level T10)
 
 -------------------------------------------------------------------------------
-6. MASTER PLAN COMPARISON - STATUS: NOT POSSIBLE (plan not accessible)
+6. MASTER PLAN COMPARISON  (now performed)
 -------------------------------------------------------------------------------
-Plan references that appear INSIDE the code packages (unverified against the plan):
- - D-1  : no remote host provisioned; blocks E5 physical Mac-off tests. Code treats
-          remote-01 as "pending D-1 resolution".
- - D-10 : process-JS / container plugin sandboxes gated (only manifest-only runs).
- - D-11 : mandatory automated plugin checks before Founder review (implemented in
-          plugin-manager.ts but never invoked - see H-10).
- - D-12 : full 326-agent / 163-team roster "do not reopen". Code seeds only
-          WHINK, MAMBA and one founder-private assistant (Marcus Vale) as rows in
-          agent_knowledge, 3 teams that are not stored.
- - "directive 6 (egress controls)", "E5", "10 Integration Hub operations".
- - Branch/schema reference: import/kamsi-prime-m1 (6f087898); the repo I can see has
-   only an "Initial commit" and a README, so I cannot confirm this baseline.
+Plan terms: "ECH-xx", "FDR-xx", "D-9/10/11/12/14", "SC-01..08", "T1..T11",
+"slots 66-72", "E1/E4a/E4b/E5". Status key: MET / PARTIAL / MISSING / CONTRADICTS.
 
-What I will check once I have the plan (checklist so we can move quickly):
- 1. Every requirement ID / decision ID -> file that implements it -> test that proves it.
- 2. Data model coverage (Agent, Team, Mission, Task, ExecutionPlan, PlanStep) vs schema.
- 3. Autonomy levels, approval/confirmation rules, risk classes A/B/C behaviour.
- 4. Founder-private data handling and what "private" must technically mean.
- 5. Mac-off continuity requirements, host topology, and cost ceilings.
- 6. Audit/receipt requirements (tamper evidence, retention, redaction).
- 7. Persona behaviour (WHINK/MAMBA), roster scale, and the E5 acceptance criteria.
+6.1 Does the code follow the plan's own ground rules?  (mostly NO)
+ R1  "Inspect the real schema; do not write against imaginary tables" (Part XI)
+     -> PARTIAL. Delta is written against a believable schema, but the packages
+        assume things the real repo contradicts (see 6.3).
+ R2  "Reuse existing Tool/ConnectorInstall/Permission/Delegation/ApprovalRequest/
+      AgentJob/AgentExecution/AgentHeartbeat/UsageEvent/Action BEFORE creating new
+      records" (Part III s15, E1 decision)
+     -> CONTRADICTS in part. New Host, CapabilityGrant, EventTicket tables are created
+        with no recorded reconciliation or ADR. The shipped reconcile-schema.ts would
+        itself pick the existing Permission model for "Capability grant" (it lists
+        Permission/Delegation as alternatives and the real schema has Permission), yet
+        the delta creates CapabilityGrant anyway. The plan allows a new table only
+        after the real-schema decision is documented. Also: no use of ApprovalRequest,
+        AgentExecution, AgentJob, UsageEvent anywhere.
+ R3  "Avoid new microservices / duplicate scheduler, approval, ledger" (s6, s7, s25)
+     -> CONTRADICTS. The repo already has services/openclaw: an MCP aggregator built
+        on the official @modelcontextprotocol/sdk 1.32.0 (already a dependency) with
+        token-gated gateway, namespaced tool names (openclaw__<platform>__<tool>),
+        description length caps, credential pass-through limited to a validated
+        connector, response-size cap, call/list/connect timeouts and config secret
+        scanning. The new packages hand-roll a second MCP client and a second gateway
+        and do not mention or reuse it. This is also why plan s6 says the custom
+        gateway "can be reused when safe".
+ R4  "Reuse established auth (passkeys, sessionVersion, lockdown)" (slot 26, UI brief s6)
+     -> CONTRADICTS. Real auth is NextAuth with strategy 'jwt' plus User.sessionVersion
+        revocation. The new requireSession reads the database `sessions` table with a
+        Bearer token. JWT sign-ins create no such row, so real logins would be rejected;
+        the only way in is the seed's 30-day token, which skips passkeys, remember-me
+        lifetime rules and sessionVersion (so "lockdown"/password-reset revocation does
+        not cut it off). EventTicket has a foreign key to Session.sessionToken, so
+        JWT users cannot even get an event ticket. [READING of real auth.ts + schema]
+ R5  Tooling: repo is a pnpm 10 workspace (workspace name "app", Next 16.4.3,
+     Prisma 6.7.0, zod 4, vitest 5, TypeScript 5.6, strict mode) with existing
+     ci.yml/security.yml (actions pinned by SHA, gitleaks, audit) and CODEOWNERS.
+     Packages assume npm/npx, `apps/web run dev`, vitest ^2, root package.json with
+     npm workspaces, a new ci.yml, and packages/holo. Dropping them in would overwrite
+     the real root package.json and CI, and plan s11 says HOLO lives inside the primary
+     app (apps/web/components/holo), not a separate package. Slot 29 says retain
+     gitleaks in CI; the new ci.yml has no secret-scan or audit step (the real repo
+     has a separate security.yml; I did not open it). [READING]
+ R6  "No roster mutation; use canonical IDs; do not invent" (s2, FDR-005/028, s26)
+     -> CONTRADICTS in seed.ts: invents teams "executive / operations / intelligence"
+        (not in the 15-directorate / 163-team roster), invents agent ids 'whink',
+        'mamba', 'marcus-vale', and puts Marcus in the same team as WHINK/MAMBA although
+        the plan says Marcus is Founder-private, "not a normal corporate director" and
+        sealed with his own Kill Team. It also writes agent_knowledge rows (a learning
+        table) as a "roster", and sets Founder autonomyLevel=3 directly, bypassing the
+        existing 'autonomy_change' approval kind. The code's README is honest that the
+        full roster is not seeded, but the plan's rule is stronger: do not fabricate.
+ R7  "Never claim DONE/LIVE/VERIFIED/24-7 without evidence" (s24, governance s6)
+     -> CONTRADICTS. README status table is all checkmarks (see section 4).
+
+6.2 Requirement-by-requirement trace
+
+ PLAN ITEM                                      CODE STATUS   NOTE
+ --------------------------------------------   -----------   ------------------------------
+ D-9 stdio on any authorised host               PARTIAL       stdio exists only inside the web process; not invocable (H-6)
+ D-9 Streamable HTTP                            PARTIAL       hand-rolled; no SSE reply handling, no initialized notification
+ D-9 legacy HTTP+SSE flagged deprecated         MISSING
+ D-9 per-transport auth/version negotiation     MISSING       credentials never sent (H-5)
+ D-10 manifest-only plugins                     PARTIAL       parser/checks exist, never called (H-10)
+ D-10 isolated-JS / container                   MISSING/gated (gating is correct per plan)
+ D-11 Founder final gate after automated scan   PARTIAL       3 manifest checks only; no dependency, licence or permission-diff review; no runtime safety tests; review button shows nothing (M-2)
+ D-12/D-14 OpenClaw selective, subordinate      MISSING       README claims E4a-10 done; no adapter code; existing gateway ignored
+ Slot 66 MCP Client Manager                     PARTIAL
+ Slot 67 Plugin Manager                         PARTIAL       dead code
+ Slot 68 Capability Registry (typed tools/resources/prompts, versions, risk, host)
+                                                PARTIAL       Tool rows only; resources/prompts dropped; no versioned/searchable registry
+ Slot 69 Integration Authentication (OAuth refs, rotation, revocation)
+                                                MISSING       static secret stored, never used; no OAuth, rotation
+ Slot 70 Policy Gateway (agent/team/mission grants, classification, budget, expiry)
+                                                PARTIAL       see C-1; mission binding and classification absent
+ Slot 71 Execution Gateway (validation, egress, timeout, idempotency, receipts, cancel)
+                                                PARTIAL       no input validation, idempotency key or cancellation; weak receipts
+ Slot 72 HOLO Integration Hub                   PARTIAL       plain page, not HOLO design language; broken URL (H-1)
+ Deny-by-default; connection never grants access
+                                                PARTIAL       grant not bound (C-1)
+ Risk classes A/B/C                             CONTRADICTS   real repo: tool-classes.json treats any tool not hash-listed as Class C (always needs a human). Discover here hard-codes riskClass 'A' for every tool and nothing reads it (H-9)
+ Approval is not dispatch; hash-bound approval  MISSING       invoke has no approvalId/contentHash/policy version/idempotency key (SC-01); ApprovalRequest unused
+ SC-01 task envelope (mission, agent, team, classification, budget, deadlines)
+                                                MISSING       call takes agentId + input only
+ SC-02 task state machine incl. BLOCKED_COST / WAITING_FOR_MAC
+                                                MISSING       invocations are single-shot; no queue/lease/fencing (uses no AgentJob)
+ Spend: integer minor units, atomic reservation, BLOCKED_COST at every invocation boundary
+                                                CONTRADICTS   only a boolean env flag; blocks CLOUD_BILLABLE but not METERED (manifest enum allows METERED, which passes); no UsageEvent, no reservation, no caps (new finding, see 6.3 N-1)
+ Sealed Founder data (public/org/confidential/FOUNDER_PRIVATE)
+                                                PARTIAL       one literal marker only (M-4)
+ Egress enforced at real environment boundaries; iptables not presumed on Mac
+                                                CONTRADICTS   plan s15 explicitly warns about this; delivered iptables-only and README says "kernel + application: done" (H-8)
+ Lease-aware host state; Mac-local goes offline with Mac
+                                                PARTIAL       works on offline; recovery broken (H-3)
+ Durable event outbox + SSE with cursor/Last-Event-ID
+                                                PARTIAL       no outbox table (derived from actions); NOTIFY broken (H-2); cursor not updated client-side (M-6)
+ Truthful UI: no optimistic success, DEMO labels
+                                                PARTIAL       Hub reads DB state (good); Test uses fixed input; nothing is labelled DEMO/UNAVAILABLE
+ One organisation, canonical 326 agents/163 teams
+                                                MISSING       subjectId is free text; not validated against packages/org-kit
+ Audit receipt: actor, mission, provider, approval, cost (T6)
+                                                PARTIAL       T6 only checks input/output/latency; no mission/approval/cost fields written
+
+6.3 New findings that only show up against the plan / real repo
+ N-1  Zero-spend gap (FDR-010): policy blocks cost class CLOUD_BILLABLE only. A tool
+      marked METERED passes with no cap. Discovery marks everything FREE. Together a
+      paid tool can run without any Founder spend authorisation.
+ N-2  Seed bypasses approval flow: autonomyLevel 3 set directly (real default is 1;
+      the schema comments show 'autonomy_change' is an approval kind).
+ N-3  Parallel auth path (R4). The sessionVersion lockdown/revocation the plan makes
+      central (UI brief s6: "CSS overlay alone is insufficient") does not apply to
+      these routes.
+ N-4  Tool.name is globally unique in the REAL schema too, so C-3 (tool hijack) is real
+      against the real database, not only the packages' version.
+ N-5  Real Action.status values documented in the schema are SUBMITTED / VALIDATED /
+      FAILED / UNVERIFIED / AWAITING_APPR. The new code writes SUCCEEDED and DENIED,
+      which are outside that documented vocabulary; existing ledger screens
+      (/api/ledger, dashboard/ledger) may not render or filter them. [UNVERIFIED]
+ N-6  Real AgentHeartbeat has no hostId and its key is workerId; the delta's change is
+      additive, but the existing worker code that writes it was not provided, so the
+      new heartbeat route may collide with the existing heartbeat writer. [UNVERIFIED]
+ N-7  ConnectorInstall already exists in the real schema with rows possible. The delta adds
+      status default 'REGISTERED' while the legacy `enabled` flag defaults true; existing
+      rows would become REGISTERED/not ENABLED unless backfilled. [READING; row data not seen]
+ N-8  Seed prints a long-lived token to the console and `prisma.seed` config is OK on
+      Prisma 6.7 (deprecated only in later majors); __dirname works under tsx.
+      (This corrects my earlier L-8 wording: not an issue on the real versions.)
+ N-9  Versions: Next 16 and zod 4 are installed in the real app; plugin-manager's
+      `z.unknown()` fields and `.default()` usage are fine in zod 4, but the packages
+      declare vitest ^2 versus the repo's ^5, so two vitest majors would coexist.
+
+6.4 T1-T11 against the plan's wording
+ T1  plan: approved agent, mission scope, verified receipt   code: no mission/approval -> PARTIAL
+ T2  denied, zero network bytes                               code: OK for no-grant case; C-1 shows an agent with someone else's grant is NOT denied (untested) -> PARTIAL
+ T3  "disabled plugin"                                        code tests a disabled connector; no plugin concept -> PARTIAL
+ T4  "credential revoked, new invocation fails"               code revokes connector status; credentials unused, so the test does not test the credential -> PARTIAL
+ T5  egress blocked at real boundaries                        only input-URL scan is tested; redirects/DNS/kernel untested -> PARTIAL
+ T6  receipt with actor/mission/provider/approval/cost        test checks 3 fields -> PARTIAL
+ T7  Hub shows factual states                                 test is an FSM unit test, not UI -> PARTIAL
+ T8-T10 simulated; physical Mac-off not done (correctly labelled); recovery/reconcile-no-duplication untested and currently broken (H-3) -> PARTIAL
+ T11a cloud spend blocked                                     passes for cloud: model provider only, not METERED (N-1) -> PARTIAL
+ T11b sealed data egress                                      literal marker only -> PARTIAL
+ Plan s24 also requires: FDR traceability check in CI, 326/163 count test, per-agent
+ private-denial test, duplicate/expired approval denial, SSE replay test: ALL MISSING.
+
+6.5 What the plan says is blocked, and the code correctly respects
+ - D-1 hosting: no paid host; remote-01 seeded as unprovisioned; honest.
+ - Container plugins disabled until isolation proven (D-10): correct.
+ - CLOUD_INFERENCE_ENABLED defaults false: correct.
+ - T8-T10 labelled simulation, physical Mac-off pending: correct.
+ - README admits roster not seeded and T10 capability-level: honest.
 
 -------------------------------------------------------------------------------
 7. PROPOSED CHANGES (ordered; nothing applied)
 -------------------------------------------------------------------------------
+
+Phase -1 - align with the plan and the real repo BEFORE any more code (new)
+  P-1.1 Stop; do not extract these packages over the repo. Re-target them to the real
+        layout: pnpm workspace, package "app" at apps/web, vitest 5, strict tsconfig,
+        existing ci.yml/security.yml (add jobs, do not replace), Prisma 6.7.
+  P-1.2 Write the E1 reconciliation the plan requires (Part III s15) against
+        origin/import/kamsi-prime-m1: for each of Host, CapabilityGrant, EventTicket
+        record "reuse / extend / new" with reasons (ADR). Extend Permission/Delegation
+        or justify the new table. Bind grants to ApprovalRequest.contentHash where the
+        plan requires approval-bound actions.
+  P-1.3 Build the gateway ON services/openclaw (official SDK) rather than a second
+        client: add stdio-on-authorised-host and Streamable HTTP there, keep its
+        namespacing, size caps and secret scanning, and reuse tool-classes.json
+        (unlisted tool = Class C). Discovery must NOT mark tools Class A.
+  P-1.4 Auth: use the existing NextAuth session (or a purpose-built signed token tied
+        to User.sessionVersion); drop the DB-session bearer path; remove the 30-day
+        printed token; make EventTicket independent of the sessions table.
+  P-1.5 Invocation contract: accept SC-01 envelope fields (mission/plan id, approval
+        id + hash, idempotency key, classification, policy version); write
+        UsageEvent/reservation; add BLOCKED_COST for METERED and unknown cost.
+  P-1.6 Seed: remove invented teams/ids; read canonical IDs from packages/org-kit;
+        treat Marcus/Kill Team as sealed; do not set autonomyLevel.
+  P-1.7 Add the plan-mandated tests: 326/163 counts, FDR traceability check, sealed-data
+        denial per agent, expired/duplicate approval denial, SSE replay/Last-Event-ID,
+        agent-B-uses-agent-A-grant denial.
+
 Phase 0 - make it buildable (1-2 days)
   P0.1  Fix extractor regex; add --force; merge PKG-A and PKG-B into one package
         (invoke.ts = PKG-A version with callback instead of cross-package import).
@@ -485,50 +672,61 @@ Phase 3 - build out
   host (blocked by D-1), roster population (blocked by D-12).
 
 -------------------------------------------------------------------------------
-8. QUESTIONS FOR YOU
+8. QUESTIONS FOR YOU  (revised after reading the plan)
 -------------------------------------------------------------------------------
- A. Master plan access
-    1. Can you paste or commit ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.md,
-       or re-share the Desktop folder after updating the Claude app on the Mac?
-       (Your shared folders whink-system / whink-ultimate showed "not available".)
-    2. Which decisions (D-1...D-12 and any later) are FINAL, and which are still open?
 
- B. Scope and ownership
-    3. Is the stdio-on-Mac MCP (local tools) a hard requirement, or could all providers
-       be HTTP/remote? This decides how we fix C-2 and H-6.
-    4. Who is allowed to register, review, enable, and grant: Founder only, or also
-       "admin"? Do you want a two-person rule (register vs. approve)?
-    5. Are Agents/Teams/Missions meant to be database entities now (needed to bind
-       grants and finish T10), or does the plan keep them in another system?
+Answered by the plan (no need to re-ask): Founder is final gate (D-11); stdio on any
+authorised host + Streamable HTTP (D-9); no spend/card/paid host (ECH-10, D-1); no
+second human reviewer (D-11); versions are Next 16 / Prisma 6.7 / pnpm 10.
 
- C. Security posture
-    6. What must "Founder-private" mean technically: classification labels on data,
-       separate stores, or just never leaving the machine? The current marker check is
-       not enough.
-    7. Is outbound access to arbitrary internet hosts ever allowed, or strictly an
-       allowlist per provider? Should cloud-billable tools be impossible to register
-       while CLOUD_INFERENCE_ENABLED=false?
-    8. Is the audit log required to be tamper-evident (hash chain / append-only), and
-       what retention and redaction rules apply to inputSummary/outputSummary?
-    9. One encryption key for all credentials, or per-host keys as the README says?
+ A. Direction (most important)
+    1. The packages duplicate the existing services/openclaw gateway, auth and CI.
+       Do you want me to REBUILD the capability gateway on top of the existing
+       services/openclaw (my recommendation), or keep the new packages and port them
+       into the pnpm monorepo as-is? This changes the whole fix plan.
+    2. Which codebase is authoritative: import/kamsi-prime-m1, or something newer?
+       The plan says active `main` integration is "a separate state to verify". Should
+       Phase -1 changes target import/kamsi-prime-m1 or a new branch off it?
+    3. Were PKG-A/PKG-B actually committed anywhere? The plan (Part III s15) says the
+       27 files reported by the other agent were not found on ECHELON branches. If
+       they were never committed, do you want them treated as a design draft only?
 
- D. Operations
-   10. What runs on the Mac to send heartbeats (an existing worker, a new daemon)?
-       What is the intended host topology until D-1 is resolved?
-   11. Heartbeat thresholds: what outage length should block calls (default 60s is
-       tight for a laptop that sleeps)? Should reconnect auto-enable providers, or
-       require Founder re-approval?
-   12. Which database and host will this run on (docker-compose is local only)? Is
-       Postgres exposed beyond localhost?
-   13. Which Prisma and Next versions are you on? (affects seed config, params typing)
+ B. Grants, approval and identity
+    4. Should a capability grant be tied to an ApprovalRequest (hash-bound, with
+       expiry), as SC-01/SC-03 imply, or is a Founder-created grant enough?
+    5. Which identities may hold grants: canonical org-kit agent/team IDs only? (I
+       would reject free-text IDs.) Should grants be mission-scoped by ExecutionPlan?
+    6. Should the Integration Hub use the existing NextAuth login (passkey, lockdown)
+       and sessionVersion revocation? Do you accept removing the DB-token path?
 
- E. Process
-   14. PKG-A and PKG-B overlap (invoke.ts, extractor). Which one is authoritative,
-       and where is the real repo (branch import/kamsi-prime-m1)? The repo I can see
-       is empty apart from README.
-   15. Do you want me to implement Phase 0-1 on branch claude/wonderful-carson-ci81s4
-       once the plan is available, with the new negative tests, or do you prefer a
-       reviewed patch set first?
+ C. Money and data
+    7. Treat METERED and unknown cost as BLOCKED_COST until you approve a cap? Where
+       should the cap live (UsageEvent costMicros, currency CAD per SC-01)?
+    8. What exactly counts as FOUNDER_PRIVATE for tool I/O: classification on the
+       envelope (my recommendation), or on the data store? Should audit summaries be
+       redacted or stored as references only?
+    9. One master encryption key, or per-host keys as the README claims? Where should
+       the key live (OS keychain per slot 27)?
+
+ D. Operations (E5 / D-1)
+   10. What sends heartbeats from the Mac, and what is the remote host until D-1 is
+       resolved? Should I research free options (desk research only) and report?
+   11. Heartbeat thresholds: OK to use degraded >= 75s, offline >= 120s for a laptop?
+       Should a returning host auto re-enable ONLY providers disabled by the outage?
+   12. Egress on the Mac: should I design a macOS pf rule set (the plan warns iptables
+       will not apply), or rely on a sandboxed container/VM for stdio MCP?
+
+ E. Plan ambiguities I found
+   13. Plan says "15 vs 16 directorates, do not invent". The seed invents three teams.
+       May I remove them and read the roster only from packages/org-kit?
+   14. Slots 66-72 are "LOCKED" but D-10 says container plugins stay disabled. Is
+       manifest-only the only plugin type for this milestone?
+   15. Should the OpenClaw adapter (E4a-10) be in this milestone, or is the existing
+       gateway enough until a per-feature vetting matrix (FDR-012) exists?
+
+ F. Execution
+   16. Shall I start Phase -1 (reconciliation ADR + realigned scaffolding + tests)
+       on branch claude/wonderful-carson-ci81s4, with no deployment, spend or merge?
 
 ===============================================================================
 END OF REPORT
