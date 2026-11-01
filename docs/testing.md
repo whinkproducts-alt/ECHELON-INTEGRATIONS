@@ -47,7 +47,7 @@ Never point `DATABASE_URL` at your real WHINK database. `prisma migrate deploy` 
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pull requests and on pushes to `main` and `claude/**`: install, prisma generate, typecheck, lint, `migrate deploy` against a `pgvector/pgvector:pg16` service container, seed, unit tests, build, Playwright. Failure screenshots, traces and the HTML report are uploaded as the `e2e-report` artifact. Actions are pinned by commit SHA. The workflow has `contents: read` only and uses dummy secrets set in `env`.
+`.github/workflows/ci.yml` runs on pull requests and on pushes to `main` (a branch with no pull request is tested when its PR is opened; pushes to `claude/**` no longer trigger it, because that ran every PR commit twice): install, prisma generate, typecheck, lint, `migrate deploy` against a `pgvector/pgvector:pg16` service container, seed, unit tests, build, Playwright. A pull request that changes only files under `docs/` or root-level `*.md` files (both the new and the old path of a rename) skips the heavy steps and still ends green; any other change, a push to `main`, 3000 or more files, or an error runs everything. Failure screenshots, traces and the HTML report are uploaded as the `e2e-report` artifact. Actions are pinned by commit SHA. The workflow has `contents: read` only and uses dummy secrets set in `env`.
 
 ## Test users
 

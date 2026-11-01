@@ -157,4 +157,6 @@ Open items added by this batch:
 - A cloud session's git proxy returned HTTP 403 for pushing tags and for deleting remote branches (pushing and merging branches worked). Delete merged branches from the GitHub UI or from the owner's machine, and record tip SHAs in the notes first; the commits stay reachable from `main`, so a branch can always be rebuilt.
 - A `.github/dependabot.yml` inside an imported repository starts working the moment it reaches the default branch and opens a wave of update PRs. Read it before merging an import, and expect major-version bumps that break a licence rule or need app testing.
 - Qodo's fixer opens `fix/remediation-*` branches with no PR. They are claims to verify, not patches to merge: one of them removed a safety path (the stuck-approval sweep) and changed no tests.
+- A workflow with both `pull_request` and `push` on the PR's own branch runs twice per commit; the concurrency group is keyed by ref, and the two refs differ. Trigger on `pull_request` and on `main` only.
+- To make a required check pass while skipping work, keep the job and gate its steps with `if`, not the whole workflow with `paths-ignore` (a skipped workflow leaves a required check pending forever).
 
