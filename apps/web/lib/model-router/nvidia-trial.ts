@@ -53,7 +53,7 @@ export async function nvidiaTrialChat(model: NvidiaTrialModel, trialCase: Nvidia
   const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
     method: 'POST',
     redirect: 'error',
-    signal: AbortSignal.timeout(45_000),
+    signal: AbortSignal.timeout(120_000),
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({
       model,
