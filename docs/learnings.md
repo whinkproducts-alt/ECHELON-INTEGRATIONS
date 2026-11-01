@@ -159,4 +159,4 @@ Open items added by this batch:
 - Qodo's fixer opens `fix/remediation-*` branches with no PR. They are claims to verify, not patches to merge: one of them removed a safety path (the stuck-approval sweep) and changed no tests.
 - A workflow with both `pull_request` and `push` on the PR's own branch runs twice per commit; the concurrency group is keyed by ref, and the two refs differ. Trigger on `pull_request` and on `main` only.
 - To make a required check pass while skipping work, keep the job and gate its steps with `if`, not the whole workflow with `paths-ignore` (a skipped workflow leaves a required check pending forever).
-
+- A key-name pattern written with `(^|[^a-z])word($|[^a-z])` and the `i` flag cannot see camelCase (`accessToken`): the letter before the word blocks the match. Match the word anywhere and subtract a short allow-list instead.
