@@ -52,6 +52,10 @@ export async function skipReason(userId: string, usesModel: boolean, critical: b
 
 /** Runs one claimed job to completion (never throws). */
 export async function runClaimedJob(job: ClaimedJob, workerId: string, now = new Date()): Promise<JobOutcome> {
+  if (job.jobKey.startsWith('capability:')) {
+    const { runCapabilityJob } = await import('@/lib/worker/capability-execution');
+    return runCapabilityJob(job, workerId, now);
+  }
   if (job.jobKey.startsWith('ear:')) {
     const { runEarJob } = await import('@/lib/worker/ear-execution');
     return runEarJob(job, workerId, now);
