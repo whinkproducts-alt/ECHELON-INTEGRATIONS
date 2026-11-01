@@ -1,0 +1,12 @@
+{
+  "name": "@whink/org-kit",
+  "version": "2.0.0",
+  "description": "WHINK GROUP portable AI organization — registry, router, governance",
+  "main": "src/router.ts",
+  "types": "src/router.ts",
+  "scripts": {
+    "test": "ts-node src/router.ts"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

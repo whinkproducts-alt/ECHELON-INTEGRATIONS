@@ -1,0 +1,12 @@
+{
+  "name": "ada-voice",
+  "version": "1.0.0",
+  "description": "ADA V2 — voice service wrapping Deepgram STT + TTS",
+  "main": "server.js",
+  "license": "MIT",
+  "dependencies": {
+    "@deepgram/sdk": "^3.9.0",
+    "express": "^4.21.1",
+    "multer": "^1.4.5-lts.1"
+  }
+}

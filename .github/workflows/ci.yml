@@ -1,0 +1,99 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'claude/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck, lint, migrate, test, build, e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        # pgvector/pgvector is PostgreSQL-licensed (permissive) and used in CI only. Same image as docker-compose.yml.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: whink
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: whink_ci_test
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U whink -d whink_ci_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Throwaway values for the CI database and a dummy auth secret. None of these is a real credential.
+      DATABASE_URL: postgresql://whink:ci_only_password@127.0.0.1:5432/whink_ci_test
+      DIRECT_URL: postgresql://whink:ci_only_password@127.0.0.1:5432/whink_ci_test
+      AUTH_SECRET: ci-dummy-auth-secret-not-a-real-secret-0123456789
+      NEXTAUTH_SECRET: ci-dummy-auth-secret-not-a-real-secret-0123456789
+      AUTH_URL: http://127.0.0.1:3100
+      NEXTAUTH_URL: http://127.0.0.1:3100
+      WHINK_OWNER_EMAILS: e2e-owner@example.test
+      NEXT_TELEMETRY_DISABLED: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma client
+        run: pnpm --filter app exec prisma generate
+
+      - name: Typecheck
+        run: pnpm --filter app typecheck || pnpm --filter app exec tsc --noEmit
+
+      - name: Lint
+        run: pnpm --filter app lint
+
+      - name: Apply every migration to a real PostgreSQL with pgvector
+        run: pnpm --filter app exec prisma migrate deploy
+
+      - name: Seed
+        run: pnpm --filter app exec prisma db seed
+
+      - name: Unit tests
+        run: M1_EXECUTION_DATABASE_URL="$DATABASE_URL" pnpm --filter app test
+
+      - name: Build
+        run: pnpm --filter app build
+
+      - name: Install e2e dependencies and the Chromium browser
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: E2E (real browser, built app, real database)
+        working-directory: e2e
+        run: npx playwright test
+
+      - name: Upload e2e report, traces and failure screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

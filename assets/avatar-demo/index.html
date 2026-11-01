@@ -1,0 +1,259 @@
+<title>WHINK Voice Test</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    color-scheme: dark;
+    --base:#070B12;
+    --surface:#0E1520;
+    --line:#1C2736;
+    --text:#E6EDF5;
+    --muted:#8392A6;
+    --accent:#4FF3EE;
+    --accent-dim:rgba(79,243,238,.16);
+    --display:"Jost","Avenir Next",system-ui,sans-serif;
+    --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  :root[data-persona="MAMBA"]{
+    --accent:#FF3B24;
+    --accent-dim:rgba(255,59,36,.16);
+  }
+  html,body{height:100%;}
+  body{
+    background:var(--base);color:var(--text);font-family:var(--body);
+    padding-inline:16px;padding-block:28px 40px;
+    transition:background .4s ease;
+  }
+  .wrap{max-width:980px;margin:0 auto;display:grid;grid-template-columns:minmax(0,480px) minmax(0,1fr);gap:36px;align-items:start;}
+  @media (max-width:820px){.wrap{grid-template-columns:1fr;}}
+
+  .stage{
+    position:relative;width:100%;aspect-ratio:1086/1448;max-width:100%;
+    border-radius:10px;overflow:hidden;background:#000;
+    box-shadow:0 0 0 1px var(--line),0 0 60px -12px var(--accent-dim);
+    transition:box-shadow .4s ease;
+  }
+  .stage.speaking{box-shadow:0 0 0 1px var(--accent),0 0 80px -8px var(--accent-dim);}
+  canvas{display:block;width:100%;height:100%;}
+  .chip{
+    position:absolute;left:12px;top:12px;
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;
+    padding:5px 9px;border-radius:4px;background:rgba(7,11,18,.78);
+    border:1px solid var(--line);color:var(--muted);
+  }
+  .stage.speaking .chip{color:var(--accent);border-color:var(--accent);}
+
+  .panel{display:flex;flex-direction:column;gap:22px;}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);}
+  h1{font-family:var(--display);font-weight:600;font-size:clamp(28px,4.4vw,40px);line-height:1.05;margin:6px 0 0;letter-spacing:.02em;}
+  .lede{color:var(--muted);margin:0;max-width:52ch;line-height:1.6;}
+
+  .switch{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;align-self:flex-start;}
+  .switch button{
+    font-family:var(--mono);font-size:12px;letter-spacing:.14em;
+    background:transparent;color:var(--muted);border:0;padding:10px 18px;cursor:pointer;
+  }
+  .switch button[aria-pressed="true"]{background:var(--accent-dim);color:var(--accent);}
+  .play{
+    font-family:var(--display);font-weight:500;font-size:16px;letter-spacing:.04em;
+    background:var(--accent);color:#05080D;border:0;border-radius:6px;padding:13px 22px;cursor:pointer;
+    align-self:flex-start;display:inline-flex;gap:10px;align-items:center;
+  }
+  .play:disabled{opacity:.5;cursor:default;}
+  button:focus-visible{outline:2px solid var(--text);outline-offset:3px;}
+
+  .shapes{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+  .shape{
+    border:1px solid var(--line);border-radius:6px;padding:10px 4px 8px;text-align:center;
+    font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface);
+    transition:border-color .06s linear,color .06s linear,background .06s linear;
+  }
+  .shape b{display:block;font-weight:500;font-size:13px;color:var(--text);margin-bottom:3px;}
+  .shape.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+  .meter{height:6px;border-radius:3px;background:var(--surface);border:1px solid var(--line);overflow:hidden;}
+  .meter i{display:block;height:100%;width:0;background:var(--accent);}
+  .label{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
+  .notes{font-size:13.5px;color:var(--muted);line-height:1.6;border-top:1px solid var(--line);padding-top:16px;margin:0;}
+  .notes strong{color:var(--text);font-weight:500;}
+  @media (prefers-reduced-motion:reduce){.stage,.shape{transition:none;}}
+</style>
+
+<div class="wrap">
+  <div class="stage" id="stage">
+    <canvas id="cv" width="1086" height="1448" aria-label="Animated portrait"></canvas>
+    <div class="chip" id="chip">IDLE</div>
+  </div>
+
+  <div class="panel">
+    <div>
+      <div class="eyebrow">WHINK Apps &middot; avatar test</div>
+      <h1 id="name">WHINK speaks</h1>
+    </div>
+    <p class="lede" id="lede">Her mouth is driven live by the audio. Nothing is pre animated. The same code will drive her from a real conversation in Phase 4.</p>
+
+    <div class="switch" role="group" aria-label="Persona">
+      <button id="bW" aria-pressed="true">WHINK</button>
+      <button id="bM" aria-pressed="false">MAMBA</button>
+    </div>
+
+    <button class="play" id="play" disabled>Loading&hellip;</button>
+
+    <div>
+      <div class="label">Mouth shape</div>
+      <div class="shapes" id="shapes">
+        <div class="shape" data-v="rest"><b>REST</b>silence</div>
+        <div class="shape" data-v="mbp"><b>MBP</b>pressed</div>
+        <div class="shape" data-v="aa"><b>AA</b>open</div>
+        <div class="shape" data-v="ee"><b>EE</b>wide</div>
+        <div class="shape" data-v="oo"><b>OO</b>round</div>
+        <div class="shape" data-v="fv"><b>FV</b>teeth</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="label">Voice level</div>
+      <div class="meter"><i id="lvl"></i></div>
+    </div>
+
+    <p class="notes"><strong>What this proves:</strong> six mouth shapes, about 90 KB per character, picked in real time from the loudness and pitch of the voice. Each full character loads in under 400 KB, against 15 MB per state in the original SVG files.</p>
+  </div>
+</div>
+
+<audio id="aW" src="whink_voice.mp3" preload="auto"></audio>
+<audio id="aM" src="mamba_voice.mp3" preload="auto"></audio>
+
+<script>
+(function(){
+  const META = {
+    WHINK:{img:"whink.webp", box:[481.4,571.5,145,118], audio:"aW",
+           lede:"Her mouth is driven live by the audio. Nothing is pre animated. The same code will drive her from a real conversation in Phase 4."},
+    MAMBA:{img:"mamba.webp", box:[448.8,569.5,168,115], audio:"aM",
+           lede:"Same engine, second mind. His mouth follows his own voice track, and the whole interface shifts to his colour."}
+  };
+  const SHAPES = ["mbp","aa","ee","oo","fv"];
+  const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  const stage = document.getElementById("stage"), chip = document.getElementById("chip");
+  const playBtn = document.getElementById("play"), lvl = document.getElementById("lvl");
+  const shapeEls = {}; document.querySelectorAll(".shape").forEach(e => shapeEls[e.dataset.v] = e);
+  const reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const assets = {WHINK:{}, MAMBA:{}};
+  function load(src){ return new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = src; }); }
+
+  let persona = "WHINK", actx = null, analysers = {}, speaking = false;
+  let cur = "rest", prev = "rest", fadeStart = 0, lastSwitch = 0, silentSince = 0, peak = 0.02, prevLevel = 0;
+
+  Promise.all(["WHINK","MAMBA"].flatMap(p => [
+    load(META[p].img).then(i => assets[p].base = i),
+    ...SHAPES.map(v => load("sprites/" + p.toLowerCase() + "_" + v + ".webp").then(i => assets[p][v] = i))
+  ])).then(() => { playBtn.disabled = false; setPlayLabel(); requestAnimationFrame(frame); })
+     .catch(() => { playBtn.textContent = "Could not load the portraits"; });
+
+  function setPlayLabel(){ playBtn.innerHTML = speaking ? "&#9632;&nbsp; Stop" : "&#9654;&nbsp; Play " + persona + "&rsquo;s voice"; }
+
+  function ensureAudio(){
+    if (actx) return;
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    for (const p of ["WHINK","MAMBA"]) {
+      const el = document.getElementById(META[p].audio);
+      const src = actx.createMediaElementSource(el);
+      const an = actx.createAnalyser(); an.fftSize = 1024; an.smoothingTimeConstant = 0.35;
+      src.connect(an); an.connect(actx.destination);
+      analysers[p] = {an, el, time:new Float32Array(an.fftSize), freq:new Float32Array(an.frequencyBinCount)};
+      el.addEventListener("ended", () => { if (p === persona) stop(); });
+    }
+  }
+
+  function start(){
+    ensureAudio(); actx.resume();
+    const a = analysers[persona].el; a.currentTime = 0;
+    a.play().then(() => { speaking = true; stage.classList.add("speaking"); chip.textContent = "SPEAKING"; setPlayLabel(); })
+            .catch(() => { playBtn.textContent = "Audio blocked. Tap again"; });
+  }
+  function stop(){
+    for (const p in analysers) { analysers[p].el.pause(); }
+    speaking = false; stage.classList.remove("speaking"); chip.textContent = "IDLE";
+    setShape("rest", performance.now()); lvl.style.width = "0"; setPlayLabel();
+  }
+  playBtn.addEventListener("click", () => speaking ? stop() : start());
+
+  function setPersona(p){
+    if (p === persona) return;
+    if (speaking) stop();
+    persona = p;
+    document.documentElement.dataset.persona = p;
+    document.getElementById("bW").setAttribute("aria-pressed", p === "WHINK");
+    document.getElementById("bM").setAttribute("aria-pressed", p === "MAMBA");
+    document.getElementById("name").textContent = p + " speaks";
+    document.getElementById("lede").textContent = META[p].lede;
+    setPlayLabel();
+  }
+  document.getElementById("bW").addEventListener("click", () => setPersona("WHINK"));
+  document.getElementById("bM").addEventListener("click", () => setPersona("MAMBA"));
+
+  function setShape(v, now){
+    if (v === cur) return;
+    prev = cur; cur = v; fadeStart = now; lastSwitch = now;
+    for (const k in shapeEls) shapeEls[k].classList.toggle("on", k === v);
+  }
+
+  function pickShape(now){
+    const A = analysers[persona]; if (!A) return;
+    const {an, time, freq} = A;
+    an.getFloatTimeDomainData(time);
+    let s = 0; for (let i = 0; i < time.length; i++) s += time[i] * time[i];
+    const rms = Math.sqrt(s / time.length);
+    peak = Math.max(rms, peak * 0.996, 0.02);
+    const level = Math.min(1, rms / peak);
+    lvl.style.width = (level * 100).toFixed(0) + "%";
+
+    an.getFloatFrequencyData(freq);
+    const hz = actx.sampleRate / an.fftSize;
+    let tot = 0, cen = 0, vhi = 0;
+    for (let i = Math.floor(80 / hz); i < Math.min(freq.length, 8000 / hz); i++) {
+      const m = Math.pow(10, freq[i] / 20), f = i * hz;
+      tot += m; cen += f * m; if (f > 4000) vhi += m;
+    }
+    const centroid = tot ? cen / tot : 0, vhiRatio = tot ? vhi / tot : 0;
+
+    let target;
+    if (level < 0.14 || rms < 0.004) {
+      if (!silentSince) silentSince = now;
+      target = (now - silentSince > 110) ? "rest" : cur;
+    } else {
+      const fromSilence = silentSince && (now - silentSince > 90);
+      silentSince = 0;
+      if (fromSilence && prevLevel < 0.14) target = "mbp";
+      else if (vhiRatio > 0.28 && level < 0.6) target = "fv";
+      else if (centroid < 1000 && level > 0.3) target = "oo";
+      else if (level > 0.55) target = "aa";
+      else target = "ee";
+    }
+    prevLevel = level;
+    if (target !== cur && (now - lastSwitch > 75 || target === "rest")) setShape(target, now);
+  }
+
+  function drawShape(v, alpha){
+    if (v === "rest" || alpha <= 0) return;
+    const [x, y, w, h] = META[persona].box;
+    ctx.globalAlpha = alpha; ctx.drawImage(assets[persona][v], x, y, w, h); ctx.globalAlpha = 1;
+  }
+
+  function frame(now){
+    if (speaking) pickShape(now);
+    const base = assets[persona].base;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    if (!reduced) {
+      const b = 1 + 0.004 * Math.sin(now / 900);
+      ctx.setTransform(b, 0, 0, b, cv.width * (1 - b) / 2, cv.height * (1 - b) / 2);
+    }
+    ctx.drawImage(base, 0, 0, cv.width, cv.height);
+    const t = Math.min(1, (now - fadeStart) / 55);
+    drawShape(prev, 1 - t);
+    drawShape(cur, t);
+    requestAnimationFrame(frame);
+  }
+  shapeEls.rest.classList.add("on");
+})();
+</script>

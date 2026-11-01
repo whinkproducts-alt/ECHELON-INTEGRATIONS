@@ -1,0 +1,49 @@
+# WHINK document recall service.
+# AnythingLLM runs in retrieval-only mode — no internal LLM (LLM_PROVIDER=none).
+# WHINK's model router handles all generation.
+#
+# Required secrets (create services/anythingllm/.env, git-ignored):
+#   ANYTHINGLLM_JWT_SECRET   openssl rand -hex 32
+#   ANYTHINGLLM_AUTH_TOKEN   openssl rand -hex 32  <- same value as ANYTHINGLLM_API_KEY in apps/web/.env
+#
+# The port is published on 127.0.0.1 only. Never expose it to the internet.
+
+services:
+  anythingllm:
+    # Pinned to 1.18.0 (latest stable semver as of 2026-10-25).
+    # This version exposes /api/v1/workspace/:slug/query (retrieval-only, no model call).
+    # To upgrade: update the tag and re-test the /query endpoint response shape.
+    image: mintplexlabs/anythingllm:1.18.0
+    restart: unless-stopped
+    # Hardening: unprivileged user, no privilege escalation.
+    user: "1000:1000"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Victor's decision (2026-10-25): 4 GB is generous for Node.js + SQLite with no local LLM.
+    mem_limit: 4g
+    cpus: 2.0
+    ports:
+      # Internal only — never expose to the internet.
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - anythingllm_data:/app/server/storage
+    environment:
+      STORAGE_DIR: /app/server/storage
+      JWT_SECRET: ${ANYTHINGLLM_JWT_SECRET:?Set ANYTHINGLLM_JWT_SECRET in services/anythingllm/.env (openssl rand -hex 32)}
+      # AUTH_TOKEN is the bearer token for API calls. Must match ANYTHINGLLM_API_KEY in apps/web/.env.
+      AUTH_TOKEN: ${ANYTHINGLLM_AUTH_TOKEN:?Set ANYTHINGLLM_AUTH_TOKEN in services/anythingllm/.env (openssl rand -hex 32)}
+      DISABLE_TELEMETRY: "true"
+      # Retrieval only — WHINK never routes generation through AnythingLLM.
+      LLM_PROVIDER: none
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/api/v1/auth"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  anythingllm_data:
+    driver: local

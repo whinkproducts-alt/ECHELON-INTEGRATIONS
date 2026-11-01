@@ -1,0 +1,45 @@
+version: '1.0'
+principles:
+  provider_independence: WHINK owns the organization; AI providers are replaceable
+    execution engines.
+  dormant_by_default: true
+  minimum_competent_team: true
+  human_pre_execution_approval_required:
+  - team_size
+  - schedule
+  - estimated_budget
+  material_change_requires_reapproval:
+  - team_size
+  - schedule
+  - scope
+  - budget
+  - paid_tools
+  - external_resources
+  reuse_before_creation:
+  - search
+  - reuse
+  - extend
+  - retrain
+  - temporary_worker
+  - create_last
+  least_privilege: true
+  human_final_authority: true
+agent_states:
+- dormant
+- consulted
+- active
+- lead
+- reviewer
+- suspended
+- retired
+new_agent_creation:
+  requires_company_wide_scan: true
+  must_scan:
+  - active
+  - dormant
+  - underutilized
+  - suspended_when_appropriate
+  - cross_department
+  - cross_directorate
+  human_approval_required: true
+  must_record_rationale: true

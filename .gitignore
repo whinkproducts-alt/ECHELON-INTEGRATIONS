@@ -1,1 +1,51 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+.yarn/install-state.gz
+.yarn/cache/
+
+# python services
+__pycache__/
+.venv/
+venv/
+
+# os and editor
+.DS_Store
+.vscode/
+.idea/
+
+# local data
+*.log
+backups/
+
+# AnythingLLM client documents and vector store (may contain private data)
+services/anythingllm/storage/
+services/openclaw/config/local/
+
+# large untracked folders (assets and marketing outside the build)
+MARKETING\ VIDEOS/
+SVG_Files_Request/
+WHINK_Group_Portable_AI_Plugin_v2/
+whink-image-briefs/
+whink-repo-setup/
+
+# claude worktrees and plugin cache
+.claude/worktrees/
+.claude/plugins/
+
+# loose assets at root
+WHINK\ ULTIMATE\ LOGO.png
+"WHINK Ultimate Architecture.html"
+apps/web/scripts/audit.json
+apps/web/scripts/secrets-scan.json
+
+# Claude Code local session state
 .claude/

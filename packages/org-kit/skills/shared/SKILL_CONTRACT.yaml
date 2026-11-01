@@ -1,0 +1,16 @@
+skill_contract_required_fields:
+- name
+- purpose
+- when_to_use
+- when_not_to_use
+- required_inputs
+- optional_inputs
+- tools_required
+- data_sources
+- output_schema
+- quality_checks
+- failure_conditions
+- escalation_path
+- memory_write_policy
+- approval_requirements
+- test_cases

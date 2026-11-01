@@ -1,0 +1,14 @@
+{
+  "name": "whink-ultimate",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter app dev",
+    "build": "pnpm --filter app build",
+    "test:router": "pnpm --filter @whink/org-kit test"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}
