@@ -1,5 +1,7 @@
 # Pending tasks (updated 2026-11-01)
 
+Launch readiness, in order: see `docs/LAUNCH-CHECKLIST.md` (status: not ready; Victor's own-Mac run comes first).
+
 Source of truth for what is open. Update it when something is done or decided. Read it at the start of every session.
 
 ## A. Waiting on Victor (decisions and actions only he can take)
@@ -81,4 +83,3 @@ Waiting on Victor:
 Open engineering:
 - Review the 10+ open Dependabot PRs one at a time: Actions bumps first, major npm bumps last, each with a licence check (CLAUDE.md rule 7). Close #16 (mapbox-gl 1 to 3) after verifying the licence. A Dependabot job for `services/anythingllm` failed.
 - Add the `finish()` terminal-update check from Qodo's `fix/remediation-2a68d1fb-185920` as its own change with a test, after the independent security review; then delete that branch. Do not remove the stuck-approval sweep.
-
