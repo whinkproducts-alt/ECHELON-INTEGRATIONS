@@ -15,7 +15,14 @@ async function evaluate(label: string, run: (trialCase: typeof NVIDIA_TRIAL_CASE
       const answer = await run(trialCase);
       cases.push({ caseId: trialCase.id, passed: trialCase.passes(answer.text), latencyMs: Math.round(performance.now() - start), tokensIn: answer.tokensIn, tokensOut: answer.tokensOut, output: answer.text.slice(0, 1000), error: null });
     } catch (error) {
-      cases.push({ caseId: trialCase.id, passed: null, latencyMs: Math.round(performance.now() - start), tokensIn: null, tokensOut: null, output: null, error: error instanceof Error ? error.name : 'UnknownError' });
+      const safeError = error instanceof Error && /^NVIDIA trial returned HTTP \d{3}$/.test(error.message) ? error.message : error instanceof Error ? error.name : 'UnknownError';
+      cases.push({ caseId: trialCase.id, passed: null, latencyMs: Math.round(performance.now() - start), tokensIn: null, tokensOut: null, output: null, error: safeError });
+      if (/^NVIDIA trial returned HTTP (401|402|403|404|410|429)$/.test(safeError)) {
+        for (const remaining of NVIDIA_TRIAL_CASES.slice(cases.length)) {
+          cases.push({ caseId: remaining.id, passed: null, latencyMs: null, tokensIn: null, tokensOut: null, output: null, error: 'skipped_after_provider_error' });
+        }
+        break;
+      }
     }
   }
   return { model: label, cases };

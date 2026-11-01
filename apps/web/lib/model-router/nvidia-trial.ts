@@ -2,8 +2,8 @@
 import { isLocalOnlyMode } from '@/lib/local-only';
 
 export const NVIDIA_TRIAL_MODELS = [
-  'deepseek-ai/deepseek-v4-flash',
-  'meta/llama-3.3-70b-instruct',
+  'deepseek-ai/deepseek-v4.1-flash',
+  'mistralai/mistral-large-4-1t-a52b',
 ] as const;
 
 export const NVIDIA_TRIAL_CASES = [
@@ -59,7 +59,7 @@ export async function nvidiaTrialChat(model: NvidiaTrialModel, trialCase: Nvidia
       model,
       messages: [{ role: 'system', content: trialCase.system }, { role: 'user', content: trialCase.user }],
       stream: false,
-      max_tokens: 256,
+      max_tokens: 1024,
       temperature: 0,
     }),
   });
