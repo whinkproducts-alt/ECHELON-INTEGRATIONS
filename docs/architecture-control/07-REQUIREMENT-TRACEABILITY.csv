@@ -1,0 +1,30 @@
+decision_id,requirement,design_references,milestones,acceptance_evidence
+FDR-001,Product/repo identity,01 §1,M0,Product header and repo origin match
+FDR-002,Preserve org counts and identity,01 §3;03 §1,"M0,M4",Registry count/hash invariants; no accidental additions
+FDR-003,Founder/WHINK/MAMBA authority,01 §3;03 §1,"M1,M2",Protected-action policy and independent review checks
+FDR-004,326 agents operationally available,01 §3;02 SC-03,M4,"Sampled agent scheduling/delegation, no 326 resident models"
+FDR-005,"Reuse agents, approval for activation",03 §1,M4,Agent activation denied absent scoped authority
+FDR-006,Mac-off 24/7 REQUIRED now,"01 §4;02 SC-03,SC-08","M3,M8","Power-off remote execution, UI and reconnect E2E"
+FDR-007,Cloud authoritative memory,01 §4;02 SC-05,"M3,M8",Persistent state while Mac off; scoped encrypted sync
+FDR-008,"Local-first, one user now",01 §5;02 SC-04,M2,Healthy Mac routes eligible tasks local
+FDR-009,Cloud escalation available now,01 §5;02 SC-04,"M2,M8","Quality failover, reason and context trace"
+FDR-010,"Zero new spend until revenue, founder controls","03 §1,§4;02 SC-04","M2,M3,M8",Zero billed calls under default; hosting spend guard
+FDR-011,"White-label deferred, modularity retained",01 §1;03 §2,"M0,M8",No multi-customer infrastructure introduced
+FDR-012,Selective OpenClaw reuse under WHINK,01 §6;02 SC-06,M5,Capability/license/security comparison and gated POC
+FDR-013,Hybrid HOLO real dashboard,01 §7;02 SC-07,M6,"Authoritative events vs fixtures, context-aware UI"
+FDR-014,Replaceable local inference engine,01 §5,M7,No unapproved Ollama replacement
+FDR-015,Model choice deferred pending benchmark,01 §5;05 §1,M7,Reproducible paired Qwen/Gemma tests
+FDR-016,ChatGPT founder command-centre workflow,01 §7;02 SC-07,M6,Verified/clearly limited approval-to-Codex handoff
+FDR-017,Shared learning with sealed Founder knowledge,02 SC-05;03 §5,"M3,M4",Allowlisted sharing + sealed negative tests
+FDR-018,"Hierarchy, independent MAMBA review",01 §3;03 §1,M4,"Actual review trace, no fake council voting"
+FDR-019,Initiative without unapproved cost,03 §1,M4,Zero billed/background runaway actions
+FDR-020,First mission WHINK Predict and Pro,01 §1;03 §1,M4,"Mission assigned, no unapproved outbound marketing"
+FDR-021,Architecture freeze and enforcement,00;03 §3;05 §5,"M0,M8",IDs + protected changes + ADR review
+FDR-022,Preserve uncommitted and historical work,03 §6;04 preface,"M0,M8",Inventory and no destructive surprises
+FDR-023,One organization across local and remote,01 §3;02 SC-03,"M3,M4",One canonical roster with cross-runner task ids
+"FDR-024","Conditional lowest-competent hierarchy, peer executive escalation","01 §2;02 SC-09;03 §8","M1,M4","Trace representative delegation/conditional escalation to canonical leads/directors/MDs, no compulsory exec hop"
+"FDR-025","Founder-only Marcus Vale and private Kill Team","01 §2;02 SC-10;03 §8","M2,M4","Cross-role negative access tests; private tasks and memory denied to other personas"
+"FDR-026","Mission-scoped agent activation and temporary cover","02 SC-09;03 §8;04 Authorized first ticket","M1,M4","Authorized substitute takeover, manager notification, audit, deny elevation"
+"FDR-027","Mac-off 24/7 now, examine spare computer and zero-new-cost memory","01 §4;03 §4;04 M3","M3,M8","Full Mac-off execution and sync test, cost/privacy evidence"
+"FDR-028","Preserve 326/163; reconcile 15 audited vs 16 planned","01 §8;02 SC-09;06 FDR-028","M0,M4","Registry hashes/counts unchanged; trace design discrepancy"
+"FDR-029","Versioned decisions and anti-drift enforcement","03 §3;05 §5;04 J5","M0,M8","CI blocks untraced governed changes; Founder approval records"
