@@ -1,0 +1,535 @@
+===============================================================================
+ECHELON CODE AUDIT REPORT  (READ-ONLY REVIEW - no code was changed)
+Date: 2026-11-01
+Reviewed:
+  [PKG-A] deepseek_text_20261101_ea8378.txt  "End-to-End Package" (25 files; E4a, E4b, T8-T10, seed, config)
+  [PKG-B] deepseek_text_20261101_18d935.txt  "Complete Code Package v2.0" (36 files; E1 schema delta, egress, FSM, T1-T7, T11, CI)
+Master plan: ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.md  -> NOT REVIEWED (see section 0)
+===============================================================================
+
+-------------------------------------------------------------------------------
+0. IMPORTANT LIMITATION - THE MASTER PLAN WAS NOT AVAILABLE
+-------------------------------------------------------------------------------
+I could not open ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.md.
+
+What I tried:
+  - Searched this cloud container's whole filesystem for the file name: not found.
+  - The GitHub repo (whinkproducts-alt/echelon-corp) contains only README.md.
+  - Checked connected computers. Your Mac "Victors-MacBook-Air" lists two folders
+    (whink-system, whink-ultimate). Both are reported as "not available" to cloud
+    sessions (typical causes: Mac app needs updating, or hidden/restricted folder).
+    Your Desktop is not in the shared list at all.
+
+CONSEQUENCE: I have NOT compared the code to the master plan, and I will not guess
+what the plan says. Everything in sections 1-5 is verified against the code alone.
+Section 6 lists only the plan references that the code packages THEMSELVES cite
+(D-1, D-10, D-11, D-12, "directive 6", E5, the 326-agent/163-team roster). I have
+not confirmed those references match the plan.
+
+To finish the comparison, either (a) paste/upload the .md here, (b) commit it to
+the repo, or (c) re-share the Desktop folder through Remote Control after updating
+the Claude app on the Mac. I will then do a requirement-by-requirement trace.
+
+Testing done: I ran what I could. Items marked [VERIFIED] were executed or
+reproduced here. Items marked [READING] come from reading the code. Items marked
+[UNVERIFIED] depend on files I was not given (full schema, tsconfig, app package.json).
+
+-------------------------------------------------------------------------------
+1. EXECUTIVE SUMMARY
+-------------------------------------------------------------------------------
+The packages are well structured, but as delivered they will not run end to end,
+and several security controls claimed as done are not enforced. The README status
+table ("all checkmarks") overstates reality.
+
+Top issues, most serious first:
+
+ 1. Authorization bypass: a grantId is never checked against the calling agent or
+    the tool (invoke.ts). Any agent holding any grant ID can call any tool.   [C-1]
+ 2. Remote code execution path: any logged-in session can register a stdio
+    provider with an arbitrary command; /discover then spawns it on the server. [C-2]
+ 3. Tool hijack: discovery upserts Tool by globally-unique name and re-points it
+    to the new connector, silently moving existing grants to an attacker's
+    endpoint.                                                                   [C-3]
+ 4. The Integration Hub UI cannot work: every call goes to /api/v1/v1/...       [VERIFIED] [H-1]
+ 5. Real-time events never fire: NOTIFY with a bind parameter is a Postgres
+    syntax error; the failure is swallowed.                                     [VERIFIED] [H-2]
+ 6. Host recovery is broken: after a Mac comes back, its providers are never
+    re-enabled. A host that beats exactly on interval also flaps DEGRADED.      [VERIFIED] [H-3]
+ 7. The code extractor cannot extract either package (0 of 61 file headers match). [VERIFIED] [H-4]
+ 8. Credentials are encrypted but never decrypted or sent: E4a-05 is
+    storage-only. README says "per-host" keys; code uses one global key.        [H-5]
+ 9. invoke speaks a different protocol (REST /mcp/tools/call) from discovery
+    (JSON-RPC). stdio providers cannot be invoked at all. Real MCP servers
+    will not work.                                                              [H-6]
+10. Listener leaks pooled connections (max 2); after two SSE connect/disconnect
+    cycles NOTIFY and new subscribers hang forever, which can hang invokeCapability. [H-7]
+
+Positive: schema design is sensible; deny-by-default and audit-on-deny pattern is
+good; token/ticket hashing for SSE tickets is correct; cloud-spend guard exists
+at two layers; test intent (T1-T11) maps well to the controls.
+
+-------------------------------------------------------------------------------
+2. SEVERITY KEY
+-------------------------------------------------------------------------------
+ C = Critical (security boundary broken)     H = High (feature does not work / major risk)
+ M = Medium (wrong in common cases)          L = Low (hygiene, polish)
+
+-------------------------------------------------------------------------------
+3. FINDINGS
+-------------------------------------------------------------------------------
+
+=== CRITICAL ===
+
+C-1  Grant is not bound to the caller or the tool  [READING]
+  File: packages/capability-gateway/src/invoke.ts (step 5)
+  When grantId is supplied the code does db.capabilityGrant.findUnique({id}) and
+  then checks only revokedAt/expiresAt. It never checks grant.subjectType/
+  subjectId === agent, grant.capabilityId === tool.id, grant.connectorInstallId,
+  grant.hostId, grant.executionPlanId, or grant.scopes.
+  Impact: agent B can pass agent A's grant ID for a different, more sensitive tool
+  and succeed. All of T1-T11 pass a valid grantId for the matching pair, so no test
+  catches this. Scopes and plan-scoped (mission-scoped) grants exist in the schema
+  but are never enforced anywhere.
+  Also: the no-grantId branch uses findFirst without filtering expiresAt, so it can
+  pick an expired grant while a valid one exists (false deny). policy.ts does this
+  correctly.
+  Fix: after loading the grant, require subject match + capability match (+
+  connector/host/plan if set) + scope check; add a negative test "agent B with
+  agent A's grantId is denied".
+
+C-2  Arbitrary command execution via provider registration  [READING]
+  Files: integrations/[...path]/route.ts (POST providers, discover), mcp-client.ts
+  POST /providers stores body.command and body.args unvalidated. POST
+  /providers/:id/discover calls McpClient.connect, which does spawn(command, args)
+  on the web server with the server's privileges. There is no role check (any valid
+  session), no command allowlist, and the egress firewall in egress-firewall.sh only
+  covers uid 1954 (echelon-plugin), not the web server user.
+  Impact: any session token = shell on the app host.
+  Fix: restrict stdio to hosts (run on the Mac/remote worker, not in the web
+  process); require founder role; allowlist command binaries; run as the sandboxed
+  plugin uid; never spawn from a web request handler.
+
+C-3  Tool name hijack on discovery  [READING]
+  File: integrations route (discover). Tool.name is globally @unique. Upsert's
+  update branch sets connectorInstallId = the new connector. Grants reference
+  tool.id, so registering a second provider that advertises a tool with the same
+  name moves every existing grant for that tool to the new endpoint.
+  Impact: an untrusted provider can capture traffic meant for a trusted one.
+  Fix: make the tool identity (connectorInstallId, name) unique; never update
+  connectorInstallId on conflict; fail loudly on a name collision.
+
+=== HIGH ===
+
+H-1  Integration Hub UI calls the wrong URL  [VERIFIED]
+  File: apps/web/src/app/integrations/page.tsx. api() prefixes '/api/v1', and every
+  caller passes a path starting '/v1/...', giving /api/v1/v1/integrations/... (404).
+  Every fetch in the page fails. Fix: drop one '/v1'.
+
+H-2  NOTIFY is never delivered  [VERIFIED]
+  File: apps/web/src/lib/listener.ts: pool.query(`NOTIFY "ch", $1`, [payload]).
+  I reproduced this against PostgreSQL 16 with the extended protocol: ERROR syntax
+  error at or near "$1". NOTIFY does not accept bind parameters. invoke.ts wraps
+  it in try { } catch { /* listener optional */ }, so the failure is silent and the
+  SSE stream never receives live events. Fix: SELECT pg_notify($1, $2) (works,
+  verified). Also stop swallowing the error silently; log it.
+
+H-3  Host recovery and DEGRADED flapping  [VERIFIED by simulation]
+  Files: heartbeat/route.ts, host-runner.ts, state-machine.ts
+  a) The heartbeat route writes status='ONLINE' directly. host-runner only
+     re-enables providers when evaluateHostState reports a transition to ONLINE
+     with the stored status OFFLINE. After a heartbeat, stored status is already
+     ONLINE, so no transition is reported and the providers disabled during the
+     outage stay DISABLED forever. Simulation: transition=null after heartbeat.
+  b) The re-enable query flips EVERY DISABLED connector on the host to ENABLED,
+     including ones the Founder disabled on purpose. There is no marker for
+     "disabled by outage".
+  c) Defaults: interval 30s, degraded after 30s. A host beating exactly every 30s
+     is DEGRADED on every cycle (simulation: 10 of 10 cycles). Policy requires
+     host.status === 'ONLINE', so DEGRADED blocks invocations. Use degraded >= 2x
+     interval (e.g. 75s) and offline >= 3x (e.g. 120s).
+  d) T8-T10 do not test recovery, so none of this is caught.
+  Fix: move recovery into one place (the runner or a shared applyHeartbeat that
+  also re-enables), record "disabledReason: HOST_OFFLINE" on the connector and
+  re-enable only those; fix thresholds; add a test "Mac returns -> providers back".
+
+H-4  The extractor cannot extract either package  [VERIFIED]
+  File: scripts/extract-code-package.py. Its regex expects lines of '=' and a bare
+  'FILE:'; the packages use lines of '#' and '# FILE:'. Result: 0 matches in PKG-A
+  (25 headers present) and 0 in PKG-B (36 present). The script prints "no FILE:
+  markers found". README's step 1 therefore fails.
+  Related: PKG-B's header says "34 total" but contains 36. Both packages contain
+  invoke.ts and the extractor; extracting PKG-B after PKG-A silently reverts
+  invoke.ts to the version WITHOUT the NOTIFY call. tsconfig.paths.json is not
+  valid JSON when extracted (contains '#' comment lines and trailing notes).
+  Fix: regex ^#{10,}\n# FILE:\s*(\S+)\n#{10,}\n; refuse to overwrite an existing
+  file without --force; ship one merged package.
+
+H-5  Credential isolation is storage-only; README overstates it  [READING]
+  - decrypt() is never called anywhere. McpClient never receives credentials
+    (hostHeader unused); invoke.ts sends no Authorization header. A provider that
+    needs a token cannot be called.
+  - README says "AES-256-GCM, per-host". crypto.ts uses one global ENCRYPTION_KEY,
+    no key ID/version (no rotation), no per-host derivation.
+  - Audit rows store raw inputSummary/outputSummary (1000 chars) with no
+    redaction, so secrets or founder-private text in tool I/O land in the Action
+    table in clear text.
+  - credentialHint stores the last 4 chars (leaks the whole value if short).
+  Fix: decrypt at call time inside the gateway only; derive per-host keys (HKDF) or
+  document single-key as accepted; version the ciphertext; add redaction.
+
+H-6  Protocol mismatch: discovery vs invocation  [READING]
+  McpClient (discover) speaks JSON-RPC to the endpoint. invoke.ts POSTs a custom
+  REST body to new URL('/mcp/tools/call', endpoint) (which also discards any path
+  in the endpoint). The test mock implements the custom REST path, so tests pass
+  while a real MCP server (JSON-RPC at /mcp) would 404/400. stdio providers have no
+  endpoint, so invoke throws "no endpoint": stdio tools are discoverable but not
+  invocable. Also: JSON-RPC "error" and MCP result.isError are treated as success.
+  McpClient gaps: no notifications/initialized after initialize (spec requires it);
+  res.json() fails if a server answers with SSE (the Accept header offers it);
+  stdio requests have no timeout (hang forever); responses are matched by id with
+  no check on `method`, so a server-initiated request can be mistaken for a reply;
+  protocolVersion is 2024-11-05.
+  Fix: one transport layer (McpClient) used by BOTH discover and invoke, behind
+  allowlistedFetch.
+
+H-7  Listener connection leak can hang invocations  [READING]
+  File: listener.ts. Pool max=2. Each first subscription checks a client out with
+  pool.connect() and never releases it or UNLISTENs. When the last subscriber
+  leaves, the channel is forgotten, so the next subscriber checks out another
+  client. After two SSE connect/disconnect cycles both pool slots are held;
+  notify() (pool.query) and further subscribers wait forever (no connection
+  timeout). invoke.ts awaits notify() after the Action is saved, so invokeCapability
+  itself can hang after succeeding. In dev the module-level Pool is also recreated
+  on hot reload (no globalThis guard, unlike db.ts).
+  Fix: one dedicated long-lived LISTEN client for the process; reference-count
+  subscribers; separate pool for notify; connectionTimeoutMillis; globalThis guard.
+
+H-8  Egress control has holes  [VERIFIED where noted]
+  a) allowlistedFetch follows redirects by default: an allowlisted host can 302 to
+     a non-allowlisted host. Needs redirect:'manual' (or 'error') and re-checking.
+  b) DNS rebinding: the IP check resolves the name, then fetch() resolves again
+     (time-of-check/time-of-use). The comment "defeats DNS rebinding" is not true.
+     Also if the hostname is allowlisted the IP is never checked, so an allowlisted
+     name pointing at 169.254.169.254 or RFC1918 passes.
+  c) mcp-client.ts uses raw fetch and is exempt from the lint rule; the discover
+     route therefore makes unrestricted outbound requests to a user-supplied URL
+     (SSRF to cloud metadata, internal services).
+  d) extractUrls  [VERIFIED]: only strings that are entirely a URL are caught.
+     Missed: URL inside a sentence, scheme-less hosts, URLs nested deeper than 6
+     levels, URLs in object keys. False positives: "note:todo", "time: 10:30" and
+     "C:\Users\x" all parse as URLs with an empty host and are DENIED.
+  e) hostAllowed  [VERIFIED]: "0.0.0.0/0" allowlists everything (no registration
+     validation); "a.test:80" never matches http://a.test:80/ (URL drops default
+     ports); IPv6 literals never match (hostname keeps brackets, isIP=0); entries
+     are case-sensitive.
+  f) scripts/egress-firewall.sh: Linux iptables only (your Founder host is a Mac:
+     needs pf); no ip6tables (IPv6 unrestricted); DNS to any resolver allowed (DNS
+     tunnelling channel); applies only to uid 1954, not to the gateway or web
+     process; allowlist file takes IPs only. README claims "kernel + application
+     egress" as done; kernel layer is not wired to the process that makes calls.
+
+H-9  Cost-class guard is bypassable  [READING]
+  Discovery creates every Tool with costClass default FREE and riskClass 'A'; the
+  UI and API have no way to set them. A cloud-billable tool registered through the
+  Hub is FREE, so BUDGET_CLOUD_DISABLED never fires for it. riskClass is never read
+  by policy or invoke (no approval/confirmation by risk). requiresEgress and
+  schema 'permissionClass'/'confirmationMethod' fields are also unused.
+
+H-10 Missing pieces make the runbook impossible  [READING]
+  - heartbeat SENDER: nothing in either package posts to
+    /api/v1/workers/:id/heartbeat. "worker:heartbeat" runs
+    packages/worker/src/heartbeat-entry.ts, which is not delivered (and
+    packages/worker has no package.json; it is only the evaluator). Hosts therefore
+    never leave OFFLINE.
+  - Not delivered: root tsconfig.json, vitest config, apps/web package.json and
+    Next/Tailwind config (UI uses Tailwind classes), package-lock.json (CI uses npm
+    ci), packages/holo/package.json, the migration SQL itself ("generate with
+    prisma migrate dev --create-only"), the full schema.prisma.
+  - Plugin path is dead code: plugin-manager.ts (loadManifest, runAutomatedChecks,
+    the D-11 checks) is never called by any route. README step (b) "POST providers
+    kind=PLUGIN" has no handler. Not exported from index.ts.
+  - Package exports: capability-gateway/package.json exports only ".", but the
+    route imports '@echelon/capability-gateway/policy' and '/mcp-client'. This
+    works only if every tool resolves tsconfig paths (Next does; Node/tsx for the
+    worker may not). Missing declared deps: zod (plugin-manager), pg (listener,
+    harness). Root package.json lists no dependencies at all.
+
+H-11 Prisma commands will not find the schema  [READING; documented Prisma defaults]
+  The schema lives in apps/web/prisma/schema.prisma, but harness/db.ts
+  (execSync 'npx prisma migrate deploy'), CI (prisma generate / migrate deploy) and
+  verify-e1-migration.sh (prisma validate/deploy/generate) pass no --schema, and the
+  root package.json has no "prisma.schema" entry. Prisma looks in ./prisma/ or the
+  package.json path, so these fail. The README commands do pass --schema; the
+  scripts do not.
+
+=== MEDIUM ===
+
+M-1  policy.ts is not the single decision point (README claim)  [READING]
+  invoke.ts re-implements the gates inline and never calls decide(). policy.ts
+  omits the founder-private and egress checks that invoke.ts has. The two will
+  drift. Actions DISABLE_PROVIDER and REVOKE_GRANT are typed but unhandled; the
+  routes for disable, revoke, review, discover never consult policy. ENABLE_PROVIDER
+  does not check the user's role (GRANT does). Any authenticated user can revoke any
+  grant by ID (no ownership check on DELETE /grants/:id) and read any provider's
+  tools.
+
+M-2  "Review permissions" is a button, not a review  [READING]
+  Review flips status to REVIEWED with no displayed permissions, no tool list, no
+  egress summary, no automated checks, and is allowed before Discover. The same user
+  registers, reviews and enables (no separation of duties). Enabling a provider with
+  zero discovered tools is possible. README op (c) is therefore only nominally met.
+
+M-3  Failed invocations are not audited  [READING]
+  Only PolicyError is persisted. Network failures, timeouts (AbortError) and
+  "MCP call failed: 500" are rethrown with no Action row, so a failed call leaves
+  no trace. Also the Action is written AFTER the side effect (no write-ahead
+  "intent" record), so a DB failure after a successful call loses the audit, and
+  the grant counter update can throw after the audit row exists. Denial rows omit
+  connectorInstallId/capabilityId/hostId so a denial cannot be attributed to a tool.
+  persona, planId, executionPlanId and correlationId are never populated.
+
+M-4  Founder-private guard is a label check, not a control  [READING]
+  Only input.__marker === 'FOUNDER_PRIVATE' at the top level is blocked. Nested,
+  differently-cased, or unmarked founder data passes. Nothing connects the seed's
+  founder-private roster row (domain 'founder-private' in agent_knowledge) to any
+  access check. T11b proves only that the literal marker is rejected.
+
+M-5  Output/input validation is a stub  [READING]
+  Result check is "is an object" (code comment says ajv is to be wired). Input is
+  never validated against inputSchema; outputSchema for discovered tools is a
+  hard-coded {type:'object'}.
+
+M-6  Realtime event stream issues  [READING]
+  - Replay then subscribe leaves a gap (events committed between the two are lost);
+    subscribe first and buffer.
+  - EchelonEventStream.onmessage only fires for unnamed events; events are sent with
+    "event: <type>", so the cursor is never updated and reconnect does not resume.
+  - The subscribe callback is async but listener.ts try/catch cannot catch its
+    rejections (unhandled rejection).
+  - /events/ticket does not catch the error requireSession throws, so an invalid
+    session yields 500 instead of 401. Expired tickets are never purged.
+  - The Hub UI polls every 5s instead of using the SSE client it ships with.
+
+M-7  Heartbeat endpoint  [READING]
+  One shared WORKER_TOKEN for all hosts: any holder can mark any hostId ONLINE.
+  Unknown hostId makes db.host.update throw (unhandled 500). Not constant-time
+  compare (hash compare softens this). Runner has no lock, so two runners would
+  duplicate audit rows, and it can overwrite a heartbeat that lands mid-cycle
+  (self-heals next cycle). A host created ONLINE with lastHeartbeat=null never
+  transitions.
+
+M-8  Seed and README  [VERIFIED/READING]
+  - README step 2: sed 's/CHANGE_ME_64_HEX_CHARS/<key>/' replaces EVERY matching
+    line, so ENCRYPTION_KEY and WORKER_TOKEN receive the SAME secret. [VERIFIED by
+    reading .env.example: both lines use that placeholder.]
+  - seed.ts uses create() for agent_knowledge (duplicates on every re-run), mints a
+    new 30-day session token each run and prints it to the console/logs, assumes
+    userProfile/personaState/agentKnowledge models and field names I cannot see.
+  - "Teams" are only console.logged, not stored.
+  - docker-compose publishes 5432 on all interfaces with postgres/postgres.
+  - Auth has no login flow: a token pasted into localStorage (XSS-readable), plaintext
+    session tokens in the DB.
+
+M-9  CI problems  [READING; some LIKELY]
+  - `on: [pull_request, push: {branches: [main]}]` parses (I checked) as a list
+    containing a mapping. GitHub's array form accepts event names only; use block
+    form. [Not tested against GitHub.]
+  - `npm ci --ignore-scripts` then `tsc --noEmit`: Prisma client is never generated
+    before tsc, so type-check cannot resolve @prisma/client types.
+  - `eslint . --max-warnings 0` will probably fail: invoke.test.ts uses `any`
+    (no-explicit-any is an error in typescript-eslint recommended), and
+    stdio-mcp-mock.js uses require/process with no globals configured (no-undef).
+  - events/route.ts destructures split(':') into possibly-undefined values; if the
+    real tsconfig sets noUncheckedIndexedAccess (the code style suggests so), tsc
+    fails there. [UNVERIFIED: tsconfig not supplied.]
+  - Integration job runs both packages' per-file DB creation plus full migrations;
+    slow but OK.
+
+M-10 Dual source of truth: ConnectorInstall keeps the legacy `enabled Boolean` and
+  adds `status`. Nothing reconciles them. Status/kind/costClass are free strings,
+  not enums (typos pass). generate-migration.ts / reconcile-schema.ts emit table
+  names like "ConnectorInstall" while the schema maps to connector_installs, and the
+  CREATE TABLE output omits NOT NULL, FKs and indexes. These two scripts are unsafe if
+  actually used for SQL; prefer prisma migrate only. rollback.sql sits in a folder
+  with no migration.sql (Prisma may reject or ignore it; check), and does not remove
+  the _prisma_migrations row.
+
+M-11 Agents are not entities: grants use free-text subjectId with no FK because there
+  is no Agent/Team model (README admits this). Result: grants can be issued to
+  non-existent agents; "Grant" in the UI asks via prompt() for a typed ID.
+
+=== LOW ===
+
+L-1  Provider create returns 500 on duplicate connectorId (P2002) and on not-found
+     updates (P2025); errorResponse has no Prisma error mapping.
+L-2  Revoking a provider does not deactivate its tools or revoke its grants; tools
+     removed upstream stay active after re-discover.
+L-3  Default egress allowlist is empty, so every call is denied with an unhelpful
+     error; the form should pre-fill the endpoint host.
+L-4  UI shows only capability.* actions, hiding connector.registered/reviewed/
+     enabled, grant.created etc. (no lifecycle audit view); no credential field, no
+     stdio/plugin/OpenClaw forms; no grant list/revoke-grant button (route exists,
+     UI does not); no health per capability.
+L-5  Fixtures use Date.now() for unique IDs; two seeds in the same millisecond
+     collide on @@unique(userId, connectorId) (flaky T9 risk). Listener's pg pool
+     is created against the main DATABASE_URL, not the test DB, so NOTIFY in tests
+     goes to the wrong database.
+L-6  T8/T9 assert code matches /RES_HOST_UNAVAILABLE|RES_PROVIDER_DISABLED/, so the
+     test cannot tell which control fired. T7 is a pure unit test named
+     "status display" that tests no display. startStdioMcpServer is never used and
+     McpClient stdio is untested.
+L-7  Dead/unused: `void createHash;` hack in the route, unused OLLAMA_URL (model
+     provider stream() is an empty stub for both local and cloud), api() returns
+     before checking JSON error bodies for non-JSON responses.
+L-8  package.json "prisma" key for seed is deprecated in newer Prisma releases
+     (version dependent). `__dirname` in seed.ts assumes CommonJS.
+L-9  README known-issue #1 says the import is '@/lib/listener' but the code uses a
+     relative path ../../../apps/web/src/lib/listener.js - a package reaching into the
+     app directory inverts the dependency; use the onCommitted callback option.
+
+-------------------------------------------------------------------------------
+4. README STATUS CLAIMS vs WHAT THE CODE SHOWS
+-------------------------------------------------------------------------------
+ E4a-01/02 MCP Client      "done"   -> discover only; invoke uses a different protocol; no stdio invoke
+ E4a-03/04 Plugin Manager  "done"   -> never called; no route; no sandbox behaviour (manifest-only)
+ E4a-05 Credential isolation "done" -> encrypt only; never decrypted/used; global key, not per-host
+ E4a-06 PDP                "done"   -> not used by invoke; incomplete vs invoke gates
+ E4a-07 invokeCapability   "10 gates" -> C-1 grant binding, scopes/plan/host ignored
+ E4a-08 Egress             "kernel + app" -> H-8 holes; kernel layer not applied to gateway process
+ E4a-09 Host heartbeat     "done"   -> no sender; recovery broken; flaps at default thresholds
+ E4a-10 OpenClaw adapter   "done"   -> README says providerKind=OPENCLAW; providerKind is a free string and no adapter code exists in these packages
+ E4b Hub UI                "done"   -> every API call 404s (H-1); several of the 10 operations only nominal
+ T1-T7, T11 "CI gates"     -> CI as written likely fails (M-9, H-11)
+ T8-T10                    -> honestly labelled simulation; recovery untested
+ The 10 Hub operations (a)-(j): (b) plugin and (c) review are not real; (a),(d)-(h),(j)
+ exist in the API but are unreachable from the UI until H-1 is fixed.
+
+-------------------------------------------------------------------------------
+5. FILES THE CODE REFERENCES BUT NO PACKAGE CONTAINS
+-------------------------------------------------------------------------------
+ packages/worker/src/heartbeat-entry.ts     packages/worker/package.json
+ apps/web/package.json                      apps/web/prisma/schema.prisma (full)
+ root tsconfig.json                         vitest.config.ts / workspace config
+ package-lock.json                          packages/holo/package.json
+ Migration SQL for e1_capability_infrastructure
+ Host-side heartbeat sender (Mac / remote worker agent)
+ Any Agent/Team/Mission/Task tables (needed for non-capability-level T10)
+
+-------------------------------------------------------------------------------
+6. MASTER PLAN COMPARISON - STATUS: NOT POSSIBLE (plan not accessible)
+-------------------------------------------------------------------------------
+Plan references that appear INSIDE the code packages (unverified against the plan):
+ - D-1  : no remote host provisioned; blocks E5 physical Mac-off tests. Code treats
+          remote-01 as "pending D-1 resolution".
+ - D-10 : process-JS / container plugin sandboxes gated (only manifest-only runs).
+ - D-11 : mandatory automated plugin checks before Founder review (implemented in
+          plugin-manager.ts but never invoked - see H-10).
+ - D-12 : full 326-agent / 163-team roster "do not reopen". Code seeds only
+          WHINK, MAMBA and one founder-private assistant (Marcus Vale) as rows in
+          agent_knowledge, 3 teams that are not stored.
+ - "directive 6 (egress controls)", "E5", "10 Integration Hub operations".
+ - Branch/schema reference: import/kamsi-prime-m1 (6f087898); the repo I can see has
+   only an "Initial commit" and a README, so I cannot confirm this baseline.
+
+What I will check once I have the plan (checklist so we can move quickly):
+ 1. Every requirement ID / decision ID -> file that implements it -> test that proves it.
+ 2. Data model coverage (Agent, Team, Mission, Task, ExecutionPlan, PlanStep) vs schema.
+ 3. Autonomy levels, approval/confirmation rules, risk classes A/B/C behaviour.
+ 4. Founder-private data handling and what "private" must technically mean.
+ 5. Mac-off continuity requirements, host topology, and cost ceilings.
+ 6. Audit/receipt requirements (tamper evidence, retention, redaction).
+ 7. Persona behaviour (WHINK/MAMBA), roster scale, and the E5 acceptance criteria.
+
+-------------------------------------------------------------------------------
+7. PROPOSED CHANGES (ordered; nothing applied)
+-------------------------------------------------------------------------------
+Phase 0 - make it buildable (1-2 days)
+  P0.1  Fix extractor regex; add --force; merge PKG-A and PKG-B into one package
+        (invoke.ts = PKG-A version with callback instead of cross-package import).
+  P0.2  Add missing files (section 5); add "prisma.schema" to package.json or --schema
+        everywhere; declare deps (zod, pg, tsx, vitest, prisma); add lockfile.
+  P0.3  Fix CI: block-form `on:`, `prisma generate` before tsc, eslint globals/any in
+        tests, schema path.
+  P0.4  Fix UI URL (H-1) and listener NOTIFY (H-2: SELECT pg_notify($1,$2)).
+
+Phase 1 - close security gaps (before any real provider is connected)
+  P1.1  invoke.ts: bind grant to subject, tool, connector, host, plan; enforce scopes.
+        Add negative tests (agent B + agent A grant; expired-preferred; wrong tool).
+  P1.2  Remove stdio spawn from the web process (C-2); founder-only registration;
+        command allowlist; validate endpoint, egressAllowlist (reject /0, wildcards).
+  P1.3  Tool identity = (connectorInstallId, name); no cross-connector overwrite (C-3).
+  P1.4  Egress: redirect:'manual', pin resolved IP into the connection, put McpClient
+        behind allowlistedFetch, parse URLs from within strings, remove depth cap or fail
+        closed past it, handle default ports/IPv6/case. Add ip6tables and pf variant for Mac.
+  P1.5  Credentials: decrypt in gateway only, send as header, key versioning, redaction
+        of audit summaries.
+  P1.6  Route all gates through policy.decide(); one implementation; add role checks to
+        enable/disable/revoke/review/discover; ownership checks on grant revoke/read.
+
+Phase 2 - correctness and reliability
+  P2.1  Single MCP transport for discover + invoke (JSON-RPC), notifications/initialized,
+        SSE responses, isError handling, timeouts for stdio, id/method guard.
+  P2.2  Heartbeat: sender agent, thresholds (>= 2x/3x interval), recovery path with
+        disabledReason, runner advisory lock, per-host tokens; tests for return-online.
+  P2.3  Listener: single LISTEN client, ref-counted, timeouts, globalThis guard.
+  P2.4  Audit: write-ahead "intent" row, record FAILED outcomes, attribute denials to
+        tool/connector/host, populate correlationId/persona/plan.
+  P2.5  Real review step (show tools, egress, automated checks incl. D-11) and wire
+        plugin-manager into the register route.
+  P2.6  Persist costClass/riskClass on registration with Founder confirmation; enforce
+        riskClass-based approval.
+  P2.7  Seed: idempotent, no token printing in shared logs, store teams, Agent model.
+
+Phase 3 - build out
+  Agent/Team/Mission models, mission-level T10, E5 physical Mac-off on a real remote
+  host (blocked by D-1), roster population (blocked by D-12).
+
+-------------------------------------------------------------------------------
+8. QUESTIONS FOR YOU
+-------------------------------------------------------------------------------
+ A. Master plan access
+    1. Can you paste or commit ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.md,
+       or re-share the Desktop folder after updating the Claude app on the Mac?
+       (Your shared folders whink-system / whink-ultimate showed "not available".)
+    2. Which decisions (D-1...D-12 and any later) are FINAL, and which are still open?
+
+ B. Scope and ownership
+    3. Is the stdio-on-Mac MCP (local tools) a hard requirement, or could all providers
+       be HTTP/remote? This decides how we fix C-2 and H-6.
+    4. Who is allowed to register, review, enable, and grant: Founder only, or also
+       "admin"? Do you want a two-person rule (register vs. approve)?
+    5. Are Agents/Teams/Missions meant to be database entities now (needed to bind
+       grants and finish T10), or does the plan keep them in another system?
+
+ C. Security posture
+    6. What must "Founder-private" mean technically: classification labels on data,
+       separate stores, or just never leaving the machine? The current marker check is
+       not enough.
+    7. Is outbound access to arbitrary internet hosts ever allowed, or strictly an
+       allowlist per provider? Should cloud-billable tools be impossible to register
+       while CLOUD_INFERENCE_ENABLED=false?
+    8. Is the audit log required to be tamper-evident (hash chain / append-only), and
+       what retention and redaction rules apply to inputSummary/outputSummary?
+    9. One encryption key for all credentials, or per-host keys as the README says?
+
+ D. Operations
+   10. What runs on the Mac to send heartbeats (an existing worker, a new daemon)?
+       What is the intended host topology until D-1 is resolved?
+   11. Heartbeat thresholds: what outage length should block calls (default 60s is
+       tight for a laptop that sleeps)? Should reconnect auto-enable providers, or
+       require Founder re-approval?
+   12. Which database and host will this run on (docker-compose is local only)? Is
+       Postgres exposed beyond localhost?
+   13. Which Prisma and Next versions are you on? (affects seed config, params typing)
+
+ E. Process
+   14. PKG-A and PKG-B overlap (invoke.ts, extractor). Which one is authoritative,
+       and where is the real repo (branch import/kamsi-prime-m1)? The repo I can see
+       is empty apart from README.
+   15. Do you want me to implement Phase 0-1 on branch claude/wonderful-carson-ci81s4
+       once the plan is available, with the new negative tests, or do you prefer a
+       reviewed patch set first?
+
+===============================================================================
+END OF REPORT
+===============================================================================
