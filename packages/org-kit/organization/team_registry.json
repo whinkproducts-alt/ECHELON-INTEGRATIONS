@@ -1,0 +1,3046 @@
+[
+  {
+    "team_id": "executive_office_corporate_strategy.office_of_the_ceo_executive_operations.office_of_the_ceo_executive_operations_core",
+    "name": "Office of the CEO & Executive Operations Core",
+    "directorate": "Executive Office & Corporate Strategy",
+    "department": "Office of the CEO & Executive Operations",
+    "department_head": "Whitney Brown",
+    "mission": "Primary execution and advisory team for Office of the CEO & Executive Operations.",
+    "core_skills": [
+      "executive_briefing",
+      "decision_tracking",
+      "executive_coordination",
+      "priority_management",
+      "leadership_meeting_ops",
+      "escalation_management",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "executive_office_corporate_strategy.corporate_strategy_strategic_planning.corporate_strategy_strategic_planning_core",
+    "name": "Corporate Strategy & Strategic Planning Core",
+    "directorate": "Executive Office & Corporate Strategy",
+    "department": "Corporate Strategy & Strategic Planning",
+    "department_head": "Chux Onwusah",
+    "mission": "Primary execution and advisory team for Corporate Strategy & Strategic Planning.",
+    "core_skills": [
+      "corporate_strategy",
+      "scenario_planning",
+      "strategic_prioritization",
+      "annual_planning",
+      "competitive_positioning",
+      "objective_design",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "executive_office_corporate_strategy.corporate_development_strategic_investments.corporate_development_strategic_investments_core",
+    "name": "Corporate Development & Strategic Investments Core",
+    "directorate": "Executive Office & Corporate Strategy",
+    "department": "Corporate Development & Strategic Investments",
+    "department_head": "Tosin (Suki) Suara",
+    "mission": "Primary execution and advisory team for Corporate Development & Strategic Investments.",
+    "core_skills": [
+      "deal_screening",
+      "investment_thesis",
+      "valuation_support",
+      "due_diligence_coordination",
+      "joint_venture_analysis",
+      "portfolio_strategy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "executive_office_corporate_strategy.enterprise_transformation_strategic_programs.enterprise_transformation_strategic_programs_core",
+    "name": "Enterprise Transformation & Strategic Programs Core",
+    "directorate": "Executive Office & Corporate Strategy",
+    "department": "Enterprise Transformation & Strategic Programs",
+    "department_head": "Nimat Omobolanle",
+    "mission": "Primary execution and advisory team for Enterprise Transformation & Strategic Programs.",
+    "core_skills": [
+      "transformation_design",
+      "program_governance",
+      "change_enablement",
+      "cross_functional_delivery",
+      "benefits_realization",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "executive_office_corporate_strategy.enterprise_business_intelligence_performance.enterprise_business_intelligence_performance_core",
+    "name": "Enterprise Business Intelligence & Performance Core",
+    "directorate": "Executive Office & Corporate Strategy",
+    "department": "Enterprise Business Intelligence & Performance",
+    "department_head": "Jideofor Nnaji",
+    "mission": "Primary execution and advisory team for Enterprise Business Intelligence & Performance.",
+    "core_skills": [
+      "executive_dashboarding",
+      "kpi_design",
+      "performance_analysis",
+      "decision_support",
+      "forecast_synthesis",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "executive_office_corporate_strategy.strategic_portfolio_pmo.strategic_portfolio_pmo_core",
+    "name": "Strategic Portfolio & PMO Core",
+    "directorate": "Executive Office & Corporate Strategy",
+    "department": "Strategic Portfolio & PMO",
+    "department_head": "Pat Johnson",
+    "mission": "Primary execution and advisory team for Strategic Portfolio & PMO.",
+    "core_skills": [
+      "portfolio_management",
+      "program_management",
+      "dependency_tracking",
+      "resource_prioritization",
+      "value_realization",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.atlas",
+    "name": "ATLAS",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist ATLAS capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "brand_strategy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.nova",
+    "name": "NOVA",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist NOVA capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "content_strategy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.vanta",
+    "name": "VANTA",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist VANTA capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "audience_intelligence",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.oracle",
+    "name": "ORACLE",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist ORACLE capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "creative_direction",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.quanta",
+    "name": "QUANTA",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist QUANTA capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "media_distribution",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.pulse",
+    "name": "PULSE",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist PULSE capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "reputation_intelligence",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.verity",
+    "name": "VERITY",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist VERITY capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "brand_strategy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.forge",
+    "name": "FORGE",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist FORGE capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "content_strategy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.rhodes",
+    "name": "RHODES",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist RHODES capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "audience_intelligence",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.prism",
+    "name": "PRISM",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist PRISM capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "creative_direction",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.halo",
+    "name": "HALO",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist HALO capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "media_distribution",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.titan",
+    "name": "TITAN",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist TITAN capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "reputation_intelligence",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.magnet",
+    "name": "MAGNET",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist MAGNET capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "brand_strategy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.flux",
+    "name": "FLUX",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist FLUX capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "content_strategy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.livewire",
+    "name": "LIVEWIRE",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist LIVEWIRE capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "audience_intelligence",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.echo",
+    "name": "ECHO",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist ECHO capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "creative_direction",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.cut",
+    "name": "CUT",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist CUT capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "media_distribution",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.sonic",
+    "name": "SONIC",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist SONIC capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "reputation_intelligence",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.signal",
+    "name": "SIGNAL",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist SIGNAL capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "brand_strategy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.mosaic",
+    "name": "MOSAIC",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist MOSAIC capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "content_strategy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.chorus",
+    "name": "CHORUS",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist CHORUS capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "audience_intelligence",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.shield",
+    "name": "SHIELD",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist SHIELD capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "creative_direction",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.brand_media_audience_intelligence.mirror",
+    "name": "MIRROR",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Brand, Media & Audience Intelligence",
+    "department_head": "Sonia Bantu",
+    "mission": "Specialist MIRROR capability team within Brand, Media & Audience Intelligence.",
+    "core_skills": [
+      "media_distribution",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.vector",
+    "name": "VECTOR",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist VECTOR capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "product_marketing",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.nexus",
+    "name": "NEXUS",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist NEXUS capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "demand_generation",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.ledger",
+    "name": "LEDGER",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist LEDGER capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "growth_strategy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.conductor",
+    "name": "CONDUCTOR",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist CONDUCTOR capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "marketing_operations",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.sentinel",
+    "name": "SENTINEL",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist SENTINEL capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "sales_enablement",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.muse",
+    "name": "MUSE",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist MUSE capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "customer_marketing",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.propel",
+    "name": "PROPEL",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist PROPEL capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "product_marketing",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.demand",
+    "name": "DEMAND",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist DEMAND capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "demand_generation",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.revops",
+    "name": "REVOPS",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist REVOPS capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "growth_strategy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.lifecycle",
+    "name": "LIFECYCLE",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist LIFECYCLE capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "marketing_operations",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.convert",
+    "name": "CONVERT",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist CONVERT capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "sales_enablement",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.authority",
+    "name": "AUTHORITY",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist AUTHORITY capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "customer_marketing",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.enable",
+    "name": "ENABLE",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist ENABLE capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "product_marketing",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.advocate",
+    "name": "ADVOCATE",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist ADVOCATE capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "demand_generation",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.field",
+    "name": "FIELD",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist FIELD capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "growth_strategy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "whink_group_marketing_intelligence.commercial_growth_marketing_intelligence.compass",
+    "name": "COMPASS",
+    "directorate": "WHINK Group Marketing Intelligence",
+    "department": "Commercial & Growth Marketing Intelligence",
+    "department_head": "David Eniolade",
+    "mission": "Specialist COMPASS capability team within Commercial & Growth Marketing Intelligence.",
+    "core_skills": [
+      "marketing_operations",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 2
+  },
+  {
+    "team_id": "sales_revenue.enterprise_sales.enterprise_sales_core",
+    "name": "Enterprise Sales Core",
+    "directorate": "Sales & Revenue",
+    "department": "Enterprise Sales",
+    "department_head": "Ijie Alpha",
+    "mission": "Primary execution and advisory team for Enterprise Sales.",
+    "core_skills": [
+      "enterprise_sales_strategy",
+      "account_planning",
+      "complex_deal_management",
+      "executive_selling",
+      "pipeline_management",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "sales_revenue.smb_mid_market_sales.smb_mid_market_sales_core",
+    "name": "SMB & Mid-Market Sales Core",
+    "directorate": "Sales & Revenue",
+    "department": "SMB & Mid-Market Sales",
+    "department_head": "Muyiwa Agoro",
+    "mission": "Primary execution and advisory team for SMB & Mid-Market Sales.",
+    "core_skills": [
+      "commercial_sales",
+      "high_velocity_pipeline",
+      "territory_management",
+      "deal_qualification",
+      "sales_forecasting",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "sales_revenue.sales_development_pipeline_generation.sales_development_pipeline_generation_core",
+    "name": "Sales Development & Pipeline Generation Core",
+    "directorate": "Sales & Revenue",
+    "department": "Sales Development & Pipeline Generation",
+    "department_head": "Mosope Talabi",
+    "mission": "Primary execution and advisory team for Sales Development & Pipeline Generation.",
+    "core_skills": [
+      "prospecting",
+      "lead_qualification",
+      "outbound_sequence_design",
+      "inbound_triage",
+      "meeting_generation",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "sales_revenue.solutions_technical_sales.solutions_technical_sales_core",
+    "name": "Solutions & Technical Sales Core",
+    "directorate": "Sales & Revenue",
+    "department": "Solutions & Technical Sales",
+    "department_head": "Matthew Okonunfua",
+    "mission": "Primary execution and advisory team for Solutions & Technical Sales.",
+    "core_skills": [
+      "technical_discovery",
+      "solution_design",
+      "demo_strategy",
+      "pre_sales_architecture",
+      "technical_validation",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "sales_revenue.channel_partner_sales.channel_partner_sales_core",
+    "name": "Channel & Partner Sales Core",
+    "directorate": "Sales & Revenue",
+    "department": "Channel & Partner Sales",
+    "department_head": "Oluwaseun Lambo",
+    "mission": "Primary execution and advisory team for Channel & Partner Sales.",
+    "core_skills": [
+      "channel_strategy",
+      "partner_recruitment",
+      "partner_enablement",
+      "co_sell_planning",
+      "channel_pipeline",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "sales_revenue.account_management_expansion.account_management_expansion_core",
+    "name": "Account Management & Expansion Core",
+    "directorate": "Sales & Revenue",
+    "department": "Account Management & Expansion",
+    "department_head": "Sam Patel",
+    "mission": "Primary execution and advisory team for Account Management & Expansion.",
+    "core_skills": [
+      "account_growth",
+      "renewal_strategy",
+      "upsell_cross_sell",
+      "relationship_management",
+      "account_health",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "sales_revenue.revenue_operations_sales_intelligence.revenue_operations_sales_intelligence_core",
+    "name": "Revenue Operations & Sales Intelligence Core",
+    "directorate": "Sales & Revenue",
+    "department": "Revenue Operations & Sales Intelligence",
+    "department_head": "Sylvester Anyanwu",
+    "mission": "Primary execution and advisory team for Revenue Operations & Sales Intelligence.",
+    "core_skills": [
+      "crm_governance",
+      "sales_forecasting",
+      "pipeline_analytics",
+      "territory_design",
+      "sales_process",
+      "revenue_reporting",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "product.product_strategy_portfolio.product_strategy_portfolio_core",
+    "name": "Product Strategy & Portfolio Core",
+    "directorate": "Product",
+    "department": "Product Strategy & Portfolio",
+    "department_head": "Dee Jay Khaled",
+    "mission": "Primary execution and advisory team for Product Strategy & Portfolio.",
+    "core_skills": [
+      "product_strategy",
+      "portfolio_prioritization",
+      "product_vision",
+      "market_fit_analysis",
+      "investment_prioritization",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "product.product_management.product_management_core",
+    "name": "Product Management Core",
+    "directorate": "Product",
+    "department": "Product Management",
+    "department_head": "Kamsiyochukwu Igboekwe",
+    "mission": "Primary execution and advisory team for Product Management.",
+    "core_skills": [
+      "requirements_management",
+      "roadmap_management",
+      "feature_prioritization",
+      "product_discovery",
+      "stakeholder_alignment",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "product.product_operations.product_operations_core",
+    "name": "Product Operations Core",
+    "directorate": "Product",
+    "department": "Product Operations",
+    "department_head": "Kiki Palmer",
+    "mission": "Primary execution and advisory team for Product Operations.",
+    "core_skills": [
+      "product_planning_ops",
+      "release_readiness",
+      "decision_tracking",
+      "product_process_design",
+      "cross_functional_coordination",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "product.product_research_customer_discovery.product_research_customer_discovery_core",
+    "name": "Product Research & Customer Discovery Core",
+    "directorate": "Product",
+    "department": "Product Research & Customer Discovery",
+    "department_head": "Denzel Washington",
+    "mission": "Primary execution and advisory team for Product Research & Customer Discovery.",
+    "core_skills": [
+      "user_research",
+      "customer_interviews",
+      "problem_validation",
+      "persona_research",
+      "jobs_to_be_done",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "product.product_analytics_intelligence.product_analytics_intelligence_core",
+    "name": "Product Analytics & Intelligence Core",
+    "directorate": "Product",
+    "department": "Product Analytics & Intelligence",
+    "department_head": "Kaisochukwu Nnaji",
+    "mission": "Primary execution and advisory team for Product Analytics & Intelligence.",
+    "core_skills": [
+      "product_analytics",
+      "adoption_analysis",
+      "retention_analysis",
+      "experiment_design",
+      "feature_usage_analysis",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "product.user_experience_service_design.user_experience_service_design_core",
+    "name": "User Experience & Service Design Core",
+    "directorate": "Product",
+    "department": "User Experience & Service Design",
+    "department_head": "Inaas Abdul",
+    "mission": "Primary execution and advisory team for User Experience & Service Design.",
+    "core_skills": [
+      "ux_strategy",
+      "journey_mapping",
+      "service_design",
+      "usability_research",
+      "accessibility_review",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "product.release_product_lifecycle_management.release_product_lifecycle_management_core",
+    "name": "Release & Product Lifecycle Management Core",
+    "directorate": "Product",
+    "department": "Release & Product Lifecycle Management",
+    "department_head": "Abiodun Iseniyi",
+    "mission": "Primary execution and advisory team for Release & Product Lifecycle Management.",
+    "core_skills": [
+      "release_governance",
+      "lifecycle_management",
+      "launch_readiness",
+      "deprecation_planning",
+      "change_coordination",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "engineering_technology.software_engineering.software_engineering_core",
+    "name": "Software Engineering Core",
+    "directorate": "Engineering & Technology",
+    "department": "Software Engineering",
+    "department_head": "Sofoluwe Coker",
+    "mission": "Primary execution and advisory team for Software Engineering.",
+    "core_skills": [
+      "frontend_engineering",
+      "backend_engineering",
+      "application_architecture",
+      "code_review",
+      "software_design",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "engineering_technology.mobile_client_platforms.mobile_client_platforms_core",
+    "name": "Mobile & Client Platforms Core",
+    "directorate": "Engineering & Technology",
+    "department": "Mobile & Client Platforms",
+    "department_head": "Ernest Abhulimehn",
+    "mission": "Primary execution and advisory team for Mobile & Client Platforms.",
+    "core_skills": [
+      "mobile_engineering",
+      "desktop_clients",
+      "cross_platform_architecture",
+      "client_performance",
+      "device_integration",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "engineering_technology.platform_engineering_core_infrastructure.platform_engineering_core_infrastructure_core",
+    "name": "Platform Engineering & Core Infrastructure Core",
+    "directorate": "Engineering & Technology",
+    "department": "Platform Engineering & Core Infrastructure",
+    "department_head": "Tinashe Muzenyi",
+    "mission": "Primary execution and advisory team for Platform Engineering & Core Infrastructure.",
+    "core_skills": [
+      "platform_engineering",
+      "shared_services",
+      "developer_platforms",
+      "runtime_architecture",
+      "service_frameworks",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "engineering_technology.architecture_technical_strategy.architecture_technical_strategy_core",
+    "name": "Architecture & Technical Strategy Core",
+    "directorate": "Engineering & Technology",
+    "department": "Architecture & Technical Strategy",
+    "department_head": "Sophia Mercurri",
+    "mission": "Primary execution and advisory team for Architecture & Technical Strategy.",
+    "core_skills": [
+      "enterprise_architecture",
+      "solution_architecture",
+      "technology_standards",
+      "architecture_review",
+      "scalability_design",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "engineering_technology.api_integrations_developer_ecosystem.api_integrations_developer_ecosystem_core",
+    "name": "API, Integrations & Developer Ecosystem Core",
+    "directorate": "Engineering & Technology",
+    "department": "API, Integrations & Developer Ecosystem",
+    "department_head": "Omolara Suara",
+    "mission": "Primary execution and advisory team for API, Integrations & Developer Ecosystem.",
+    "core_skills": [
+      "api_design",
+      "integration_architecture",
+      "sdk_design",
+      "partner_integrations",
+      "developer_experience",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "engineering_technology.devops_sre_cloud_engineering.devops_sre_cloud_engineering_core",
+    "name": "DevOps, SRE & Cloud Engineering Core",
+    "directorate": "Engineering & Technology",
+    "department": "DevOps, SRE & Cloud Engineering",
+    "department_head": "Raven May Mei",
+    "mission": "Primary execution and advisory team for DevOps, SRE & Cloud Engineering.",
+    "core_skills": [
+      "cicd",
+      "site_reliability",
+      "cloud_infrastructure",
+      "observability",
+      "capacity_management",
+      "deployment_automation",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "engineering_technology.quality_engineering_test_automation.quality_engineering_test_automation_core",
+    "name": "Quality Engineering & Test Automation Core",
+    "directorate": "Engineering & Technology",
+    "department": "Quality Engineering & Test Automation",
+    "department_head": "Terhemba Ahile",
+    "mission": "Primary execution and advisory team for Quality Engineering & Test Automation.",
+    "core_skills": [
+      "test_strategy",
+      "test_automation",
+      "performance_testing",
+      "regression_testing",
+      "quality_gates",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "engineering_technology.release_engineering_configuration_management.release_engineering_configuration_management_core",
+    "name": "Release Engineering & Configuration Management Core",
+    "directorate": "Engineering & Technology",
+    "department": "Release Engineering & Configuration Management",
+    "department_head": "Rebecca Johnson",
+    "mission": "Primary execution and advisory team for Release Engineering & Configuration Management.",
+    "core_skills": [
+      "build_systems",
+      "release_packaging",
+      "versioning",
+      "configuration_management",
+      "rollback_planning",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "engineering_technology.engineering_productivity_developer_experience.engineering_productivity_developer_experience_core",
+    "name": "Engineering Productivity & Developer Experience Core",
+    "directorate": "Engineering & Technology",
+    "department": "Engineering Productivity & Developer Experience",
+    "department_head": "Étienne Moreau",
+    "mission": "Primary execution and advisory team for Engineering Productivity & Developer Experience.",
+    "core_skills": [
+      "developer_productivity",
+      "engineering_tooling",
+      "dev_environment_design",
+      "coding_standards",
+      "workflow_automation",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "engineering_technology.technical_documentation_engineering_knowledge.technical_documentation_engineering_knowledge_core",
+    "name": "Technical Documentation & Engineering Knowledge Core",
+    "directorate": "Engineering & Technology",
+    "department": "Technical Documentation & Engineering Knowledge",
+    "department_head": "Leila Haddad",
+    "mission": "Primary execution and advisory team for Technical Documentation & Engineering Knowledge.",
+    "core_skills": [
+      "technical_writing",
+      "architecture_documentation",
+      "runbook_design",
+      "developer_docs",
+      "knowledge_management",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "data_artificial_intelligence.ai_engineering_applied_intelligence.ai_engineering_applied_intelligence_core",
+    "name": "AI Engineering & Applied Intelligence Core",
+    "directorate": "Data & Artificial Intelligence",
+    "department": "AI Engineering & Applied Intelligence",
+    "department_head": "Lukas Schneider",
+    "mission": "Primary execution and advisory team for AI Engineering & Applied Intelligence.",
+    "core_skills": [
+      "llm_integration",
+      "ai_application_engineering",
+      "inference_workflows",
+      "ai_automation",
+      "production_ai",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "data_artificial_intelligence.agent_architecture_ai_workforce_systems.agent_architecture_ai_workforce_systems_core",
+    "name": "Agent Architecture & AI Workforce Systems Core",
+    "directorate": "Data & Artificial Intelligence",
+    "department": "Agent Architecture & AI Workforce Systems",
+    "department_head": "Hanae Nakamura",
+    "mission": "Primary execution and advisory team for Agent Architecture & AI Workforce Systems.",
+    "core_skills": [
+      "agent_architecture",
+      "multi_agent_orchestration",
+      "agent_registry",
+      "agent_lifecycle",
+      "capability_mapping",
+      "delegation_design",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "data_artificial_intelligence.skill_engineering_tool_orchestration.skill_engineering_tool_orchestration_core",
+    "name": "Skill Engineering & Tool Orchestration Core",
+    "directorate": "Data & Artificial Intelligence",
+    "department": "Skill Engineering & Tool Orchestration",
+    "department_head": "Mateo Fernández",
+    "mission": "Primary execution and advisory team for Skill Engineering & Tool Orchestration.",
+    "core_skills": [
+      "skill_design",
+      "tool_contracts",
+      "skill_testing",
+      "tool_routing",
+      "permission_integration",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "data_artificial_intelligence.machine_learning_model_development.machine_learning_model_development_core",
+    "name": "Machine Learning & Model Development Core",
+    "directorate": "Data & Artificial Intelligence",
+    "department": "Machine Learning & Model Development",
+    "department_head": "Dr. Priyanka Rao",
+    "mission": "Primary execution and advisory team for Machine Learning & Model Development.",
+    "core_skills": [
+      "machine_learning",
+      "model_training",
+      "fine_tuning",
+      "predictive_modeling",
+      "recommendation_systems",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "data_artificial_intelligence.model_evaluation_reliability_intelligence_quality.model_evaluation_reliability_intelligence_quality_core",
+    "name": "Model Evaluation, Reliability & Intelligence Quality Core",
+    "directorate": "Data & Artificial Intelligence",
+    "department": "Model Evaluation, Reliability & Intelligence Quality",
+    "department_head": "Elias Haddad",
+    "mission": "Primary execution and advisory team for Model Evaluation, Reliability & Intelligence Quality.",
+    "core_skills": [
+      "model_evaluation",
+      "hallucination_testing",
+      "benchmarking",
+      "regression_testing",
+      "red_team_coordination",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "data_artificial_intelligence.model_routing_ai_infrastructure.model_routing_ai_infrastructure_core",
+    "name": "Model Routing & AI Infrastructure Core",
+    "directorate": "Data & Artificial Intelligence",
+    "department": "Model Routing & AI Infrastructure",
+    "department_head": "Ingrid Bergström",
+    "mission": "Primary execution and advisory team for Model Routing & AI Infrastructure.",
+    "core_skills": [
+      "model_routing",
+      "inference_infrastructure",
+      "provider_abstraction",
+      "local_model_ops",
+      "cost_performance_optimization",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "data_artificial_intelligence.data_engineering_data_platforms.data_engineering_data_platforms_core",
+    "name": "Data Engineering & Data Platforms Core",
+    "directorate": "Data & Artificial Intelligence",
+    "department": "Data Engineering & Data Platforms",
+    "department_head": "Kwesi Boateng",
+    "mission": "Primary execution and advisory team for Data Engineering & Data Platforms.",
+    "core_skills": [
+      "data_pipelines",
+      "data_warehousing",
+      "etl_elt",
+      "data_architecture",
+      "data_quality",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "data_artificial_intelligence.data_science_decision_intelligence.data_science_decision_intelligence_core",
+    "name": "Data Science & Decision Intelligence Core",
+    "directorate": "Data & Artificial Intelligence",
+    "department": "Data Science & Decision Intelligence",
+    "department_head": "Dr. Sofia Petrovic",
+    "mission": "Primary execution and advisory team for Data Science & Decision Intelligence.",
+    "core_skills": [
+      "statistical_modeling",
+      "forecasting",
+      "experimentation",
+      "optimization",
+      "decision_science",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "data_artificial_intelligence.knowledge_systems_enterprise_memory.knowledge_systems_enterprise_memory_core",
+    "name": "Knowledge Systems & Enterprise Memory Core",
+    "directorate": "Data & Artificial Intelligence",
+    "department": "Knowledge Systems & Enterprise Memory",
+    "department_head": "Leila Ben Youssef",
+    "mission": "Primary execution and advisory team for Knowledge Systems & Enterprise Memory.",
+    "core_skills": [
+      "knowledge_graphs",
+      "semantic_search",
+      "rag_systems",
+      "vector_databases",
+      "provenance",
+      "enterprise_memory",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "data_artificial_intelligence.ai_governance_technology_responsible_ai_systems.ai_governance_technology_responsible_ai_systems_core",
+    "name": "AI Governance Technology & Responsible AI Systems Core",
+    "directorate": "Data & Artificial Intelligence",
+    "department": "AI Governance Technology & Responsible AI Systems",
+    "department_head": "Amina El-Sayed",
+    "mission": "Primary execution and advisory team for AI Governance Technology & Responsible AI Systems.",
+    "core_skills": [
+      "ai_policy_enforcement",
+      "ai_lineage",
+      "ai_auditability",
+      "approval_gates",
+      "responsible_ai_controls",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "data_artificial_intelligence.ai_finops_usage_intelligence.ai_finops_usage_intelligence_core",
+    "name": "AI FinOps & Usage Intelligence Core",
+    "directorate": "Data & Artificial Intelligence",
+    "department": "AI FinOps & Usage Intelligence",
+    "department_head": "Gabriel Costa",
+    "mission": "Primary execution and advisory team for AI FinOps & Usage Intelligence.",
+    "core_skills": [
+      "ai_cost_tracking",
+      "token_economics",
+      "compute_utilization",
+      "capacity_planning",
+      "cost_optimization",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "data_artificial_intelligence.ai_platform_operations_observability.ai_platform_operations_observability_core",
+    "name": "AI Platform Operations & Observability Core",
+    "directorate": "Data & Artificial Intelligence",
+    "department": "AI Platform Operations & Observability",
+    "department_head": "Min-jun Park",
+    "mission": "Primary execution and advisory team for AI Platform Operations & Observability.",
+    "core_skills": [
+      "agent_observability",
+      "model_monitoring",
+      "trace_analysis",
+      "latency_monitoring",
+      "drift_monitoring",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "research_development.applied_research.applied_research_core",
+    "name": "Applied Research Core",
+    "directorate": "Research & Development",
+    "department": "Applied Research",
+    "department_head": "Dr. Tendai Muchengeti",
+    "mission": "Primary execution and advisory team for Applied Research.",
+    "core_skills": [
+      "applied_research",
+      "research_design",
+      "technical_experimentation",
+      "evidence_synthesis",
+      "prototype_evaluation",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "research_development.emerging_technologies_future_systems.emerging_technologies_future_systems_core",
+    "name": "Emerging Technologies & Future Systems Core",
+    "directorate": "Research & Development",
+    "department": "Emerging Technologies & Future Systems",
+    "department_head": "Kenji Mori",
+    "mission": "Primary execution and advisory team for Emerging Technologies & Future Systems.",
+    "core_skills": [
+      "technology_scouting",
+      "future_systems",
+      "technology_forecasting",
+      "experimental_assessment",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "research_development.experimental_engineering_prototyping.experimental_engineering_prototyping_core",
+    "name": "Experimental Engineering & Prototyping Core",
+    "directorate": "Research & Development",
+    "department": "Experimental Engineering & Prototyping",
+    "department_head": "Andrés Valdés",
+    "mission": "Primary execution and advisory team for Experimental Engineering & Prototyping.",
+    "core_skills": [
+      "rapid_prototyping",
+      "proof_of_concept",
+      "experimental_engineering",
+      "prototype_testing",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "research_development.ai_autonomous_systems_research.ai_autonomous_systems_research_core",
+    "name": "AI & Autonomous Systems Research Core",
+    "directorate": "Research & Development",
+    "department": "AI & Autonomous Systems Research",
+    "department_head": "Dr. Samira Qureshi",
+    "mission": "Primary execution and advisory team for AI & Autonomous Systems Research.",
+    "core_skills": [
+      "autonomous_agents_research",
+      "multimodal_ai_research",
+      "machine_reasoning",
+      "agent_autonomy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "research_development.humancomputer_interaction_future_interfaces.humancomputer_interaction_future_interfaces_core",
+    "name": "Human–Computer Interaction & Future Interfaces Core",
+    "directorate": "Research & Development",
+    "department": "Human–Computer Interaction & Future Interfaces",
+    "department_head": "Freja Lindholm",
+    "mission": "Primary execution and advisory team for Human–Computer Interaction & Future Interfaces.",
+    "core_skills": [
+      "hci_research",
+      "voice_interfaces",
+      "gesture_interfaces",
+      "spatial_computing",
+      "human_ai_interaction",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "research_development.advanced_computing_systems_research.advanced_computing_systems_research_core",
+    "name": "Advanced Computing & Systems Research Core",
+    "directorate": "Research & Development",
+    "department": "Advanced Computing & Systems Research",
+    "department_head": "Dr. Kwame Asante",
+    "mission": "Primary execution and advisory team for Advanced Computing & Systems Research.",
+    "core_skills": [
+      "distributed_systems_research",
+      "edge_computing",
+      "privacy_preserving_compute",
+      "advanced_architectures",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "research_development.research_partnerships_academic_collaboration.research_partnerships_academic_collaboration_core",
+    "name": "Research Partnerships & Academic Collaboration Core",
+    "directorate": "Research & Development",
+    "department": "Research Partnerships & Academic Collaboration",
+    "department_head": "Claire Dubois",
+    "mission": "Primary execution and advisory team for Research Partnerships & Academic Collaboration.",
+    "core_skills": [
+      "research_partnerships",
+      "academic_collaboration",
+      "joint_research",
+      "grant_scanning",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "research_development.innovation_incubation_technology_transfer.innovation_incubation_technology_transfer_core",
+    "name": "Innovation Incubation & Technology Transfer Core",
+    "directorate": "Research & Development",
+    "department": "Innovation Incubation & Technology Transfer",
+    "department_head": "Rafael Mendes",
+    "mission": "Primary execution and advisory team for Innovation Incubation & Technology Transfer.",
+    "core_skills": [
+      "innovation_incubation",
+      "technology_transfer",
+      "maturity_assessment",
+      "venture_handoff",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "research_development.intellectual_property_discovery_invention_management.intellectual_property_discovery_invention_management_core",
+    "name": "Intellectual Property Discovery & Invention Management Core",
+    "directorate": "Research & Development",
+    "department": "Intellectual Property Discovery & Invention Management",
+    "department_head": "Noura Al-Mansouri",
+    "mission": "Primary execution and advisory team for Intellectual Property Discovery & Invention Management.",
+    "core_skills": [
+      "invention_capture",
+      "patentability_screening",
+      "prior_art_coordination",
+      "ip_portfolio_support",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "research_development.research_intelligence_scientific_foresight.research_intelligence_scientific_foresight_core",
+    "name": "Research Intelligence & Scientific Foresight Core",
+    "directorate": "Research & Development",
+    "department": "Research Intelligence & Scientific Foresight",
+    "department_head": "Dr. Ji-won Seo",
+    "mission": "Primary execution and advisory team for Research Intelligence & Scientific Foresight.",
+    "core_skills": [
+      "literature_review",
+      "patent_landscape",
+      "scientific_foresight",
+      "research_trend_analysis",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "information_technology.enterprise_applications_business_systems.enterprise_applications_business_systems_core",
+    "name": "Enterprise Applications & Business Systems Core",
+    "directorate": "Information Technology",
+    "department": "Enterprise Applications & Business Systems",
+    "department_head": "Grace Kimani",
+    "mission": "Primary execution and advisory team for Enterprise Applications & Business Systems.",
+    "core_skills": [
+      "enterprise_apps",
+      "business_systems",
+      "application_admin",
+      "saas_governance",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "information_technology.end_user_computing_workplace_technology.end_user_computing_workplace_technology_core",
+    "name": "End-User Computing & Workplace Technology Core",
+    "directorate": "Information Technology",
+    "department": "End-User Computing & Workplace Technology",
+    "department_head": "Yuki Tanaka",
+    "mission": "Primary execution and advisory team for End-User Computing & Workplace Technology.",
+    "core_skills": [
+      "endpoint_management",
+      "workplace_technology",
+      "device_support",
+      "desktop_management",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "information_technology.it_service_management_service_desk.it_service_management_service_desk_core",
+    "name": "IT Service Management & Service Desk Core",
+    "directorate": "Information Technology",
+    "department": "IT Service Management & Service Desk",
+    "department_head": "Michael O'Connor",
+    "mission": "Primary execution and advisory team for IT Service Management & Service Desk.",
+    "core_skills": [
+      "itsm",
+      "incident_management",
+      "request_management",
+      "service_catalog",
+      "problem_management",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "information_technology.cloud_infrastructure_operations.cloud_infrastructure_operations_core",
+    "name": "Cloud & Infrastructure Operations Core",
+    "directorate": "Information Technology",
+    "department": "Cloud & Infrastructure Operations",
+    "department_head": "Ananya Deshmukh",
+    "mission": "Primary execution and advisory team for Cloud & Infrastructure Operations.",
+    "core_skills": [
+      "cloud_ops",
+      "server_ops",
+      "infrastructure_monitoring",
+      "backup_operations",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "information_technology.network_connectivity_services.network_connectivity_services_core",
+    "name": "Network & Connectivity Services Core",
+    "directorate": "Information Technology",
+    "department": "Network & Connectivity Services",
+    "department_head": "Chinedu Eze",
+    "mission": "Primary execution and advisory team for Network & Connectivity Services.",
+    "core_skills": [
+      "network_operations",
+      "connectivity",
+      "network_monitoring",
+      "network_capacity",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "information_technology.identity_access_administration.identity_access_administration_core",
+    "name": "Identity & Access Administration Core",
+    "directorate": "Information Technology",
+    "department": "Identity & Access Administration",
+    "department_head": "Katarina Novak",
+    "mission": "Primary execution and advisory team for Identity & Access Administration.",
+    "core_skills": [
+      "identity_administration",
+      "access_provisioning",
+      "joiner_mover_leaver",
+      "mfa_admin",
+      "directory_services",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "information_technology.collaboration_productivity_platforms.collaboration_productivity_platforms_core",
+    "name": "Collaboration & Productivity Platforms Core",
+    "directorate": "Information Technology",
+    "department": "Collaboration & Productivity Platforms",
+    "department_head": "Farah Rahman",
+    "mission": "Primary execution and advisory team for Collaboration & Productivity Platforms.",
+    "core_skills": [
+      "collaboration_platforms",
+      "productivity_suite_admin",
+      "messaging_admin",
+      "document_collaboration",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "information_technology.it_asset_configuration_management.it_asset_configuration_management_core",
+    "name": "IT Asset & Configuration Management Core",
+    "directorate": "Information Technology",
+    "department": "IT Asset & Configuration Management",
+    "department_head": "João Ferreira",
+    "mission": "Primary execution and advisory team for IT Asset & Configuration Management.",
+    "core_skills": [
+      "it_asset_management",
+      "cmdb",
+      "license_tracking",
+      "configuration_management",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "information_technology.enterprise_systems_administration.enterprise_systems_administration_core",
+    "name": "Enterprise Systems Administration Core",
+    "directorate": "Information Technology",
+    "department": "Enterprise Systems Administration",
+    "department_head": "Thabo Mokoena",
+    "mission": "Primary execution and advisory team for Enterprise Systems Administration.",
+    "core_skills": [
+      "systems_administration",
+      "patch_management",
+      "server_admin",
+      "enterprise_platform_ops",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "information_technology.it_architecture_technology_standards.it_architecture_technology_standards_core",
+    "name": "IT Architecture & Technology Standards Core",
+    "directorate": "Information Technology",
+    "department": "IT Architecture & Technology Standards",
+    "department_head": "Dr. Elise van der Meer",
+    "mission": "Primary execution and advisory team for IT Architecture & Technology Standards.",
+    "core_skills": [
+      "it_architecture",
+      "technology_standards",
+      "it_roadmap",
+      "platform_standardization",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "cybersecurity_resilience.security_operations_incident_response.security_operations_incident_response_core",
+    "name": "Security Operations & Incident Response Core",
+    "directorate": "Cybersecurity & Resilience",
+    "department": "Security Operations & Incident Response",
+    "department_head": "Marcus Lund",
+    "mission": "Primary execution and advisory team for Security Operations & Incident Response.",
+    "core_skills": [
+      "soc_operations",
+      "incident_response",
+      "detection_triage",
+      "case_management",
+      "containment_coordination",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "cybersecurity_resilience.threat_intelligence_threat_hunting.threat_intelligence_threat_hunting_core",
+    "name": "Threat Intelligence & Threat Hunting Core",
+    "directorate": "Cybersecurity & Resilience",
+    "department": "Threat Intelligence & Threat Hunting",
+    "department_head": "Olumide Adekunle",
+    "mission": "Primary execution and advisory team for Threat Intelligence & Threat Hunting.",
+    "core_skills": [
+      "threat_intelligence",
+      "threat_hunting",
+      "ioc_analysis",
+      "adversary_tracking",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "cybersecurity_resilience.identity_security_privileged_access.identity_security_privileged_access_core",
+    "name": "Identity Security & Privileged Access Core",
+    "directorate": "Cybersecurity & Resilience",
+    "department": "Identity Security & Privileged Access",
+    "department_head": "Camille Tremblay",
+    "mission": "Primary execution and advisory team for Identity Security & Privileged Access.",
+    "core_skills": [
+      "iam_security",
+      "pam",
+      "conditional_access",
+      "identity_threat_detection",
+      "least_privilege",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "cybersecurity_resilience.security_engineering.security_engineering_core",
+    "name": "Security Engineering Core",
+    "directorate": "Cybersecurity & Resilience",
+    "department": "Security Engineering",
+    "department_head": "Arjun Mehra",
+    "mission": "Primary execution and advisory team for Security Engineering.",
+    "core_skills": [
+      "security_engineering",
+      "security_automation",
+      "security_tooling",
+      "control_implementation",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "cybersecurity_resilience.cloud_infrastructure_security.cloud_infrastructure_security_core",
+    "name": "Cloud & Infrastructure Security Core",
+    "directorate": "Cybersecurity & Resilience",
+    "department": "Cloud & Infrastructure Security",
+    "department_head": "Sofia Dimitrova",
+    "mission": "Primary execution and advisory team for Cloud & Infrastructure Security.",
+    "core_skills": [
+      "cloud_security",
+      "infrastructure_security",
+      "configuration_assurance",
+      "cloud_posture_management",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "cybersecurity_resilience.application_product_security.application_product_security_core",
+    "name": "Application & Product Security Core",
+    "directorate": "Cybersecurity & Resilience",
+    "department": "Application & Product Security",
+    "department_head": "Diego Morales",
+    "mission": "Primary execution and advisory team for Application & Product Security.",
+    "core_skills": [
+      "application_security",
+      "secure_sdlc",
+      "code_security",
+      "product_threat_modeling",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "cybersecurity_resilience.security_architecture.security_architecture_core",
+    "name": "Security Architecture Core",
+    "directorate": "Cybersecurity & Resilience",
+    "department": "Security Architecture",
+    "department_head": "Dr. Miriam Kessler",
+    "mission": "Primary execution and advisory team for Security Architecture.",
+    "core_skills": [
+      "security_architecture",
+      "zero_trust",
+      "control_architecture",
+      "security_patterns",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "cybersecurity_resilience.vulnerability_exposure_management.vulnerability_exposure_management_core",
+    "name": "Vulnerability & Exposure Management Core",
+    "directorate": "Cybersecurity & Resilience",
+    "department": "Vulnerability & Exposure Management",
+    "department_head": "Bongani Dlamini",
+    "mission": "Primary execution and advisory team for Vulnerability & Exposure Management.",
+    "core_skills": [
+      "vulnerability_management",
+      "attack_surface_management",
+      "remediation_prioritization",
+      "exposure_analysis",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "cybersecurity_resilience.data_security_information_protection.data_security_information_protection_core",
+    "name": "Data Security & Information Protection Core",
+    "directorate": "Cybersecurity & Resilience",
+    "department": "Data Security & Information Protection",
+    "department_head": "Noor Al-Khatib",
+    "mission": "Primary execution and advisory team for Data Security & Information Protection.",
+    "core_skills": [
+      "data_security",
+      "dlp",
+      "classification",
+      "encryption_strategy",
+      "information_protection",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "cybersecurity_resilience.third_party_supply_chain_security.third_party_supply_chain_security_core",
+    "name": "Third-Party & Supply Chain Security Core",
+    "directorate": "Cybersecurity & Resilience",
+    "department": "Third-Party & Supply Chain Security",
+    "department_head": "Haruka Watanabe",
+    "mission": "Primary execution and advisory team for Third-Party & Supply Chain Security.",
+    "core_skills": [
+      "third_party_risk",
+      "supplier_security",
+      "supply_chain_security",
+      "vendor_assessment",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "cybersecurity_resilience.cyber_risk_security_governance.cyber_risk_security_governance_core",
+    "name": "Cyber Risk & Security Governance Core",
+    "directorate": "Cybersecurity & Resilience",
+    "department": "Cyber Risk & Security Governance",
+    "department_head": "Gabriela Torres",
+    "mission": "Primary execution and advisory team for Cyber Risk & Security Governance.",
+    "core_skills": [
+      "cyber_risk",
+      "security_governance",
+      "security_policy",
+      "control_mapping",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "cybersecurity_resilience.business_continuity_disaster_recovery_cyber_resilience.business_continuity_disaster_recovery_cyber_resilience_core",
+    "name": "Business Continuity, Disaster Recovery & Cyber Resilience Core",
+    "directorate": "Cybersecurity & Resilience",
+    "department": "Business Continuity, Disaster Recovery & Cyber Resilience",
+    "department_head": "Henrik Sørensen",
+    "mission": "Primary execution and advisory team for Business Continuity, Disaster Recovery & Cyber Resilience.",
+    "core_skills": [
+      "business_continuity",
+      "disaster_recovery",
+      "resilience_testing",
+      "crisis_recovery",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "finance_accounting.accounting_close.accounting_close_core",
+    "name": "Accounting & Close Core",
+    "directorate": "Finance & Accounting",
+    "department": "Accounting & Close",
+    "department_head": "Helena Costa",
+    "mission": "Primary execution and advisory team for Accounting & Close.",
+    "core_skills": [
+      "general_ledger",
+      "month_end_close",
+      "reconciliations",
+      "journal_entries",
+      "accounting_policy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "finance_accounting.financial_reporting_consolidation.financial_reporting_consolidation_core",
+    "name": "Financial Reporting & Consolidation Core",
+    "directorate": "Finance & Accounting",
+    "department": "Financial Reporting & Consolidation",
+    "department_head": "Kwabena Mensah",
+    "mission": "Primary execution and advisory team for Financial Reporting & Consolidation.",
+    "core_skills": [
+      "financial_reporting",
+      "consolidation",
+      "management_reporting",
+      "financial_statement_preparation",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "finance_accounting.fp_a_budgeting_forecasting.fp_a_budgeting_forecasting_core",
+    "name": "FP&A, Budgeting & Forecasting Core",
+    "directorate": "Finance & Accounting",
+    "department": "FP&A, Budgeting & Forecasting",
+    "department_head": "Priya Raman",
+    "mission": "Primary execution and advisory team for FP&A, Budgeting & Forecasting.",
+    "core_skills": [
+      "fp_and_a",
+      "budgeting",
+      "forecasting",
+      "variance_analysis",
+      "scenario_modeling",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "finance_accounting.treasury_capital_management.treasury_capital_management_core",
+    "name": "Treasury & Capital Management Core",
+    "directorate": "Finance & Accounting",
+    "department": "Treasury & Capital Management",
+    "department_head": "Mikhail Petrov",
+    "mission": "Primary execution and advisory team for Treasury & Capital Management.",
+    "core_skills": [
+      "treasury",
+      "cash_management",
+      "liquidity_planning",
+      "capital_management",
+      "banking_operations",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "finance_accounting.tax.tax_core",
+    "name": "Tax Core",
+    "directorate": "Finance & Accounting",
+    "department": "Tax",
+    "department_head": "Aisha Bello",
+    "mission": "Primary execution and advisory team for Tax.",
+    "core_skills": [
+      "tax_compliance",
+      "tax_planning",
+      "tax_research",
+      "indirect_tax",
+      "corporate_tax",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "finance_accounting.billing_accounts_receivable_accounts_payable.billing_accounts_receivable_accounts_payable_core",
+    "name": "Billing, Accounts Receivable & Accounts Payable Core",
+    "directorate": "Finance & Accounting",
+    "department": "Billing, Accounts Receivable & Accounts Payable",
+    "department_head": "Camila Ferreira",
+    "mission": "Primary execution and advisory team for Billing, Accounts Receivable & Accounts Payable.",
+    "core_skills": [
+      "billing",
+      "accounts_receivable",
+      "accounts_payable",
+      "collections",
+      "vendor_payments",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "finance_accounting.payroll_finance.payroll_finance_core",
+    "name": "Payroll Finance Core",
+    "directorate": "Finance & Accounting",
+    "department": "Payroll Finance",
+    "department_head": "Thandiwe Ncube",
+    "mission": "Primary execution and advisory team for Payroll Finance.",
+    "core_skills": [
+      "payroll_accounting",
+      "payroll_controls",
+      "payroll_reconciliation",
+      "compensation_accounting",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "finance_accounting.financial_controls_management_accounting.financial_controls_management_accounting_core",
+    "name": "Financial Controls & Management Accounting Core",
+    "directorate": "Finance & Accounting",
+    "department": "Financial Controls & Management Accounting",
+    "department_head": "Giulia Romano",
+    "mission": "Primary execution and advisory team for Financial Controls & Management Accounting.",
+    "core_skills": [
+      "financial_controls",
+      "management_accounting",
+      "cost_accounting",
+      "control_testing",
+      "policy_compliance",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "legal_risk_governance.corporate_commercial_legal.corporate_commercial_legal_core",
+    "name": "Corporate & Commercial Legal Core",
+    "directorate": "Legal, Risk & Governance",
+    "department": "Corporate & Commercial Legal",
+    "department_head": "Marcus Feldman",
+    "mission": "Primary execution and advisory team for Corporate & Commercial Legal.",
+    "core_skills": [
+      "corporate_law",
+      "commercial_law",
+      "legal_advisory",
+      "entity_governance",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "legal_risk_governance.contracts_transactions.contracts_transactions_core",
+    "name": "Contracts & Transactions Core",
+    "directorate": "Legal, Risk & Governance",
+    "department": "Contracts & Transactions",
+    "department_head": "Zainab Bakare",
+    "mission": "Primary execution and advisory team for Contracts & Transactions.",
+    "core_skills": [
+      "contract_review",
+      "contract_drafting",
+      "transaction_support",
+      "negotiation_support",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "legal_risk_governance.intellectual_property_technology_legal.intellectual_property_technology_legal_core",
+    "name": "Intellectual Property & Technology Legal Core",
+    "directorate": "Legal, Risk & Governance",
+    "department": "Intellectual Property & Technology Legal",
+    "department_head": "Dr. Lucía Herrera",
+    "mission": "Primary execution and advisory team for Intellectual Property & Technology Legal.",
+    "core_skills": [
+      "ip_law",
+      "technology_law",
+      "software_licensing",
+      "ip_strategy",
+      "patent_support",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "legal_risk_governance.employment_legal.employment_legal_core",
+    "name": "Employment Legal Core",
+    "directorate": "Legal, Risk & Governance",
+    "department": "Employment Legal",
+    "department_head": "Daniel Cho",
+    "mission": "Primary execution and advisory team for Employment Legal.",
+    "core_skills": [
+      "employment_law",
+      "workplace_legal",
+      "hr_legal_advice",
+      "policy_review",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "legal_risk_governance.privacy_data_protection.privacy_data_protection_core",
+    "name": "Privacy & Data Protection Core",
+    "directorate": "Legal, Risk & Governance",
+    "department": "Privacy & Data Protection",
+    "department_head": "Amélie Laurent",
+    "mission": "Primary execution and advisory team for Privacy & Data Protection.",
+    "core_skills": [
+      "privacy_law",
+      "data_protection",
+      "pia_dpia",
+      "data_subject_rights",
+      "privacy_contracts",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "legal_risk_governance.enterprise_risk_management.enterprise_risk_management_core",
+    "name": "Enterprise Risk Management Core",
+    "directorate": "Legal, Risk & Governance",
+    "department": "Enterprise Risk Management",
+    "department_head": "Sipho Dlamini",
+    "mission": "Primary execution and advisory team for Enterprise Risk Management.",
+    "core_skills": [
+      "enterprise_risk",
+      "risk_register",
+      "risk_assessment",
+      "risk_reporting",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "legal_risk_governance.governance_board_affairs.governance_board_affairs_core",
+    "name": "Governance & Board Affairs Core",
+    "directorate": "Legal, Risk & Governance",
+    "department": "Governance & Board Affairs",
+    "department_head": "Ingrid Madsen",
+    "mission": "Primary execution and advisory team for Governance & Board Affairs.",
+    "core_skills": [
+      "corporate_governance",
+      "board_support",
+      "policy_governance",
+      "committee_administration",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "legal_risk_governance.regulatory_compliance_ethics.regulatory_compliance_ethics_core",
+    "name": "Regulatory Compliance & Ethics Core",
+    "directorate": "Legal, Risk & Governance",
+    "department": "Regulatory Compliance & Ethics",
+    "department_head": "Farida El-Masri",
+    "mission": "Primary execution and advisory team for Regulatory Compliance & Ethics.",
+    "core_skills": [
+      "regulatory_compliance",
+      "ethics_program",
+      "compliance_monitoring",
+      "policy_compliance",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "legal_risk_governance.records_information_governance.records_information_governance_core",
+    "name": "Records & Information Governance Core",
+    "directorate": "Legal, Risk & Governance",
+    "department": "Records & Information Governance",
+    "department_head": "Tomasz Kowalski",
+    "mission": "Primary execution and advisory team for Records & Information Governance.",
+    "core_skills": [
+      "records_management",
+      "retention_schedule",
+      "information_governance",
+      "legal_hold_coordination",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "people_culture.hr_business_partnering_people_operations.hr_business_partnering_people_operations_core",
+    "name": "HR Business Partnering & People Operations Core",
+    "directorate": "People & Culture",
+    "department": "HR Business Partnering & People Operations",
+    "department_head": "Nneka Eze",
+    "mission": "Primary execution and advisory team for HR Business Partnering & People Operations.",
+    "core_skills": [
+      "hrbp",
+      "people_operations",
+      "workforce_support",
+      "policy_administration",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "people_culture.talent_acquisition.talent_acquisition_core",
+    "name": "Talent Acquisition Core",
+    "directorate": "People & Culture",
+    "department": "Talent Acquisition",
+    "department_head": "Sofia Lindström",
+    "mission": "Primary execution and advisory team for Talent Acquisition.",
+    "core_skills": [
+      "recruiting",
+      "candidate_sourcing",
+      "interview_design",
+      "talent_pipeline",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "people_culture.onboarding_employee_experience.onboarding_employee_experience_core",
+    "name": "Onboarding & Employee Experience Core",
+    "directorate": "People & Culture",
+    "department": "Onboarding & Employee Experience",
+    "department_head": "Javier Morales",
+    "mission": "Primary execution and advisory team for Onboarding & Employee Experience.",
+    "core_skills": [
+      "employee_onboarding",
+      "employee_experience",
+      "journey_design",
+      "engagement_programs",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "people_culture.employee_relations.employee_relations_core",
+    "name": "Employee Relations Core",
+    "directorate": "People & Culture",
+    "department": "Employee Relations",
+    "department_head": "Amina Yusuf",
+    "mission": "Primary execution and advisory team for Employee Relations.",
+    "core_skills": [
+      "employee_relations",
+      "case_management",
+      "workplace_investigations_coordination",
+      "conflict_resolution",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "people_culture.total_rewards_compensation_benefits.total_rewards_compensation_benefits_core",
+    "name": "Total Rewards, Compensation & Benefits Core",
+    "directorate": "People & Culture",
+    "department": "Total Rewards, Compensation & Benefits",
+    "department_head": "Claire Beaumont",
+    "mission": "Primary execution and advisory team for Total Rewards, Compensation & Benefits.",
+    "core_skills": [
+      "compensation",
+      "benefits",
+      "total_rewards",
+      "job_architecture",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "people_culture.performance_talent_management.performance_talent_management_core",
+    "name": "Performance & Talent Management Core",
+    "directorate": "People & Culture",
+    "department": "Performance & Talent Management",
+    "department_head": "Kofi Agyeman",
+    "mission": "Primary execution and advisory team for Performance & Talent Management.",
+    "core_skills": [
+      "performance_management",
+      "talent_reviews",
+      "succession_planning",
+      "goal_management",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "people_culture.learning_development.learning_development_core",
+    "name": "Learning & Development Core",
+    "directorate": "People & Culture",
+    "department": "Learning & Development",
+    "department_head": "Hana Suzuki",
+    "mission": "Primary execution and advisory team for Learning & Development.",
+    "core_skills": [
+      "learning_design",
+      "training_programs",
+      "capability_development",
+      "curriculum_design",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "people_culture.organizational_design_workforce_planning.organizational_design_workforce_planning_core",
+    "name": "Organizational Design & Workforce Planning Core",
+    "directorate": "People & Culture",
+    "department": "Organizational Design & Workforce Planning",
+    "department_head": "Rajiv Menon",
+    "mission": "Primary execution and advisory team for Organizational Design & Workforce Planning.",
+    "core_skills": [
+      "org_design",
+      "workforce_planning",
+      "capacity_planning",
+      "role_design",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "people_culture.people_analytics.people_analytics_core",
+    "name": "People Analytics Core",
+    "directorate": "People & Culture",
+    "department": "People Analytics",
+    "department_head": "Elena Popescu",
+    "mission": "Primary execution and advisory team for People Analytics.",
+    "core_skills": [
+      "people_analytics",
+      "workforce_metrics",
+      "attrition_analysis",
+      "engagement_analysis",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "people_culture.ai_workforce_organizational_intelligence.ai_workforce_organizational_intelligence_core",
+    "name": "AI Workforce & Organizational Intelligence Core",
+    "directorate": "People & Culture",
+    "department": "AI Workforce & Organizational Intelligence",
+    "department_head": "Dr. Maya Kilonzo",
+    "mission": "Primary execution and advisory team for AI Workforce & Organizational Intelligence.",
+    "core_skills": [
+      "agent_workforce_registry",
+      "agent_capability_mapping",
+      "agent_utilization",
+      "agent_reuse_scan",
+      "agent_governance",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "operations_procurement.corporate_operations.corporate_operations_core",
+    "name": "Corporate Operations Core",
+    "directorate": "Operations & Procurement",
+    "department": "Corporate Operations",
+    "department_head": "Nadia Petrescu",
+    "mission": "Primary execution and advisory team for Corporate Operations.",
+    "core_skills": [
+      "corporate_operations",
+      "operating_rhythm",
+      "shared_services",
+      "operational_coordination",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "operations_procurement.business_process_continuous_improvement.business_process_continuous_improvement_core",
+    "name": "Business Process & Continuous Improvement Core",
+    "directorate": "Operations & Procurement",
+    "department": "Business Process & Continuous Improvement",
+    "department_head": "Samuel Adekunle",
+    "mission": "Primary execution and advisory team for Business Process & Continuous Improvement.",
+    "core_skills": [
+      "process_mapping",
+      "lean_improvement",
+      "process_automation",
+      "continuous_improvement",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "operations_procurement.procurement_strategic_sourcing.procurement_strategic_sourcing_core",
+    "name": "Procurement & Strategic Sourcing Core",
+    "directorate": "Operations & Procurement",
+    "department": "Procurement & Strategic Sourcing",
+    "department_head": "Linh Nguyen",
+    "mission": "Primary execution and advisory team for Procurement & Strategic Sourcing.",
+    "core_skills": [
+      "procurement",
+      "strategic_sourcing",
+      "rfp_management",
+      "supplier_selection",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "operations_procurement.vendor_supplier_management.vendor_supplier_management_core",
+    "name": "Vendor & Supplier Management Core",
+    "directorate": "Operations & Procurement",
+    "department": "Vendor & Supplier Management",
+    "department_head": "Matteo Ricci",
+    "mission": "Primary execution and advisory team for Vendor & Supplier Management.",
+    "core_skills": [
+      "vendor_management",
+      "supplier_performance",
+      "contract_vendor_coordination",
+      "vendor_risk_coordination",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "operations_procurement.facilities_workplace.facilities_workplace_core",
+    "name": "Facilities & Workplace Core",
+    "directorate": "Operations & Procurement",
+    "department": "Facilities & Workplace",
+    "department_head": "Chloe Martin",
+    "mission": "Primary execution and advisory team for Facilities & Workplace.",
+    "core_skills": [
+      "facilities_management",
+      "workplace_services",
+      "space_operations",
+      "maintenance_coordination",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "operations_procurement.real_estate_physical_infrastructure.real_estate_physical_infrastructure_core",
+    "name": "Real Estate & Physical Infrastructure Core",
+    "directorate": "Operations & Procurement",
+    "department": "Real Estate & Physical Infrastructure",
+    "department_head": "Ahmed Al-Hassan",
+    "mission": "Primary execution and advisory team for Real Estate & Physical Infrastructure.",
+    "core_skills": [
+      "real_estate",
+      "lease_management",
+      "site_planning",
+      "physical_infrastructure",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "operations_procurement.quality_management.quality_management_core",
+    "name": "Quality Management Core",
+    "directorate": "Operations & Procurement",
+    "department": "Quality Management",
+    "department_head": "Dr. Eva Horváth",
+    "mission": "Primary execution and advisory team for Quality Management.",
+    "core_skills": [
+      "quality_management",
+      "quality_systems",
+      "root_cause_analysis",
+      "corrective_actions",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "operations_procurement.operational_performance_service_excellence.operational_performance_service_excellence_core",
+    "name": "Operational Performance & Service Excellence Core",
+    "directorate": "Operations & Procurement",
+    "department": "Operational Performance & Service Excellence",
+    "department_head": "Bongiwe Khumalo",
+    "mission": "Primary execution and advisory team for Operational Performance & Service Excellence.",
+    "core_skills": [
+      "service_excellence",
+      "operational_kpis",
+      "capacity_analysis",
+      "service_improvement",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "customer_organization.customer_success.customer_success_core",
+    "name": "Customer Success Core",
+    "directorate": "Customer Organization",
+    "department": "Customer Success",
+    "department_head": "Sofia Mendes",
+    "mission": "Primary execution and advisory team for Customer Success.",
+    "core_skills": [
+      "customer_success",
+      "adoption_strategy",
+      "customer_value",
+      "success_planning",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "customer_organization.customer_onboarding_implementation.customer_onboarding_implementation_core",
+    "name": "Customer Onboarding & Implementation Core",
+    "directorate": "Customer Organization",
+    "department": "Customer Onboarding & Implementation",
+    "department_head": "Caleb Nwosu",
+    "mission": "Primary execution and advisory team for Customer Onboarding & Implementation.",
+    "core_skills": [
+      "customer_onboarding",
+      "implementation_planning",
+      "deployment_coordination",
+      "go_live_readiness",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "customer_organization.professional_services.professional_services_core",
+    "name": "Professional Services Core",
+    "directorate": "Customer Organization",
+    "department": "Professional Services",
+    "department_head": "Aiko Fujimoto",
+    "mission": "Primary execution and advisory team for Professional Services.",
+    "core_skills": [
+      "consulting_delivery",
+      "solution_implementation",
+      "client_delivery",
+      "engagement_management",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "customer_organization.technical_account_management.technical_account_management_core",
+    "name": "Technical Account Management Core",
+    "directorate": "Customer Organization",
+    "department": "Technical Account Management",
+    "department_head": "Lars Petersen",
+    "mission": "Primary execution and advisory team for Technical Account Management.",
+    "core_skills": [
+      "technical_account_management",
+      "technical_escalation",
+      "architecture_guidance",
+      "customer_technical_health",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "customer_organization.customer_support_service_desk.customer_support_service_desk_core",
+    "name": "Customer Support & Service Desk Core",
+    "directorate": "Customer Organization",
+    "department": "Customer Support & Service Desk",
+    "department_head": "Naomi Chen",
+    "mission": "Primary execution and advisory team for Customer Support & Service Desk.",
+    "core_skills": [
+      "customer_support",
+      "ticket_triage",
+      "knowledge_base",
+      "sla_management",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "customer_organization.customer_education_adoption.customer_education_adoption_core",
+    "name": "Customer Education & Adoption Core",
+    "directorate": "Customer Organization",
+    "department": "Customer Education & Adoption",
+    "department_head": "Fatima Zahra",
+    "mission": "Primary execution and advisory team for Customer Education & Adoption.",
+    "core_skills": [
+      "customer_training",
+      "adoption_enablement",
+      "learning_content",
+      "enablement_programs",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "customer_organization.renewals_expansion.renewals_expansion_core",
+    "name": "Renewals & Expansion Core",
+    "directorate": "Customer Organization",
+    "department": "Renewals & Expansion",
+    "department_head": "Diego Fernandes",
+    "mission": "Primary execution and advisory team for Renewals & Expansion.",
+    "core_skills": [
+      "renewals",
+      "expansion_strategy",
+      "commercial_retention",
+      "renewal_forecasting",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "customer_organization.customer_health_escalation_management.customer_health_escalation_management_core",
+    "name": "Customer Health & Escalation Management Core",
+    "directorate": "Customer Organization",
+    "department": "Customer Health & Escalation Management",
+    "department_head": "Grace Owusu",
+    "mission": "Primary execution and advisory team for Customer Health & Escalation Management.",
+    "core_skills": [
+      "customer_health",
+      "risk_accounts",
+      "escalation_management",
+      "churn_prevention",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "internal_audit_assurance.financial_audit_assurance.financial_audit_assurance_core",
+    "name": "Financial Audit & Assurance Core",
+    "directorate": "Internal Audit & Assurance",
+    "department": "Financial Audit & Assurance",
+    "department_head": "Helena Novak",
+    "mission": "Primary execution and advisory team for Financial Audit & Assurance.",
+    "core_skills": [
+      "financial_audit",
+      "assurance",
+      "audit_testing",
+      "financial_controls_review",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "internal_audit_assurance.technology_audit.technology_audit_core",
+    "name": "Technology Audit Core",
+    "directorate": "Internal Audit & Assurance",
+    "department": "Technology Audit",
+    "department_head": "Dr. Marcus Chen",
+    "mission": "Primary execution and advisory team for Technology Audit.",
+    "core_skills": [
+      "technology_audit",
+      "it_controls",
+      "systems_assurance",
+      "change_management_audit",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "internal_audit_assurance.cybersecurity_assurance.cybersecurity_assurance_core",
+    "name": "Cybersecurity Assurance Core",
+    "directorate": "Internal Audit & Assurance",
+    "department": "Cybersecurity Assurance",
+    "department_head": "Leila Haddad-Sayegh",
+    "mission": "Primary execution and advisory team for Cybersecurity Assurance.",
+    "core_skills": [
+      "cyber_assurance",
+      "security_control_testing",
+      "security_audit",
+      "cyber_risk_assurance",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "internal_audit_assurance.operational_audit.operational_audit_core",
+    "name": "Operational Audit Core",
+    "directorate": "Internal Audit & Assurance",
+    "department": "Operational Audit",
+    "department_head": "Tawanda Moyo",
+    "mission": "Primary execution and advisory team for Operational Audit.",
+    "core_skills": [
+      "operational_audit",
+      "process_audit",
+      "efficiency_review",
+      "control_assessment",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "internal_audit_assurance.compliance_governance_audit.compliance_governance_audit_core",
+    "name": "Compliance & Governance Audit Core",
+    "directorate": "Internal Audit & Assurance",
+    "department": "Compliance & Governance Audit",
+    "department_head": "Ingrid Solberg",
+    "mission": "Primary execution and advisory team for Compliance & Governance Audit.",
+    "core_skills": [
+      "compliance_audit",
+      "governance_assurance",
+      "regulatory_control_testing",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "internal_audit_assurance.controls_assurance.controls_assurance_core",
+    "name": "Controls Assurance Core",
+    "directorate": "Internal Audit & Assurance",
+    "department": "Controls Assurance",
+    "department_head": "Priya Kapoor",
+    "mission": "Primary execution and advisory team for Controls Assurance.",
+    "core_skills": [
+      "internal_controls",
+      "control_design_review",
+      "control_effectiveness_testing",
+      "sox_style_controls",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "internal_audit_assurance.ai_systems_agent_governance_audit.ai_systems_agent_governance_audit_core",
+    "name": "AI Systems & Agent Governance Audit Core",
+    "directorate": "Internal Audit & Assurance",
+    "department": "AI Systems & Agent Governance Audit",
+    "department_head": "Dr. Kojo Mensima",
+    "mission": "Primary execution and advisory team for AI Systems & Agent Governance Audit.",
+    "core_skills": [
+      "ai_audit",
+      "agent_governance_audit",
+      "model_risk_assurance",
+      "ai_control_testing",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  }
+]

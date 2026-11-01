@@ -1,0 +1,31 @@
+{
+  "provider_name": "xai_grok",
+  "adapter_version": "1.0",
+  "capabilities": {
+    "reasoning": true,
+    "tool_use": true,
+    "structured_output": true,
+    "multimodal": true,
+    "web_search": "native_or_adapter",
+    "file_analysis": "native_or_adapter"
+  },
+  "mapping": {
+    "web.search": "PROVIDER_SPECIFIC_TOOL",
+    "files.search": "PROVIDER_SPECIFIC_TOOL",
+    "email.send": "PROVIDER_SPECIFIC_TOOL",
+    "calendar.create": "PROVIDER_SPECIFIC_TOOL"
+  },
+  "notes": "Keep provider-specific logic here. Do not alter core WHINK agent/skill definitions.",
+  "costing": {
+    "currency": "CONFIGURE",
+    "input_token_rate": null,
+    "output_token_rate": null,
+    "tool_call_rates": {},
+    "note": "Populate current provider rates in deployment environment. Core WHINK files must not hard-code vendor prices."
+  },
+  "execution_contract": {
+    "must_receive_human_approval": true,
+    "must_not_execute_if_authorization_status_is_not": "APPROVED",
+    "must_return_usage_metadata": true
+  }
+}

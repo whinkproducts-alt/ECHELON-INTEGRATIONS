@@ -1,0 +1,438 @@
+{
+  "_comment": "Recommended always-on roster. agentId values are real org-kit agent_ids (kind agent) or staff-directory ids (kind persona). Entries with job null are standby: no scheduled job exists yet, so they stay disabled. schedule is \"every <N><m|h|d>\". Cost model: docs/security.md \"Standing roster and worker\".",
+  "version": 1,
+  "roster": [
+    {
+      "key": "amara-okafor",
+      "kind": "persona",
+      "agentId": "amara-okafor",
+      "name": "Amara Okafor",
+      "group": "innovation_committee",
+      "role": "Chief Innovation & Opportunity Officer: weekly intelligence brief",
+      "job": "weekly_brief",
+      "params": {},
+      "schedule": "every 7d",
+      "maxTokensPerRun": 4000,
+      "modelTier": "deep",
+      "enabled": true
+    },
+    {
+      "key": "mateo-restrepo",
+      "kind": "persona",
+      "agentId": "mateo-restrepo",
+      "name": "Mateo Restrepo",
+      "group": "innovation_committee",
+      "role": "Senior Opportunity Scout: hourly scan of fresh news memories",
+      "job": "opportunity_scan",
+      "params": {
+        "lens": "scout"
+      },
+      "schedule": "every 1h",
+      "maxTokensPerRun": 3000,
+      "modelTier": "standard",
+      "enabled": true
+    },
+    {
+      "key": "priya-raghunathan",
+      "kind": "persona",
+      "agentId": "priya-raghunathan",
+      "name": "Priya Raghunathan",
+      "group": "innovation_committee",
+      "role": "Strategic Market Analyst: sector and competitor angle",
+      "job": "opportunity_scan",
+      "params": {
+        "lens": "market"
+      },
+      "schedule": "every 6h",
+      "maxTokensPerRun": 3000,
+      "modelTier": "standard",
+      "enabled": true
+    },
+    {
+      "key": "soren-oconnell",
+      "kind": "persona",
+      "agentId": "soren-oconnell",
+      "name": "Soren O'Connell",
+      "group": "innovation_committee",
+      "role": "Growth Strategist: scale levers for existing subsidiaries",
+      "job": "opportunity_scan",
+      "params": {
+        "lens": "growth"
+      },
+      "schedule": "every 6h",
+      "maxTokensPerRun": 3000,
+      "modelTier": "standard",
+      "enabled": true
+    },
+    {
+      "key": "mei-ling-tan",
+      "kind": "persona",
+      "agentId": "mei-ling-tan",
+      "name": "Mei-Ling Tan",
+      "group": "innovation_committee",
+      "role": "Venture Scout: early-stage, acquisition and partnership angle",
+      "job": "opportunity_scan",
+      "params": {
+        "lens": "venture"
+      },
+      "schedule": "every 12h",
+      "maxTokensPerRun": 3000,
+      "modelTier": "standard",
+      "enabled": true
+    },
+    {
+      "key": "news-americas",
+      "kind": "agent",
+      "agentId": "whink_group_marketing_intelligence.brand_media_audience_intelligence.vanta.jelena_markovic",
+      "name": "Jelena Markovi\u0107",
+      "group": "news_desk",
+      "role": "News desk: Americas",
+      "job": "news_digest",
+      "params": {
+        "desk": "americas"
+      },
+      "schedule": "every 30m",
+      "maxTokensPerRun": 2500,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "news-europe-africa",
+      "kind": "agent",
+      "agentId": "whink_group_marketing_intelligence.brand_media_audience_intelligence.pulse.anika_patel",
+      "name": "Anika Patel",
+      "group": "news_desk",
+      "role": "News desk: Europe & Africa",
+      "job": "news_digest",
+      "params": {
+        "desk": "europe_africa"
+      },
+      "schedule": "every 30m",
+      "maxTokensPerRun": 2500,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "news-asia-pacific",
+      "kind": "agent",
+      "agentId": "whink_group_marketing_intelligence.brand_media_audience_intelligence.quanta.sofia_alvarez",
+      "name": "Sofia Alvarez",
+      "group": "news_desk",
+      "role": "News desk: Asia-Pacific",
+      "job": "news_digest",
+      "params": {
+        "desk": "asia_pacific"
+      },
+      "schedule": "every 30m",
+      "maxTokensPerRun": 2500,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "news-tech-ai",
+      "kind": "agent",
+      "agentId": "research_development.emerging_technologies_future_systems.emerging_technologies_future_systems_core.bianca_santos",
+      "name": "Bianca Santos",
+      "group": "news_desk",
+      "role": "News desk: technology & AI",
+      "job": "news_digest",
+      "params": {
+        "desk": "tech_ai"
+      },
+      "schedule": "every 30m",
+      "maxTokensPerRun": 2500,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "news-markets-business",
+      "kind": "agent",
+      "agentId": "executive_office_corporate_strategy.enterprise_business_intelligence_performance.enterprise_business_intelligence_performance_core.leila_haddad",
+      "name": "Leila Haddad",
+      "group": "news_desk",
+      "role": "News desk: markets & business",
+      "job": "news_digest",
+      "params": {
+        "desk": "markets_business"
+      },
+      "schedule": "every 30m",
+      "maxTokensPerRun": 2500,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "news-canada",
+      "kind": "agent",
+      "agentId": "whink_group_marketing_intelligence.brand_media_audience_intelligence.vanta.noah_williams",
+      "name": "Noah Williams",
+      "group": "news_desk",
+      "role": "News desk: Canada",
+      "job": "news_digest",
+      "params": {
+        "desk": "canada"
+      },
+      "schedule": "every 30m",
+      "maxTokensPerRun": 2500,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "monitor-consult",
+      "kind": "agent",
+      "agentId": "customer_organization.professional_services.professional_services_core.agent301_whink301",
+      "name": "Vero Okafor",
+      "group": "subsidiary_monitor",
+      "role": "Project monitor: Whink Consult",
+      "job": "project_monitor",
+      "params": {
+        "subsidiary": "consult"
+      },
+      "schedule": "every 2h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "monitor-real-estate",
+      "kind": "agent",
+      "agentId": "operations_procurement.real_estate_physical_infrastructure.real_estate_physical_infrastructure_core.agent291_whink291",
+      "name": "Kike Oladele",
+      "group": "subsidiary_monitor",
+      "role": "Project monitor: Whink Real Estate",
+      "job": "project_monitor",
+      "params": {
+        "subsidiary": "real-estate"
+      },
+      "schedule": "every 2h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "monitor-trades",
+      "kind": "agent",
+      "agentId": "executive_office_corporate_strategy.corporate_development_strategic_investments.corporate_development_strategic_investments_core.nadia_rahman",
+      "name": "Nadia Rahman",
+      "group": "subsidiary_monitor",
+      "role": "Project monitor: Whink Trades & Investments",
+      "job": "project_monitor",
+      "params": {
+        "subsidiary": "trades"
+      },
+      "schedule": "every 2h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "monitor-apps",
+      "kind": "agent",
+      "agentId": "product.product_operations.product_operations_core.hassan_bashir",
+      "name": "Hassan Bashir",
+      "group": "subsidiary_monitor",
+      "role": "Project monitor: WHINK Apps",
+      "job": "project_monitor",
+      "params": {
+        "subsidiary": "apps"
+      },
+      "schedule": "every 2h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "monitor-frontliners",
+      "kind": "agent",
+      "agentId": "operations_procurement.operational_performance_service_excellence.operational_performance_service_excellence_core.agent295_whink295",
+      "name": "Olamide Baddo",
+      "group": "subsidiary_monitor",
+      "role": "Project monitor: Whink Frontliners",
+      "job": "project_monitor",
+      "params": {
+        "subsidiary": "frontliners"
+      },
+      "schedule": "every 2h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "security-soc",
+      "kind": "agent",
+      "agentId": "cybersecurity_resilience.security_operations_incident_response.security_operations_incident_response_core.agent203_whink203",
+      "name": "Wanjiru Kamau",
+      "group": "security_watch",
+      "role": "Security watch: denials and failures",
+      "job": "security_watch",
+      "params": {
+        "scope": "denials"
+      },
+      "schedule": "every 15m",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "security-threat-intel",
+      "kind": "agent",
+      "agentId": "cybersecurity_resilience.threat_intelligence_threat_hunting.threat_intelligence_threat_hunting_core.agent205_whink205",
+      "name": "Yetunde Adeyinka",
+      "group": "security_watch",
+      "role": "Security watch: injection and untrusted content",
+      "job": "security_watch",
+      "params": {
+        "scope": "injection"
+      },
+      "schedule": "every 30m",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "security-vuln",
+      "kind": "agent",
+      "agentId": "cybersecurity_resilience.vulnerability_exposure_management.vulnerability_exposure_management_core.agent217_whink217",
+      "name": "Kehinde Adewale",
+      "group": "security_watch",
+      "role": "Security watch: approvals and protected actions",
+      "job": "security_watch",
+      "params": {
+        "scope": "protected"
+      },
+      "schedule": "every 1h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "memory-curator-dedupe",
+      "kind": "agent",
+      "agentId": "data_artificial_intelligence.knowledge_systems_enterprise_memory.knowledge_systems_enterprise_memory_core.jorge_almeida",
+      "name": "Jorge Almeida",
+      "group": "memory_curation",
+      "role": "Memory curation: consolidate duplicates",
+      "job": "memory_curation",
+      "params": {
+        "scope": "dedupe"
+      },
+      "schedule": "every 24h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "memory-curator-decay",
+      "kind": "agent",
+      "agentId": "data_artificial_intelligence.knowledge_systems_enterprise_memory.knowledge_systems_enterprise_memory_core.tara_singh",
+      "name": "Tara Singh",
+      "group": "memory_curation",
+      "role": "Memory curation: decay stale low-confidence items",
+      "job": "memory_curation",
+      "params": {
+        "scope": "decay"
+      },
+      "schedule": "every 24h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": true
+    },
+    {
+      "key": "exec-ceo-office",
+      "kind": "agent",
+      "agentId": "executive_office_corporate_strategy.office_of_the_ceo_executive_operations.office_of_the_ceo_executive_operations_core.aarav_kapoor",
+      "name": "Aarav Kapoor",
+      "group": "executive_office",
+      "role": "Executive office: briefing and decision tracking (standby, no job yet)",
+      "job": null,
+      "params": {},
+      "schedule": "every 24h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": false
+    },
+    {
+      "key": "exec-ceo-office-2",
+      "kind": "agent",
+      "agentId": "executive_office_corporate_strategy.office_of_the_ceo_executive_operations.office_of_the_ceo_executive_operations_core.amina_diallo",
+      "name": "Amina Diallo",
+      "group": "executive_office",
+      "role": "Executive office: reviewer (standby, no job yet)",
+      "job": null,
+      "params": {},
+      "schedule": "every 24h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": false
+    },
+    {
+      "key": "exec-strategy",
+      "kind": "agent",
+      "agentId": "executive_office_corporate_strategy.corporate_strategy_strategic_planning.corporate_strategy_strategic_planning_core.lucia_navarro",
+      "name": "Luc\u00eda Navarro",
+      "group": "executive_office",
+      "role": "Executive office: strategic prioritisation (standby, no job yet)",
+      "job": null,
+      "params": {},
+      "schedule": "every 24h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": false
+    },
+    {
+      "key": "ops-corporate",
+      "kind": "agent",
+      "agentId": "operations_procurement.corporate_operations.corporate_operations_core.agent281_whink281",
+      "name": "Amina Garba",
+      "group": "operations",
+      "role": "Operations: operating rhythm (standby, no job yet)",
+      "job": null,
+      "params": {},
+      "schedule": "every 24h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": false
+    },
+    {
+      "key": "ops-process",
+      "kind": "agent",
+      "agentId": "operations_procurement.business_process_continuous_improvement.business_process_continuous_improvement_core.agent283_whink283",
+      "name": "Chinelo Obi",
+      "group": "operations",
+      "role": "Operations: process watch (standby, no job yet)",
+      "job": null,
+      "params": {},
+      "schedule": "every 24h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": false
+    },
+    {
+      "key": "finance-fpa",
+      "kind": "agent",
+      "agentId": "finance_accounting.fp_a_budgeting_forecasting.fp_a_budgeting_forecasting_core.agent231_whink231",
+      "name": "Zanele Dube",
+      "group": "finance_watch",
+      "role": "Finance watch: variance and forecast (standby, no job yet)",
+      "job": null,
+      "params": {},
+      "schedule": "every 24h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": false
+    },
+    {
+      "key": "legal-compliance",
+      "kind": "agent",
+      "agentId": "legal_risk_governance.regulatory_compliance_ethics.regulatory_compliance_ethics_core.agent257_whink257",
+      "name": "Abiola Ogunbayo",
+      "group": "legal_compliance_watch",
+      "role": "Legal & compliance watch (standby, no job yet)",
+      "job": null,
+      "params": {},
+      "schedule": "every 24h",
+      "maxTokensPerRun": 0,
+      "modelTier": "fast",
+      "enabled": false
+    }
+  ]
+}

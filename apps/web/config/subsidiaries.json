@@ -1,0 +1,85 @@
+{
+  "_comment": "The five WHINK Group subsidiaries. Facts from the Group website (https://whink-group.onrender.com), read 2026-10-25. Do not add facts beyond these.",
+  "subsidiaries": [
+    {
+      "id": "consult",
+      "name": "Whink Consult",
+      "logo": "/brand/subsidiaries/consult.webp",
+      "intro": "IT services, implementation, and practical support for business change.",
+      "about": "Whink Consult helps organizations turn technology decisions into working solutions. Our focus spans IT services, implementation planning, delivery coordination, and helping teams adopt new ways of working.",
+      "services": [
+        { "title": "IT services", "description": "Practical support for business technology, systems, and operations." },
+        { "title": "Implementation", "description": "Planning, configuration coordination, rollout, and adoption support." },
+        { "title": "Project delivery", "description": "Clear milestones, stakeholder coordination, and structured handovers." }
+      ],
+      "location": null,
+      "notice": null,
+      "directors": [
+        { "name": "Victor Igboekwe", "title": "Founder & Executive Director, Whink Consult", "imageUrl": "/board/victor-igboekwe.webp", "boardId": "victor-igboekwe" }
+      ]
+    },
+    {
+      "id": "real-estate",
+      "name": "Whink Real Estate",
+      "logo": "/brand/subsidiaries/real-estate.webp",
+      "intro": "Property flipping, development work, and commercial rentals.",
+      "about": "Whink Real Estate focuses on the potential of places: improving properties, progressing development opportunities, and providing commercial rental space.",
+      "services": [
+        { "title": "Property flipping", "description": "Acquiring and improving properties for resale." },
+        { "title": "Development work", "description": "Turning property opportunities into purposeful development projects." },
+        { "title": "Commercial rentals", "description": "Spaces for businesses to establish and grow." }
+      ],
+      "location": null,
+      "notice": null,
+      "directors": [
+        { "name": "Whitney Brown", "title": "Executive Director, Real Estate", "imageUrl": "/board/whitney-brown.webp", "boardId": null }
+      ]
+    },
+    {
+      "id": "trades",
+      "name": "Whink Trades & Investments",
+      "logo": "/brand/subsidiaries/trades.webp",
+      "intro": "The trading arm of Whink Group.",
+      "about": "Whink Trades is the trading arm of Whink Group. The company is no longer accepting investors. A trading bot is planned, with further details to be announced.",
+      "services": [
+        { "title": "Trading operations", "description": "The trading arm of the Whink Group portfolio." },
+        { "title": "Trading bot", "description": "Coming soon. Launch timing and capabilities will be announced." }
+      ],
+      "location": null,
+      "notice": "We are no longer accepting investors. Whink Trades is closed to new investment.",
+      "directors": [
+        { "name": "Juliet Igboekwe", "title": "Executive Director, Whink Trades & Investments", "imageUrl": "/board/juliet-igboekwe.webp", "boardId": "juliet-igboekwe" }
+      ]
+    },
+    {
+      "id": "apps",
+      "name": "Whink Apps",
+      "logo": "/brand/subsidiaries/apps.webp",
+      "intro": "Application development, AI, robotics, and technology that advances the way the world works.",
+      "about": "Whink Apps is a subsidiary of The WHINK Group. It builds innovative apps, including Whink Ultimate.",
+      "services": [],
+      "location": null,
+      "notice": null,
+      "directors": [
+        { "name": "Anthony Igboekwe", "title": "Executive Director, Whink Apps", "imageUrl": "/board/anthony-igboekwe.webp", "boardId": "anthony-igboekwe" }
+      ]
+    },
+    {
+      "id": "frontliners",
+      "name": "Whink Frontliners",
+      "logo": "/brand/subsidiaries/frontliners.webp",
+      "intro": "Construction and procurement. A Whink Group subsidiary in Nigeria.",
+      "about": "Whink Frontliners is our Nigeria-based construction and procurement firm. It brings construction delivery and sourcing requirements together to support projects from planning through execution.",
+      "services": [
+        { "title": "Construction", "description": "Construction delivery and project coordination in Nigeria." },
+        { "title": "Procurement", "description": "Sourcing and procurement support for project requirements." },
+        { "title": "Delivery coordination", "description": "Coordinating materials, suppliers, and project needs." }
+      ],
+      "location": "Nigeria",
+      "notice": null,
+      "directors": [
+        { "name": "Dr Tinaye Lydia Muzenyi", "title": "Executive Director & Head of People Operations, Whink Frontliners", "imageUrl": "/board/dr-tinaye.webp", "boardId": "dr-tinaye" }
+      ]
+    }
+  ]
+}

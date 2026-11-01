@@ -1,0 +1,28 @@
+{
+  "agent_id": "directorate.department.team.person",
+  "name": "First Last",
+  "title": "Role title",
+  "organization": {
+    "directorate": "",
+    "department": "",
+    "team": ""
+  },
+  "mission": "",
+  "reports_to": "",
+  "responsibilities": [],
+  "skills": [],
+  "tools": [],
+  "data_access": [],
+  "permissions": [],
+  "autonomy_level": 0,
+  "human_approval_required_for": [],
+  "completion_criteria": [],
+  "kpis": [],
+  "model_requirements": {
+    "reasoning": "low|medium|high",
+    "context_window": "standard|large",
+    "structured_output": true,
+    "multimodal": "optional"
+  },
+  "provider_binding": null
+}

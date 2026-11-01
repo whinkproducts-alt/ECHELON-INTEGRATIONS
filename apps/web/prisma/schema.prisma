@@ -1,0 +1,1468 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── Auth.js tables ──────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          String    @default("user")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  passkeys                PasskeyCredential[]
+  passwordResetTokens     PasswordResetToken[]
+  passkeyChallenges       PasskeyChallenge[]
+  sessionVersion          Int                      @default(0)
+  accounts                Account[]
+  sessions                Session[]
+  profile                 UserProfile?
+  preferences             UserPreference?
+  apiKeys                 UserApiKey[]
+  conversations           Conversation[]
+  projects                ProjectMember[]
+  ownedProjects           Project[]
+  personaState            PersonaState?
+  actions                 Action[]
+  permissions             Permission[]
+  delegations             Delegation[]
+  evaluationRuns          EvaluationRun[]
+  calendarEvents          CalendarEvent[]
+  notes                   Note[]
+  approvalRequests        ApprovalRequest[]
+  socialConnections       SocialConnection[]
+  skillSubmissions        SkillSubmission[]
+  oauthStates             OAuthState[]
+  scheduledPosts          ScheduledPost[]
+  documentWorkspaces      DocumentWorkspace[]
+  documents               Document[]
+  notificationPreferences NotificationPreference[]
+  boardMeetings           BoardMeeting[]
+  connectorInstalls       ConnectorInstall[]
+  hosts                   Host[]
+  capabilityGrants        CapabilityGrant[]
+  usageEvents             UsageEvent[]
+  contacts                Contact[]
+  changeRequests          ChangeRequest[]
+  contracts               Contract[]
+  commsRequests           CommsRequest[]
+  swarmRuns               SwarmRun[]
+  agentJobs               AgentJob[]
+  agentExecutions         AgentExecution[]
+  recommendations         Recommendation[]
+  newsSeen                NewsSeen[]
+
+  @@map("users")
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ── User Profile & Preferences ──────────────────────────────────
+
+model UserProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  displayName        String?
+  timezone           String   @default("UTC")
+  workingHoursStart  String   @default("09:00")
+  workingHoursEnd    String   @default("17:00")
+  interruptionBudget String   @default("BALANCED")
+  autonomyLevel      Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model UserPreference {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  verbosity             String   @default("STANDARD")
+  mambaPreference       String   @default("ON_REQUEST")
+  defaultFunctionalMode String?
+  executionProfile      String   @default("BALANCED")
+  preferredModel        String? // e.g. "claude-sonnet-4-5", "gpt-4o", "wink-qwen3.5-9b-8k"
+  monthlyTokenBudget    BigInt? // null = use tenant/env default; 0 = unlimited
+  budgetSoftPct         Int? // null = default 80
+  budgetHardPct         Int? // null = default 100
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model UserApiKey {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String // "anthropic" | "openai"
+  encryptedKey String // AES-256-GCM encrypted, hex-encoded
+  keyHint      String // last 4 chars of the plaintext key
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+  @@map("user_api_keys")
+}
+
+// ── Persona ─────────────────────────────────────────────────────
+
+model PersonaState {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  activePersona    String   @default("WHINK")
+  mambaMode        String? // OBSIDIAN | null
+  functionalMode   String?
+  activationSource String   @default("system")
+  activatedAt      DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("persona_states")
+}
+
+// ── Conversations & Messages ────────────────────────────────────
+
+model Conversation {
+  id         String   @id @default(cuid())
+  userId     String
+  title      String   @default("New Conversation")
+  projectId  String?
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project  Project?  @relation(fields: [projectId], references: [id])
+  messages Message[]
+
+  @@index([userId, updatedAt])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String // user | assistant | system
+  content        String
+  persona        String? // WHINK | MAMBA | PETER | PAUL | MICAH | NANDI
+  mambaMode      String? // OBSIDIAN | null
+  functionalMode String?
+  toolCalls      String? // JSON string of tool calls
+  metadata       String? // JSON string
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// ── Projects ────────────────────────────────────────────────────
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  goal        String?
+  description String?
+  status      String   @default("ACTIVE")
+  subsidiary  String? // WHINK Group subsidiary id (validated against config/subsidiaries.json); null = unassigned
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner          User                  @relation(fields: [ownerId], references: [id])
+  members        ProjectMember[]
+  tasks          ProjectTask[]
+  milestones     ProjectMilestone[]
+  decisions      ProjectDecision[]
+  risks          ProjectRisk[]
+  openQuestions  ProjectOpenQuestion[]
+  conversations  Conversation[]
+  memoryEpisodes MemoryEpisode[]
+  memorySemantic MemorySemantic[]
+  entityEdges    EntityEdge[]
+  hypotheses     Hypothesis[]
+  contracts      Contract[]
+
+  @@index([ownerId])
+  @@index([ownerId, subsidiary])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      String   @default("member")
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+model ProjectTask {
+  id           String    @id @default(cuid())
+  projectId    String
+  title        String
+  description  String?
+  status       String    @default("TODO")
+  priority     String    @default("MEDIUM")
+  assignee     String?
+  dueDate      DateTime?
+  dependencies String? // JSON array of task IDs
+  source       String? // how the task was created
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@map("project_tasks")
+}
+
+model ProjectMilestone {
+  id          String    @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  status      String    @default("PENDING")
+  targetDate  DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_milestones")
+}
+
+model ProjectDecision {
+  id          String   @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  rationale   String?
+  decidedBy   String?
+  decidedAt   DateTime @default(now())
+  status      String   @default("DECIDED")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_decisions")
+}
+
+model ProjectRisk {
+  id          String   @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  severity    String   @default("MEDIUM")
+  likelihood  String   @default("MEDIUM")
+  mitigation  String?
+  status      String   @default("OPEN")
+  createdAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_risks")
+}
+
+model ProjectOpenQuestion {
+  id         String    @id @default(cuid())
+  projectId  String
+  question   String
+  context    String?
+  assignedTo String?
+  status     String    @default("OPEN")
+  answer     String?
+  answeredAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_open_questions")
+}
+
+// ── Memory Engine ───────────────────────────────────────────────
+
+model MemoryEpisode {
+  id             String                      @id @default(cuid())
+  userId         String
+  projectId      String?
+  eventType      String // decision_made, meeting_completed, correction, mamba_insight, etc.
+  entities       String? // JSON array of entity references
+  summary        String
+  source         String // conversation, tool, integration, auto
+  eventDate      DateTime? // absolute event date (B8 — resolved from relative dates)
+  messageId      String? // id of the message that triggered auto-extraction (B9)
+  extractorModel String? // LLM model used for extraction, distinct from embeddingModel (B9)
+  confidence     Float                       @default(0.8)
+  importance     Float                       @default(0.5)
+  privacyClass   String                      @default("PERSONAL")
+  supersededBy   String? // ID of newer episode
+  embedding      Unsupported("vector(768)")?
+  embeddingModel String? // e.g. "ollama/nomic-embed-text"
+  createdAt      DateTime                    @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([projectId])
+  @@map("memory_episodes")
+}
+
+model MemorySemantic {
+  id              String                      @id @default(cuid())
+  userId          String
+  projectId       String?
+  statement       String
+  sourceType      String // user, conversation, integration, mamba, auto
+  sourceId        String? // reference to source conversation/message
+  messageId       String? // id of the message that triggered auto-extraction (B9)
+  extractorModel  String? // LLM model used for extraction, distinct from embeddingModel (B9)
+  confidence      Float                       @default(0.8)
+  epistemicStatus String // KNOWN, INFERRED, HYPOTHESIS, UNVERIFIED
+  supersededBy    String? // ID of newer semantic memory
+  retrievedAt     DateTime?
+  scope           String?                     @default("general")
+  validFrom       DateTime                    @default(now())
+  supersededAt    DateTime?
+  embedding       Unsupported("vector(768)")?
+  embeddingModel  String? // e.g. "ollama/nomic-embed-text"
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([projectId])
+  @@map("memory_semantic")
+}
+
+// ── Auto Memory Daily Cap (B12) ─────────────────────────────────
+
+model MemoryDailyCap {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String // YYYY-MM-DD
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("memory_daily_cap")
+}
+
+model MemoryProcedural {
+  id          String   @id @default(cuid())
+  userId      String
+  category    String // email_tone, report_structure, model_preference, etc.
+  description String
+  details     String? // JSON string of procedural details
+  confidence  Float    @default(0.9)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, category])
+  @@map("memory_procedural")
+}
+
+// ── Hypotheses (MAMBA Memory Firewall) ──────────────────────────
+
+model Hypothesis {
+  id              String   @id @default(cuid())
+  userId          String
+  projectId       String?
+  statement       String
+  epistemicStatus String // MUST be 'hypothesis' — enforced by DB CHECK
+  confidence      Float    @default(0.3) // MAX 0.4 — enforced by DB CHECK
+  source          String   @default("MAMBA")
+  mambaMode       String? // OBSIDIAN | null
+  rationale       String?
+  supersededBy    String?
+  createdAt       DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("hypotheses")
+}
+
+// ── Entity / Knowledge Graph ────────────────────────────────────
+
+model EntityNode {
+  id            String   @id @default(cuid())
+  userId        String
+  type          String // PERSON, ORGANIZATION, PROJECT, DOCUMENT, LOCATION, EVENT
+  canonicalName String
+  confidence    Float    @default(0.8)
+  metadata      String? // JSON for additional properties
+  mergedInto    String? // ID of entity this was merged into
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  aliases   EntityAlias[]
+  edgesFrom EntityEdge[]  @relation("EdgeFrom")
+  edgesTo   EntityEdge[]  @relation("EdgeTo")
+
+  @@index([userId, type])
+  @@map("entity_nodes")
+}
+
+model EntityAlias {
+  id       String @id @default(cuid())
+  entityId String
+  alias    String
+
+  entity EntityNode @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@index([alias])
+  @@map("entity_aliases")
+}
+
+model EntityEdge {
+  id               String   @id @default(cuid())
+  fromId           String
+  toId             String
+  relationshipType String
+  context          String?
+  confidence       Float    @default(0.8)
+  projectId        String?
+  supersededBy     String?
+  createdAt        DateTime @default(now())
+
+  from    EntityNode @relation("EdgeFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to      EntityNode @relation("EdgeTo", fields: [toId], references: [id], onDelete: Cascade)
+  project Project?   @relation(fields: [projectId], references: [id])
+
+  @@index([fromId])
+  @@index([toId])
+  @@index([projectId])
+  @@map("entity_edges")
+}
+
+// ── Tool Registry ───────────────────────────────────────────────
+
+model Tool {
+  id                  String   @id @default(cuid())
+  name                String   @unique
+  description         String
+  capabilities        String // JSON array
+  inputSchema         String? // JSON schema
+  outputSchema        String? // JSON schema
+  riskClass           String   @default("A") // A, B, C
+  requiredPermissions String? // JSON array
+  isActive            Boolean  @default(true)
+  version             String   @default("1.0.0")
+  createdAt           DateTime @default(now())
+
+  // Capability Gateway (E1/E4a). Provider tools are namespaced, so one provider can never take over
+  // another's tool name. riskClass defaults to the strictest value for provider tools (set in code).
+  connectorInstallId String?
+  originalName       String?
+  costClass          String  @default("UNKNOWN") // FREE | METERED | CLOUD_BILLABLE | UNKNOWN; only FREE runs
+  timeoutMs          Int     @default(30000)
+  defHash            String? // hash of the sanitised definition as last discovered
+  reviewedDefHash    String? // hash the Founder reviewed; riskClass above applies only while it matches defHash
+
+  connectorInstall ConnectorInstall? @relation(fields: [connectorInstallId], references: [id], onDelete: SetNull)
+  grants           CapabilityGrant[]
+  actions          Action[]
+
+  @@index([connectorInstallId])
+  @@map("tools")
+}
+
+// ── Execution Plans ─────────────────────────────────────────────
+
+model ExecutionPlan {
+  id        String   @id @default(cuid())
+  userId    String
+  objective String
+  persona   String   @default("WHINK")
+  riskLevel String   @default("LOW")
+  status    String   @default("PENDING") // PENDING, RUNNING, COMPLETE, FAILED, CANCELLED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  steps           PlanStep[]
+  CapabilityGrant CapabilityGrant[]
+
+  @@index([userId])
+  @@map("execution_plans")
+}
+
+model PlanStep {
+  id               String    @id @default(cuid())
+  planId           String
+  stepOrder        Int
+  capability       String
+  description      String?
+  dependencies     String? // JSON array of step IDs
+  status           String    @default("PENDING")
+  approvalRequired Boolean   @default(false)
+  result           String? // JSON
+  error            String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+
+  plan ExecutionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, stepOrder])
+  @@map("plan_steps")
+}
+
+// ── Action Ledger (append-only) ─────────────────────────────────
+
+model Action {
+  id                 String   @id @default(cuid())
+  userId             String
+  initiator          String // user | system | automation
+  persona            String? // WHINK | MAMBA
+  mambaMode          String? // OBSIDIAN | null
+  planId             String?
+  tool               String?
+  action             String
+  permissionClass    String   @default("A")
+  confirmationMethod String? // auto | user_confirmed | delegated
+  inputSummary       String?
+  outputSummary      String?
+  validationResult   String? // JSON
+  status             String   @default("SUBMITTED") // SUBMITTED, VALIDATED, FAILED, UNVERIFIED, AWAITING_APPROVAL, DENIED
+  outcome            String?
+  postmortem         String?
+  correlationId      String?
+  latencyMs          Int?
+  createdAt          DateTime @default(now())
+
+  // Capability Gateway receipts (E1/E4a). All optional: legacy rows are unchanged. Written only by lib/ledger.ts.
+  connectorInstallId String?
+  capabilityId       String? // Tool.id
+  hostId             String?
+  errorCode          String?
+  approvalId         String?
+  grantId            String?
+
+  user             User              @relation(fields: [userId], references: [id])
+  // Receipts are never rewritten after the fact: deleting a provider, tool or host that has receipts is refused (NO ACTION).
+  connectorInstall ConnectorInstall? @relation(fields: [connectorInstallId], references: [id], onDelete: NoAction)
+  capability       Tool?             @relation(fields: [capabilityId], references: [id], onDelete: NoAction)
+  host             Host?             @relation(fields: [hostId], references: [id], onDelete: NoAction)
+
+  @@index([userId, createdAt])
+  @@index([correlationId])
+  @@index([connectorInstallId])
+  @@index([capabilityId])
+  @@index([hostId])
+  @@map("actions")
+}
+
+// ── Permissions & Delegations ───────────────────────────────────
+
+model Permission {
+  id         String   @id @default(cuid())
+  userId     String
+  capability String
+  class      String   @default("A") // A, B, C
+  granted    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, capability])
+  @@map("permissions")
+}
+
+model Delegation {
+  id         String    @id @default(cuid())
+  userId     String
+  capability String
+  conditions String? // JSON conditions
+  permission String    @default("automatic")
+  expiresAt  DateTime?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, capability])
+  @@map("delegations")
+}
+
+// ── Tenant Config (white label) ─────────────────────────────────
+
+model TenantConfig {
+  id          String   @id @default(cuid())
+  tenantId    String   @unique // matches userId for single-tenant; org ID for multi
+  productName String   @default("WHINK")
+  logoUrl     String?
+  accentColor String   @default("#38B6FF")
+  supportUrl  String?
+  privacyUrl  String?
+  termsUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tenant_config")
+}
+
+// ── Evaluation Harness ──────────────────────────────────────────
+
+model EvaluationScenario {
+  id                 String   @id @default(cuid())
+  category           String // memory_accuracy, persona_switching, permission_enforcement, context_retrieval
+  title              String
+  input              String
+  expectedBehavior   String
+  acceptanceCriteria String?
+  createdAt          DateTime @default(now())
+
+  runs EvaluationRun[]
+
+  @@map("evaluation_scenarios")
+}
+
+model EvaluationRun {
+  id         String   @id @default(cuid())
+  scenarioId String
+  userId     String
+  result     String // PASS, FAIL, PARTIAL
+  score      Float?
+  details    String? // JSON
+  executedAt DateTime @default(now())
+
+  scenario EvaluationScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  user     User               @relation(fields: [userId], references: [id])
+
+  @@index([scenarioId])
+  @@map("evaluation_runs")
+}
+
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime
+  location    String?
+  allDay      Boolean  @default(false)
+  externalId  String? // for future Google Calendar sync
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startAt])
+  @@map("calendar_events")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String   @default("Untitled")
+  content   String
+  tags      String? // JSON array
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("notes")
+}
+
+// ── Working Memory (persistent KV with TTL) ─────────────────────
+
+model WorkingMemory {
+  id        String    @id @default(cuid())
+  userId    String
+  key       String
+  value     String
+  expiresAt DateTime?
+  updatedAt DateTime  @updatedAt
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("working_memory")
+}
+
+// ── Task Handoffs ────────────────────────────────────────────────
+
+model TaskHandoff {
+  id        String   @id @default(cuid())
+  taskId    String
+  agentId   String
+  userId    String
+  summary   String
+  approach  String
+  blockers  String?
+  nextSteps String?
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+  @@index([agentId])
+  @@index([userId])
+  @@map("task_handoffs")
+}
+
+// ── Document Workspaces (tenant-scoped AnythingLLM mapping) ──────
+
+model DocumentWorkspace {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  workspaceSlug String   @unique
+  createdAt     DateTime @default(now())
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents Document[]
+
+  @@map("document_workspaces")
+}
+
+// ── Per-file document ownership record (H1 / C6 / PIPEDA Q3) ────
+// One row per uploaded file; anythingllmDocId is the ID AnythingLLM assigned.
+// Ownership is enforced here — no userId means no access.
+
+model Document {
+  id               String   @id @default(cuid())
+  userId           String
+  workspaceId      String
+  anythingllmDocId String
+  filename         String
+  mimeType         String
+  sizeBytes        Int
+  sha256           String
+  uploadedAt       DateTime @default(now())
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace DocumentWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, anythingllmDocId])
+  @@index([userId])
+  @@map("documents")
+}
+
+// ── Compound Agent Intelligence ─────────────────────────────────
+
+model AgentKnowledge {
+  id        String   @id @default(cuid())
+  agentId   String // e.g. "backend-engineer", "frontend-engineer"
+  domain    String // e.g. "tool-loop", "prisma", "auth", "ui"
+  taskType  String // e.g. "migration", "api-route", "component", "debug"
+  lesson    String // The actual lesson — what worked, what failed, why
+  outcome   String // "success" | "failure" | "partial"
+  tags      String? // JSON array of keyword tags for retrieval
+  accountId String?  @map("account_id") // M1: tenant isolation. null = global/curated lesson
+  createdAt DateTime @default(now())
+
+  @@index([agentId])
+  @@index([domain])
+  @@index([taskType])
+  @@index([accountId])
+  @@map("agent_knowledge")
+}
+
+// ── Approvals ───────────────────────────────────────────────────
+// A pending Class C tool call or EAR. Decided by id only; 30 s expiry; executed exactly once.
+
+model ApprovalRequest {
+  id              String    @id @default(cuid())
+  userId          String
+  kind            String // tool_call | ear | autonomy_change | scheduled_post
+  tool            String?
+  params          Json?
+  contentHash     String // sha256 hex of canonical {kind, tool, params}
+  summary         String
+  permissionClass String
+  status          String    @default("PENDING") // PENDING, APPROVED, EXECUTING, EXECUTED, DENIED, EXPIRED, FAILED
+  correlationId   String
+  conversationId  String?
+  persona         String    @default("WHINK")
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime
+  decidedAt       DateTime?
+  executedAt      DateTime?
+  result          Json?
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commsRequest   CommsRequest?
+  agentExecution AgentExecution?
+
+  @@index([userId, status, expiresAt])
+  @@map("approval_requests")
+}
+
+model SocialConnection {
+  id                 String    @id @default(cuid())
+  userId             String
+  platform           String // x | instagram | tiktok
+  accessTokenEnc     String // AES-256-GCM via lib/key-encryption.ts, never plaintext
+  refreshTokenEnc    String?
+  scopes             String    @default("")
+  expiresAt          DateTime?
+  platformUserId     String?
+  platformHandle     String?
+  status             String    @default("active") // active | expired | revoked
+  consentGrantedAt   DateTime?
+  consentTextVersion String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform])
+  @@map("social_connections")
+}
+
+model OAuthState {
+  id                 String    @id @default(cuid())
+  userId             String
+  platform           String
+  stateHash          String    @unique // sha256 hex of the state value; the state itself is never stored
+  codeVerifierEnc    String // PKCE verifier, encrypted
+  redirectUri        String
+  consentGrantedAt   DateTime?
+  consentTextVersion String?
+  createdAt          DateTime  @default(now())
+  expiresAt          DateTime
+  usedAt             DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, platform])
+  @@map("oauth_states")
+}
+
+model ScheduledPost {
+  id             String    @id @default(cuid())
+  userId         String
+  approvalId     String
+  platform       String
+  // Platform account id the post was approved for; a send is refused if the connection now differs.
+  platformUserId String?
+  tool           String
+  args           Json
+  contentHash    String // sha256 of canonical {tool, args} as approved
+  sendAt         DateTime
+  status         String    @default("scheduled") // scheduled | sending | sent | failed | cancelled
+  error          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  sentAt         DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([approvalId])
+  @@index([status, sendAt])
+  @@index([userId, status])
+  @@map("scheduled_posts")
+}
+
+// ── Notification Preferences ─────────────────────────────────────
+
+model NotificationPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  channel   String // EMAIL | WHATSAPP | SMS | TELEGRAM | PHONE_CALL
+  enabled   Boolean  @default(false)
+  address   String? // email, phone E.164, or Telegram chat ID
+  schedule  String   @default("DAILY") // DAILY | IMMEDIATE | WEEKLY
+  time      String   @default("08:00") // HH:MM in user's local time
+  timeZone  String   @default("America/Edmonton")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel])
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+// ── Board meetings ───────────────────────────────────────────────
+// Per-user. Minutes are free text and are untrusted data on read.
+
+model BoardMeeting {
+  id           String    @id @default(cuid())
+  userId       String
+  title        String
+  scheduledFor DateTime
+  agenda       String[]
+  attendees    String[]
+  status       String    @default("SCHEDULED") // SCHEDULED | HELD | CANCELLED
+  minutes      String?
+  minutesAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, scheduledFor])
+  @@map("board_meetings")
+}
+
+// ── Connectors ───────────────────────────────────────────────────
+// config holds non-secret settings only. Tokens live in their own encrypted tables.
+
+model ConnectorInstall {
+  id          String   @id @default(cuid())
+  userId      String
+  connectorId String
+  enabled     Boolean  @default(true)
+  config      Json?
+  installedAt DateTime @default(now())
+
+  // Capability Gateway (E1/E4a). `kind` CATALOG rows are the legacy catalog installs and are never
+  // touched by the capability layer. MCP_SERVER rows are Founder-registered providers.
+  kind                String    @default("CATALOG") // CATALOG | MCP_SERVER
+  transport           String? // streamable-http | stdio
+  endpoint            String?
+  command             String?
+  args                String[]  @default([])
+  hostId              String?
+  credentialsEnc      String? // AES-256-GCM (lib/key-encryption); never returned by any API
+  credentialHint      String?
+  egressAllowlist     String[]  @default([])
+  maxDataClass        String    @default("organization") // highest data class this provider may receive
+  status              String    @default("REGISTERED") // REGISTERED | REVIEWED | ENABLED | DISABLED | REVOKED
+  disabledReason      String?
+  reviewedByUserId    String?
+  reviewedAt          DateTime?
+  reviewedFingerprint String? // hash of endpoint+allowlist+tool definitions at review; a change forces re-review
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  host    Host?    @relation(fields: [hostId], references: [id], onDelete: SetNull)
+  tools   Tool[]
+  actions Action[]
+
+  @@unique([userId, connectorId])
+  @@index([userId])
+  @@index([kind, status])
+  @@index([hostId])
+  @@map("connector_installs")
+}
+
+// ── Usage ────────────────────────────────────────────────────────
+
+model UsageEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  provider   String
+  model      String
+  tokensIn   Int      @default(0)
+  tokensOut  Int      @default(0)
+  costMicros Int      @default(0)
+  kind       String   @default("chat") // chat | tool_loop | embed | other
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("usage_events")
+}
+
+// ── Contacts and outbound comms ──────────────────────────────────
+
+model Contact {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  email     String?
+  phone     String? // E.164
+  company   String?
+  tags      String[]
+  source    String   @default("manual") // manual | vcard | google
+  notes     String?
+  createdAt DateTime @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commsRequests CommsRequest[]
+
+  @@index([userId])
+  @@index([userId, phone])
+  @@index([userId, email])
+  @@map("contacts")
+}
+
+// Links one outbound message or call to its approval request. Content lives on the approval row.
+model CommsRequest {
+  id         String   @id @default(cuid())
+  userId     String
+  contactId  String
+  approvalId String   @unique
+  kind       String // message | call
+  channel    String // SMS | WHATSAPP | TELEGRAM | EMAIL | PHONE_CALL
+  createdAt  DateTime @default(now())
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contact  Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  approval ApprovalRequest @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  @@index([userId, contactId])
+  @@map("comms_requests")
+}
+
+// ── Change requests and contracts ────────────────────────────────
+
+model ChangeRequest {
+  id                String   @id @default(cuid())
+  userId            String
+  title             String
+  body              String
+  status            String   @default("DRAFT") // DRAFT | REFINED | AWAITING_APPROVAL | SENT | IN_PROGRESS | PR_OPENED | MERGED | REJECTED | FAILED
+  spec              Json?
+  risk              String?
+  approvalId        String?
+  githubIssueUrl    String?
+  githubIssueNumber Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@map("change_requests")
+}
+
+model Contract {
+  id           String    @id @default(cuid())
+  userId       String
+  title        String
+  counterparty String
+  subsidiary   String?
+  projectId    String?
+  valueAmount  Decimal?  @db.Decimal(14, 2)
+  currency     String    @default("CAD")
+  status       String    @default("DRAFT") // DRAFT | ACTIVE | COMPLETED | TERMINATED
+  startDate    DateTime?
+  endDate      DateTime?
+  renewalDate  DateTime?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([userId, subsidiary])
+  @@index([userId, projectId])
+  @@index([userId, createdAt, id])
+  @@map("contracts")
+}
+
+// ── Skill uploads (untrusted reference knowledge pipeline) ──────────
+// An uploaded skill is outsider-written data. It can become reference memory; it never
+// registers tools, changes permissions, or enters the org-kit executed skill registry.
+
+model SkillSubmission {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  filename   String
+  sha256     String
+  sizeBytes  Int
+  status     String    @default("QUEUED") // QUEUED | SCANNING | REJECTED_SECURITY | ASSESSING | ACCEPTED | REJECTED_VALUE | WAITING_MODEL | FAILED
+  content    String // raw upload, encrypted at rest when ENCRYPTION_KEY is configured ("enc:" prefix), else "raw:"
+  scanReport Json?
+  committee  Json?
+  decision   String?
+  reason     String?
+  memoryIds  String[]
+  attempts   Int       @default(0)
+  leaseOwner String?
+  leaseUntil DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sha256])
+  @@index([userId, createdAt])
+  @@index([status, updatedAt])
+  @@map("skill_submissions")
+}
+
+model PasskeyCredential {
+  id           String    @id @default(cuid())
+  userId       String
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      BigInt    @default(0)
+  transports   String[]
+  deviceName   String
+  backedUp     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("passkey_credentials")
+}
+
+// Single-use WebAuthn challenges and 60 second login tickets. Consumed by a conditional update.
+model PasskeyChallenge {
+  id        String    @id @default(cuid())
+  userId    String?
+  challenge String
+  purpose   String
+  remember  Boolean   @default(false)
+  clientKey String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([clientKey, purpose])
+  @@map("passkey_challenges")
+}
+
+// ── Standing roster worker (24/7 organisation) ──────────────────
+
+// One row per (job, user). Claimed with an atomic conditional update; see lib/worker/scheduler.ts.
+model AgentJob {
+  id                  String    @id @default(cuid())
+  jobKey              String
+  userId              String
+  nextRunAt           DateTime
+  lastRunAt           DateTime?
+  lastStatus          String? // OK | FAILED | SKIPPED | TIMEOUT
+  lastError           String? // short reason code, never content
+  leaseUntil          DateTime?
+  leaseOwner          String?
+  runs                Int       @default(0)
+  consecutiveFailures Int       @default(0)
+  createdAt           DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([jobKey, userId])
+  @@index([nextRunAt])
+  @@index([userId])
+  @@map("agent_jobs")
+}
+
+// Process-level facts only (no user data).
+model AgentExecution {
+  id          String          @id @default(cuid())
+  userId      String
+  approvalId  String          @unique
+  contentHash String
+  agentIds    String[]
+  status      String          @default("QUEUED")
+  attempts    Int             @default(0)
+  claimToken  String?
+  output      Json?
+  reason      String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approval    ApprovalRequest @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("agent_executions")
+}
+
+model AgentHeartbeat {
+  workerId   String   @id
+  startedAt  DateTime
+  lastSeenAt DateTime
+  version    String
+
+  @@map("agent_heartbeats")
+}
+
+// What the news desk has already seen, so the same link is never scored twice. Pruned after 14 days.
+model NewsSeen {
+  id        String   @id @default(cuid())
+  userId    String
+  linkHash  String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, linkHash])
+  @@index([createdAt])
+  @@map("news_seen")
+}
+
+// Suggestions from the standing roster, shown in the "WHINK recommends" column.
+model Recommendation {
+  id          String    @id @default(cuid())
+  userId      String
+  source      String // agent name
+  kind        String
+  title       String
+  body        String
+  link        String?
+  severity    String    @default("info") // info | warning | critical
+  dedupeKey   String?
+  createdAt   DateTime  @default(now())
+  dismissedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, dismissedAt, createdAt])
+  @@map("recommendations")
+}
+
+// ── Swarm: many agents, one initiative, no overlap ───────────────
+
+model SwarmRun {
+  id              String    @id @default(cuid())
+  userId          String
+  projectId       String?
+  subsidiary      String?
+  title           String
+  initiative      String // untrusted user text, always wrapped before model use
+  status          String    @default("PLANNED") // PLANNED | RUNNING | FINALIZING | DONE | FAILED | CANCELLED
+  minAgents       Int
+  agentCount      Int
+  estimate        Json
+  tokenCap        Int
+  tokensUsed      Int       @default(0)
+  cancelRequested Boolean   @default(false)
+  stopReason      String?
+  result          String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks     SwarmTask[]
+  claims    SwarmClaim[]
+  learnings SwarmLearning[]
+
+  @@index([userId, createdAt])
+  @@map("swarm_runs")
+}
+
+model SwarmTask {
+  id             String    @id @default(cuid())
+  runId          String
+  userId         String
+  lane           String // exclusive scope key
+  role           String // lead | integrator | redteam | reviewer | worker
+  agentId        String // real org-kit agent_id
+  fit            String // matched | generalist
+  title          String
+  objective      String
+  deliverable    String
+  requiredSkills String[]
+  covers         String[] // lanes this task reviews, challenges or integrates
+  dependsOn      String[] // lanes
+  estimatedCalls Int       @default(1)
+  status         String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED | SKIPPED
+  attempts       Int       @default(0)
+  output         Json?
+  error          String?
+  tokensIn       Int       @default(0)
+  tokensOut      Int       @default(0)
+  claimOwner     String? // engine instance holding the lane claim; every write after acquire checks it
+  startedAt      DateTime?
+  heartbeatAt    DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  run SwarmRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, lane])
+  @@index([runId, status])
+  @@index([userId])
+  @@map("swarm_tasks")
+}
+
+// DB-level exclusive claim on a lane. The unique key is what makes two engines unable to run one lane.
+model SwarmClaim {
+  id        String   @id @default(cuid())
+  runId     String
+  userId    String
+  lane      String
+  taskId    String
+  owner     String
+  createdAt DateTime @default(now())
+
+  run SwarmRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, lane])
+  @@index([userId])
+  @@map("swarm_claims")
+}
+
+model SwarmLearning {
+  id         String   @id @default(cuid())
+  runId      String
+  userId     String
+  agentId    String
+  lane       String
+  text       String
+  sha256     String
+  confidence Float    @default(0.5)
+  createdAt  DateTime @default(now())
+
+  run SwarmRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, sha256])
+  @@index([runId, createdAt])
+  @@index([userId])
+  @@map("swarm_learnings")
+}
+
+// ── Durable rate limiter (fixed-window counters, shared across workers/restarts) ──
+// Keys are "<bucket>:<subject>" (subject is a client address or sign-in account, hashed or
+// plain); this table holds no user content and is not tenant data.
+
+model RateLimitBucket {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+  @@map("rate_limit_buckets")
+}
+
+// ── Password reset (only the SHA-256 of the token is stored; single use; 30 minute life) ──
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+// ── Capability Gateway (E1/E4a) ─────────────────────────────────────────────────────────────────
+// Reconciliation: see docs/CAPABILITY-GATEWAY.md. Permission and Delegation are per user and per
+// capability name, so they cannot say "this agent may call this tool on this provider for this
+// mission". Host and CapabilityGrant are therefore new; everything else extends existing tables.
+
+/**
+ * A place that runs MCP servers (the Mac, or a remote worker). Liveness is derived from lastHeartbeat.
+ */
+model Host {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  kind          String    @default("REMOTE") // LOCAL | REMOTE
+  status        String    @default("OFFLINE") // ONLINE | DEGRADED | OFFLINE (materialised by the sweep)
+  tokenHash     String // sha256 of the host token; the token is shown once and never stored
+  capabilities  Json      @default("{}")
+  metadata      Json      @default("{}")
+  lastHeartbeat DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providers ConnectorInstall[]
+  actions   Action[]
+
+  @@unique([userId, name])
+  @@index([userId, status])
+  @@map("hosts")
+}
+
+/**
+ * Deny by default. A row lets ONE canonical agent or team call ONE tool, optionally only within one
+ * mission (execution plan), until it expires. There is no wildcard, no standing grant and no grant
+ * that outlives GRANT_MAX_DAYS. The tool, not the provider, is what is granted.
+ */
+model CapabilityGrant {
+  id              String    @id @default(cuid())
+  userId          String
+  subjectType     String // AGENT | TEAM
+  subjectId       String // canonical org-kit agent_id or team id
+  toolId          String
+  executionPlanId String?
+  scopes          String[]  @default([])
+  maxInvocations  Int?
+  invocationCount Int       @default(0)
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  grantedByUserId String
+  createdAt       DateTime  @default(now())
+  lastInvokedAt   DateTime?
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tool          Tool           @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  executionPlan ExecutionPlan? @relation(fields: [executionPlanId], references: [id], onDelete: Cascade) // a mission-scoped grant must not become unrestricted when its mission is deleted
+
+  @@index([userId, subjectType, subjectId])
+  @@index([toolId])
+  @@map("capability_grants")
+}

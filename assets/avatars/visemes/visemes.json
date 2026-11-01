@@ -1,0 +1,61 @@
+{
+  "WHINK": {
+    "sprite_box_in_crop": [
+      135,
+      165,
+      425,
+      400
+    ],
+    "crop_offset_in_master_2168x2896": [
+      826,
+      978
+    ],
+    "sprite_origin_in_master_2168x2896": [
+      961,
+      1143
+    ],
+    "visemes": {
+      "rest": "WHINK_rest.png",
+      "mbp": "WHINK_mbp.png",
+      "aa": "WHINK_aa.png",
+      "ee": "WHINK_ee.png",
+      "oo": "WHINK_oo.png",
+      "fv": "WHINK_fv.png"
+    }
+  },
+  "MAMBA": {
+    "sprite_box_in_crop": [
+      90,
+      185,
+      425,
+      415
+    ],
+    "crop_offset_in_master_2168x2896": [
+      806,
+      954
+    ],
+    "sprite_origin_in_master_2168x2896": [
+      896,
+      1139
+    ],
+    "visemes": {
+      "rest": "MAMBA_rest.png",
+      "mbp": "MAMBA_mbp.png",
+      "aa": "MAMBA_aa.png",
+      "ee": "MAMBA_ee.png",
+      "oo": "MAMBA_oo.png",
+      "fv": "MAMBA_fv.png"
+    }
+  },
+  "_notes": {
+    "phoneme_map": {
+      "rest": "silence",
+      "mbp": "M B P",
+      "aa": "A I and open vowels",
+      "ee": "E S T D N K G Y and most consonants",
+      "oo": "O U W Q",
+      "fv": "F V"
+    },
+    "source": "Derived from existing closed, parted and open frames by scaling within a feathered mouth mask."
+  }
+}

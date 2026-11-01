@@ -1,0 +1,46 @@
+# Local development only.
+# POSTGRES_PASSWORD is intentionally weak — it never leaves your machine.
+# Rotate before deploying to any shared or production environment.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: whink
+      POSTGRES_USER: whink
+      POSTGRES_PASSWORD: whink_local   # local dev only — see note above
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"   # localhost only. Set POSTGRES_PORT in a repo-root .env if 5432 is taken on your machine
+    volumes:
+      - whink_pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whink"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Speech-to-text: faster-whisper (OpenAI-compatible /v1/audio/transcriptions)
+  # Needs ~2 GB RAM. Set WHISPER_MODEL to 'base' to reduce memory use.
+  whisper:
+    image: fedirz/faster-whisper-server:latest-cpu
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8765:8000"
+    environment:
+      WHISPER__MODEL: ${WHISPER_MODEL:-base}
+    volumes:
+      - whink_whisper_cache:/root/.cache/huggingface
+
+  # Text-to-speech: kokoro-fastapi (OpenAI-compatible /v1/audio/speech)
+  # Lightweight — runs on CPU with ~500 MB RAM.
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.2.2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8766:8880"
+
+volumes:
+  whink_pgdata:
+  whink_whisper_cache:

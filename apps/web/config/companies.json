@@ -1,0 +1,29 @@
+[
+  {
+    "id": "group",
+    "name": "The WHINK Group",
+    "role": "Parent group of companies",
+    "logo": "/brand/whink-group.webp",
+    "aspect": 1,
+    "url": "https://whink-group.onrender.com",
+    "description": "The WHINK Group is a group of companies. It owns and directs WHINK Apps."
+  },
+  {
+    "id": "apps",
+    "name": "WHINK Apps",
+    "role": "Subsidiary of The WHINK Group; software studio",
+    "logo": "/brand/whink-apps-v2.jpg",
+    "aspect": 1.5,
+    "url": "https://whink-group.onrender.com/#apps",
+    "description": "WHINK Apps is a subsidiary of The WHINK Group. It builds innovative apps."
+  },
+  {
+    "id": "ultimate",
+    "name": "Whink Ultimate",
+    "role": "App built by WHINK Apps",
+    "logo": "/brand/whink-ultimate-emerald.webp",
+    "aspect": 1,
+    "url": "https://whink-group.onrender.com/#ultimate",
+    "description": "W.H.I.N.K. Ultimate is the AI chief of staff app built by WHINK Apps."
+  }
+]

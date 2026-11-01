@@ -1,0 +1,20 @@
+{
+  "name": "whink-openclaw-social-upstream",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WHINK social MCP upstream (X, Instagram, TikTok). Official platform APIs only. Baked into the gateway image.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "typescript": "5.7.2"
+  }
+}

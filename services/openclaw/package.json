@@ -1,0 +1,25 @@
+{
+  "name": "whink-openclaw-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WHINK's own MCP aggregator gateway. Re-exposes upstream MCP servers as <platform>__<tool> from one authenticated streamable HTTP endpoint.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "typescript": "5.7.2",
+    "vitest": "2.1.8"
+  }
+}

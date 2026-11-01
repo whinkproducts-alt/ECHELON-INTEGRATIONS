@@ -1,0 +1,22 @@
+# Reviewed gitleaks findings (first full-history scan, 2026-11-01). Each entry is one exact
+# commit:file:rule:line fingerprint, so a new secret anywhere else, or on another line, still fails the scan.
+# Values are not recorded here. Reviewed from the redacted CI log and the file context; the owner should confirm.
+
+# Test fixtures: dummy keys and tokens used to test redaction, secret detection and credential handling.
+fc877121226af09cf9dc71c353e5c015083749db:apps/web/lib/__tests__/capability-gateway.integration.test.ts:generic-api-key:26
+eb92813931d1996a421b3d0e65d52a4726fb1a35:apps/web/lib/__tests__/workspace-redact.test.ts:generic-api-key:7
+b782496bedd0036bc6a590a38718a17ba2cc73a4:apps/web/lib/__tests__/workspace-redact.test.ts:generic-api-key:6
+91dd0bcc42ae01eb7209d87e6e0626884d7fc1c3:apps/web/lib/__tests__/protected-review.test.ts:aws-access-token:76
+0580be7f7e9fbd078f1af399e4a4f951980e21ff:apps/web/lib/__tests__/social-d3-sse.test.ts:generic-api-key:16
+b82af333ff87d1096626e94559f282f9e092a40f:apps/web/lib/__tests__/openclaw-credential.test.ts:generic-api-key:21
+ecdc60cb642198c87087b0f41e60927134be160d:services/openclaw/upstreams/social/test/social.test.ts:generic-api-key:7
+4a3d7f5d3f63a5e08e61c1d0819657bd45ee35ba:services/openclaw/test/config.test.ts:aws-access-token:50
+4a3d7f5d3f63a5e08e61c1d0819657bd45ee35ba:services/openclaw/test/config.test.ts:aws-access-token:66
+8f1942843a6113f306216673794dc156ad0bb0ad:apps/web/lib/__tests__/model-router-tools-secrets.test.ts:generic-api-key:3
+
+# The repo's own scanner allow-list of known fixtures.
+e8b68698a4e1fea21cbbbd0fbce3eebaeff02d7d:apps/web/.secret-scan-allow:aws-access-token:16
+
+# Master plan archive: line 70697 sits inside an embedded base64 block (lines 70000 to 70800 are all
+# base64 characters only); the "square-access-token" pattern matched encoded data by chance.
+8aee29df0d971ab6073fec919f7d00e899a1683d:docs/ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.txt:square-access-token:70697
