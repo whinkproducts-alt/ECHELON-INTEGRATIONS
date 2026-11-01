@@ -454,3 +454,7 @@ Victor's first install on his Mac (pnpm 12.5.1) failed with ERR_PNPM_MINIMUM_REL
 - Qodo's `fix/remediation-2a68d1fb-185920` is not merged. Take only the `finish()` terminal-update check, later, as a small change with a test and an independent security review. Do not remove the stuck-approval sweep: it is the only path that gives a crashed approval a terminal state and a ledger row.
 - Dependabot PRs are not merged blindly. Order of review: GitHub Actions bumps first (check the pinned SHAs and CI), then npm minor and patch, then major bumps one at a time with a licence check. The mapbox-gl 1 to 3 bump is expected to break rule 7 (proprietary licence): verify, then close it.
 
+## 2026-11-01 Model change handoff rule (set by Victor)
+- After a model change or a new session, the new model reads the notes (latest daily sync, pending tasks, recent decisions, matching learnings, `git status` and `git log`) and carries on; it does not scan the whole chat. The working model keeps the notes handoff-ready before each work block ends and before any planned model change, including one "Next step" line in the daily sync. Rule text is in `CLAUDE.md`, section "Model change handoff".
+- Limit: this is an instruction the next model reads at session start. It cannot stop a model that keeps the same running chat from also seeing that chat; it only tells it not to depend on it.
+
