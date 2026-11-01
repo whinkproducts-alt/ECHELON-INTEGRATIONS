@@ -32,6 +32,23 @@ The same four hard-coded prompts were sent through the fixed NVIDIA chat-complet
 
 Mistral scored **4/4** on this small synthetic fixture, using 249 input and 692 output tokens in total. Its extraction case also passed a separate access probe with the replacement key before the full run. DeepSeek has **no score** because it returned no answer; do not count a timeout as a wrong answer or infer that its access is denied. A four-case fixture cannot establish broader reliability, tool-call behavior, privacy suitability, or cost at scale. The local and hosted timings are not a controlled latency benchmark.
 
+## Nemotron 3 Ultra hosted follow-up
+
+The Founder requested an assessment of `nvidia/nemotron-3-ultra-550b-a55b` specifically as a **free NVIDIA-hosted web/API model**, not as a local installation. On 2026-11-01, the saved trial key accessed its hosted endpoint. The same four synthetic prompts were sent with `reasoning_effort: medium`, `temperature: 0`, `max_tokens: 1024`, no tools, and a 120-second request limit. This was an isolated evaluation call; the application router and production paths were not changed.
+
+| Synthetic case | Result | Time | Tokens in/out |
+| --- | --- | ---: | ---: |
+| Structured extraction | Pass | 1,246 ms | 67 / 79 |
+| Untrusted quoted text | Pass | 2,328 ms | 70 / 133 |
+| Zero-spend choice | Pass | 30,108 ms | 87 / 85 |
+| Simple arithmetic | Pass | 1,029 ms | 57 / 54 |
+
+Score: **4/4**, with 281 input and 351 output tokens total. A separate extraction access probe also passed. The 30-second outlier means these four requests do not establish reliable latency. A request specifying `reasoning_budget: 512` received HTTP 400 because the hosted V2 runner reported that `thinking_token_budget` was unsupported; removing that field succeeded. Do not assume that every documented reasoning control works on this hosted deployment.
+
+NVIDIA lists a free prototype endpoint and browser playground for this model. Its Developer Program FAQ restricts free hosted access to prototyping, research, development, and testing; it defines service to real end users as production use requiring a separate entitlement. The model page says trial inputs and outputs are recorded. Therefore, this is a promising **free cloud evaluation candidate**, not a verified zero-cost production default. Quota, sustained availability, tool calling, and real ECHELON workflows remain untested. The model is text in/text out; it does not itself supply calls, messaging, voice, avatars, or video. Its published architecture includes Mamba-2, but that does not imply ECHELON has a local Mamba runtime.
+
+Official references: https://build.nvidia.com/nvidia/nemotron-3-ultra-550b-a55b ; https://build.nvidia.com/nvidia/nemotron-3-ultra-550b-a55b/modelcard ; https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-ultra-550b-a55b-infer ; https://docs.api.nvidia.com/nim/docs/product
+
 ## Reproduce the NVIDIA comparison
 
 1. Sign in to NVIDIA Build and obtain a developer trial API key under its trial terms. Do not paste the key into chat or commit it.
