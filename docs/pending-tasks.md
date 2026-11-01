@@ -1,4 +1,4 @@
-# Pending tasks (updated 2026-10-27)
+# Pending tasks (updated 2026-11-01)
 
 Source of truth for what is open. Update it when something is done or decided. Read it at the start of every session.
 
@@ -56,4 +56,20 @@ Built and independently reviewed, never run against a real Ollama or on the owne
 - streamChat (plain streamed replies without tools) still uses the OpenAI-compatible /v1 path for Gemma; only the tool loop and one-shot chat use native /api/chat.
 - Local-Only mode: spoken approvals in approval-card.tsx still use browser speech (set NEXT_PUBLIC_WHINK_LOCAL_ONLY=true for the voice hook); owner emails are not verified (open signup lets a stranger register a listed owner email that has no account yet; keep SIGNUP_ENABLED false); a hardlink to a secret file is refused only when its link count is above 1; the 50 ms settle in project-access.test.ts works around an in-flight import race in that test file.
 - Apple git 2.39 (Xcode tools) lacks GIT_ATTR_SOURCE; the hostile-config refusal still applies and a warning is logged.
+
+## H. Capability Gateway / Integration Hub (added 2026-11-01)
+Built on branch `integration/echelon-capability-gateway` (PR #3). Design and limits: docs/CAPABILITY-GATEWAY.md. Review fixes: docs/decisions.md, entry "independent security review".
+Waiting on Victor:
+- Enable GitHub code scanning (Settings, Code security). CodeQL analyses fine but fails to upload while it is off, so it is red on every PR.
+- Turn on branch protection with required reviews on `main` (item A7).
+- D-1 (hosting for the remote worker) before the physical Mac-off acceptance test E5.
+- Confirm the 12 gitleaks findings allow-listed in `.gitleaksignore` (11 test fixtures, 1 base64 false positive in the master plan). Reviewed from the redacted CI log and file context only.
+- Confirm defaults: heartbeat 30/75/120 s, grants capped at 30 days, one `ENCRYPTION_KEY` for all provider credentials.
+- Reset any dev database that applied an earlier version of migration 20261101120000_capability_gateway_e1 (edited in place before merge).
+Open engineering items:
+- A second independent security-reviewer pass on the review-fix changes (egress, review flow, registry scoping). Not yet done.
+- Before any agent or chat path calls a provider tool: wrap and injection-scan provider output and descriptions (review CG-12).
+- Accepted for now: CG-9 in-flight owner test call survives a revoke; CG-13 ciphertext in old row versions and backups; CG-14 a bland-named money tool relies on the review.
+- Not built: stdio host agent, plugin formats beyond MCP, OpenClaw capability adapter, network-level egress (pf or container on the Mac), OAuth for providers, key rotation and per-host keys, a scheduled worker job for the host sweep.
+- Phase 3 Recall hardening (section C) is still untouched.
 
