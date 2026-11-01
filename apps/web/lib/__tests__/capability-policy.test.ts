@@ -130,6 +130,15 @@ describe('data classification (T11b)', () => {
   it('QODO: non-credential siblings and short or non-string values under a credential key still pass', () => {
     expect(code(input({ args: { text: 'a long ordinary sentence here', auth: { type: 'bearer' }, password: { min_length: 12, required: true } } }))).toBe('ALLOW');
   });
+  it('CG2-1 credential key names are recognised in camelCase, kebab-case and header style', () => {
+    const v = 'Zx9fQ2mK8vLp3RtYw7NbHc1DsAe6UgJi5OqX4TvB';
+    for (const k of ['accessToken', 'refreshToken', 'authToken', 'idToken', 'x-auth-token', 'X-Auth', 'auth', 'pwd', 'cookie', 'Set-Cookie', 'sessionId', 'session_key', 'clientSecret', 'apiKey', 'pin', 'authKey']) {
+      expect(code(input({ args: { [k]: k === 'pin' ? '12345678' : v } })), k).toBe('DATA_CLASS_DENIED');
+    }
+  });
+  it('CG2-1 names about counting or splitting text are not treated as credentials', () => {
+    expect(code(input({ args: { tokenizer: 'a-long-tokenizer-name', maxTokens: 'unlimited-long', max_tokens: 'unlimited-long', author: 'Victor Igboekwe', pinned: 'a-pinned-note-long', spinner: 'a-spinner-text' } }))).toBe('ALLOW');
+  });
   it('ordinary arguments are not caught by the structural credential check', () => {
     expect(code(input({ args: { text: 'hello', max_tokens: 100, token_count: 5, query: 'quarterly tokens report', tokenizer: 'gpt' } }))).toBe('ALLOW');
     expect(code(input({ args: { password: 'x' } }))).toBe('ALLOW'); // too short to be a credential

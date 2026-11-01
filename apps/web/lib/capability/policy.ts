@@ -118,7 +118,11 @@ export function effectiveToolClass(tool: Pick<PolicyTool, 'riskClass' | 'defHash
   return tool.riskClass === 'A' || tool.riskClass === 'B' ? tool.riskClass : 'C';
 }
 
-const CREDENTIAL_KEY = /(secret|passw(?:or)?d|passphrase|api[_-]?key|apikey|credential|private[_-]?key|authorization|bearer|(?:^|[^a-z])token(?:$|[^a-z]))/i;
+// Key names that hold a credential. "token" matches anywhere in the name (accessToken, refresh-token, X_TOKEN), minus a few
+// names that are about counting or splitting text, not secrets. Letter case does not matter and camelCase is covered.
+const CREDENTIAL_KEY = /(secret|passw(?:or)?d|pwd|passphrase|api[_-]?key|apikey|credential|private[_-]?key|authorization|bearer|cookie|session[_-]?(?:id|key|token)|auth[_-]?(?:key|code|header)|token|(?:^|[^a-z])auth(?:$|[^a-z])|^pin$)/i;
+const NOT_A_CREDENTIAL_KEY = /(tokeniz|max[_-]?tokens|num[_-]?tokens|tokens?[_-]?(?:count|limit|used|budget|usage)|^tokens$)/i;
+const isCredentialKey = (k: string): boolean => CREDENTIAL_KEY.test(k) && !NOT_A_CREDENTIAL_KEY.test(k);
 
 /**
  * True when a string value matches a secret rule on its own, when a non-trivial string is stored under a
@@ -140,7 +144,7 @@ export function argsMayContainCredential(args: unknown): boolean {
     if (v && typeof v === 'object') {
       if (seen.has(v)) return false;
       seen.add(v);
-      return Object.entries(v as Record<string, unknown>).some(([k, x]) => walk(x, depth + 1, underCredential || CREDENTIAL_KEY.test(k)));
+      return Object.entries(v as Record<string, unknown>).some(([k, x]) => walk(x, depth + 1, underCredential || isCredentialKey(k)));
     }
     return false;
   };

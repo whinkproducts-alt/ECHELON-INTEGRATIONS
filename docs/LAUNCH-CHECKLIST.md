@@ -49,7 +49,7 @@ Not built, so do not expect it: stdio execution on a host, plugin formats beyond
 
 | # | Gate | Status |
 |---|---|---|
-| 4.1 | A second independent security-reviewer pass on the review fixes (egress, review flow, credential gate, heartbeat). | Open |
+| 4.1 | A second independent security-reviewer pass on the review fixes (egress, review flow, credential gate, heartbeat). | **Done** (2026-11-01): one high fixed; CG2-2 to CG2-7 deferred, see `docs/decisions.md` |
 | 4.2 | Branch protection with required reviews on `main`, secret-scanning push protection, 2FA, signed commits. Only the owner can set these. | Open |
 | 4.3 | Confirm the 12 allow-listed gitleaks findings in `.gitleaksignore` (11 test fixtures, 1 base64 false positive). They were reviewed from the redacted CI log only. | Open |
 | 4.4 | Delete the three merged branches (the cloud session got HTTP 403). Tip SHAs and the recreate command are in `docs/daily-syncs/2026-11-01.md`. | Open |
