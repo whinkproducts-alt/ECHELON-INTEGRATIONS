@@ -306,7 +306,7 @@ The agent roster was informed by the structure of contains-studio/agents. The ag
 
 This repo is paired with the **W.H.I.N.K ULTIMATE** Cowork project on claude.ai (Projects → W.H.I.N.K ULTIMATE).
 
-At the start of every Claude Code session:
+At the start of every Claude Code session (after a model change, use the shorter path in "Model change handoff" below instead):
 - Read `docs/daily-syncs/` — the most recent file is the current project state
 - Read `docs/decisions.md` — the dated decision log
 - Read `docs/learnings.md` — everything learnt building the app: Victor's preferences, the organisation, what exists, gotchas, open items
@@ -318,7 +318,7 @@ Account-level memory (`/areas/whink-ai-assistant.md`) is writable from Claude Co
 — update it whenever Victor states a new fact or makes a decision during a build session.
 
 ## Model change handoff (rule set by Victor 2026-11-01)
-When the model changes, or a new session starts, the new model does NOT scan or re-read the whole chat. The notes are the handoff. It reads, in this order, and then carries on:
+When the model changes, or a new session starts, the new model does NOT scan or re-read the whole chat. The notes are the handoff. This path is the one to use after a model change; it is the "Cowork sync" list above, narrowed to what the task needs. It reads, in this order, and then carries on:
 1. The newest file in `docs/daily-syncs/` (its Status and Next step lines say where things stand).
 2. `docs/pending-tasks.md` (everything open and who it waits on).
 3. The newest entries in `docs/decisions.md` and the sections of `docs/learnings.md` that match the task.
