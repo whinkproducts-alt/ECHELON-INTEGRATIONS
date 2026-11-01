@@ -316,3 +316,6 @@ At the start of every Claude Code session:
 The end-of-day-memory-sync scheduled task keeps all three in sync automatically.
 Account-level memory (`/areas/whink-ai-assistant.md`) is writable from Claude Code sessions
 — update it whenever Victor states a new fact or makes a decision during a build session.
+
+## Capability Gateway (Integration Hub)
+MCP providers, hosts, per-tool grants and receipts live in `apps/web/lib/capability/` with the UI at `/dashboard/integrations`. Design, schema reconciliation, guardrail mapping and the honest list of what is not done are in `docs/CAPABILITY-GATEWAY.md`. A connected provider grants nothing; a call needs a grant, passes the policy gates and then the permission engine like any other action.

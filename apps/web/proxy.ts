@@ -70,6 +70,11 @@ async function handle(req: NextRequest & { auth: any }, nonce: string, csp: stri
     return passThrough();
   }
 
+  // Host heartbeat: authenticated by the host's own token in the route, not by a browser session.
+  if (req.method === 'POST' && /^\/api\/integrations\/hosts\/[A-Za-z0-9]{1,64}\/heartbeat$/.test(pathname)) {
+    return passThrough();
+  }
+
   // Dev-only preview harness. Never matches outside `next dev`; production keeps the auth wall.
   if (process.env.NODE_ENV === 'development' && (pathname === '/dev-preview' || pathname.startsWith('/dev-preview/'))) {
     return passThrough();

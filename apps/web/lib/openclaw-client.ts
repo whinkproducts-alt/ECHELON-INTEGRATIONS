@@ -249,3 +249,67 @@ export async function callOpenClawTool(
   }
   return text;
 }
+
+// ── Founder-registered capability providers (lib/capability) ────────────────────────────────────
+// Same boundary rule as above: this file is the only place that knows the MCP transport. The
+// capability layer passes in an egress-checked `fetch` and gets plain data back. No SDK types leave
+// this file, no connection is pooled (each call opens and closes its own), and redirects are the
+// caller's fetch's business (the allow-listed fetch never follows them).
+
+export interface ExternalMcpConn {
+  endpoint: string;
+  fetch: typeof fetch;
+  headers?: Record<string, string>;
+}
+
+async function withExternalClient<T>(conn: ExternalMcpConn, timeoutMs: number, fn: (client: Client) => Promise<T>): Promise<T> {
+  assertLoopbackWhenLocalOnly(conn.endpoint, 'MCP provider');
+  const transport = new StreamableHTTPClientTransport(new URL(conn.endpoint), {
+    fetch: conn.fetch,
+    requestInit: { headers: conn.headers ?? {}, signal: AbortSignal.timeout(timeoutMs) },
+  });
+  const client = new Client({ name: 'echelon', version: '1.0.0' }, { capabilities: {} });
+  try {
+    await client.connect(transport, { timeout: timeoutMs });
+    return await fn(client);
+  } finally {
+    await client.close().catch(() => undefined);
+  }
+}
+
+/** Raw tool list from an external provider, paged and size-capped. The caller sanitises every entry. */
+export async function listExternalMcpTools(conn: ExternalMcpConn, timeoutMs = LIST_TIMEOUT_MS): Promise<unknown[]> {
+  return withExternalClient(conn, timeoutMs, async (client) => {
+    const all: unknown[] = [];
+    let cursor: string | undefined;
+    let bytes = 0;
+    for (let page = 0; page < MAX_LIST_PAGES; page++) {
+      const res = await client.listTools(cursor ? { cursor } : undefined, { timeout: timeoutMs });
+      bytes += JSON.stringify(res.tools).length;
+      if (bytes > MAX_LIST_BYTES) throw new GatewayError('Provider tool list exceeds size cap');
+      all.push(...res.tools);
+      cursor = res.nextCursor;
+      if (!cursor) break;
+    }
+    return all;
+  });
+}
+
+/** One tool call on an external provider. Text content only, capped; the result is untrusted. */
+export async function callExternalMcpTool(
+  conn: ExternalMcpConn,
+  toolName: string,
+  args: Record<string, unknown>,
+  timeoutMs: number,
+): Promise<{ text: string; isError: boolean }> {
+  const res = await withExternalClient(conn, timeoutMs, (client) => client.callTool({ name: toolName, arguments: args }, undefined, { timeout: timeoutMs }));
+  const parts: string[] = [];
+  if (Array.isArray(res.content)) {
+    for (const p of res.content as Array<Record<string, unknown> | null>) {
+      if (p && p.type === 'text' && typeof p.text === 'string') parts.push(p.text);
+      else parts.push(`[${String(p?.type ?? 'unknown').slice(0, 20)} content omitted]`);
+    }
+  }
+  const joined = parts.join('\n');
+  return { text: joined.length > MAX_RESULT_CHARS ? `${joined.slice(0, MAX_RESULT_CHARS)}\n[truncated]` : joined, isError: res.isError === true };
+}

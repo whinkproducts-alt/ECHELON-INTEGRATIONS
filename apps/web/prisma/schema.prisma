@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
@@ -22,45 +22,47 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  passkeys          PasskeyCredential[]
-  passwordResetTokens PasswordResetToken[]
-  passkeyChallenges PasskeyChallenge[]
-  sessionVersion    Int       @default(0)
-  accounts          Account[]
-  sessions          Session[]
-  profile           UserProfile?
-  preferences       UserPreference?
-  apiKeys           UserApiKey[]
-  conversations     Conversation[]
-  projects          ProjectMember[]
-  ownedProjects     Project[]
-  personaState      PersonaState?
-  actions           Action[]
-  permissions       Permission[]
-  delegations       Delegation[]
-  evaluationRuns    EvaluationRun[]
-  calendarEvents    CalendarEvent[]
-  notes             Note[]
-  approvalRequests  ApprovalRequest[]
-  socialConnections  SocialConnection[]
-  skillSubmissions   SkillSubmission[]
-  oauthStates        OAuthState[]
-  scheduledPosts     ScheduledPost[]
-  documentWorkspaces       DocumentWorkspace[]
-  documents                Document[]
-  notificationPreferences  NotificationPreference[]
-  boardMeetings            BoardMeeting[]
-  connectorInstalls        ConnectorInstall[]
-  usageEvents              UsageEvent[]
-  contacts                 Contact[]
-  changeRequests           ChangeRequest[]
-  contracts                Contract[]
-  commsRequests            CommsRequest[]
-  swarmRuns                SwarmRun[]
-  agentJobs                AgentJob[]
-  agentExecutions          AgentExecution[]
-  recommendations          Recommendation[]
-  newsSeen                 NewsSeen[]
+  passkeys                PasskeyCredential[]
+  passwordResetTokens     PasswordResetToken[]
+  passkeyChallenges       PasskeyChallenge[]
+  sessionVersion          Int                      @default(0)
+  accounts                Account[]
+  sessions                Session[]
+  profile                 UserProfile?
+  preferences             UserPreference?
+  apiKeys                 UserApiKey[]
+  conversations           Conversation[]
+  projects                ProjectMember[]
+  ownedProjects           Project[]
+  personaState            PersonaState?
+  actions                 Action[]
+  permissions             Permission[]
+  delegations             Delegation[]
+  evaluationRuns          EvaluationRun[]
+  calendarEvents          CalendarEvent[]
+  notes                   Note[]
+  approvalRequests        ApprovalRequest[]
+  socialConnections       SocialConnection[]
+  skillSubmissions        SkillSubmission[]
+  oauthStates             OAuthState[]
+  scheduledPosts          ScheduledPost[]
+  documentWorkspaces      DocumentWorkspace[]
+  documents               Document[]
+  notificationPreferences NotificationPreference[]
+  boardMeetings           BoardMeeting[]
+  connectorInstalls       ConnectorInstall[]
+  hosts                   Host[]
+  capabilityGrants        CapabilityGrant[]
+  usageEvents             UsageEvent[]
+  contacts                Contact[]
+  changeRequests          ChangeRequest[]
+  contracts               Contract[]
+  commsRequests           CommsRequest[]
+  swarmRuns               SwarmRun[]
+  agentJobs               AgentJob[]
+  agentExecutions         AgentExecution[]
+  recommendations         Recommendation[]
+  newsSeen                NewsSeen[]
 
   @@map("users")
 }
@@ -514,6 +516,20 @@ model Tool {
   version             String   @default("1.0.0")
   createdAt           DateTime @default(now())
 
+  // Capability Gateway (E1/E4a). Provider tools are namespaced, so one provider can never take over
+  // another's tool name. riskClass defaults to the strictest value for provider tools (set in code).
+  connectorInstallId String?
+  originalName       String?
+  costClass          String  @default("UNKNOWN") // FREE | METERED | CLOUD_BILLABLE | UNKNOWN; only FREE runs
+  timeoutMs          Int     @default(30000)
+  defHash            String? // hash of the sanitised definition as last discovered
+  reviewedDefHash    String? // hash the Founder reviewed; riskClass above applies only while it matches defHash
+
+  connectorInstall ConnectorInstall? @relation(fields: [connectorInstallId], references: [id], onDelete: SetNull)
+  grants           CapabilityGrant[]
+  actions          Action[]
+
+  @@index([connectorInstallId])
   @@map("tools")
 }
 
@@ -529,7 +545,8 @@ model ExecutionPlan {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  steps PlanStep[]
+  steps           PlanStep[]
+  CapabilityGrant CapabilityGrant[]
 
   @@index([userId])
   @@map("execution_plans")
@@ -579,10 +596,24 @@ model Action {
   latencyMs          Int?
   createdAt          DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  // Capability Gateway receipts (E1/E4a). All optional: legacy rows are unchanged. Written only by lib/ledger.ts.
+  connectorInstallId String?
+  capabilityId       String? // Tool.id
+  hostId             String?
+  errorCode          String?
+  approvalId         String?
+  grantId            String?
+
+  user             User              @relation(fields: [userId], references: [id])
+  connectorInstall ConnectorInstall? @relation(fields: [connectorInstallId], references: [id], onDelete: SetNull)
+  capability       Tool?             @relation(fields: [capabilityId], references: [id], onDelete: SetNull)
+  host             Host?             @relation(fields: [hostId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([correlationId])
+  @@index([connectorInstallId])
+  @@index([capabilityId])
+  @@index([hostId])
   @@map("actions")
 }
 
@@ -815,8 +846,8 @@ model ApprovalRequest {
   executedAt      DateTime?
   result          Json?
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  commsRequest CommsRequest?
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commsRequest   CommsRequest?
   agentExecution AgentExecution?
 
   @@index([userId, status, expiresAt])
@@ -824,20 +855,20 @@ model ApprovalRequest {
 }
 
 model SocialConnection {
-  id              String    @id @default(cuid())
-  userId          String
-  platform        String // x | instagram | tiktok
-  accessTokenEnc  String // AES-256-GCM via lib/key-encryption.ts, never plaintext
-  refreshTokenEnc String?
-  scopes          String    @default("")
-  expiresAt       DateTime?
-  platformUserId  String?
-  platformHandle  String?
-  status          String    @default("active") // active | expired | revoked
-  consentGrantedAt DateTime?
+  id                 String    @id @default(cuid())
+  userId             String
+  platform           String // x | instagram | tiktok
+  accessTokenEnc     String // AES-256-GCM via lib/key-encryption.ts, never plaintext
+  refreshTokenEnc    String?
+  scopes             String    @default("")
+  expiresAt          DateTime?
+  platformUserId     String?
+  platformHandle     String?
+  status             String    @default("active") // active | expired | revoked
+  consentGrantedAt   DateTime?
   consentTextVersion String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -846,17 +877,17 @@ model SocialConnection {
 }
 
 model OAuthState {
-  id              String    @id @default(cuid())
-  userId          String
-  platform        String
-  stateHash       String    @unique // sha256 hex of the state value; the state itself is never stored
-  codeVerifierEnc String // PKCE verifier, encrypted
-  redirectUri     String
-  consentGrantedAt DateTime?
+  id                 String    @id @default(cuid())
+  userId             String
+  platform           String
+  stateHash          String    @unique // sha256 hex of the state value; the state itself is never stored
+  codeVerifierEnc    String // PKCE verifier, encrypted
+  redirectUri        String
+  consentGrantedAt   DateTime?
   consentTextVersion String?
-  createdAt       DateTime  @default(now())
-  expiresAt       DateTime
-  usedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  expiresAt          DateTime
+  usedAt             DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -892,14 +923,14 @@ model ScheduledPost {
 // ── Notification Preferences ─────────────────────────────────────
 
 model NotificationPreference {
-  id       String  @id @default(cuid())
-  userId   String
-  channel  String  // EMAIL | WHATSAPP | SMS | TELEGRAM | PHONE_CALL
-  enabled  Boolean @default(false)
-  address  String? // email, phone E.164, or Telegram chat ID
-  schedule String  @default("DAILY") // DAILY | IMMEDIATE | WEEKLY
-  time     String  @default("08:00") // HH:MM in user's local time
-  timeZone String  @default("America/Edmonton")
+  id        String   @id @default(cuid())
+  userId    String
+  channel   String // EMAIL | WHATSAPP | SMS | TELEGRAM | PHONE_CALL
+  enabled   Boolean  @default(false)
+  address   String? // email, phone E.164, or Telegram chat ID
+  schedule  String   @default("DAILY") // DAILY | IMMEDIATE | WEEKLY
+  time      String   @default("08:00") // HH:MM in user's local time
+  timeZone  String   @default("America/Edmonton")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -942,10 +973,33 @@ model ConnectorInstall {
   config      Json?
   installedAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Capability Gateway (E1/E4a). `kind` CATALOG rows are the legacy catalog installs and are never
+  // touched by the capability layer. MCP_SERVER rows are Founder-registered providers.
+  kind                String    @default("CATALOG") // CATALOG | MCP_SERVER
+  transport           String? // streamable-http | stdio
+  endpoint            String?
+  command             String?
+  args                String[]  @default([])
+  hostId              String?
+  credentialsEnc      String? // AES-256-GCM (lib/key-encryption); never returned by any API
+  credentialHint      String?
+  egressAllowlist     String[]  @default([])
+  maxDataClass        String    @default("organization") // highest data class this provider may receive
+  status              String    @default("REGISTERED") // REGISTERED | REVIEWED | ENABLED | DISABLED | REVOKED
+  disabledReason      String?
+  reviewedByUserId    String?
+  reviewedAt          DateTime?
+  reviewedFingerprint String? // hash of endpoint+allowlist+tool definitions at review; a change forces re-review
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  host    Host?    @relation(fields: [hostId], references: [id], onDelete: SetNull)
+  tools   Tool[]
+  actions Action[]
 
   @@unique([userId, connectorId])
   @@index([userId])
+  @@index([kind, status])
+  @@index([hostId])
   @@map("connector_installs")
 }
 
@@ -1064,24 +1118,24 @@ model Contract {
 // registers tools, changes permissions, or enters the org-kit executed skill registry.
 
 model SkillSubmission {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String
-  filename    String
-  sha256      String
-  sizeBytes   Int
-  status      String   @default("QUEUED") // QUEUED | SCANNING | REJECTED_SECURITY | ASSESSING | ACCEPTED | REJECTED_VALUE | WAITING_MODEL | FAILED
-  content     String // raw upload, encrypted at rest when ENCRYPTION_KEY is configured ("enc:" prefix), else "raw:"
-  scanReport  Json?
-  committee   Json?
-  decision    String?
-  reason      String?
-  memoryIds   String[]
-  attempts    Int      @default(0)
-  leaseOwner  String?
-  leaseUntil  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  filename   String
+  sha256     String
+  sizeBytes  Int
+  status     String    @default("QUEUED") // QUEUED | SCANNING | REJECTED_SECURITY | ASSESSING | ACCEPTED | REJECTED_VALUE | WAITING_MODEL | FAILED
+  content    String // raw upload, encrypted at rest when ENCRYPTION_KEY is configured ("enc:" prefix), else "raw:"
+  scanReport Json?
+  committee  Json?
+  decision   String?
+  reason     String?
+  memoryIds  String[]
+  attempts   Int       @default(0)
+  leaseOwner String?
+  leaseUntil DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1155,30 +1209,30 @@ model AgentJob {
 
 // Process-level facts only (no user data).
 model AgentExecution {
-  id           String @id @default(cuid())
-  userId       String
-  approvalId   String @unique
-  contentHash  String
-  agentIds     String[]
-  status       String @default("QUEUED")
-  attempts     Int @default(0)
-  claimToken   String?
-  output       Json?
-  reason       String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  approval     ApprovalRequest @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  id          String          @id @default(cuid())
+  userId      String
+  approvalId  String          @unique
+  contentHash String
+  agentIds    String[]
+  status      String          @default("QUEUED")
+  attempts    Int             @default(0)
+  claimToken  String?
+  output      Json?
+  reason      String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approval    ApprovalRequest @relation(fields: [approvalId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
   @@map("agent_executions")
 }
 
 model AgentHeartbeat {
-  workerId  String   @id
-  startedAt DateTime
+  workerId   String   @id
+  startedAt  DateTime
   lastSeenAt DateTime
-  version   String
+  version    String
 
   @@map("agent_heartbeats")
 }
@@ -1350,4 +1404,64 @@ model PasswordResetToken {
   @@index([userId, usedAt])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+// ── Capability Gateway (E1/E4a) ─────────────────────────────────────────────────────────────────
+// Reconciliation: see docs/CAPABILITY-GATEWAY.md. Permission and Delegation are per user and per
+// capability name, so they cannot say "this agent may call this tool on this provider for this
+// mission". Host and CapabilityGrant are therefore new; everything else extends existing tables.
+
+/**
+ * A place that runs MCP servers (the Mac, or a remote worker). Liveness is derived from lastHeartbeat.
+ */
+model Host {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  kind          String    @default("REMOTE") // LOCAL | REMOTE
+  status        String    @default("OFFLINE") // ONLINE | DEGRADED | OFFLINE (materialised by the sweep)
+  tokenHash     String // sha256 of the host token; the token is shown once and never stored
+  capabilities  Json      @default("{}")
+  metadata      Json      @default("{}")
+  lastHeartbeat DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providers ConnectorInstall[]
+  actions   Action[]
+
+  @@unique([userId, name])
+  @@index([userId, status])
+  @@map("hosts")
+}
+
+/**
+ * Deny by default. A row lets ONE canonical agent or team call ONE tool, optionally only within one
+ * mission (execution plan), until it expires. There is no wildcard, no standing grant and no grant
+ * that outlives GRANT_MAX_DAYS. The tool, not the provider, is what is granted.
+ */
+model CapabilityGrant {
+  id              String    @id @default(cuid())
+  userId          String
+  subjectType     String // AGENT | TEAM
+  subjectId       String // canonical org-kit agent_id or team id
+  toolId          String
+  executionPlanId String?
+  scopes          String[]  @default([])
+  maxInvocations  Int?
+  invocationCount Int       @default(0)
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  grantedByUserId String
+  createdAt       DateTime  @default(now())
+  lastInvokedAt   DateTime?
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tool          Tool           @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  executionPlan ExecutionPlan? @relation(fields: [executionPlanId], references: [id], onDelete: SetNull)
+
+  @@index([userId, subjectType, subjectId])
+  @@index([toolId])
+  @@map("capability_grants")
 }

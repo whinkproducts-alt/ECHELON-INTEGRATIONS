@@ -38,6 +38,13 @@ export interface LedgerEntry {
   validationResult?: string | null;
   /** Category of a protected action (money or proprietary) judged by the caller, who may know the parameters. */
   protectedCategory?: ProtectedCategory;
+  /** Capability Gateway receipt fields (all optional). */
+  connectorInstallId?: string | null;
+  capabilityId?: string | null;
+  hostId?: string | null;
+  errorCode?: string | null;
+  approvalId?: string | null;
+  grantId?: string | null;
 }
 
 /** Convenience alias used in API routes. metadata is serialised to inputSummary. */
@@ -53,6 +60,7 @@ export interface LedgerPatch {
   outcome?: string | null;
   postmortem?: string | null;
   latencyMs?: number | null;
+  errorCode?: string | null;
 }
 
 function cap(v: string | null | undefined): string | null | undefined {
@@ -103,6 +111,12 @@ export async function recordAction(entry: LedgerEntry, client: Pick<typeof prism
       validationResult: withProtectedMeta(entry),
       correlationId: entry.correlationId ?? undefined,
       latencyMs: entry.latencyMs ?? undefined,
+      connectorInstallId: entry.connectorInstallId ?? undefined,
+      capabilityId: entry.capabilityId ?? undefined,
+      hostId: entry.hostId ?? undefined,
+      errorCode: entry.errorCode ?? undefined,
+      approvalId: entry.approvalId ?? undefined,
+      grantId: entry.grantId ?? undefined,
     },
   });
   return { id: row.id };
@@ -139,6 +153,7 @@ export async function updateActionStatus(
   if (patch.outcome !== undefined) data.outcome = cap(patch.outcome);
   if (patch.postmortem !== undefined) data.postmortem = cap(patch.postmortem);
   if (patch.latencyMs !== undefined) data.latencyMs = patch.latencyMs;
+  if (patch.errorCode !== undefined) data.errorCode = patch.errorCode;
   const res = await prisma.action.updateMany({ where: { id: actionId, userId }, data });
   return res.count === 1;
 }

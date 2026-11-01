@@ -495,6 +495,20 @@ export async function decide(
       return { id, status: 'EXECUTED', result: { success: true, data: receipt } };
     }
 
+    if (row.kind === 'tool_call' && row.tool && row.tool.startsWith('mcp_')) {
+      // Founder-registered capability providers (lib/capability). The executor re-runs every policy gate
+      // and the hash-locked approval check; nothing about the approval path is weakened for these tools.
+      const { isCapabilityTool } = await import('@/lib/capability/providers');
+      if (isCapabilityTool(row.tool)) {
+        const { executeApprovedCapability } = await import('@/lib/capability/invoke');
+        const out = await executeApprovedCapability(userId, {
+          id: row.id, tool: row.tool, params: row.params, contentHash: row.contentHash, correlationId: row.correlationId, persona: row.persona,
+        });
+        return finish(row, 'EXECUTING', out.success ? 'EXECUTED' : 'FAILED',
+          { success: out.success, data: out.data, error: out.error }, clock, 'user_confirmed');
+      }
+    }
+
     // Dynamic import: tool-registry imports this module (createApproval).
     const { executeApprovedTool } = await import('@/lib/tool-registry');
     const res = await executeApprovedTool(userId, {
