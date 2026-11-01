@@ -64,6 +64,15 @@ describe('heartbeat endpoint: failures are rate limited, valid hosts never are',
     expect(recordHeartbeat).not.toHaveBeenCalled();
   });
 
+  it('QODO: malformed bodies with a well-formed token are failures too, so they cannot be sent without limit', async () => {
+    recordHeartbeat.mockResolvedValue({ ok: true, status: 'ONLINE', receivedAt: new Date().toISOString() });
+    for (let i = 0; i < 30; i++) expect((await call('203.0.113.20', { body: '{bad' })).status).toBe(400);
+    expect((await call('203.0.113.20', { body: '{bad' })).status).toBe(429);
+    expect((await call('203.0.113.20', { type: 'text/plain', body: 'x' })).status).toBe(429);
+    expect((await call('203.0.113.20')).status).toBe(200); // a good heartbeat from the same address still passes
+    expect(recordHeartbeat).toHaveBeenCalledTimes(1);
+  });
+
   it('QODO-5: a malformed or wrongly typed body is an error and never becomes an empty heartbeat', async () => {
     recordHeartbeat.mockResolvedValue({ ok: true, status: 'ONLINE', receivedAt: new Date().toISOString() });
     expect((await call('203.0.113.9', { body: '{not json' })).status).toBe(400);

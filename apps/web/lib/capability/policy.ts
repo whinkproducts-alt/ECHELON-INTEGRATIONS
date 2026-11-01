@@ -127,22 +127,24 @@ const CREDENTIAL_KEY = /(secret|passw(?:or)?d|passphrase|api[_-]?key|apikey|cred
 export function argsMayContainCredential(args: unknown): boolean {
   let nodes = 0;
   const seen = new Set<unknown>();
-  const walk = (v: unknown, depth: number, key: string | null): boolean => {
+  // `underCredential` is true for everything beneath a credential-named key, at any depth, through objects and arrays:
+  // {"Authorization": {"value": "..."}} and {"api_key": ["..."]} are as much a credential as {"api_key": "..."}.
+  const walk = (v: unknown, depth: number, underCredential: boolean): boolean => {
     // Too deep or too large: stop here. The egress gate below refuses arguments it cannot scan completely, so the call is denied either way.
     if (++nodes > 20_000 || depth > 32) return false;
     if (typeof v === 'string') {
       if (SECRET_RULES.some((r) => r.re.test(v))) return true;
-      return key !== null && CREDENTIAL_KEY.test(key) && v.length >= 8;
+      return underCredential && v.length >= 8;
     }
-    if (Array.isArray(v)) return v.some((x) => walk(x, depth + 1, key));
+    if (Array.isArray(v)) return v.some((x) => walk(x, depth + 1, underCredential));
     if (v && typeof v === 'object') {
       if (seen.has(v)) return false;
       seen.add(v);
-      return Object.entries(v as Record<string, unknown>).some(([k, x]) => walk(x, depth + 1, k));
+      return Object.entries(v as Record<string, unknown>).some(([k, x]) => walk(x, depth + 1, underCredential || CREDENTIAL_KEY.test(k)));
     }
     return false;
   };
-  return walk(args, 0, null);
+  return walk(args, 0, false);
 }
 
 export function evaluateGates(p: PolicyInput): PolicyDecision {

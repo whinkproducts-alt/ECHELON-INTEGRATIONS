@@ -17,13 +17,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Failures are counted, successes are not: a valid host can never be starved by someone else's bad requests.
   // Per client address when a trusted proxy gives one, else a looser shared bucket.
   const addr = clientKey(req.headers);
-  const failed = async (): Promise<Response> =>
+  // Counts one failed attempt. Over the limit the caller gets 429; otherwise `fallback` (default: the one 401 answer for
+  // "no such host" and "wrong token"). Every failure path goes through here, including unreadable bodies.
+  const failed = async (fallback?: Response): Promise<Response> =>
     (addr ? await limitOr429('heartbeat', addr) : await limitOr429('heartbeat_route', 'heartbeat'))
-    ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 }); // one answer for "no such host" and "wrong token"
+    ?? fallback ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!m) return failed();
   const parsed = await readJsonBody(req, 8 * 1024);
   // A body that cannot be read is an error, never an empty heartbeat: the host's stored details are left alone.
-  if ('response' in parsed) return parsed.response;
+  if ('response' in parsed) return failed(parsed.response);
   const body = parsed.body && typeof parsed.body === 'object' && !Array.isArray(parsed.body) ? (parsed.body as { capabilities?: unknown; metadata?: unknown }) : {};
   try {
     const out = await recordHeartbeat(id, m[1], body);

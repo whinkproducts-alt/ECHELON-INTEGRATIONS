@@ -121,6 +121,15 @@ describe('data classification (T11b)', () => {
     expect(code(input({ args: { text: `api_key = "${v}"` } }))).toBe('DATA_CLASS_DENIED');
     expect(code(input({ args: { access_token: v } }))).toBe('DATA_CLASS_DENIED');
   });
+  it('QODO: a credential-named key taints everything beneath it, through objects and arrays at any depth', () => {
+    expect(code(input({ args: { Authorization: { value: 'unprefixed-secret-value' } } }))).toBe('DATA_CLASS_DENIED');
+    expect(code(input({ args: { api_key: ['unprefixed-secret-value'] } }))).toBe('DATA_CLASS_DENIED');
+    expect(code(input({ args: { creds: { password: { inner: [{ deep: 'unprefixed-secret-value' }] } } } }))).toBe('DATA_CLASS_DENIED');
+    expect(code(input({ args: { headers: [{ name: 'x', bearer: { v: 'unprefixed-secret-value' } }] } }))).toBe('DATA_CLASS_DENIED');
+  });
+  it('QODO: non-credential siblings and short or non-string values under a credential key still pass', () => {
+    expect(code(input({ args: { text: 'a long ordinary sentence here', auth: { type: 'bearer' }, password: { min_length: 12, required: true } } }))).toBe('ALLOW');
+  });
   it('ordinary arguments are not caught by the structural credential check', () => {
     expect(code(input({ args: { text: 'hello', max_tokens: 100, token_count: 5, query: 'quarterly tokens report', tokenizer: 'gpt' } }))).toBe('ALLOW');
     expect(code(input({ args: { password: 'x' } }))).toBe('ALLOW'); // too short to be a credential
