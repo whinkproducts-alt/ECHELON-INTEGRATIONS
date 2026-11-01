@@ -98,7 +98,7 @@ test.describe('Integration Hub', () => {
     expect(disc.status).toBe(200);
     expect(disc.json.created).toBe(1);
 
-    const checks = await apiJson<{ pass: boolean; summary: { tools: Array<{ id: string; riskClass: string; costClass: string }> } }>(page, 'GET', `/api/integrations/providers/${pid}/checks`);
+    const checks = await apiJson<{ pass: boolean; summary: { fingerprint: string; tools: Array<{ id: string; riskClass: string; costClass: string }> } }>(page, 'GET', `/api/integrations/providers/${pid}/checks`);
     expect(checks.json.pass).toBe(true);
     const tool = checks.json.summary.tools[0];
     expect(tool.riskClass).toBe('C'); // strictest until reviewed
@@ -106,8 +106,13 @@ test.describe('Integration Hub', () => {
 
     // Enabling before the review is refused.
     expect((await apiJson(page, 'POST', `/api/integrations/providers/${pid}/enable`, {})).status).toBe(409);
+    // The review is pinned to the definitions that were shown: without their fingerprint it is refused and nothing is stamped.
+    expect(checks.json.summary.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect((await apiJson(page, 'POST', `/api/integrations/providers/${pid}/review`, { tools: [{ toolId: tool.id, riskClass: 'C', costClass: 'FREE' }] })).status).toBe(409);
+    expect((await apiJson(page, 'POST', `/api/integrations/providers/${pid}/review`, { fingerprint: 'f'.repeat(64), tools: [{ toolId: tool.id, riskClass: 'C', costClass: 'FREE' }] })).status).toBe(409);
+    expect((await apiJson(page, 'POST', `/api/integrations/providers/${pid}/enable`, {})).status).toBe(409); // still not reviewed
     // Review as class C and FREE: it may run, but only with the Founder's approval each time.
-    expect((await apiJson(page, 'POST', `/api/integrations/providers/${pid}/review`, { tools: [{ toolId: tool.id, riskClass: 'C', costClass: 'FREE' }] })).status).toBe(200);
+    expect((await apiJson(page, 'POST', `/api/integrations/providers/${pid}/review`, { fingerprint: checks.json.summary.fingerprint, tools: [{ toolId: tool.id, riskClass: 'C', costClass: 'FREE' }] })).status).toBe(200);
     expect((await apiJson(page, 'POST', `/api/integrations/providers/${pid}/enable`, {})).status).toBe(200);
 
     // Test as the Founder: class C => an approval request, nothing sent.
