@@ -5,6 +5,8 @@ ECHELON is the private, Founder-directed AI organisation for the WHINK Group
 (KAMSI-PRIME / WHINK Ultimate) is preserved here as imported history.
 
 Start here:
+- `docs/product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md` - current Founder-requested architecture for readiness items 1–10; VS Code builds from here
+- `docs/ECHELON-READINESS-EXECUTION.md` - execution checklist, verified status and next action for VS Code
 - `ECHELON-START-HERE.md` - authority, constraints, acceptance
 - `docs/architecture-control/` - Founder decision register (FDR-001..029), contracts, governance
 - `docs/ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.txt` - full master plan archive

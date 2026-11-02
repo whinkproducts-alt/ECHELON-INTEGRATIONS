@@ -1,5 +1,10 @@
 # Pending tasks (updated 2026-11-01)
 
+2026-11-01 continuation: this historical list contains stale implementation claims.
+Use `product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md` and
+`ECHELON-READINESS-EXECUTION.md` for the current Founder-requested build sequence.
+Inspect owning code before acting on any older item below.
+
 Source of truth for what is open. Update it when something is done or decided. Read it at the start of every session.
 
 ## A. Waiting on Victor (decisions and actions only he can take)
