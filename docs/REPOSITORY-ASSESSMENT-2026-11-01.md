@@ -44,3 +44,9 @@ Continue from [execution checklist](ECHELON-READINESS-EXECUTION.md), using [arch
 ## Remote gate correction
 
 Initial PR #21 CI passed the default production build but failed the new queue browser assertion (503 instead of 202): the clean CI browser environment lacked an encryption key for encrypted pending jobs. Added a disposable deterministic test-only key to E2E_ENV. Local .env had masked that fixture gap. This changes only the isolated browser-test setup; real deployments still require their own encryption key. Final remote gate results must be checked before merging.
+
+## Verified main publication
+
+PR #21 merged into main as `ef7e8971c8c8165f6fce900e1b277df2ebd86c90` after all checks passed on code head `92a072e`: CI (typecheck, lint, migrations, tests, default production build and browser suite), CodeQL, gitleaks and production dependency audit. Evidence: https://github.com/whinkproducts-alt/ECHELON-CORP/pull/21 ; CI https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41383823495 ; security https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41383823554 . This final publication record changes documentation only; main-push workflows may run again.
+
+Main is the canonical continuation branch and contains the former supporting-pilot and architecture-branch heads plus newer security fixes. Local verification: 2246 tests passed/38 skipped; 22 browser tests passed; old-database forward-upgrade tests 47 passed; explicit hardware test 25 passed after final transport safeguard. Live GitHub/provider/Founder acceptance and remaining architecture tickets remain pending. No deployment or external communications were performed.

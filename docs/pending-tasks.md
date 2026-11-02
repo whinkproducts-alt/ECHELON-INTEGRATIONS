@@ -1,5 +1,7 @@
 # Pending tasks (updated 2026-11-01)
 
+Main consolidation completed through PR #21 after green CI/security. Architecture, pilot code, assessment and continuation notes are on main. Remaining feature/live acceptance work is tracked in `ECHELON-READINESS-EXECUTION.md`.
+
 Launch readiness, in order: see `docs/LAUNCH-CHECKLIST.md` (status: not ready; Victor's own-Mac run comes first).
 2026-11-01 continuation: this historical list contains stale implementation claims.
 Use `product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md` and

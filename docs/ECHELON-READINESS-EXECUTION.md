@@ -1,7 +1,7 @@
 # VS Code: continue ECHELON functional readiness
 
 Updated 2026-11-01. Start with [the architecture](product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md).
-Architecture is complete as a specification, not implemented functionality. The current task changed documentation only.
+Architecture is complete as a specification. Current main also includes reconciled worker/provider pilot code; remaining features are tracked below. PR #21 passed full CI/security and was merged; see repository assessment.
 
 Current consolidation: latest main security/CI work, worker/GitHub pilot, NVIDIA evaluation code and architecture notes are reconciled together. Pilot integration commit: `fc020b0`. The supporting pilot branch is provenance; do not replay its commits again. See [repository assessment](REPOSITORY-ASSESSMENT-2026-11-01.md) for verified checks and branch decisions. Verify current main HEAD before continuing.
 
