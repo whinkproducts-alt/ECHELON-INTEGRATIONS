@@ -160,3 +160,7 @@ Open items added by this batch:
 - A workflow with both `pull_request` and `push` on the PR's own branch runs twice per commit; the concurrency group is keyed by ref, and the two refs differ. Trigger on `pull_request` and on `main` only.
 - To make a required check pass while skipping work, keep the job and gate its steps with `if`, not the whole workflow with `paths-ignore` (a skipped workflow leaves a required check pending forever).
 - A key-name pattern written with `(^|[^a-z])word($|[^a-z])` and the `i` flag cannot see camelCase (`accessToken`): the letter before the word blocks the match. Match the word anywhere and subtract a short allow-list instead.
+
+## Main reconciliation (2026-11-01)
+
+Fetch all branch heads before claiming a branch is current. Main had newer security changes than the architecture branch, while the separate pilot had useful unmerged application work. Preserve both. An existing test DB can retain old foreign-key rules after an upstream migration was edited in place; validate on a fresh isolated DB. Turbopack local port permissions failed here; webpack build passed. Record both outcomes; GitHub CI still validates the default compiler. Run resource-heavy verification sequentially on this Mac; unconstrained parallel tests produced timeouts, while serial verification retained all assertions and passed.

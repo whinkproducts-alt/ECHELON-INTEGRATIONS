@@ -5,10 +5,14 @@ ECHELON is the private, Founder-directed AI organisation for the WHINK Group
 (KAMSI-PRIME / WHINK Ultimate) is preserved here as imported history.
 
 Start here:
+- `docs/REPOSITORY-ASSESSMENT-2026-11-01.md` - current main reconciliation, branch inventory and verified checks
+- `docs/product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md` - current Founder-requested architecture for readiness items 1–10; VS Code builds from here
+- `docs/ECHELON-READINESS-EXECUTION.md` - execution checklist, verified status and next action for VS Code
 - `ECHELON-START-HERE.md` - authority, constraints, acceptance
 - `docs/architecture-control/` - Founder decision register (FDR-001..029), contracts, governance
 - `docs/ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.txt` - full master plan archive
 - `docs/CAPABILITY-GATEWAY.md` - E1/E4a/E4b capability gateway (this integration branch)
+- `docs/GITHUB-GATEWAY-HANDOFF.md` - verified local worker and GitHub provider work, setup, and remaining acceptance
 - `ECHELON_CODE_AUDIT_REPORT.txt` - audit of the first E4 code packages
 
 The remainder of this file is the inherited WHINK Ultimate setup guide. It is kept

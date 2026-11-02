@@ -12,6 +12,8 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const secret = process.env.AUTH_SECRET || 'e2e-dummy-auth-secret-not-a-real-secret-0123456789';
 
 export const E2E_ENV = {
+  // Disposable encryption key for the isolated browser-test database; never a deployment secret.
+  ENCRYPTION_KEY: 'ab'.repeat(32),
   AUTH_SECRET: secret,
   NEXTAUTH_SECRET: secret,
   AUTH_URL: BASE,

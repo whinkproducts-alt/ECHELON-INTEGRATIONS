@@ -1,6 +1,12 @@
 # Pending tasks (updated 2026-11-01)
 
 Launch readiness, in order: see `docs/LAUNCH-CHECKLIST.md` (status: not ready; Victor's own-Mac run comes first).
+2026-11-01 continuation: this historical list contains stale implementation claims.
+Use `product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md` and
+`ECHELON-READINESS-EXECUTION.md` for the current Founder-requested build sequence.
+Inspect owning code before acting on any older item below.
+
+Current main consolidation and test evidence: `docs/REPOSITORY-ASSESSMENT-2026-11-01.md`. Pilot commits have been reconciled; do not replay them. Live provider/owner and R01–R10 acceptance remain open.
 
 Source of truth for what is open. Update it when something is done or decided. Read it at the start of every session.
 

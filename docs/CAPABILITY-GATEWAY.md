@@ -127,3 +127,69 @@ ECHELON_URL=https://your-echelon ECHELON_HOST_ID=<id> ECHELON_HOST_TOKEN=<token>
 ```
 
 Optional thresholds (seconds; the loader forces degraded >= 2x interval and offline >= 1.5x degraded): `HEARTBEAT_INTERVAL_SEC=30`, `HEARTBEAT_DEGRADED_AFTER_SEC=75`, `HEARTBEAT_OFFLINE_AFTER_SEC=120`. `ENCRYPTION_KEY` must be set to register a provider with a credential.
+
+## One-shot worker connection (local implementation)
+
+Owner-only `POST /api/integrations/jobs` accepts `requestId`, canonical `agentId`,
+`toolName`, JSON `args`, `dataClass` and optional `missionId`. Admission creates an
+`AgentJob`; it grants no permission and does not approve or execute a tool.
+Repeated identical request ids return the same job; different content is rejected.
+`GET /api/integrations/jobs?id=...` returns account-scoped metadata and receipt /
+approval ids, never pending arguments. The approval disposition is a separate field.
+
+The existing runner dispatches `capability:` jobs to
+`lib/worker/capability-execution.ts`. Every call goes through `invokeCapability`
+as the specified AGENT, never OWNER. Current grants, provider state, host,
+cost, data and permissions are checked by the gateway at execution time.
+Class C waits for the existing approval path. The internal-analysis EAR path is unchanged.
+
+Pending inputs are encrypted using the existing server key and hash-bound to the
+account and request. They are erased on dispatch completion, including when an
+approval is created. Existing approval-record storage semantics are unchanged.
+Requests are limited to 64 KiB and refused after 15 minutes in the queue.
+
+Dispatch is at most once, not a guarantee of exactly-once external effects.
+An atomic QUEUED-to-DISPATCHING transition prevents duplicate dispatch. Terminal
+jobs are never reclaimed. An expired DISPATCHING lease is reported as UNKNOWN,
+and is never automatically replayed. Transport errors/timeouts also produce
+UNKNOWN because the remote effect may already have happened. Crash reconciliation
+and cleanup of encrypted inputs retained by interrupted jobs are not implemented.
+
+The worker is an owner-directed queued tool call, not autonomous planning. The
+fixed-repository report provider is described below; live GitHub acceptance is
+still pending. The web server does not start the worker automatically.
+
+Tests: `lib/__tests__/capability-worker.integration.test.ts` uses real PostgreSQL,
+MCP sockets, the scheduler and runner. `e2e/tests/integrations.spec.ts` tests
+owner-only queue admission, idempotency, rejected extra fields and metadata-only
+status in a browser. The earlier claim in this document that Integration Hub
+browser tests do not exist is superseded by those existing and extended tests.
+
+## Fixed-repository GitHub report provider (local code, not authorized live)
+
+`scripts/github-readonly-mcp.ts` exposes one tool, `repo_build_health`, on a
+loopback-only MCP endpoint behind a separate bearer. It rejects caller-supplied
+repository, URL, method, headers or other arguments. `lib/github-readonly/report.ts`
+constructs only fixed GitHub REST reads under the configured owner/repository,
+resolves the configured branch once and pins checks, statuses and Actions to its
+commit. It does not follow redirects or ingest raw job logs. Missing or pending
+checks and incomplete pagination yield UNVERIFIED. PRs are excluded from the
+Issues list. Output above the size cap fails visibly instead of being cut into
+an invalid partial report.
+
+The provider is designed for a private GitHub App installed on ECHELON-CORP with
+read access to Contents, Checks, Commit statuses, Actions, Issues and Pull
+requests. Its App id, installation id, key path, fixed owner/repo/branch and
+local bearer are required environment configuration. No App, key or live token
+has been configured by this change. The provider verifies that the installation
+token names exactly the configured repository and the required read permissions.
+A static bearer sent from the Integration Hub authenticates only to this local
+provider. The provider mints and caches its short-lived GitHub App token; that
+token is never a gateway tool argument or result.
+
+The worker now stores a successful result encrypted and bounded to 16 KiB.
+The owner-only job status endpoint decrypts and marks it as untrusted provider
+content. Gateway receipts still contain summaries/hashes, not raw output.
+Queued input and result retention for interrupted jobs needs a separate policy.
+Local fixture and MCP smoke tests cover the repository boundary and reporting;
+live GitHub App and end-to-end report acceptance remain pending.

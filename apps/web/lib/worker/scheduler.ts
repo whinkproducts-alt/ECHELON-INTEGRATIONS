@@ -70,6 +70,7 @@ export async function claimDueJobs(workerId: string, limit: number, now = new Da
       SELECT id FROM agent_jobs
       WHERE "nextRunAt" <= ${now} AND ("leaseUntil" IS NULL OR "leaseUntil" < ${now})
         AND ("jobKey" NOT LIKE 'ear:%' OR "lastStatus" IS NULL OR "lastStatus" = 'RETRY_SCHEDULED')
+        AND ("jobKey" NOT LIKE 'capability:%' OR "lastStatus" = 'QUEUED')
       ORDER BY "nextRunAt" ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED

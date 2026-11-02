@@ -1198,6 +1198,11 @@ model AgentJob {
   leaseOwner          String?
   runs                Int       @default(0)
   consecutiveFailures Int       @default(0)
+  capabilityRequestEnc String? // encrypted, erased after dispatch; never returned by API
+  capabilityRequestHash String? // idempotency binding, retained after payload erasure
+  capabilityResultEnc String? // capped untrusted result, encrypted for owner-only retrieval
+  capabilityReceiptId String?
+  capabilityApprovalId String?
   createdAt           DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
