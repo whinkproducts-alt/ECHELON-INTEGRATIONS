@@ -1,5 +1,14 @@
 # GitHub Gateway Handoff
 
+Reconciliation update 2026-11-01: the supporting pilot is now reconciled with the latest main gateway security fixes. See `REPOSITORY-ASSESSMENT-2026-11-01.md` for current verification. The original verification and setup sections below are historical; live GitHub acceptance is still pending.
+
+Continuation update, 2026-11-01: read `product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md`
+and `ECHELON-READINESS-EXECUTION.md` before continuing implementation. The Founder
+requested a complete build plan for readiness items 1–10. App creation and private-key
+download were reported after this original note; installation/configuration and live
+worker acceptance must be checked before recreating anything. The historical statement
+below that no App exists is not current evidence. No live pilot pass is recorded here.
+
 This note describes the local work on `integration/echelon-capability-gateway` after
 baseline commit `fc877121226af09cf9dc71c353e5c015083749db`. Read
 [`CAPABILITY-GATEWAY.md`](CAPABILITY-GATEWAY.md) for the gateway design and limits.
