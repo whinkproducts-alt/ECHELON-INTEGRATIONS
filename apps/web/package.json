@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "evaluate:nvidia-trial": "tsx scripts/evaluate-nvidia-trial.ts",
     "memory:reembed": "tsx scripts/backfill-embeddings.ts",
     "security:scan": "tsx scripts/scan-secrets.ts",
     "board:import": "tsx scripts/import-board.ts",

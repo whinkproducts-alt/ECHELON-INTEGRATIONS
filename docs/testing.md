@@ -56,3 +56,11 @@ Never point `DATABASE_URL` at your real WHINK database. `prisma migrate deploy` 
 ## Playwright stays out of the app
 
 `e2e/` is its own package, outside the pnpm workspace. See docs/decisions.md, 2026-10-26, for the CLAUDE.md D9 interpretation that needs Victor's OK.
+
+## Explicit local-model check
+
+The real Ollama streaming test runs only with `OLLAMA_INTEGRATION_MODEL` set to an
+installed model tag. It restricts the compatible endpoint to loopback and fails if
+the requested model or service is unavailable. Without that opt-in it is reported
+as skipped, not passing. Example from apps/web: `OLLAMA_INTEGRATION_MODEL=wink-qwen3.5-9b-8k:latest pnpm exec vitest run lib/__tests__/model-router.test.ts`.
+Record hardware results separately from mocked router tests.

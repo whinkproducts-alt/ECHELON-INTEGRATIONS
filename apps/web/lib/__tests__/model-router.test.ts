@@ -353,30 +353,18 @@ describe('BYOK apiKey override', () => {
   });
 });
 
-describe('Ollama round-trip (integration)', () => {
+describe.skipIf(!process.env.OLLAMA_INTEGRATION_MODEL)('Ollama round-trip (integration)', () => {
   it(
-    'skips gracefully when Ollama is not reachable',
+    'streams a response from the explicitly configured installed local model',
     async () => {
       vi.resetModules();
-      const baseUrl = (
-        process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1'
-      ).replace(/\/$/, '');
-
-      let ollamaUp = false;
-      try {
-        const res = await fetch(`${baseUrl}/models`, { signal: AbortSignal.timeout(500) });
-        ollamaUp = res.ok;
-      } catch {
-        ollamaUp = false;
-      }
-
-      if (!ollamaUp) {
-        console.log('Ollama not reachable — skipping integration test');
-        return;
-      }
-
+      const baseUrl = (process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://127.0.0.1:11434/v1').replace(/\/$/, '');
+      const url = new URL(baseUrl);
+      expect(['127.0.0.1', 'localhost', '[::1]']).toContain(url.hostname);
+      const res = await fetch(`${baseUrl}/models`, { signal: AbortSignal.timeout(5000) });
+      expect(res.ok).toBe(true);
       const { streamChat } = await import('../model-router');
-      const model = process.env.DEFAULT_MODEL ?? 'llama3.1:8b';
+      const model = process.env.OLLAMA_INTEGRATION_MODEL!;
       const stream = await streamChat({
         messages: [{ role: 'user', content: 'Reply with the single word: pong' }],
         model,
@@ -394,7 +382,7 @@ describe('Ollama round-trip (integration)', () => {
 
       expect(lines[lines.length - 1].type).toBe('done');
     },
-    30_000, // Allow for a cold local-model load on constrained hardware.
+    90_000, // Explicit hardware integration may include a cold local-model load.
   );
 });
 

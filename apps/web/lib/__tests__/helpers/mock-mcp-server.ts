@@ -13,7 +13,7 @@ export interface MockMcp {
   close: () => Promise<void>;
 }
 
-export async function startMockMcp(opts: { tools?: Array<{ name: string; description?: string }> } = {}): Promise<MockMcp> {
+export async function startMockMcp(opts: { tools?: Array<{ name: string; description?: string }>; delayMs?: number } = {}): Promise<MockMcp> {
   const calls: MockCall[] = [];
   const toolDefs = opts.tools ?? [{ name: 'echo', description: 'Echo the supplied text back' }];
   const build = (authorization: string | null): McpServer => {
@@ -21,6 +21,7 @@ export async function startMockMcp(opts: { tools?: Array<{ name: string; descrip
     for (const t of toolDefs) {
       s.registerTool(t.name, { description: t.description ?? t.name, inputSchema: { text: z.string().optional() } }, async (args: { text?: string }) => {
         calls.push({ tool: t.name, args: args as Record<string, unknown>, authorization, at: Date.now() });
+        if (opts.delayMs) await new Promise((resolve) => setTimeout(resolve, opts.delayMs));
         return { content: [{ type: 'text' as const, text: `echo: ${args.text ?? ''}` }] };
       });
     }

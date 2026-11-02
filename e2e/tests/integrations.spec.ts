@@ -52,6 +52,8 @@ test.describe('Integration Hub', () => {
     const page = await ctx.newPage();
     await loginAndWait(page, USER_B.email);
     expect((await apiJson(page, 'GET', '/api/integrations/providers')).status).toBe(403);
+    expect((await apiJson(page, 'GET', '/api/integrations/jobs?id=foreign')).status).toBe(403);
+    expect((await apiJson(page, 'POST', '/api/integrations/jobs', {})).status).toBe(403);
     expect((await apiJson(page, 'POST', '/api/integrations/providers', { connectorId: 'nope', transport: 'streamable-http', endpoint: mcpUrl })).status).toBe(403);
     await page.goto('/dashboard/integrations');
     await expect(page.getByText('available to the account owner only')).toBeVisible();
@@ -98,7 +100,7 @@ test.describe('Integration Hub', () => {
     expect(disc.status).toBe(200);
     expect(disc.json.created).toBe(1);
 
-    const checks = await apiJson<{ pass: boolean; summary: { fingerprint: string; tools: Array<{ id: string; riskClass: string; costClass: string }> } }>(page, 'GET', `/api/integrations/providers/${pid}/checks`);
+    const checks = await apiJson<{ pass: boolean; summary: { fingerprint: string; tools: Array<{ id: string; name: string; riskClass: string; costClass: string }> } }>(page, 'GET', `/api/integrations/providers/${pid}/checks`);
     expect(checks.json.pass).toBe(true);
     const tool = checks.json.summary.tools[0];
     expect(tool.riskClass).toBe('C'); // strictest until reviewed
@@ -153,6 +155,22 @@ test.describe('Integration Hub', () => {
     await expect(page.getByText(slug).first()).toBeVisible();
     await expect(page.getByText(/has \s*not\s* been verified yet|not.*verified yet/).first()).toBeVisible();
     await page.screenshot({ path: 'test-results/integration-hub.png', fullPage: true });
+
+    // An authenticated owner can queue an agent call; this does not dispatch or approve it.
+    const request = { requestId: `queue-${slug}`, agentId: roster.json.agents[0].id, toolName: tool.name, args: { text: 'queued-browser-payload' }, dataClass: 'organization' };
+    const callCount = calls.length;
+    const queued = await apiJson<{ job: { id: string; lastStatus: string } }>(page, 'POST', '/api/integrations/jobs', request);
+    expect(queued.status).toBe(202);
+    expect(queued.json.job.lastStatus).toBe('QUEUED');
+    expect(calls.length).toBe(callCount);
+    expect(JSON.stringify(queued.json)).not.toContain('queued-browser-payload');
+    const repeated = await apiJson<{ job: { id: string } }>(page, 'POST', '/api/integrations/jobs', request);
+    expect(repeated.json.job.id).toBe(queued.json.job.id);
+    expect((await apiJson(page, 'POST', '/api/integrations/jobs', { ...request, args: { text: 'changed' } })).status).toBe(409);
+    expect((await apiJson(page, 'POST', '/api/integrations/jobs', { ...request, userId: 'another-user' })).status).toBe(400);
+    const state = await apiJson<{ job: { lastStatus: string } }>(page, 'GET', `/api/integrations/jobs?id=${queued.json.job.id}`);
+    expect(state.status).toBe(200);
+    expect(state.json.job.lastStatus).toBe('QUEUED');
 
     // Revoke is final: credential gone, grants revoked, enabling refused.
     expect((await apiJson(page, 'POST', `/api/integrations/providers/${pid}/revoke`, {})).status).toBe(200);

@@ -9,6 +9,7 @@ Start here:
 - `docs/architecture-control/` - Founder decision register (FDR-001..029), contracts, governance
 - `docs/ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.txt` - full master plan archive
 - `docs/CAPABILITY-GATEWAY.md` - E1/E4a/E4b capability gateway (this integration branch)
+- `docs/GITHUB-GATEWAY-HANDOFF.md` - verified local worker and GitHub provider work, setup, and remaining acceptance
 - `ECHELON_CODE_AUDIT_REPORT.txt` - audit of the first E4 code packages
 
 The remainder of this file is the inherited WHINK Ultimate setup guide. It is kept
