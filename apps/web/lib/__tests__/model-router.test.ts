@@ -365,8 +365,10 @@ describe.skipIf(!process.env.OLLAMA_INTEGRATION_MODEL)('Ollama round-trip (integ
       expect(res.ok).toBe(true);
       const { streamChat } = await import('../model-router');
       const model = process.env.OLLAMA_INTEGRATION_MODEL!;
+      expect(model).not.toMatch(/^(claude|gemini)/i);
       const stream = await streamChat({
         messages: [{ role: 'user', content: 'Reply with the single word: pong' }],
+        baseUrl,
         model,
         maxTokens: 64,
       });
