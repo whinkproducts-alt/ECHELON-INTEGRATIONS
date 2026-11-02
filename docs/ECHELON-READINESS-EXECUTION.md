@@ -51,3 +51,5 @@ telephony costs, iMessage bridge, speech provider, model data ceilings/order and
 Do not recreate credentials reported as already created; locate/configure securely with the Founder.
 Never print key contents. Current App creation is conversation evidence only; validate actual installation.
 Do not deploy, merge, purchase, send real messages or claim Mac-off completion from this handoff alone.
+
+Publication-time GitHub warning: the push reported 134 default-branch vulnerability alerts (8 critical, 49 high, 58 moderate, 19 low). These are untriaged platform alerts, not independently verified reachable vulnerabilities in this branch. R01/R10 must inspect the current dependency graph and alerts, prioritize relevant fixes, and record actual audit results; do not claim security readiness from earlier audit notes.
