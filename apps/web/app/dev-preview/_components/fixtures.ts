@@ -40,15 +40,15 @@ function usage(range: string) {
   const days = range === '30d' ? 30 : 7;
   const daily = Array.from({ length: days }, (_, i) => ({
     day: new Date(Date.UTC(2026, 9, 25 - (days - 1 - i))).toISOString().slice(0, 10),
-    tokensIn: 4000 + ((i * 3719) % 9000), tokensOut: 1500 + ((i * 2113) % 4000), costMicros: 90000 + ((i * 7919) % 120000),
+    tokensIn: 4000 + ((i * 3719) % 9000), tokensOut: 1500 + ((i * 2113) % 4000), unknownCostCalls: 0, costMicros: 90000 + ((i * 7919) % 120000),
   }));
   return {
     range, daily,
     byModel: [
-      { model: 'fixture-large', provider: 'fixture', tokensIn: 52000, tokensOut: 21000, costMicros: 1200000, calls: 41 },
-      { model: 'fixture-local', provider: 'local', tokensIn: 18000, tokensOut: 7000, costMicros: 0, calls: 19 },
+      { model: 'fixture-large', provider: 'fixture', tokensIn: 52000, tokensOut: 21000, unknownCostCalls: 0, costMicros: 1200000, calls: 41 },
+      { model: 'fixture-local', provider: 'local', tokensIn: 18000, tokensOut: 7000, unknownCostCalls: 0, costMicros: 0, calls: 19 },
     ],
-    budget: { state: 'soft', used: 410000, limit: 500000, softPct: 80, hardPct: 100, resetsAt: '2026-11-01T00:00:00.000Z' },
+    budget: { state: 'soft', reserved: 0, used: 410000, limit: 500000, softPct: 80, hardPct: 100, resetsAt: '2026-11-01T00:00:00.000Z' },
     connectivity: 'online',
   };
 }

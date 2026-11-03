@@ -213,10 +213,10 @@ export async function deleteProfile(userId: string, id: string): Promise<boolean
   return r.count === 1;
 }
 
-/** Operator spend admission plus user-paid keys. Selecting a paid model never admits spend by itself. */
-export function paidAdmission(env: EnvMap = process.env, ownKeys: ReadonlySet<string> = new Set()) {
-  const operatorAdmitted = env.WHINK_PAID_MODELS_ENABLED === 'true';
-  return (e: ModelRegistryEntry) => operatorAdmitted || ownKeys.has(e.provider);
+/** Deployment eligibility only. Keys authenticate a provider; they never authorize charges. */
+export function paidAdmission(env: EnvMap = process.env) {
+  const enabled = env.WHINK_PAID_MODELS_ENABLED === 'true';
+  return () => enabled;
 }
 
 export function localFallbackModel(env: EnvMap = process.env): string {

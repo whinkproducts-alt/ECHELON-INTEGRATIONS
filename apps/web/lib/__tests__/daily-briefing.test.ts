@@ -16,7 +16,7 @@ const EMPTY: BriefingSources = {
   approvals: { pending: 0, executed: 0, denied: 0, expired: 0, failed: 0 },
   executions: { running: 0, succeeded: 0, failed: 0, blocked: 0 },
   swarm: { running: 0, done: 0, failed: 0 },
-  usage: { costMicros: 0, events: 0 },
+  usage: { unknownCostCalls: 0, costMicros: 0, events: 0 },
 };
 
 beforeEach(() => { resetDb(); recordActionSafe.mockClear(); });
@@ -51,7 +51,7 @@ describe('composition', () => {
     expect(lines.find((l) => l.kind === 'tasks')!.text).toBe('4 tasks overdue: A; B C; D; and 1 more.');
   });
   it('reports approvals and cost from the counts', () => {
-    const lines = composeBriefing({ ...EMPTY, approvals: { pending: 1, executed: 2, denied: 1, expired: 0, failed: 0 }, usage: { costMicros: 1_234_567, events: 3 } }, { localDate: '2026-11-01' });
+    const lines = composeBriefing({ ...EMPTY, approvals: { pending: 1, executed: 2, denied: 1, expired: 0, failed: 0 }, usage: { unknownCostCalls: 0, costMicros: 1_234_567, events: 3 } }, { localDate: '2026-11-01' });
     const text = lines.map((l) => l.text).join(' ');
     expect(text).toContain('1 approval waiting for you now. In the last day: 2 ran, 1 denied, 0 expired.');
     expect(text).toContain('$1.23 across 3 calls');
@@ -70,7 +70,7 @@ describe('generation', () => {
     db.approvalRequest.groupBy.mockResolvedValue([]);
     db.agentExecution.groupBy.mockResolvedValue([]);
     db.swarmRun.groupBy.mockResolvedValue([]);
-    db.usageEvent.aggregate.mockResolvedValue({ _sum: { costMicros: 0 }, _count: { _all: 0 } });
+    db.usageEvent.aggregate.mockResolvedValue({ _sum: { costMicros: 0 }, _count: { costMicros: 0, _all: 0 } });
   };
   it('first request of the day creates revision 1, encrypted, scoped to the account, and ledgers it', async () => {
     db.userProfile.findUnique.mockResolvedValue({ timezone: 'America/Edmonton' });

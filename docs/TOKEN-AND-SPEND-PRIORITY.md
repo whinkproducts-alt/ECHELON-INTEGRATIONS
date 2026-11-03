@@ -22,3 +22,18 @@ Founder instruction, 2026-11-02: prioritize token and usage-spend reduction befo
 7. Keep coding work economical: targeted searches, concise updates, focused validation, durable notes and minimal history reprocessing.
 
 Then continue R01–R10 from the architecture: real mission/GitHub acceptance, actual fallback, sealed-team enforcement/lockdown assurance, all channels and voice, briefing/avatars, service inventory/backups and approved Mac-off runtime. Current R04/R06/R07/R08 notes overstate some acceptance: iMessage and two-way calls are unfinished; sealed team is still client-only; live fallback is not wired. Provider recipients, entitlements, iMessage bridge and remote host require concrete Founder choices. No live send, purchase or deployment is authorized by this document.
+
+## Dispatch audit and accounting follow-up (2026-11-02)
+
+| Path inspected | Actual behavior / remaining boundary |
+| --- | --- |
+| Chat and tool rounds | Profile selection is only a preview of eligibility. Explicit model, preference and default reach tool dispatch without that selection. Tool rejection before the first side effect can trigger another provider call through plain streaming. |
+| Auto memory and agent learning | A clean reply longer than 100 characters can start two separate completions: 0–5 memory candidates with permission and sensitivity checks, plus an agent lesson with a different schema. A completed-turn record does not generate text, but episodic writes can request an embedding. Retain both learning outputs; do not count them as interchangeable. Prior conversation taint now suppresses debrief. |
+| Worker and EAR | Generic worker calls chatOnce and records character-based token estimates after success. EAR has a separate local-model probe and strict usage write. These are not equivalent controls. |
+| Swarm, skills, change requests, tool registry | Planner, agent, skill stages, spec refinement and one tool call chatOnce directly. Some callers do not propagate an authenticated account to the router. |
+| Embeddings | Memory write/search and backfill use embed; explicit compatible URL, Ollama or OpenAI. Semantic writes already reuse one vector for dedup and storage. |
+| Voice and evaluation | STT/TTS call their configured transports outside the text router. Deepgram, OpenAI and remote compatible endpoints need separate admission. NVIDIA trial is a separate opt-in evaluator; no live test performed. |
+
+Current changes remove key presence as spend eligibility in profile selection, and distinguish unknown cost from an estimated zero in usage, finance and briefing. Historical zeros cannot be distinguished and migrate to unknown. Priced subtotals are estimates; worker/swarm token estimates are not provider receipts. Still open: atomic reservations at dispatch, accounting on failure/cancellation, safe fallback and a representative before/after measurement. No universal spend limit is established by these changes.
+
+Local EAR follow-up: a row lock on the authenticated user serializes admission among participating workers, including the first reservation. Reserve serialized input bytes plus the output allowance against the monthly token threshold; settle once using a character-based estimate. Failed/uncertain calls retain their hold. This bounds participating local attempts under that accounting rule; it is neither a provider-token guarantee nor a paid-route dollar cap. The usage budget separates outstanding holds from settled token estimates.

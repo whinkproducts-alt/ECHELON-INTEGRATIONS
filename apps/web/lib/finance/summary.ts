@@ -65,7 +65,7 @@ export async function financeSummary(userId: string, now = new Date()) {
     prisma.contract.findMany({ where: { userId, status: live, endDate: { gte: now, lte: horizon } }, orderBy: { endDate: 'asc' }, take: 100 }),
     prisma.contract.findMany({ where: { userId, status: live, renewalDate: { gte: now, lte: horizon } }, orderBy: { renewalDate: 'asc' }, take: 100 }),
     budgetState(userId, now),
-    prisma.usageEvent.aggregate({ where: { userId, createdAt: { gte: start } }, _sum: { tokensIn: true, tokensOut: true, costMicros: true }, _count: { _all: true } }),
+    prisma.usageEvent.aggregate({ where: { userId, createdAt: { gte: start } }, _sum: { tokensIn: true, tokensOut: true, costMicros: true }, _count: { costMicros: true, _all: true } }),
   ]);
 
   const { byGroup, byCurrency } = combineContractValue(grouped as unknown as GroupRow[]);
@@ -90,7 +90,7 @@ export async function financeSummary(userId: string, now = new Date()) {
       calls: cost._count._all,
       tokensIn: cost._sum.tokensIn ?? 0,
       tokensOut: cost._sum.tokensOut ?? 0,
-      // Stored per call at record time from WHINK_MODEL_PRICES; 0 when no prices are configured.
+      unknownCostCalls: cost._count._all - cost._count.costMicros,
       costMicros: cost._sum.costMicros ?? 0,
       monthlyTokenBudget: budget.limit,
       budgetState: budget.state,

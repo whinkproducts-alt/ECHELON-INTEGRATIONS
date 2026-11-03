@@ -125,7 +125,7 @@ describe('messages route: conversationTainted propagates from working memory', (
 
     runToolLoop.mockResolvedValue(
       sse([
-        { type: 'text', content: 'Here is the plan.' },
+        { type: 'text', content: 'Here is the plan.'.repeat(10) },
         { type: 'done' },
       ])
     );
@@ -135,6 +135,7 @@ describe('messages route: conversationTainted propagates from working memory', (
     expect(runToolLoop).toHaveBeenCalledTimes(1);
     const callArgs = runToolLoop.mock.calls[0][0];
     expect(callArgs).toMatchObject({ conversationTainted: true });
+    expect((await import('@/lib/orchestrator')).debriefTurn).not.toHaveBeenCalled();
   });
 
   it('passes conversationTainted:false when working memory has no taint key for this conversation', async () => {

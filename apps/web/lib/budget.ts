@@ -4,6 +4,7 @@
  * Soft and hard thresholds are percentages (defaults 80 and 100).
  * The month is a UTC calendar month.
  */
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { runGuarded } from '@/lib/guarded-action';
@@ -12,6 +13,7 @@ export type BudgetStateName = 'ok' | 'soft' | 'hard';
 export interface BudgetState {
   state: BudgetStateName;
   used: number;
+  reserved: number;
   /** null when unlimited. */
   limit: number | null;
   softPct: number;
@@ -51,9 +53,9 @@ export function decideBudget(used: number, limit: number | null, softPct: number
   return 'ok';
 }
 
-export async function budgetState(userId: string, now = new Date()): Promise<BudgetState> {
+export async function budgetState(userId: string, now = new Date(), db: Pick<Prisma.TransactionClient, 'userPreference' | 'usageEvent'> = prisma): Promise<BudgetState> {
   if (!userId) throw new Error('budget: userId is required');
-  const pref = await prisma.userPreference.findUnique({
+  const pref = await db.userPreference.findUnique({
     where: { userId },
     select: { monthlyTokenBudget: true, budgetSoftPct: true, budgetHardPct: true },
   });
@@ -63,12 +65,13 @@ export async function budgetState(userId: string, now = new Date()): Promise<Bud
   const hardPct = Math.min(pref?.budgetHardPct ?? hardCeiling, hardCeiling);
   const softPct = Math.min(pref?.budgetSoftPct ?? envInt('WHINK_BUDGET_SOFT_PCT', 80), hardPct);
   const { start, resetsAt } = monthWindow(now);
-  const agg = await prisma.usageEvent.aggregate({
-    where: { userId, createdAt: { gte: start } },
-    _sum: { tokensIn: true, tokensOut: true },
+  const agg = await db.usageEvent.aggregate({
+    where: { userId, createdAt: { gte: start, lt: resetsAt } },
+    _sum: { tokensIn: true, tokensOut: true, reservedTokens: true },
   });
+  const reserved = agg?._sum?.reservedTokens ?? 0;
   const used = (agg?._sum?.tokensIn ?? 0) + (agg?._sum?.tokensOut ?? 0);
-  return { state: decideBudget(used, limit, softPct, hardPct), used, limit, softPct, hardPct, resetsAt: resetsAt.toISOString() };
+  return { reserved, state: decideBudget(used + reserved, limit, softPct, hardPct), used, limit, softPct, hardPct, resetsAt: resetsAt.toISOString() };
 }
 
 export const BudgetInputSchema = z.object({

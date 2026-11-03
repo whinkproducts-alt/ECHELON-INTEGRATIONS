@@ -10,11 +10,11 @@ import { UsageChart, type DayPoint } from './usage-chart';
 import { BudgetEditor } from './budget-editor';
 import { countdown, fmtCompact, fmtInt, fmtUsd } from './format';
 
-interface Budget { state: 'ok' | 'soft' | 'hard'; used: number; limit: number | null; softPct: number; hardPct: number; resetsAt: string }
-interface ModelRow { model: string; provider: string; tokensIn: number; tokensOut: number; costMicros: number; calls: number }
+interface Budget { state: 'ok' | 'soft' | 'hard'; used: number; reserved: number; limit: number | null; softPct: number; hardPct: number; resetsAt: string }
+interface ModelRow { model: string; provider: string; tokensIn: number; tokensOut: number; unknownCostCalls: number; costMicros: number; calls: number }
 interface UsagePayload {
   range: '7d' | '30d';
-  daily: (DayPoint & { costMicros: number })[];
+  daily: (DayPoint & { unknownCostCalls: number; costMicros: number })[];
   byModel: ModelRow[];
   budget: Budget;
   connectivity: 'online' | 'degraded' | 'offline';
@@ -88,8 +88,11 @@ export function UsageScreen() {
     const b = data.budget;
     const periodTokens = data.daily.reduce((a, d) => a + d.tokensIn + d.tokensOut, 0);
     const periodCost = data.daily.reduce((a, d) => a + d.costMicros, 0);
+    const unknown = data.daily.reduce((a, d) => a + d.unknownCostCalls, 0);
+    const calls = data.byModel.reduce((a, m) => a + m.calls, 0);
     const limited = b.state !== 'ok' && b.limit !== null;
-    const pct = b.limit ? Math.round((b.used / b.limit) * 100) : 0;
+    const committed = b.used + b.reserved;
+    const pct = b.limit ? Math.round((committed / b.limit) * 100) : 0;
     const resets = now === null ? null : Math.max(0, Date.parse(b.resetsAt) - now);
     const maxModel = Math.max(1, ...data.byModel.map((m) => m.tokensIn + m.tokensOut));
     return (
@@ -98,10 +101,11 @@ export function UsageScreen() {
           <HoloPanel tone={limited ? 'amber' : 'accent'} glow={limited ? 'soft' : 'none'} brackets className="flex flex-col items-center gap-4 text-center">
             <p className="font-mono text-[0.6875rem] uppercase tracking-[0.25em] text-muted-foreground">Monthly token budget</p>
             {b.limit ? (
-              <HoloMeter variant="arc" size={220} value={b.used} max={b.limit} limit={limited} label={`${fmtInt(b.used)} of ${fmtInt(b.limit)} tokens`} valueText={`${pct}%`} />
+              <HoloMeter variant="arc" size={220} value={committed} max={b.limit} limit={limited} label={`${fmtInt(committed)} of ${fmtInt(b.limit)} tokens`} valueText={`${pct}%`} />
             ) : (
               <HoloMeter variant="arc" size={220} value={0} max={1} label={`${fmtInt(b.used)} tokens used`} valueText="No cap" />
             )}
+            {b.reserved > 0 && <p className="text-sm text-muted-foreground">{fmtInt(b.used)} tokens recorded; {fmtInt(b.reserved)} held for unsettled attempts.</p>}
             {limited && (
               <HoloBadge tone="amber" dot pulse>{b.state === 'hard' ? 'Hard limit reached' : 'Soft limit reached'}</HoloBadge>
             )}
@@ -135,8 +139,8 @@ export function UsageScreen() {
           <HoloStat label="Tokens this month" value={b.used} format={(n) => fmtCompact(n)} tone="deep" />
           <HoloPanel tone="neutral">
             <p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-muted-foreground">Cost estimate, {range}</p>
-            <p className="mt-2 font-mono text-3xl tabular-nums text-foreground">{periodCost > 0 ? fmtUsd(periodCost) : 'Not priced'}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{periodCost > 0 ? 'An estimate from configured prices, not a bill.' : 'No model prices are configured on the server, so no cost is guessed.'}</p>
+            <p className="mt-2 font-mono text-3xl tabular-nums text-foreground">{unknown && calls === unknown ? 'Unknown' : fmtUsd(periodCost)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{unknown ? `Excludes ${fmtInt(unknown)} calls with unknown cost.` : 'Estimated from configured prices.'}</p>
           </HoloPanel>
         </HoloGrid>
 
@@ -149,7 +153,7 @@ export function UsageScreen() {
               {data.byModel.map((m) => (
                 <HoloMeter
                   key={`${m.provider}/${m.model}`} value={m.tokensIn + m.tokensOut} max={maxModel}
-                  label={`${m.model} (${m.provider})`} valueText={`${fmtCompact(m.tokensIn + m.tokensOut)} tokens · ${fmtInt(m.calls)} calls${m.costMicros > 0 ? ` · ${fmtUsd(m.costMicros)}` : ''}`}
+                  label={`${m.model} (${m.provider})`} valueText={`${fmtCompact(m.tokensIn + m.tokensOut)} tokens · ${fmtInt(m.calls)} calls${m.unknownCostCalls < m.calls ? ` · ${fmtUsd(m.costMicros)}` : ''}${m.unknownCostCalls ? ` · ${m.unknownCostCalls} unpriced` : ''}`}
                 />
               ))}
             </HoloPanel>

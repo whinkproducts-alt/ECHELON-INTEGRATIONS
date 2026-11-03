@@ -52,7 +52,7 @@ export function modelRegistry(env: EnvMap = process.env): ModelRegistryEntry[] {
     {
       id: 'anthropic-sonnet', label: 'Claude Sonnet (Anthropic API)', provider: 'anthropic', model: 'claude-sonnet-5-5',
       kind: 'api', local: false, cost: 'metered', dataCeiling: 'private', capabilities: { text: true, tools: true, stream: true },
-      timeoutMs: 60_000, admitted: true, note: 'Paid per token. Used only when paid models are admitted or you stored your own key.',
+      timeoutMs: 60_000, admitted: true, note: 'Paid per token. Paid routing must be enabled. A stored key alone does not enable it.',
     },
     {
       id: 'anthropic-haiku', label: 'Claude Haiku (Anthropic API)', provider: 'anthropic', model: 'claude-haiku-5-5',

@@ -11,7 +11,7 @@ import { buildMessages, parseAgentReply } from '@/lib/swarm/agent-call';
 import { chatOnce, isNativeOllamaModel, nativeOllamaUrl, verifyLocalAnalysisModel } from '@/lib/model-router';
 import { isLoopbackUrl } from '@/lib/local-only';
 import { budgetState } from '@/lib/budget';
-import { recordUsageStrict } from '@/lib/usage';
+import { reserveLocalAnalysis, settleLocalAnalysis } from '@/lib/model-router/reservations';
 import type { ExecutionAuthorizationRequest } from '@whink/org-kit';
 import type { ClaimedJob, JobOutcome } from './scheduler';
 import type { AgentExecution, Prisma } from '@prisma/client';
@@ -132,6 +132,11 @@ export async function runEarJob(job: ClaimedJob, workerId: string, _now = new Da
       if (!(await verifyLocalAnalysisModel(route.model, route.baseUrl))) throw new Error('BLOCKED_COST');
       const task = { lane: agent.agent_id, role: 'worker' as const, title: 'Approved internal analysis', objective: ear.objective, deliverable: 'Internal analysis or draft only; identify unsupported actions as blockers.', requiredSkills: ear.required_skills, covers: [], dependsOn: [], estimatedCalls: 1, agentId: agent.agent_id, agentName: agent.name, fit: 'matched' as const };
       const messages = buildMessages({ task, agent, deps: outputs.map((o) => ({ lane: o.agentId, result: o.result })), failedDeps: [], learnings: [] });
+      // Reserve the input byte length plus output ceiling, not a character/4 estimate.
+      // A lost response (including a crash) leaves the full hold charged to this month's capacity.
+      const inputText = messages.map((m) => m.content).join('');
+      const reservation = await reserveLocalAnalysis(job.userId, route.model, Buffer.byteLength(JSON.stringify(messages)) + 1000)
+        .catch(() => { throw new Error('BLOCKED_COST'); });
       const cancelled = new AbortController();
       const poll = setInterval(() => {
         void prisma.agentExecution.findFirst({ where: { id: executionId, userId: job.userId, status: 'RUNNING', claimToken: token } })
@@ -142,10 +147,11 @@ export async function runEarJob(job: ClaimedJob, workerId: string, _now = new Da
         text = await chatOnce({ ...route, messages, maxTokens: 1000, temperature: 0.2, signal: AbortSignal.any([cancelled.signal, attemptDeadline, AbortSignal.timeout(TIMEOUT_MS)]) });
       } finally {
         clearInterval(poll);
-        // Estimates, including a conservative output reservation when a call failed without usage.
-        try {
-          await recordUsageStrict({ userId: job.userId, provider: 'local-analysis', model: route.model, tokensIn: Math.ceil(messages.map((m) => m.content).join('').length / 4), tokensOut: text ? Math.ceil(text.length / 4) : 1000, kind: 'other' });
-        } catch { throw new Error('BLOCKED_COST'); }
+        if (text) {
+          try {
+            await settleLocalAnalysis(job.userId, reservation.id, route.model, Math.ceil(inputText.length / 4), Math.ceil(text.length / 4));
+          } catch { throw new Error('BLOCKED_COST'); }
+        }
       }
       const parsed = parseAgentReply(text, task);
       if (parsed.securityEvents.length) throw new Error('BLOCKED_POLICY');

@@ -476,3 +476,5 @@ Preserve latest main security/CI changes and integrate the worker/GitHub pilot p
 ## 2026-11-02 — Token and usage-spend reduction first
 
 Founder prioritized token and usage-spend reduction before remaining end-to-end readiness. Preserve correctness, security and required functionality. Begin with deterministic optional-context/history reduction and CI fixture repair; never trim system/current request. No new paid call/top-up authorized. See TOKEN-AND-SPEND-PRIORITY.md for unfinished admission/accounting gates.
+
+2026-11-02 — Treat absent pricing as unknown; historical zero cost is ambiguous. API keys authenticate but cannot grant paid profile eligibility. Local EAR workers reserve capacity before inference and settle the same account-scoped row once; uncertain attempts hold capacity through that UTC budget month. Estimated tokens are not provider receipts. These rules do not enable paid models.
