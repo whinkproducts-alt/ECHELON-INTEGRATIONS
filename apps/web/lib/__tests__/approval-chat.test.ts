@@ -7,7 +7,7 @@ describe('B2: bare chat approval approves nothing', () => {
 
   beforeEach(() => {
     vi.resetModules();
-    decide.mockReset(); runToolLoop.mockReset(); messageCreate.mockReset();
+    decide.mockReset(); runToolLoop.mockReset(); messageCreate.mockReset().mockResolvedValue({ id: 'saved-message', createdAt: new Date() });
     vi.doMock('next/server', () => ({
       NextRequest: class {},
       NextResponse: { json: (b: unknown, init?: { status?: number }) => new Response(JSON.stringify(b), { status: init?.status ?? 200 }) },

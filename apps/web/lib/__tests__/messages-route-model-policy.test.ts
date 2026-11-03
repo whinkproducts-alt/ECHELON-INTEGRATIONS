@@ -54,7 +54,7 @@ describe('messages route: requested model is checked against the allow-list', ()
           update: vi.fn(),
         },
         message: {
-          create: vi.fn(),
+          create: vi.fn().mockResolvedValue({ id: 'saved-message', createdAt: new Date() }),
           findMany: vi.fn().mockResolvedValue([]),
         },
         personaState: { findUnique: vi.fn().mockResolvedValue(null) },
@@ -118,7 +118,7 @@ describe('messages route: requested model is checked against the allow-list', ()
     vi.doMock('@/lib/db', () => ({
       prisma: {
         conversation: { findFirst: vi.fn().mockResolvedValue({ id: 'c1', userId: 'u1', projectId: null }), update: vi.fn() },
-        message: { create: vi.fn(), findMany: messageFindMany },
+        message: { create: vi.fn().mockResolvedValue({ id: 'saved-message', createdAt: new Date() }), findMany: messageFindMany },
         personaState: { findUnique: vi.fn().mockResolvedValue(null) },
         userPreference: { findUnique: vi.fn().mockResolvedValue(null) },
         userApiKey: { findUnique: userApiKeyFind },

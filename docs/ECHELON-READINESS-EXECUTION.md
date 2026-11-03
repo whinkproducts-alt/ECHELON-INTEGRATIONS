@@ -1,5 +1,8 @@
 # ECHELON functional readiness
 
+
+Current Founder priority (2026-11-02): reduce token and usage spend first, preserving correctness/security, then continue end-to-end readiness. Read TOKEN-AND-SPEND-PRIORITY.md. Paid-admission/accounting gates remain unfinished until verified.
+
 Updated 2026-11-02. Architecture spec: [product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md](product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md).
 
 Current main HEAD: `ccecfcf` (2026-11-02). R04/R06/R07/R08 merged. All merged branches deleted. Remaining open branches: `fix/remediation-2a68d1fb-185920` (Qodo bot, not merged by design) and Dependabot PRs (pending review).

@@ -27,7 +27,7 @@ describe('M1 taint persistence across conversation turns', () => {
   function makePrisma() {
     return {
       conversation: { findFirst: vi.fn().mockResolvedValue({ id: 'cv1', userId: 'u1', projectId: null }), update: vi.fn() },
-      message: { create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+      message: { create: vi.fn().mockResolvedValue({ id: 'saved-message', createdAt: new Date() }), findMany: vi.fn().mockResolvedValue([]) },
       personaState: { findUnique: vi.fn() },
       userPreference: { findUnique: vi.fn().mockResolvedValue(null) },
       userApiKey: { findUnique: vi.fn().mockResolvedValue(null) },

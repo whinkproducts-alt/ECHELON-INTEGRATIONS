@@ -472,3 +472,7 @@ Victor's first install on his Mac (pnpm 12.5.1) failed with ERR_PNPM_MINIMUM_REL
 ## 2026-11-01 — Founder-requested main consolidation
 
 Preserve latest main security/CI changes and integrate the worker/GitHub pilot plus architecture notes after reconciliation and checks. Keep dependency upgrade proposals and superseded bot remediation separate pending their own review. An explicit installed local model selects hardware integration tests; no assumed model download or silent success. Failed/cancelled GitHub checks cannot yield a clean report. Assessment and execution notes are the continuation source.
+
+## 2026-11-02 — Token and usage-spend reduction first
+
+Founder prioritized token and usage-spend reduction before remaining end-to-end readiness. Preserve correctness, security and required functionality. Begin with deterministic optional-context/history reduction and CI fixture repair; never trim system/current request. No new paid call/top-up authorized. See TOKEN-AND-SPEND-PRIORITY.md for unfinished admission/accounting gates.

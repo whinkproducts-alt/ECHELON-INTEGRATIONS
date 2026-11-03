@@ -32,6 +32,7 @@ vi.mock('@/lib/ledger', () => ({
 
 import { assembleContext, formatContextForPrompt } from '@/lib/context-engine';
 import { searchMemory } from '@/lib/memory-engine';
+import { listWorkingMemory } from '@/lib/working-memory';
 import { queryDocuments } from '@/lib/anythingllm-client';
 import { prisma } from '@/lib/db';
 import { recordActionSafe } from '@/lib/ledger';
@@ -41,6 +42,7 @@ const CONV_ID = 'conv-001';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(listWorkingMemory).mockResolvedValue([]);
   // Reset to empty defaults
   (searchMemory as any).mockResolvedValue({ semantics: [], episodes: [], hypotheses: [] });
   (queryDocuments as any).mockResolvedValue([]);
@@ -262,5 +264,18 @@ describe('assembleContext — document_recall_unavailable ledger (C11)', () => {
     );
     expect(unavailableCall).toBeDefined();
     expect(unavailableCall[0].userId).toBe(USER_ID);
+  });
+});
+
+
+describe('optional recall budget', () => {
+  it('does not let invisible working-memory control data starve emitted project context', async () => {
+    vi.mocked(listWorkingMemory).mockResolvedValue([{ key: 'control', value: 'x'.repeat(7900), expiresAt: null }]);
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'p', name: 'Important project', status: 'ACTIVE' } as never);
+    const result = await assembleContext(USER_ID, CONV_ID, 'p');
+    expect(result.workingMemory).toHaveLength(1);
+    expect(result.projectContext).toContain('Important project');
+    expect(formatContextForPrompt(result)).not.toContain('x'.repeat(100));
+    expect(result.totalChars).toBe(result.projectContext!.length);
   });
 });

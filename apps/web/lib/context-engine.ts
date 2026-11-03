@@ -1,5 +1,6 @@
 import { isTaintingSourceType, semanticEnvelopeSource } from '@/lib/skills/labels';
 import { prisma } from '@/lib/db';
+import { recallCharBudget } from '@/lib/model-router/context-budget';
 import { listWorkingMemory } from '@/lib/working-memory';
 import { filterToolResult, scanForInjectionPatterns, stripFakeUntrustedTags, wrapUntrustedContent } from '@/lib/content-isolation';
 import { searchMemory } from '@/lib/memory-engine';
@@ -7,9 +8,6 @@ import { queryDocuments } from '@/lib/anythingllm-client';
 import { recordActionSafe } from '@/lib/ledger';
 
 
-const MAX_CONTEXT_TOKENS = 80000;
-const AVG_CHARS_PER_TOKEN = 4;
-const MAX_CONTEXT_CHARS = MAX_CONTEXT_TOKENS * AVG_CHARS_PER_TOKEN;
 const MAX_PROJECT_FIELD_CHARS = 300;
 
 /** Sanitise a user/model-written project field: strip fake envelope tags, normalise, escape brackets, cap length, one line. */
@@ -65,15 +63,19 @@ export async function assembleContext(
     totalChars: 0,
   };
 
-  let budget = MAX_CONTEXT_CHARS;
+  const maxContextChars = recallCharBudget();
+  let budget = maxContextChars;
 
+  // Working-memory control metadata is returned separately, not emitted by formatContextForPrompt.
+  // Bound it independently so invisible control entries cannot starve the actual recall prompt.
+  let workingChars = 0;
   // 1. Working memory (highest priority)
   const wmEntries = await listWorkingMemory(userId);
   for (const { key, value } of wmEntries) {
     const entry = `[${key}] ${value}`;
-    if (budget - entry.length > 0) {
+    if (workingChars + entry.length <= maxContextChars) {
       result.workingMemory.push(entry);
-      budget -= entry.length;
+      workingChars += entry.length;
     }
   }
 
@@ -289,7 +291,7 @@ export async function assembleContext(
     }
   }
 
-  result.totalChars = MAX_CONTEXT_CHARS - budget;
+  result.totalChars = maxContextChars - budget;
   return result;
 }
 
