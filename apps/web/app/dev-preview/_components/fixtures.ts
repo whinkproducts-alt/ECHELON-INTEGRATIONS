@@ -48,7 +48,7 @@ function usage(range: string) {
       { model: 'fixture-large', provider: 'fixture', tokensIn: 52000, tokensOut: 21000, unknownCostCalls: 0, costMicros: 1200000, calls: 41 },
       { model: 'fixture-local', provider: 'local', tokensIn: 18000, tokensOut: 7000, unknownCostCalls: 0, costMicros: 0, calls: 19 },
     ],
-    budget: { state: 'soft', used: 410000, limit: 500000, softPct: 80, hardPct: 100, resetsAt: '2026-11-01T00:00:00.000Z' },
+    budget: { state: 'soft', reserved: 0, used: 410000, limit: 500000, softPct: 80, hardPct: 100, resetsAt: '2026-11-01T00:00:00.000Z' },
     connectivity: 'online',
   };
 }

@@ -45,3 +45,5 @@ Victor runs own-Mac setup: supply `.env` values, run `npx prisma migrate dev`, r
 Do not recreate credentials reported as already created; locate/configure securely with the Founder. Never print key contents. Do not deploy, merge, purchase, send real messages or claim Mac-off completion without Victor's explicit approval.
 
 GitHub reports 134 default-branch vulnerability alerts (8 critical, 49 high, 58 moderate, 19 low) — untriaged Dependabot alerts, not independently verified reachable vulnerabilities. R01/R10 must inspect and prioritize; do not claim security readiness from earlier audit notes alone.
+
+2026-11-02 continuation: the historical main SHA above predates the efficiency work. Track #23 (bounded context, ownership fixture) and #24 (cost reporting, tainted debrief, scoped EAR reservations). Database-race evidence is local and isolated; no device, cloud failover, dollar cap or Mac-off acceptance follows from it.

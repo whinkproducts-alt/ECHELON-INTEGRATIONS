@@ -10,7 +10,7 @@ import { UsageChart, type DayPoint } from './usage-chart';
 import { BudgetEditor } from './budget-editor';
 import { countdown, fmtCompact, fmtInt, fmtUsd } from './format';
 
-interface Budget { state: 'ok' | 'soft' | 'hard'; used: number; limit: number | null; softPct: number; hardPct: number; resetsAt: string }
+interface Budget { state: 'ok' | 'soft' | 'hard'; used: number; reserved: number; limit: number | null; softPct: number; hardPct: number; resetsAt: string }
 interface ModelRow { model: string; provider: string; tokensIn: number; tokensOut: number; unknownCostCalls: number; costMicros: number; calls: number }
 interface UsagePayload {
   range: '7d' | '30d';
@@ -91,7 +91,8 @@ export function UsageScreen() {
     const unknown = data.daily.reduce((a, d) => a + d.unknownCostCalls, 0);
     const calls = data.byModel.reduce((a, m) => a + m.calls, 0);
     const limited = b.state !== 'ok' && b.limit !== null;
-    const pct = b.limit ? Math.round((b.used / b.limit) * 100) : 0;
+    const committed = b.used + b.reserved;
+    const pct = b.limit ? Math.round((committed / b.limit) * 100) : 0;
     const resets = now === null ? null : Math.max(0, Date.parse(b.resetsAt) - now);
     const maxModel = Math.max(1, ...data.byModel.map((m) => m.tokensIn + m.tokensOut));
     return (
@@ -100,10 +101,11 @@ export function UsageScreen() {
           <HoloPanel tone={limited ? 'amber' : 'accent'} glow={limited ? 'soft' : 'none'} brackets className="flex flex-col items-center gap-4 text-center">
             <p className="font-mono text-[0.6875rem] uppercase tracking-[0.25em] text-muted-foreground">Monthly token budget</p>
             {b.limit ? (
-              <HoloMeter variant="arc" size={220} value={b.used} max={b.limit} limit={limited} label={`${fmtInt(b.used)} of ${fmtInt(b.limit)} tokens`} valueText={`${pct}%`} />
+              <HoloMeter variant="arc" size={220} value={committed} max={b.limit} limit={limited} label={`${fmtInt(committed)} of ${fmtInt(b.limit)} tokens`} valueText={`${pct}%`} />
             ) : (
               <HoloMeter variant="arc" size={220} value={0} max={1} label={`${fmtInt(b.used)} tokens used`} valueText="No cap" />
             )}
+            {b.reserved > 0 && <p className="text-sm text-muted-foreground">{fmtInt(b.used)} tokens recorded; {fmtInt(b.reserved)} held for unsettled attempts.</p>}
             {limited && (
               <HoloBadge tone="amber" dot pulse>{b.state === 'hard' ? 'Hard limit reached' : 'Soft limit reached'}</HoloBadge>
             )}

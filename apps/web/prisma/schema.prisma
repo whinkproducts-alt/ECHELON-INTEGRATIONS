@@ -1016,6 +1016,8 @@ model UsageEvent {
   model      String
   tokensIn   Int      @default(0)
   tokensOut  Int      @default(0)
+  reservedTokens Int @default(0)
+  usageBasis String @default("unspecified")
   costMicros Int?     // null = unpriced or unavailable
   kind       String   @default("chat") // chat | tool_loop | embed | other
   createdAt  DateTime @default(now())

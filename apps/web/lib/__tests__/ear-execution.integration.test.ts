@@ -7,6 +7,8 @@ const model = vi.hoisted(() => ({ call: vi.fn(), admission: vi.fn() }));
 vi.mock('@/lib/model-router', async (importOriginal) => ({
   ...await importOriginal<typeof import('@/lib/model-router')>(), chatOnce: model.call, verifyLocalAnalysisModel: model.admission,
 }));
+import { reserveLocalAnalysis, settleLocalAnalysis } from '@/lib/model-router/reservations';
+import { budgetState } from '@/lib/budget';
 import { prisma } from '@/lib/db';
 import { createApproval, decide } from '@/lib/approvals';
 import { admittedAgents, analysisRoute, cancelExecution, runEarJob } from '@/lib/worker/ear-execution';
@@ -67,6 +69,19 @@ describe.skipIf(!enabled)('M1 real database execution', () => {
       await prisma.user.deleteMany({ where: { id: { in: [userId, otherId] } } });
     }
     await prisma.$disconnect();
+  });
+
+  it('concurrent local attempts cannot both take the last capacity; settlement is scoped and single-use', async () => {
+    await prisma.userPreference.upsert({ where: { userId: otherId }, create: { userId: otherId, monthlyTokenBudget: 100 }, update: { monthlyTokenBudget: 100 } });
+    const attempts = await Promise.allSettled(Array.from({ length: 8 }, () => reserveLocalAnalysis(otherId, 'local', 75)));
+    const winners = attempts.flatMap(a => a.status === 'fulfilled' ? [a.value] : []);
+    expect(winners).toHaveLength(1);
+    expect(await budgetState(otherId)).toMatchObject({ used: 0, reserved: 75 });
+    const id = winners[0].id;
+    await expect(settleLocalAnalysis(userId, id, 'local', 5, 10)).rejects.toThrow('BLOCKED_COST');
+    await settleLocalAnalysis(otherId, id, 'local', 5, 10);
+    await expect(settleLocalAnalysis(otherId, id, 'local', 5, 10)).rejects.toThrow('BLOCKED_COST');
+    expect(await budgetState(otherId)).toMatchObject({ used: 15, reserved: 0 });
   });
 
   it('persists queue admission, actual worker result, lifecycle and audit, never simulated dispatch', async () => {
@@ -137,7 +152,7 @@ describe.skipIf(!enabled)('M1 real database execution', () => {
     expect((await row(missing.id)).status).toBe('BLOCKED_COST');
     expect(model.call).not.toHaveBeenCalled();
     const q = await queued();
-    vi.spyOn(prisma.usageEvent, 'create').mockRejectedValueOnce(new Error('meter unavailable'));
+    vi.spyOn(prisma.usageEvent, 'updateMany').mockRejectedValueOnce(new Error('meter unavailable'));
     const job = await claim(q.id);
     await runEarJob(job, 'm1-worker');
     expect((await row(q.id)).status).toBe('BLOCKED_COST');
