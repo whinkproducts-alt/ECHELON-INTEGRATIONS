@@ -5,7 +5,7 @@ Current Founder priority (2026-11-02): reduce token and usage spend first, prese
 
 Updated 2026-11-02. Architecture spec: [product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md](product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md).
 
-Current main HEAD: `ccecfcf` (2026-11-02). R04/R06/R07/R08 merged. All merged branches deleted. Remaining open branches: `fix/remediation-2a68d1fb-185920` (Qodo bot, not merged by design) and Dependabot PRs (pending review).
+Implementation checkpoint: PRs #23 and #24 merged through `bd58401c43b8c65f1976fac7f79f19f2f6906db0`. See the 2026-11-02 daily sync for CI and assurance. The remaining dependency and remediation heads were not merged.
 
 ## Next action
 
@@ -18,7 +18,7 @@ Victor runs own-Mac setup: supply `.env` values, run `npx prisma migrate dev`, r
 - Daily Board Room entry briefing from real tasks/approvals, with motion and voice.
 - Model-priority control: selectable first/second/third and saved-order switch. Browser chat is manual handoff; NVIDIA trial restrictions and privacy/cost gates still apply.
 - Avatar: add blinking if it preserves existing behavior; otherwise keep breathing/mouth animation. Blinking is now implemented conditionally (speaks/active states only).
-- Lockdown: stop new jobs, outbound tools, cloud calls, mic/camera; retain local review/audit. Lockdown is now implemented.
+- Lockdown: stop new jobs, outbound tools, cloud calls, mic/camera; retain local review/audit. Several lockdown boundaries are implemented; whole-flow and in-flight assurance is pending.
 - No elapsed-time estimates. Ask concise A/B/C questions for missing decisions, and keep independent work moving.
 
 ## Build status
@@ -28,10 +28,10 @@ Victor runs own-Mac setup: supply `.env` values, run `npx prisma migrate dev`, r
 | R01 baseline | TODO | Victor must supply .env, run `prisma migrate dev`, run `pnpm dev`, sign in |
 | R02 real mission | PARTIAL | Analysis path exists; capability-worker pilot reconciled with main; live full journey needed after R01 |
 | R03 GitHub pilot | PARTIAL | Provider and fixture tests pass; App installation/key setup and live worker report need Victor |
-| R04 models | BUILT — AWAITING LIVE ACCEPTANCE | Commit `cc7a8fa`. Priority logic, registry, profile CRUD API, settings panel. 2273 tests pass. Next: Victor tests model selector in running app |
+| R04 models | PARTIAL | Registry, saved profiles and selection exist. Wire failure fallback to actual dispatch and prove the configured order without replaying tools. |
 | R05 Mac-off | TODO / PROVIDER DECISION | Architecture/runbook needed; approved remote host and physical test needed |
-| R06 channels/voice | BUILT — AWAITING LIVE ACCEPTANCE | Commit `cc7a8fa`. Real SMTP/Twilio SMS/WhatsApp/Telegram/voice adapters. Next: Victor supplies TWILIO_* + SMTP_* and tests a real send |
-| R07 sealed team/lockdown | BUILT — AWAITING LIVE ACCEPTANCE | Commit `cc7a8fa`. Full lockdown module, API, UI. Security pass still needed. Next: Victor tests lockdown toggle in running app |
+| R06 channels/voice | PARTIAL | Adapters exist; iMessage bridge and two-way calls are unfinished. Verify each authorized channel and real hearing/speaking. |
+| R07 sealed team/lockdown | PARTIAL | Persist sealed objectives and enforce owner-only server access; verify in-flight lockdown while preserving local audit. |
 | R08 briefing/avatars | BUILT — AWAITING LIVE ACCEPTANCE | Commit `cc7a8fa`. Daily briefing logic + API + Board Room UI + conditional avatar blink. Next: Victor tests Board Room in running app |
 | R09 organization/HOLO | PARTIAL | Canonical registry and UI exist; lifecycle coverage and directorate reconciliation pending |
 | R10 readiness/services | TODO | Inventory, independent assurance, backups, all acceptance evidence |

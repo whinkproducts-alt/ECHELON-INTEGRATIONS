@@ -1,9 +1,11 @@
 # Pending tasks (updated 2026-11-02)
 
 
+PRs #23/#24 merged; account reservations currently cover local EAR analysis only. Next: explicit paid chat and automatic sidecars at dispatch, then embeddings and voice. See the daily sync for exact CI evidence.
+
 Current Founder priority (2026-11-02): reduce token and usage spend first, preserving correctness/security, then continue end-to-end readiness. Read TOKEN-AND-SPEND-PRIORITY.md. Paid-admission/accounting gates remain unfinished until verified.
 
-R04, R06, R07 and R08 implementation merged to main 2026-11-02 (2273 tests pass, 0 lint errors, clean typecheck and build). Live acceptance for all four tickets requires Victor's own-Mac run with real credentials. Remaining feature/live acceptance work is tracked in `ECHELON-READINESS-EXECUTION.md`.
+Initial R04, R06, R07 and R08 code merged to main 2026-11-02 (2273 tests pass, 0 lint errors, clean typecheck and build). Live acceptance for all four tickets requires Victor's own-Mac run with real credentials. Remaining feature/live acceptance work is tracked in `ECHELON-READINESS-EXECUTION.md`.
 
 Launch readiness, in order: see `docs/LAUNCH-CHECKLIST.md` (status: not ready; Victor's own-Mac run comes first).
 2026-11-01 continuation: this historical list contains stale implementation claims.
@@ -16,7 +18,7 @@ Current main consolidation and test evidence: `docs/REPOSITORY-ASSESSMENT-2026-1
 ## BUILT AND MERGED 2026-11-02 (pending live acceptance only)
 - **R04 Model Priority**: `lib/model-router/priority.ts`, registry, profile API, settings panel — built, merged, tests pass. Live acceptance: Victor tests model selector in running app.
 - **R06 Channels/Voice**: `lib/comms/delivery.ts` real adapters (SMTP, Twilio SMS, WhatsApp, Telegram, voice), channels API — built, merged. Live acceptance: Victor supplies TWILIO_* and SMTP_* env values and tests a real send.
-- **R07 Lockdown/Sealed Team**: Full lockdown module (core, client, HTTP enforcement), API, UI — built, merged. Live acceptance: Victor tests lockdown toggle in running app.
+- **R07 Lockdown/Sealed Team**: Partial lockdown enforcement (core, client, HTTP enforcement), API, UI — built, merged. Live acceptance: Victor tests lockdown toggle in running app.
 - **R08 Daily Briefing + Avatar Blink**: Briefing logic, API, Board Room UI, conditional avatar blink — built, merged. Live acceptance: Victor tests Board Room in running app.
 - **New migration**: `20261102120000_readiness_safety_models_briefing` — Victor must run `npx prisma migrate dev` on dev DB before starting the app.
 
