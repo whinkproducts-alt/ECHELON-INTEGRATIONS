@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AVATAR_STATE_LABELS, MouthTracker, breathing, easeLook, transitionPath,
-  type AvatarLook, type AvatarState, type MouthShape, type PersonaAnimation,
+  AVATAR_STATE_LABELS, BlinkScheduler, MouthTracker, blinkFlagEnabled, breathing, easeLook, transitionPath,
+  type AvatarLook, type AvatarState, type EyeAnchor, type MouthShape, type PersonaAnimation,
 } from './avatar-engine';
 import type { AudioFeed } from './avatar-audio-feed';
 import { readTokenRgb, rgbCss, type Rgb } from '../holo/holo-color';
@@ -78,6 +78,28 @@ function buildMouthSheet(img: HTMLImageElement, anim: PersonaAnimation, teeth: R
   return sheet;
 }
 
+/**
+ * Eyelid for one eye: the skin just above the eye, stretched down over it by the closure amount, clipped to the eye
+ * and finished with a soft lash line. Uses the portrait's own pixels, so no extra art or colours are introduced.
+ */
+function drawLid(g: CanvasRenderingContext2D, img: HTMLImageElement, eye: EyeAnchor, closure: number, px: number, py: number, pw: number, ph: number, lash: Rgb): void {
+  if (closure <= 0.02) return;
+  const cx = px + eye.x * pw, cy = py + eye.y * ph;
+  const ew = eye.w * pw, eh = eye.h * ph;
+  const top = cy - eh / 2;
+  const lidH = eh * closure;
+  g.save();
+  g.beginPath(); g.ellipse(cx, cy, ew / 2, eh / 2, 0, 0, Math.PI * 2); g.clip();
+  const sx = (eye.x - eye.w / 2) * img.naturalWidth;
+  const sh = eye.h * 0.9 * img.naturalHeight;
+  const sy = (eye.y - eye.h / 2) * img.naturalHeight - sh;
+  g.drawImage(img, sx, sy, eye.w * img.naturalWidth, sh, cx - ew / 2, top, ew, lidH);
+  g.strokeStyle = rgbCss(lash, 0.55 * Math.min(1, closure * 1.5));
+  g.lineWidth = Math.max(1, eh * 0.09);
+  g.beginPath(); g.ellipse(cx, top + lidH - eh / 2 * (1 - closure), ew / 2 * 0.96, eh / 2 * Math.max(0.15, 1 - closure), 0, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+  g.restore();
+}
+
 interface Tokens {
   hud: Rgb; fg: Rgb; amber: Rgb; denial: Rgb; bg: Rgb; font: string;
 }
@@ -130,6 +152,9 @@ export function AvatarCanvas({ animation, state, name, audio = null, hud = [], w
       const sheet = buildMouthSheet(img, animation, tokens.fg);
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const tracker = new MouthTracker();
+      // R08 conditional blink: flag on, eye anchors present, motion allowed. Otherwise nothing changes.
+      const blink = blinkFlagEnabled() && animation.eyes && !reduced ? new BlinkScheduler() : null;
+      const lash: Rgb = (() => { const c = sampleColor(img, animation.mouth.x, animation.mouth.y, animation.mouth.width); return [c[0] * 0.15, c[1] * 0.1, c[2] * 0.1]; })();
       let look: AvatarLook = { ...animation.targets.idle };
       let shown: AvatarState = stateRef.current;
       let queue: AvatarState[] = [];
@@ -164,6 +189,7 @@ export function AvatarCanvas({ animation, state, name, audio = null, hud = [], w
         const motion = reduced ? 0 : 1;
         ring += dt / 1000 * look.ringSpeed * motion;
         const b = breathing(now / 1000, animation.breathPeriodSec, animation.breathAmp * motion, tracker.loudness);
+        const closure = blink ? blink.update(dt) : 0;
         const accent = accentFor(shown, tokens);
 
         g.clearRect(0, 0, width, height);
@@ -196,6 +222,10 @@ export function AvatarCanvas({ animation, state, name, audio = null, hud = [], w
             sheet, (idx % 3) * CELL_W, Math.floor(idx / 3) * CELL_H, CELL_W, CELL_H,
             px + animation.mouth.x * pw - mw / 2, py + animation.mouth.y * ph - mh / 2, mw, mh,
           );
+        }
+        if (closure > 0 && animation.eyes) {
+          drawLid(g, img, animation.eyes.left, closure, px, py, pw, ph, lash);
+          drawLid(g, img, animation.eyes.right, closure, px, py, pw, ph, lash);
         }
         if (supportsFilter) g.filter = 'none';
         else if (look.desaturate > 0.01) { g.fillStyle = rgbCss(tokens.bg, look.desaturate * 0.45); g.fillRect(px, py, pw, ph); }

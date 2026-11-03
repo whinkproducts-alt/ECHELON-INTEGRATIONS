@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, User, Shield, Bell, Gauge, CreditCard, Palette, Key, Eye, EyeOff, Link2, Trash2, CheckCircle } from 'lucide-react';
+import { Save, User, Shield, Bell, Gauge, CreditCard, Palette, Key, Eye, EyeOff, Link2, Trash2, CheckCircle, Cpu, ShieldAlert, Radio } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { BillingSurface } from '../billing/_components/billing-surface';
 import { AutonomyApprovalPanel } from './autonomy-approval-panel';
 import { PasskeysPanel } from './passkeys-panel';
+import { ModelPriorityPanel } from './model-priority-panel';
+import { ChannelsPanel, SafetyPanel } from './safety-panel';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import {
   interpretPatchResponse, pickPendingAutonomy, resolveDecision, type AutonomyApproval,
@@ -341,6 +343,17 @@ export function SettingsSurface() {
             <Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Settings'}
           </button>
           <PasskeysPanel />
+
+          {/* R04 / R07 / R06: these save on their own, not with Save Settings. */}
+          <Section title="Model priority" icon={<Cpu className="h-4 w-4" />}>
+            <ModelPriorityPanel />
+          </Section>
+          <Section title="Lockdown" icon={<ShieldAlert className="h-4 w-4" />}>
+            <SafetyPanel />
+          </Section>
+          <Section title="Communication channels" icon={<Radio className="h-4 w-4" />}>
+            <ChannelsPanel />
+          </Section>
         </>
       )}
 

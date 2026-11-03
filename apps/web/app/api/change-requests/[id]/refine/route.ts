@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
+import { lockdownResponse } from '@/lib/safety/lockdown-http';
 import { requireUserId } from '@/lib/api-helpers';
 import { limitOr429 } from '@/lib/rate-limit';
 import { refine } from '@/lib/change-requests/service';
@@ -12,6 +13,8 @@ export async function POST(_req: Request, { params }: Ctx) {
   if ('response' in a) return a.response;
   const limited = await limitOr429('change_requests', a.userId);
   if (limited) return limited as NextResponse;
+  const locked = await lockdownResponse(a.userId, 'change_request_refine');
+  if (locked) return locked;
   const { id } = await params;
   const res = await refine(a.userId, id);
   if (res === null) return NextResponse.json({ error: 'Not found' }, { status: 404 });

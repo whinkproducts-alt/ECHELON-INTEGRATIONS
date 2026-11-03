@@ -9,6 +9,7 @@ import { CommandPalette, useCommandPaletteHotkey } from '@/components/shell/comm
 import { BootSequence } from '@/components/shell/boot-sequence';
 import { NavRail } from '@/components/shell/nav-rail';
 import { TopBar, type ConnectionState } from '@/components/shell/top-bar';
+import { LockdownBanner, LockdownButton, SafetyProvider } from '@/components/safety/lockdown-control';
 
 interface PersonaState {
   activePersona: string;
@@ -57,6 +58,7 @@ export function DashboardShell({ children, user, connection = 'online' }: { chil
   const signOutNow = () => signOut({ redirectTo: '/login' });
 
   return (
+    <SafetyProvider>
     <div className="relative flex h-screen overflow-hidden bg-background" style={accentStyle}>
       <a href="#main-content" className="sr-only z-[70] rounded bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:absolute focus:left-2 focus:top-2">Skip to content</a>
       <HoloOrbBackdrop stars={60} />
@@ -76,12 +78,15 @@ export function DashboardShell({ children, user, connection = 'online' }: { chil
           personaLabel={personaLabel} personaKind={isMamba ? 'adversarial' : 'primary'} functionalMode={personaState.functionalMode}
           connection={offline ? 'offline' : connection} userEmail={user?.email ?? undefined}
           onOpenPalette={() => setPalette(true)} onOpenNav={() => setMobileNav(true)}
+          actions={<LockdownButton />}
         />
+        <LockdownBanner />
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto outline-none">{children}</main>
       </div>
 
       <BootSequence />
       <CommandPalette open={palette} onOpenChange={setPalette} />
     </div>
+    </SafetyProvider>
   );
 }

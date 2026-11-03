@@ -1,6 +1,6 @@
 'use client';
 // TopBar props: personaLabel: string, personaKind: 'primary'|'adversarial', functionalMode?: string|null, connection?: 'online'|'degraded'|'offline' (read-only),
-// userEmail?: string, onOpenPalette: ()=>void, onOpenNav?: ()=>void (mobile menu). Clock renders only after mount.
+// userEmail?: string, onOpenPalette: ()=>void, onOpenNav?: ()=>void (mobile menu), actions?: ReactNode (e.g. the lockdown control). Clock renders only after mount.
 import * as React from 'react';
 import Link from 'next/link';
 import { Menu, Search } from 'lucide-react';
@@ -36,9 +36,9 @@ function Clock() {
   );
 }
 
-export function TopBar({ personaLabel, personaKind, functionalMode, connection = 'online', userEmail, onOpenPalette, onOpenNav }: {
+export function TopBar({ personaLabel, personaKind, functionalMode, connection = 'online', userEmail, onOpenPalette, onOpenNav, actions }: {
   personaLabel: string; personaKind: 'primary' | 'adversarial'; functionalMode?: string | null; connection?: ConnectionState;
-  userEmail?: string; onOpenPalette: () => void; onOpenNav?: () => void;
+  userEmail?: string; onOpenPalette: () => void; onOpenNav?: () => void; actions?: React.ReactNode;
 }) {
   const { appName } = useTenantConfig();
   const conn = CONNECTION[connection];
@@ -65,6 +65,7 @@ export function TopBar({ personaLabel, personaKind, functionalMode, connection =
 
       <div className="flex items-center gap-2 sm:gap-3">
         <InstallPrompt className="hidden md:inline-flex" />
+        {actions}
         <HoloBadge tone={personaKind === 'primary' ? 'accent' : 'mamba'} dot pulse>{personaLabel}</HoloBadge>
         {functionalMode && <span className="hidden rounded bg-secondary px-2 py-1 font-mono text-xs text-muted-foreground lg:inline">{functionalMode}</span>}
         <HoloBadge tone={conn.tone} dot pulse={connection !== 'online'}>{conn.label}</HoloBadge>

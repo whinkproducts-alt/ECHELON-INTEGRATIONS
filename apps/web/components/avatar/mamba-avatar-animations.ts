@@ -21,6 +21,7 @@ export const mambaAvatarAnimation: PersonaAnimation = {
   portraitSize: { width: 530, height: 750 },
   // Source mouth 535,612 minus crop 255,110.
   mouth: { x: 280 / 530, y: 502 / 750, width: 120 / 530 },
+  eyes: { left: { x: 214 / 530, y: 365 / 750, w: 46 / 530, h: 22 / 750 }, right: { x: 340 / 530, y: 365 / 750, w: 46 / 530, h: 22 / 750 } },
   hudToken: '--hud-mamba',
   breathPeriodSec: 5.4,
   breathAmp: 0.005,

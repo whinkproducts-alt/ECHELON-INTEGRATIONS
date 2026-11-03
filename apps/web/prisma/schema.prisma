@@ -63,6 +63,9 @@ model User {
   agentExecutions         AgentExecution[]
   recommendations         Recommendation[]
   newsSeen                NewsSeen[]
+  safetyState             AccountSafetyState?
+  modelRoutingProfiles    ModelRoutingProfile[]
+  dailyBriefings          DailyBriefing[]
 
   @@map("users")
 }
@@ -1470,4 +1473,74 @@ model CapabilityGrant {
   @@index([userId, subjectType, subjectId])
   @@index([toolId])
   @@map("capability_grants")
+}
+
+// ── Functional readiness (R04, R07, R08) ─────────────────────────────────────────────────────────
+// See docs/product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md sections 4, 5, 8 and 9.
+
+/**
+ * R07 lockdown. One row per account. Every change increments epoch in the same transaction as its
+ * ledger row, so a worker or outbound boundary that read an older epoch can tell the state moved.
+ * No row means "not locked". A read failure is treated as locked by lib/safety/lockdown.ts.
+ */
+model AccountSafetyState {
+  userId     String   @id
+  lockedDown Boolean  @default(false)
+  epoch      Int      @default(0)
+  reason     String?
+  changedBy  String?
+  changedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account_safety_states")
+}
+
+/**
+ * R04 saved model priority. choices is an ordered list (1 to 3) of registry entry ids from
+ * lib/model-router/registry.ts; never a credential, URL or key. At most one active profile per user
+ * (enforced by a partial unique index in the migration). revision increments on every edit.
+ */
+model ModelRoutingProfile {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  choices   String[]
+  revision  Int      @default(1)
+  active    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId, active])
+  @@map("model_routing_profiles")
+}
+
+/**
+ * R08 daily Board Room briefing. The script is encrypted with lib/key-encryption.ts; sources holds
+ * kind and id references only (no titles or content). One revision per regeneration.
+ */
+model DailyBriefing {
+  id           String    @id @default(cuid())
+  userId       String
+  localDate    String // YYYY-MM-DD in timeZone
+  timeZone     String
+  revision     Int       @default(1)
+  sourceHash   String
+  sourceCount  Int       @default(0)
+  sources      Json      @default("[]")
+  scriptEnc    String?
+  status       String    @default("READY") // READY | FAILED
+  error        String?
+  sourceCutoff DateTime
+  seenAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, localDate, revision])
+  @@index([userId, localDate])
+  @@map("daily_briefings")
 }

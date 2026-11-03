@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
+import { lockdownResponse } from '@/lib/safety/lockdown-http';
 import { requireUserId } from '@/lib/api-helpers';
 import { limitOr429 } from '@/lib/rate-limit';
 import { requestSmsBriefing } from '@/lib/briefing/sms';
@@ -16,6 +17,8 @@ export async function POST() {
   const limited = await limitOr429('comms', who.userId);
   if (limited) return limited;
 
+  const locked = await lockdownResponse(who.userId, 'briefing_sms');
+  if (locked) return locked;
   try {
     const r = await requestSmsBriefing(who.userId);
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });

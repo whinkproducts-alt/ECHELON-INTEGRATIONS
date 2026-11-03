@@ -20,6 +20,8 @@ export const whinkAvatarAnimation: PersonaAnimation = {
   portraitSize: { width: 630, height: 770 },
   // Mouth located on the cropped portrait (source 545,612 minus crop 250,230).
   mouth: { x: 295 / 630, y: 382 / 770, width: 118 / 630 },
+  // Eyes located on the same cropped portrait (behind the glasses lenses).
+  eyes: { left: { x: 245 / 630, y: 271 / 770, w: 54 / 630, h: 26 / 770 }, right: { x: 363 / 630, y: 271 / 770, w: 54 / 630, h: 26 / 770 } },
   hudToken: '--hud-whink',
   breathPeriodSec: 4.2,
   breathAmp: 0.008,

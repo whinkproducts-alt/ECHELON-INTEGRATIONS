@@ -33,6 +33,7 @@ import { loadHeartbeatConfig } from '@/lib/capability/heartbeat';
 import { providerFingerprint } from '@/lib/capability/providers';
 import { agentMayAct, resolveAgent } from '@/lib/capability/roster';
 import type { EgressDeps } from '@/lib/capability/egress';
+import { isLockedDown } from '@/lib/safety/lockdown';
 
 export class CapabilityError extends Error {
   constructor(readonly code: CapabilityErrorCode, message: string, readonly actionId?: string) {
@@ -126,6 +127,8 @@ export async function invokeCapability(p: InvokeParams, deps: InvokeDeps = {}, a
     throw new CapabilityError(code, reason, actionId);
   };
 
+  // R07: no capability call leaves the account while it is locked down. Checked before any lookup or I/O.
+  if (await isLockedDown(p.userId)) return deny('AUTHZ_POLICY_DENIED', 'Lockdown is active');
   if (!isDataClass(p.dataClass)) return deny('VAL_INPUT_INVALID', 'dataClass is required');
   if (!p.args || typeof p.args !== 'object' || Array.isArray(p.args)) return deny('VAL_INPUT_INVALID', 'arguments must be an object');
 

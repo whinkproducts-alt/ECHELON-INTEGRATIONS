@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
+import { lockdownResponse } from '@/lib/safety/lockdown-http';
 import { requireUserId, readJsonBody } from '@/lib/api-helpers';
 import { limitOr429 } from '@/lib/rate-limit';
 import { PlanInputSchema, createPlan, listRuns } from '@/lib/swarm/service';
@@ -16,6 +17,8 @@ export async function POST(req: Request) {
   if ('response' in a) return a.response;
   const limited = await limitOr429('swarm', a.userId);
   if (limited) return limited;
+  const locked = await lockdownResponse(a.userId, 'swarm_plan');
+  if (locked) return locked;
   const body = await readJsonBody(req, 24 * 1024);
   if ('response' in body) return body.response;
   const parsed = PlanInputSchema.safeParse(body.body);
