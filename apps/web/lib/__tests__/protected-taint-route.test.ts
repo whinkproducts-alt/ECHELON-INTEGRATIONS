@@ -56,7 +56,7 @@ describe('messages route: recalled document chunks taint the tool loop from the 
           update: vi.fn(),
         },
         message: {
-          create: vi.fn(),
+          create: vi.fn().mockResolvedValue({ id: 'saved-message', createdAt: new Date() }),
           findMany: vi.fn().mockResolvedValue([]),
         },
         personaState: { findUnique: vi.fn().mockResolvedValue(null) },

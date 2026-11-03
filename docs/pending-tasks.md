@@ -1,5 +1,8 @@
 # Pending tasks (updated 2026-11-02)
 
+
+Current Founder priority (2026-11-02): reduce token and usage spend first, preserving correctness/security, then continue end-to-end readiness. Read TOKEN-AND-SPEND-PRIORITY.md. Paid-admission/accounting gates remain unfinished until verified.
+
 R04, R06, R07 and R08 implementation merged to main 2026-11-02 (2273 tests pass, 0 lint errors, clean typecheck and build). Live acceptance for all four tickets requires Victor's own-Mac run with real credentials. Remaining feature/live acceptance work is tracked in `ECHELON-READINESS-EXECUTION.md`.
 
 Launch readiness, in order: see `docs/LAUNCH-CHECKLIST.md` (status: not ready; Victor's own-Mac run comes first).

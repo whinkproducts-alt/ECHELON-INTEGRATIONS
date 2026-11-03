@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { isLocalOnlyMode, localOnlyViolation, localModelNameForLocalOnly } from '@/lib/local-only';
 import { getSafetyState, ledgerLockdownBlock, LOCKDOWN_MESSAGE } from '@/lib/safety/lockdown';
+import { budgetConversation } from '@/lib/model-router/context-budget';
 import { activeProfile, paidAdmission, planRoute } from '@/lib/model-router/priority';
 import { isModelAllowed, isModelNameShape } from '@/lib/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
@@ -114,7 +115,7 @@ export async function POST(
 
     // Save user message (only after passing all block checks)
     const personaState = await prisma.personaState.findUnique({ where: { userId: session.user.id } });
-    await prisma.message.create({
+    const savedUserMessage = await prisma.message.create({
       data: {
         conversationId,
         role: 'user',
@@ -131,21 +132,23 @@ export async function POST(
 
     // Get conversation history for context — most recent 50, in chronological order
     const history = (await prisma.message.findMany({
-      where: { conversationId, conversation: { userId: session.user.id } },
+      where: { conversationId, conversation: { userId: session.user.id }, createdAt: { lt: savedUserMessage.createdAt } },
       orderBy: { createdAt: 'desc' },
       take: 50,
     })).reverse();
 
-    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+    const unbudgetedMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: orchResult.systemPrompt },
       ...(history ?? []).map((m: any) => ({
         role: m.role === 'user' ? 'user' as const : 'assistant' as const,
         content: m.content,
       })),
+      // Anchor to this request; concurrent submissions must not replace the latest user input.
+      { role: 'user', content: userMessage },
     ];
 
     // Update conversation title from first message
-    if ((history?.length ?? 0) <= 1) {
+    if ((history?.length ?? 0) === 0) {
       const titleSnippet = userMessage.substring(0, 60) + (userMessage.length > 60 ? '...' : '');
       await prisma.conversation.update({
         where: { id: conversationId },
@@ -360,6 +363,15 @@ export async function POST(
       persona: activePersona,
       correlationId,
     });
+
+    const inputBudget = budgetConversation(unbudgetedMessages);
+    const messages = inputBudget.messages;
+    if (inputBudget.omittedMessages || inputBudget.mandatoryOverTarget) {
+      await recordActionSafe({ userId: session.user.id, initiator: 'system', persona: activePersona,
+        action: 'model_context_budgeted', tool: 'model_router', permissionClass: 'A', status: 'VALIDATED', correlationId,
+        inputSummary: JSON.stringify({ originalChars: inputBudget.originalChars, retainedChars: inputBudget.retainedChars,
+          omittedMessages: inputBudget.omittedMessages, mandatoryOverTarget: inputBudget.mandatoryOverTarget }) });
+    }
 
     let routerStream: ReadableStream<Uint8Array>;
     try {

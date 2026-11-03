@@ -40,7 +40,7 @@ async function post(message: string): Promise<{ raw: string; events: Array<Recor
   vi.doMock('@/lib/db', () => ({
     prisma: {
       conversation: { findFirst: vi.fn(async () => ({ id: 'c1', userId: 'u2', projectId: null })), update: vi.fn() },
-      message: { create: vi.fn(), findMany: vi.fn(async () => []) },
+      message: { create: vi.fn().mockResolvedValue({ id: 'saved-message', createdAt: new Date() }), findMany: vi.fn(async () => []) },
       personaState: { findUnique: vi.fn(async () => null) },
       userPreference: { findUnique: vi.fn(async () => null) },
       userApiKey: { findUnique: vi.fn(async () => null) },
