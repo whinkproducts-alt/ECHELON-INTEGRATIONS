@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
+import { lockdownResponse } from '@/lib/safety/lockdown-http';
 import { requireUserId } from '@/lib/api-helpers';
 import { limitOr429 } from '@/lib/rate-limit';
 import { startRun } from '@/lib/swarm/service';
@@ -10,6 +11,8 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   if ('response' in a) return a.response;
   const limited = await limitOr429('swarm', a.userId);
   if (limited) return limited;
+  const locked = await lockdownResponse(a.userId, 'swarm_start');
+  if (locked) return locked;
   const { id } = await ctx.params;
   const r = await startRun(a.userId, id);
   if (!r.ok) return NextResponse.json({ error: r.error, ...(r.code ? { code: r.code } : {}) }, { status: r.status });

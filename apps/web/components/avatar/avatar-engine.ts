@@ -1,8 +1,10 @@
 // Shared avatar animation engine. Pure maths and data, no DOM, safe for SSR and tests.
 // Per character files (whink-avatar-animations.ts, mamba-avatar-animations.ts) supply the tuning.
 //
-// Decision 2026-09-27 stands: avatars do not blink. Motion is audio driven mouth shapes,
-// slow breathing, and eased state changes.
+// Motion is audio driven mouth shapes, slow breathing, and eased state changes.
+// Blinking (R08, decision 2026-11-01): conditional. It is drawn only when NEXT_PUBLIC_AVATAR_BLINK is 'true' and the
+// persona has eye anchors, and never with reduced motion. The flag stays off until visual QA on both avatars passes;
+// with it off, behaviour is exactly the 2026-09-27 no-blink design (breathing and mouth only).
 
 export const MOUTH_SHAPES = ['rest', 'closed', 'open', 'wide', 'round', 'teeth'] as const;
 export type MouthShape = (typeof MOUTH_SHAPES)[number];
@@ -60,6 +62,8 @@ export interface PersonaAnimation {
   portraitSize: { width: number; height: number };
   /** Mouth anchor as fractions of the portrait. */
   mouth: { x: number; y: number; width: number };
+  /** Eye anchors (centre, width, height) as fractions of the portrait. Optional: no anchors, no blink. */
+  eyes?: { left: EyeAnchor; right: EyeAnchor };
   /** CSS custom property (H S% L% triplet) for the HUD. Token only. */
   hudToken: string;
   /** Persona tuning. */
@@ -69,6 +73,67 @@ export interface PersonaAnimation {
   tauMs: number;
   mouthScale: number;
   targets: StateTargets;
+}
+
+export interface EyeAnchor { x: number; y: number; w: number; h: number }
+
+/** Build-time flag. Client code reads NEXT_PUBLIC_* at build, so a change needs a rebuild (rollback = unset it). */
+export function blinkFlagEnabled(env: Record<string, string | undefined> = { NEXT_PUBLIC_AVATAR_BLINK: process.env.NEXT_PUBLIC_AVATAR_BLINK }): boolean {
+  return env.NEXT_PUBLIC_AVATAR_BLINK === 'true';
+}
+
+export interface BlinkTiming { minGapMs: number; maxGapMs: number; closeMs: number; holdMs: number; openMs: number; doubleChance: number }
+export const DEFAULT_BLINK: BlinkTiming = { minGapMs: 2800, maxGapMs: 6500, closeMs: 70, holdMs: 40, openMs: 120, doubleChance: 0.12 };
+
+/**
+ * Natural blink timing: a quick close, a short hold, a slower open, irregular gaps and an occasional double blink.
+ * Returns eyelid closure 0 (open) to 1 (closed). Pure: the random source is injected for tests.
+ */
+export class BlinkScheduler {
+  private t = 0;
+  private nextAt: number;
+  private phase: 'open' | 'closing' | 'hold' | 'opening' = 'open';
+  private phaseT = 0;
+  private pendingDouble = false;
+
+  constructor(private readonly rng: () => number = Math.random, private readonly timing: BlinkTiming = DEFAULT_BLINK) {
+    this.nextAt = this.gap();
+  }
+
+  private gap(): number {
+    return this.timing.minGapMs + this.rng() * (this.timing.maxGapMs - this.timing.minGapMs);
+  }
+
+  update(dtMs: number): number {
+    const dt = Math.max(0, Math.min(dtMs, 100));
+    this.t += dt;
+    this.phaseT += dt;
+    const { closeMs, holdMs, openMs } = this.timing;
+    switch (this.phase) {
+      case 'open':
+        if (this.t >= this.nextAt) { this.phase = 'closing'; this.phaseT = 0; this.pendingDouble = this.rng() < this.timing.doubleChance; }
+        return 0;
+      case 'closing':
+        if (this.phaseT >= closeMs) { this.phase = 'hold'; this.phaseT = 0; return 1; }
+        return easeInOut(this.phaseT / closeMs);
+      case 'hold':
+        if (this.phaseT >= holdMs) { this.phase = 'opening'; this.phaseT = 0; }
+        return 1;
+      case 'opening':
+        if (this.phaseT >= openMs) {
+          this.phase = 'open'; this.phaseT = 0;
+          this.nextAt = this.t + (this.pendingDouble ? 140 : this.gap());
+          this.pendingDouble = false;
+          return 0;
+        }
+        return 1 - easeInOut(this.phaseT / openMs);
+    }
+  }
+}
+
+function easeInOut(x: number): number {
+  const c = Math.min(1, Math.max(0, x));
+  return c * c * (3 - 2 * c);
 }
 
 export function easeLook(current: AvatarLook, target: AvatarLook, dtMs: number, tauMs: number): AvatarLook {

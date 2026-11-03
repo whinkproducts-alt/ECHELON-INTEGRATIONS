@@ -6,6 +6,7 @@ import { logger, generateCorrelationId } from '@/lib/logger';
 import { budgetState } from '@/lib/budget';
 import { connectivityMode, offlineFallbackEnabled, ollamaReachable } from '@/lib/offline';
 import { recordActionSafe } from '@/lib/ledger';
+import { isLockedDown, ledgerLockdownBlock } from '@/lib/safety/lockdown';
 import { JOBS } from '@/lib/worker/jobs';
 import { assertNoTools, ledgerRun, makeContext } from '@/lib/worker/context';
 import { claimDueJobs, completeJob, discoverUsers, ensureJobs, resolveJob, type ClaimedJob, type JobOutcome } from '@/lib/worker/scheduler';
@@ -52,6 +53,13 @@ export async function skipReason(userId: string, usesModel: boolean, critical: b
 
 /** Runs one claimed job to completion (never throws). */
 export async function runClaimedJob(job: ClaimedJob, workerId: string, now = new Date()): Promise<JobOutcome> {
+  // R07: re-check lockdown immediately before running. The claim filter covers most cases; this covers a
+  // lockdown engaged between claim and run. The lease is released without changing the job's own status.
+  if (await isLockedDown(job.userId)) {
+    await ledgerLockdownBlock(job.userId, `worker:${job.jobKey.split(':')[0]}`, job.id);
+    await prisma.agentJob.updateMany({ where: { id: job.id, userId: job.userId, leaseOwner: workerId }, data: { leaseUntil: null, leaseOwner: null } });
+    return 'SKIPPED';
+  }
   if (job.jobKey.startsWith('capability:')) {
     const { runCapabilityJob } = await import('@/lib/worker/capability-execution');
     return runCapabilityJob(job, workerId, now);

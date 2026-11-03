@@ -14,6 +14,7 @@ import { canUseGatewayTool, isGatewayTool } from '@/lib/gateway-access';
 import { logger } from '@/lib/logger';
 import { recordAction, recordActionSafe, type LedgerStatus } from '@/lib/ledger';
 import { checkApprovedAction, logSecurityEvent } from '@/lib/permission-engine';
+import { isLockedDown, ledgerLockdownBlock } from '@/lib/safety/lockdown';
 import { approvalContentHash } from '@/lib/canonical-json';
 import { approvalConfirmationCode, verifyConfirmationCode } from '@/lib/approval-code';
 import { classifyProtected, type ProtectedCategory } from '@/lib/protected-actions';
@@ -463,6 +464,13 @@ export async function decide(
   if (recomputed !== row.contentHash) {
     await logSecurityEvent(userId, 'approval_hash_mismatch', `Approval ${row.id} content changed after creation; not run`, row.correlationId);
     return finish(row, 'EXECUTING', 'FAILED', { success: false, error: 'Approved content no longer matches; not run' }, clock);
+  }
+
+  // R07: lockdown is re-checked after the decision and before anything runs. The approval is consumed as FAILED,
+  // never resumed later: after release the Founder makes a fresh request.
+  if (await isLockedDown(userId)) {
+    await ledgerLockdownBlock(userId, `approval:${row.tool}`, row.correlationId);
+    return finish(row, 'EXECUTING', 'FAILED', { success: false, error: 'Lockdown is active; not run' }, clock);
   }
 
   try {

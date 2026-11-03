@@ -130,10 +130,12 @@ describe('real SMS delivery (Twilio REST, mocked fetch)', () => {
     expect(await sendToContact({ userId: 'u1', channel: 'SMS', to: TO, body: 'hi' })).toMatchObject({ sent: true, sid: MSID });
   });
 
-  it('other channels stay stubs and make no network call', async () => {
+  it('other channels without their own credentials are not configured and make no network call', async () => {
     const { deliver } = await import('../comms/delivery');
-    expect(await deliver({ userId: 'u1', channel: 'WHATSAPP', to: TO, body: 'x' })).toMatchObject({ sent: false, reason: 'twilio_not_implemented_yet' });
-    expect(await deliver({ userId: 'u1', channel: 'TELEGRAM', to: '1', body: 'x' })).toMatchObject({ sent: false });
+    // Twilio account credentials alone are not enough: WhatsApp needs its enrolled sender, Telegram its bot token.
+    expect(await deliver({ userId: 'u1', channel: 'WHATSAPP', to: TO, body: 'x' })).toMatchObject({ sent: false, reason: 'not_configured' });
+    expect(await deliver({ userId: 'u1', channel: 'TELEGRAM', to: '1', body: 'x' })).toMatchObject({ sent: false, reason: 'not_configured' });
+    expect(await deliver({ userId: 'u1', channel: 'IMESSAGE', to: TO, body: 'x' })).toMatchObject({ sent: false, reason: 'imessage_bridge_unavailable' });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

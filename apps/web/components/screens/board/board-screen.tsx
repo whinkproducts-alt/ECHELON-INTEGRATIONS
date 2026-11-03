@@ -8,6 +8,7 @@ import type { BoardMember } from '@/lib/board';
 import { BoardGallery } from './board-gallery';
 import { ConvenePanel, type MeetingsState } from './convene-panel';
 import { MeetingRoom } from './meeting-room';
+import { DailyBriefing } from './daily-briefing';
 import type { BoardMeetingView } from './types';
 
 export function BoardScreen({ members }: { members: BoardMember[] }) {
@@ -59,7 +60,7 @@ export function BoardScreen({ members }: { members: BoardMember[] }) {
       <div className="relative z-10 mx-auto w-full max-w-7xl space-y-8 p-4 sm:p-8">
         <HoloHeading eyebrow="Governance" title="Board Room"
           description={`${members.length} members${pending ? `, ${pending} with details pending` : ''}. Convene a meeting, run the table, keep the minutes.`}
-          actions={assistant ? <HoloButton onClick={quickStart} loading={quick.loading} leftIcon={<Zap className="h-4 w-4" aria-hidden />}>Quick Meeting with {assistant.name}</HoloButton> : undefined} />
+          actions={<div className="flex flex-wrap items-center gap-2"><DailyBriefing />{assistant ? <HoloButton onClick={quickStart} loading={quick.loading} leftIcon={<Zap className="h-4 w-4" aria-hidden />}>Quick Meeting with {assistant.name}</HoloButton> : null}</div>} />
         {quick.error && <p role="alert" className="text-sm text-[hsl(var(--ember))]"><span className="font-mono text-xs uppercase tracking-wider">Error: </span>{quick.error}</p>}
         <HoloTabs ariaLabel="Board room sections" value={tab} onValueChange={setTab} tabs={[
           { id: 'members', label: 'Members', content: members.length ? <BoardGallery members={members} /> : <HoloEmpty title="No board members configured" description="Add confirmed members to config/board.json." icon={<Users className="h-6 w-6" aria-hidden />} /> },

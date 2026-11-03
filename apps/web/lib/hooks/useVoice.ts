@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { beginSpeech, endSpeech } from '@/lib/hooks/speech-activity';
+import { isClientLockedDown, onClientLockdown, trackMedia } from '@/lib/safety/client-lockdown';
 
 declare global {
   interface Window {
@@ -67,6 +68,7 @@ export function useVoice(): UseVoiceReturn {
 
   // ── MediaRecorder path (server STT fallback) ──────────────────────────────
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const playingRef = useRef<HTMLAudioElement | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const resolveServerSttRef = useRef<((t: string) => void) | null>(null);
 
@@ -116,7 +118,7 @@ export function useVoice(): UseVoiceReturn {
   }, [stopLipSync]);
 
   const startListening = useCallback(() => {
-    if (isListening) return;
+    if (isListening || isClientLockedDown()) return;
 
     const SpeechRecognitionCtor =
       typeof window !== 'undefined'
@@ -172,6 +174,9 @@ export function useVoice(): UseVoiceReturn {
     if (typeof MediaRecorder === 'undefined') return;
 
     navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then((stream) => {
+      // R07: lockdown may have started while the permission prompt was open.
+      if (isClientLockedDown()) { stream.getTracks().forEach((t) => t.stop()); return; }
+      trackMedia(stream);
       audioChunksRef.current = [];
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
@@ -246,6 +251,7 @@ export function useVoice(): UseVoiceReturn {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
+        playingRef.current = audio;
 
         // ── Wire up AnalyserNode for lipsync ───────────────────────────
         let didStartLipSync = false;
@@ -319,8 +325,18 @@ export function useVoice(): UseVoiceReturn {
     setIsSpeaking(false);
   }, [startLipSync, stopLipSync]);
 
+  // R07: on lockdown stop listening and speaking immediately. The tracks themselves are stopped by client-lockdown.
+  useEffect(() => onClientLockdown((locked) => {
+    if (!locked) return;
+    try { recognitionRef.current?.abort?.(); } catch { /* not running */ }
+    try { if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop(); } catch { /* not running */ }
+    try { playingRef.current?.pause(); } catch { /* not playing */ }
+    setIsListening(false);
+    setIsSpeaking(false);
+  }), []);
+
   const speak = useCallback(async (text: string): Promise<void> => {
-    if (!text.trim()) return;
+    if (!text.trim() || isClientLockedDown()) return;
     beginSpeech();
     try {
       await speakInner(text);

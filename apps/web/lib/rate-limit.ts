@@ -77,6 +77,9 @@ export const RATE_RULES = {
   signup_bootstrap: { limit: 5, windowMs: 60_000 },
   passkey_reauth: { limit: 5, windowMs: 60_000 },
   recommendations: { limit: 60, windowMs: 60_000 },
+  /** Daily briefing regeneration (reads several tables) and model profile edits. */
+  briefing: { limit: 6, windowMs: 60_000 },
+  model_profiles: { limit: 30, windowMs: 60_000 },
   /** Host heartbeat (token-authenticated, no session). Counts FAILED attempts only (bad format, unknown host, wrong token), per client address, or the looser shared bucket when no trustworthy address exists. Valid heartbeats are never counted, so nobody can starve a real host. */
   heartbeat: { limit: 30, windowMs: 60_000 },
   heartbeat_route: { limit: 600, windowMs: 60_000 },

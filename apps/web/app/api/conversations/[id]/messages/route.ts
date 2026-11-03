@@ -1,5 +1,7 @@
 export const dynamic = 'force-dynamic';
-import { localOnlyViolation, localModelNameForLocalOnly } from '@/lib/local-only';
+import { isLocalOnlyMode, localOnlyViolation, localModelNameForLocalOnly } from '@/lib/local-only';
+import { getSafetyState, ledgerLockdownBlock, LOCKDOWN_MESSAGE } from '@/lib/safety/lockdown';
+import { activeProfile, paidAdmission, planRoute } from '@/lib/model-router/priority';
 import { isModelAllowed, isModelNameShape } from '@/lib/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
@@ -260,6 +262,34 @@ export async function POST(
     const defaultModel = process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k';
     let resolvedModel = requestedModel ?? userPrefs?.preferredModel ?? defaultModel;
 
+    // R07: read the lockdown state once for this turn (fails closed). R04: when the request names no model, the
+    // Founder's active priority profile decides, using the first eligible choice. A manual handoff or no eligible
+    // choice is shown as a blocked result, never silently replaced by a paid or trial model.
+    const safety = await getSafetyState(session.user.id);
+    if (!requestedModel) {
+      const profile = await activeProfile(session.user.id).catch(() => null);
+      if (profile) {
+        const ownKeys = new Set((await prisma.userApiKey.findMany({ where: { userId: session.user.id }, select: { provider: true } }).catch(() => [] as Array<{ provider: string }>)).map((k) => k.provider));
+        const plan = planRoute(profile.choices, {
+          lockedDown: safety.lockedDown, localOnly: isLocalOnlyMode(), dataClass: 'private', needsTools: false,
+          paidAdmitted: paidAdmission(process.env, ownKeys),
+        });
+        const first = plan.steps[0];
+        await recordActionSafe({
+          userId: session.user.id, initiator: 'user', persona: orchResult.newPersona ?? 'WHINK',
+          action: 'model_route_selected', tool: 'model_priority', permissionClass: 'A', status: first?.type === 'auto' ? 'VALIDATED' : 'DENIED',
+          correlationId, inputSummary: `profile=${profile.id} rev=${profile.revision} chosen=${first?.entry.id ?? 'none'} skipped=${plan.skipped.map((x) => `${x.id}:${x.reason}`).join(',') || 'none'}`.slice(0, 500),
+        });
+        if (!first) {
+          return NextResponse.json({ error: 'No model in your priority list can take this request right now.', code: 'MODEL_ROUTE_BLOCKED', skipped: plan.skipped }, { status: 409 });
+        }
+        if (first.type === 'handoff') {
+          return NextResponse.json({ error: `${first.entry.label} is a manual handoff. Open it from Settings > Model priority, or choose Skip to continue with the next model.`, code: 'MODEL_ROUTE_HANDOFF', handoffUrl: first.entry.handoffUrl ?? null, skipped: plan.skipped }, { status: 409 });
+        }
+        resolvedModel = first.entry.model;
+      }
+    }
+
     // Load BYOK key for the resolved provider, if one is stored
     let byokApiKey: string | undefined;
     try {
@@ -296,6 +326,25 @@ export async function POST(
       });
       resolvedModel = localModelNameForLocalOnly();
       byokApiKey = undefined;
+    }
+
+    // R07 lockdown: no cloud model and no per-user key. Use the local model; if even that would leave the machine
+    // (non-loopback endpoint), refuse the turn.
+    if (safety.lockedDown) {
+      const lockEnv = { ...process.env, WHINK_LOCAL_ONLY: 'true' };
+      if (localOnlyViolation(resolvedModel, { apiKey: byokApiKey }, lockEnv)) {
+        resolvedModel = localModelNameForLocalOnly(lockEnv);
+        byokApiKey = undefined;
+        await recordActionSafe({
+          userId: session.user.id, initiator: 'user', persona: orchResult.newPersona ?? 'WHINK',
+          action: 'model_not_allowed', tool: 'model_policy', permissionClass: 'A', status: 'DENIED',
+          correlationId, inputSummary: 'reason=lockdown cloud model replaced by the local model',
+        });
+      }
+      if (localOnlyViolation(resolvedModel, {}, lockEnv)) {
+        await ledgerLockdownBlock(session.user.id, 'chat_model', correlationId);
+        return NextResponse.json({ error: LOCKDOWN_MESSAGE, code: 'LOCKDOWN_ACTIVE' }, { status: 423 });
+      }
     }
 
     // M1: Check if a prior injection-blocked turn left a taint flag for this conversation.

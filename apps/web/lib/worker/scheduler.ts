@@ -71,6 +71,8 @@ export async function claimDueJobs(workerId: string, limit: number, now = new Da
       WHERE "nextRunAt" <= ${now} AND ("leaseUntil" IS NULL OR "leaseUntil" < ${now})
         AND ("jobKey" NOT LIKE 'ear:%' OR "lastStatus" IS NULL OR "lastStatus" = 'RETRY_SCHEDULED')
         AND ("jobKey" NOT LIKE 'capability:%' OR "lastStatus" = 'QUEUED')
+        -- R07: nothing is claimed for an account in lockdown.
+        AND NOT EXISTS (SELECT 1 FROM account_safety_states s WHERE s."userId" = agent_jobs."userId" AND s."lockedDown")
       ORDER BY "nextRunAt" ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED

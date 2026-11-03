@@ -30,6 +30,7 @@ import { resolveDestination } from '@/lib/contacts/comms';
 import dns from 'dns';
 import net from 'net';
 import https from 'https';
+import { isLockedDown } from '@/lib/safety/lockdown';
 
 // ── SSRF protection helpers ──────────────────────────────────────────────────
 
@@ -1011,6 +1012,16 @@ export async function executeTool(
       correlationId: cid, latencyMs: Date.now() - startTime,
     });
     return { success: false, error: `Tool not available in Local-Only mode: ${toolName.substring(0, 64)}`, timestamp: nowIso(), toolVersion: '1.0.0' };
+  }
+
+  // R07 lockdown: no tool runs, read or write, local or remote. Chat still answers (local model only).
+  if (await isLockedDown(userId)) {
+    await recordActionSafe({
+      userId, initiator, persona, mambaMode, tool: toolName, action: 'tool_execution_denied',
+      permissionClass: 'C', status: 'DENIED', inputSummary: safeJson(params), outputSummary: 'lockdown',
+      correlationId: cid, latencyMs: Date.now() - startTime,
+    });
+    return { success: false, error: 'Lockdown is active: tools are stopped', timestamp: nowIso(), toolVersion: '1.0.0' };
   }
 
   // Workspace tools belong to the operator: owner accounts only. Checked first, so a non-owner learns nothing

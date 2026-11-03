@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { isLocalOnlyMode, localOnlyBlocksUrl, redirectOpt, SPEECH_UNAVAILABLE } from '@/lib/local-only';
 import { ledgerLocalOnlyBlock } from '@/lib/local-only-guard';
+import { isLockedDown, ledgerLockdownBlock, LOCKDOWN_MESSAGE } from '@/lib/safety/lockdown';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 
@@ -20,6 +21,12 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // R07: lockdown stops the microphone and speech. Checked before the body is read or any provider is called.
+  if (await isLockedDown(session.user.id)) {
+    await ledgerLockdownBlock(session.user.id, 'voice_tts');
+    return NextResponse.json({ error: LOCKDOWN_MESSAGE, code: 'LOCKDOWN_ACTIVE' }, { status: 423 });
   }
 
   let body: { text?: unknown; voice?: unknown };
