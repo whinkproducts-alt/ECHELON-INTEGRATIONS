@@ -1,16 +1,12 @@
-# VS Code: continue ECHELON functional readiness
+# ECHELON functional readiness
 
-Updated 2026-11-01. Start with [the architecture](product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md).
-Architecture is complete as a specification. Current main also includes reconciled worker/provider pilot code; remaining features are tracked below. PR #21 passed full CI/security and was merged; see repository assessment.
+Updated 2026-11-02. Architecture spec: [product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md](product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md).
 
-Current consolidation: latest main security/CI work, worker/GitHub pilot, NVIDIA evaluation code and architecture notes are reconciled together. Pilot integration commit: `fc020b0`. The supporting pilot branch is provenance; do not replay its commits again. See [repository assessment](REPOSITORY-ASSESSMENT-2026-11-01.md) for verified checks and branch decisions. Verify current main HEAD before continuing.
+Current main HEAD: `ccecfcf` (2026-11-02). R04/R06/R07/R08 merged. All merged branches deleted. Remaining open branches: `fix/remediation-2a68d1fb-185920` (Qodo bot, not merged by design) and Dependabot PRs (pending review).
 
 ## Next action
 
-Execute R01: inspect current owning code, config-presence flags without values, Git state,
-local services and test setup. Create an isolated test database; do not reset the owner's
-DB. Record baseline build/typecheck/lint/full-suite results. Then close R02/R03 with a
-real harmless mission and a restricted GitHub report through the worker/gateway.
+Victor runs own-Mac setup: supply `.env` values, run `npx prisma migrate dev`, run `pnpm dev`, sign in. This is the R01 gate — nothing can be live-accepted until this passes. See pending-tasks.md section A for the full list of what only Victor can do.
 
 ## Founder choices
 
@@ -18,38 +14,31 @@ real harmless mission and a restricted GitHub report through the worker/gateway.
 - All communication channels plus hearing and speaking required, including iMessage feasibility and real calls. Do not reduce scope to Telegram/email without asking.
 - Daily Board Room entry briefing from real tasks/approvals, with motion and voice.
 - Model-priority control: selectable first/second/third and saved-order switch. Browser chat is manual handoff; NVIDIA trial restrictions and privacy/cost gates still apply.
-- Avatar: add blinking if it preserves existing behavior; otherwise keep breathing/mouth animation. This is the confirmed conditional A-otherwise-B instruction, not a later rejection of blinking.
-- Lockdown: stop new jobs, outbound tools, cloud calls, mic/camera; retain local review/audit.
+- Avatar: add blinking if it preserves existing behavior; otherwise keep breathing/mouth animation. Blinking is now implemented conditionally (speaks/active states only).
+- Lockdown: stop new jobs, outbound tools, cloud calls, mic/camera; retain local review/audit. Lockdown is now implemented.
 - No elapsed-time estimates. Ask concise A/B/C questions for missing decisions, and keep independent work moving.
 
 ## Build status
 
 | Ticket | Status | Evidence / next gate |
 |---|---|---|
-| R01 baseline | TODO | Current full baseline, sign-in, worker startup, DB verification |
-| R02 real mission | PARTIAL | Analysis path exists; capability-worker pilot is reconciled with main security fixes; live full journey needed |
-| R03 GitHub pilot | PARTIAL | Provider and fixture tests; inspect App installation/key setup; live worker report missing |
-| R04 models | PARTIAL | Synthetic results: Nemotron 4/4, Mistral 4/4, local Qwen 2/4; NVIDIA DeepSeek timed out. Registry/profile/fallback UI not built |
-| R05 Mac-off | TODO / PROVIDER DECISION | Prepare architecture/runbook; approved remote host and physical test needed |
-| R06 channels/voice | PARTIAL | SMTP/SMS code exists; other delivery adapters and live acceptance pending |
-| R07 sealed team/lockdown | TODO | Client-only Kill Team brief; global lockdown absent |
-| R08 briefing/avatars | PARTIAL | Avatar mouth/breathing code exists; entry briefing/blinking conditional feature pending |
-| R09 organization/HOLO | PARTIAL | Canonical registry and UI exist; actual lifecycle coverage and directorate reconciliation pending |
+| R01 baseline | TODO | Victor must supply .env, run `prisma migrate dev`, run `pnpm dev`, sign in |
+| R02 real mission | PARTIAL | Analysis path exists; capability-worker pilot reconciled with main; live full journey needed after R01 |
+| R03 GitHub pilot | PARTIAL | Provider and fixture tests pass; App installation/key setup and live worker report need Victor |
+| R04 models | BUILT — AWAITING LIVE ACCEPTANCE | Commit `cc7a8fa`. Priority logic, registry, profile CRUD API, settings panel. 2273 tests pass. Next: Victor tests model selector in running app |
+| R05 Mac-off | TODO / PROVIDER DECISION | Architecture/runbook needed; approved remote host and physical test needed |
+| R06 channels/voice | BUILT — AWAITING LIVE ACCEPTANCE | Commit `cc7a8fa`. Real SMTP/Twilio SMS/WhatsApp/Telegram/voice adapters. Next: Victor supplies TWILIO_* + SMTP_* and tests a real send |
+| R07 sealed team/lockdown | BUILT — AWAITING LIVE ACCEPTANCE | Commit `cc7a8fa`. Full lockdown module, API, UI. Security pass still needed. Next: Victor tests lockdown toggle in running app |
+| R08 briefing/avatars | BUILT — AWAITING LIVE ACCEPTANCE | Commit `cc7a8fa`. Daily briefing logic + API + Board Room UI + conditional avatar blink. Next: Victor tests Board Room in running app |
+| R09 organization/HOLO | PARTIAL | Canonical registry and UI exist; lifecycle coverage and directorate reconciliation pending |
 | R10 readiness/services | TODO | Inventory, independent assurance, backups, all acceptance evidence |
 
-Last recorded tests before architecture: targeted NVIDIA tests 4/4, typecheck and targeted lint passed.
-Earlier gateway handoff records successful build/focused gateway checks but non-green broad suites.
-No tests were rerun to imply current full-build success during this documentation task.
+## Current test baseline (2026-11-02, commit `cc7a8fa`)
 
-For each completed slice replace status with VERIFIED only alongside exact commit, reproducible command,
-evidence level, passed/failed/skipped counts, rollback and remaining limits. Update this file and relevant notes.
-Keep pending questions with ticket IDs. First provider decisions: real recipients, approved channel identities,
-telephony costs, iMessage bridge, speech provider, model data ceilings/order and remote host/store.
+153 Vitest files, 2273 tests passed, 105 skipped. Lint: 0 errors, 7 pre-existing warnings. `tsc --noEmit`: clean. `next build`: compiled successfully. New migration `20261102120000_readiness_safety_models_briefing` not yet applied to any live DB — Victor must run `npx prisma migrate dev`.
 
-Do not recreate credentials reported as already created; locate/configure securely with the Founder.
-Never print key contents. Current App creation is conversation evidence only; validate actual installation.
-Do not deploy, merge, purchase, send real messages or claim Mac-off completion from this handoff alone.
+## Standing rules
 
-Publication-time GitHub warning: the push reported 134 default-branch vulnerability alerts (8 critical, 49 high, 58 moderate, 19 low). These are untriaged platform alerts, not independently verified reachable vulnerabilities in this branch. R01/R10 must inspect the current dependency graph and alerts, prioritize relevant fixes, and record actual audit results; do not claim security readiness from earlier audit notes.
+Do not recreate credentials reported as already created; locate/configure securely with the Founder. Never print key contents. Do not deploy, merge, purchase, send real messages or claim Mac-off completion without Victor's explicit approval.
 
-Reconciliation verification: 41 migrations applied on a fresh isolated test DB; 150 Vitest files passed, 2246 tests passed and 38 skipped, including explicit installed-Qwen streaming; typecheck passed; lint had 0 errors/8 existing warnings; webpack production build and tracked-tree secret scan passed. All 22 built-app browser tests passed. A forward migration upgrades previously applied gateway FK actions without a reset; see repository assessment. These supersede earlier non-green baseline notes for this candidate; skipped tests and live providers remain distinct gates.
+GitHub reports 134 default-branch vulnerability alerts (8 critical, 49 high, 58 moderate, 19 low) — untriaged Dependabot alerts, not independently verified reachable vulnerabilities. R01/R10 must inspect and prioritize; do not claim security readiness from earlier audit notes alone.
