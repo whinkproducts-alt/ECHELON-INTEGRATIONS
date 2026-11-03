@@ -32,21 +32,22 @@ describe('usage recording', () => {
     recordUsage({ userId: '', provider: 'p', model: 'm', tokensIn: 5, tokensOut: 5 });
     expect(db.usageEvent.create).not.toHaveBeenCalled();
   });
-  it('cost is 0 without configured prices, never a guess', () => {
-    expect(estimateCostMicros('claude-x', 1000, 1000, undefined)).toBe(0);
+  it('cost is unknown without configured prices, never a guess', () => {
+    expect(estimateCostMicros('claude-x', 1000, 1000, '')).toBeNull();
     expect(estimateCostMicros('claude-x', 1000, 2000, JSON.stringify({ claude: { in: 3, out: 15 } }))).toBe(33000);
-    expect(estimateCostMicros('claude-x', 1, 1, 'not json')).toBe(0);
+    expect(estimateCostMicros('claude-x', 1, 1, 'not json')).toBeNull();
+    expect(estimateCostMicros('local', 1, 1, '{"local":{"in":0,"out":0}}')).toBe(0);
   });
   it('summary is scoped by userId and aggregates per day and model', async () => {
     db.usageEvent.findMany.mockResolvedValue([
       { provider: 'a', model: 'm1', tokensIn: 10, tokensOut: 5, costMicros: 1, createdAt: new Date('2026-10-25T01:00:00Z') },
-      { provider: 'a', model: 'm1', tokensIn: 1, tokensOut: 1, costMicros: 0, createdAt: new Date('2026-10-25T02:00:00Z') },
+      { provider: 'a', model: 'm1', tokensIn: 1, tokensOut: 1, costMicros: null, createdAt: new Date('2026-10-25T02:00:00Z') },
     ]);
     const s = await usageSummary('uA', '7d', new Date('2026-10-25T12:00:00Z'));
     expect(db.usageEvent.findMany.mock.calls[0][0].where.userId).toBe('uA');
     expect(s.daily).toHaveLength(7);
     expect(s.daily.at(-1)).toMatchObject({ day: '2026-10-25', tokensIn: 11, tokensOut: 6 });
-    expect(s.byModel[0]).toMatchObject({ model: 'm1', calls: 2 });
+    expect(s.byModel[0]).toMatchObject({ model: 'm1', calls: 2, unknownCostCalls: 1, costMicros: 1 });
   });
 });
 

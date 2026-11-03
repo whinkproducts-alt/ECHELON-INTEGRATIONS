@@ -42,7 +42,7 @@ function finance(now: number, empty: boolean) {
       { kind: 'end', date: iso(now + 40 * DAY), contractId: 'ctr_fixture_2', title: 'Sample lease agreement', counterparty: 'Placeholder Properties', subsidiary: 'real-estate', status: 'ACTIVE', valueAmount: '96500.50', currency: 'CAD' },
     ] },
     modelSpend: {
-      month: iso(now).slice(0, 7), calls: empty ? 0 : 412, tokensIn: empty ? 0 : 1_250_000, tokensOut: empty ? 0 : 310_000, costMicros: empty ? 0 : 18_420_000,
+      month: iso(now).slice(0, 7), calls: empty ? 0 : 412, tokensIn: empty ? 0 : 1_250_000, tokensOut: empty ? 0 : 310_000, unknownCostCalls: 0, costMicros: empty ? 0 : 18_420_000,
       monthlyTokenBudget: 1_800_000, budgetState: empty ? 'ok' : 'soft', resetsAt: iso(now + 12 * DAY),
     },
     omitted: [{ field: 'spendBySubsidiary', reason: 'Usage events carry no project or swarm link, so spend cannot be attributed to a subsidiary without guessing.' }],

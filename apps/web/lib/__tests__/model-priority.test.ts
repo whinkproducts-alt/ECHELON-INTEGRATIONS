@@ -68,11 +68,9 @@ describe('planning', () => {
     expect(p.skipped).toEqual([{ id: 'anthropic-sonnet', reason: 'paid_not_admitted' }]);
     expect(ids(p)).toEqual(['auto:local-default']);
   });
-  it('paid admission comes from the operator flag or the user’s own key', () => {
-    const e = modelRegistry(ENV).find((x) => x.id === 'anthropic-sonnet')!;
-    expect(paidAdmission({ WHINK_PAID_MODELS_ENABLED: 'true' })(e)).toBe(true);
-    expect(paidAdmission({}, new Set(['anthropic']))(e)).toBe(true);
-    expect(paidAdmission({}, new Set(['openai']))(e)).toBe(false);
+  it('configured credentials cannot enable paid routing without operator admission', () => {
+    expect(paidAdmission({ ANTHROPIC_API_KEY: 'fixture' })()).toBe(false);
+    expect(paidAdmission({ WHINK_PAID_MODELS_ENABLED: 'true' })()).toBe(true);
   });
   it('a missing credential is skipped as not configured', () => {
     const p = planRoute(['anthropic-sonnet'], ctx({ env: {} }));

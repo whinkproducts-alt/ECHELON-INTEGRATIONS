@@ -34,7 +34,7 @@ export interface BriefingSources {
   approvals: { pending: number; executed: number; denied: number; expired: number; failed: number } | null;
   executions: { running: number; succeeded: number; failed: number; blocked: number } | null;
   swarm: { running: number; done: number; failed: number } | null;
-  usage: { costMicros: number; events: number } | null;
+  usage: { costMicros: number; unknownCostCalls: number; events: number } | null;
 }
 
 export interface BriefingView {
@@ -117,7 +117,12 @@ export function composeBriefing(src: BriefingSources, opts: { localDate: string;
   if (!src.usage) lines.push({ kind: 'usage', text: 'Model cost is unavailable right now.', href: '/dashboard/usage', unavailable: true });
   else {
     const dollars = (src.usage.costMicros / 1_000_000).toFixed(2);
-    lines.push({ kind: 'usage', text: src.usage.events ? `Recorded model cost in the last day: $${dollars} across ${plural(src.usage.events, 'call')}.` : 'No model cost was recorded in the last day.', href: '/dashboard/usage' });
+    const { events, unknownCostCalls } = src.usage;
+    const priced = events - unknownCostCalls;
+    const parts = [];
+    if (priced) parts.push(`Estimated model cost in the last day: $${dollars} across ${plural(priced, 'call')}.`);
+    if (unknownCostCalls) parts.push(`Cost unknown for ${plural(unknownCostCalls, 'call')}.`);
+    lines.push({ kind: 'usage', text: parts.join(' ') || 'No model cost was recorded in the last day.', href: '/dashboard/usage' });
   }
 
   lines.push({ kind: 'closing', text: 'That is everything on record. Open any line to see its source.' });
@@ -187,8 +192,8 @@ export async function gatherSources(userId: string, cutoff: Date, timeZone: stri
     return { running: n('RUNNING', 'FINALIZING'), done: n('DONE'), failed: n('FAILED') };
   })(), 'swarm');
   const usage = settle((async () => {
-    const agg = await prisma.usageEvent.aggregate({ where: { userId, createdAt: { gte: since, lte: cutoff } }, _sum: { costMicros: true }, _count: { _all: true } });
-    return { costMicros: agg._sum.costMicros ?? 0, events: agg._count._all };
+    const agg = await prisma.usageEvent.aggregate({ where: { userId, createdAt: { gte: since, lte: cutoff } }, _sum: { costMicros: true }, _count: { costMicros: true, _all: true } });
+    return { costMicros: agg._sum.costMicros ?? 0, unknownCostCalls: agg._count._all - agg._count.costMicros, events: agg._count._all };
   })(), 'usage');
   const [t, a, e, s, u] = await Promise.all([tasks, approvals, executions, swarm, usage]);
   return { tasks: t, approvals: a, executions: e, swarm: s, usage: u };

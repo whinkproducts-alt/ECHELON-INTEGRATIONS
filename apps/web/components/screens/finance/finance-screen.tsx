@@ -97,9 +97,9 @@ function Spend({ m }: { m: ModelSpend }) {
         <dl className="grid gap-4 sm:grid-cols-3">
           <div><dt className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">Calls</dt><dd className="font-mono text-xl tabular-nums text-foreground">{fmtInt(m.calls)}</dd></div>
           <div><dt className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">Tokens in / out</dt><dd className="font-mono text-xl tabular-nums text-foreground">{fmtCompact(m.tokensIn)} / {fmtCompact(m.tokensOut)}</dd></div>
-          <div><dt className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">Recorded cost</dt><dd className="font-mono text-xl tabular-nums text-foreground">{fmtUsd(m.costMicros)}</dd></div>
+          <div><dt className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-muted-foreground">Priced calls (estimate)</dt><dd className="font-mono text-xl tabular-nums text-foreground">{m.calls > 0 && m.unknownCostCalls === m.calls ? 'Unknown' : fmtUsd(m.costMicros)}</dd></div>
         </dl>
-        {m.costMicros === 0 && m.calls > 0 && <p className="text-xs text-muted-foreground">Cost shows 0 when no model prices are configured on the server. It is not an estimate.</p>}
+        {m.unknownCostCalls > 0 && <p className="text-xs text-muted-foreground">Cost unknown for {m.unknownCostCalls} calls.</p>}
         {budget ? (
           <div className="space-y-2">
             <HoloMeter label="Tokens used against the monthly budget" value={used} max={budget} limit={m.budgetState !== 'ok'}

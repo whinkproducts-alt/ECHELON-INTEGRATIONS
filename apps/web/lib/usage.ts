@@ -5,7 +5,7 @@
  *
  * Cost: prices are optional config (env WHINK_MODEL_PRICES, JSON of
  * {"<model prefix>": {"in": <USD per 1M input tokens>, "out": <USD per 1M output tokens>}}).
- * With no price the cost is 0 (unknown), never a guess. USD per 1M tokens equals micro-USD per token.
+ * With no price the cost is null (unknown), never a guess. USD per 1M tokens equals micro-USD per token.
  */
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -37,16 +37,18 @@ function clampInt(n: unknown): number {
   return Number.isFinite(v) && v > 0 ? Math.min(v, 2_000_000_000) : 0;
 }
 
-export function estimateCostMicros(model: string, tokensIn: number, tokensOut: number, pricesJson = process.env.WHINK_MODEL_PRICES): number {
-  if (!pricesJson) return 0;
+export function estimateCostMicros(model: string, tokensIn: number, tokensOut: number, pricesJson = process.env.WHINK_MODEL_PRICES): number | null {
+  if (!pricesJson || tokensIn + tokensOut === 0) return null;
   try {
     const prices = JSON.parse(pricesJson) as Record<string, { in?: number; out?: number }>;
     const key = Object.keys(prices).filter((p) => model.startsWith(p)).sort((a, b) => b.length - a.length)[0];
-    if (!key) return 0;
+    if (!key) return null;
     const p = prices[key];
-    return clampInt((p.in ?? 0) * tokensIn + (p.out ?? 0) * tokensOut);
+    if (typeof p.in !== 'number' || typeof p.out !== 'number' || !Number.isFinite(p.in) || !Number.isFinite(p.out) || p.in < 0 || p.out < 0) return null;
+    const cost = Math.round(p.in * tokensIn + p.out * tokensOut);
+    return cost <= 2_147_483_647 ? cost : null;
   } catch {
-    return 0;
+    return null;
   }
 }
 
@@ -74,8 +76,8 @@ export function recordUsage(input: UsageInput): void {
   }
 }
 
-export interface DailyUsage { day: string; tokensIn: number; tokensOut: number; costMicros: number }
-export interface ModelUsage { model: string; provider: string; tokensIn: number; tokensOut: number; costMicros: number; calls: number }
+export interface DailyUsage { day: string; tokensIn: number; tokensOut: number; unknownCostCalls: number; costMicros: number }
+export interface ModelUsage { model: string; provider: string; tokensIn: number; tokensOut: number; unknownCostCalls: number; costMicros: number; calls: number }
 
 export const USAGE_RANGES = { '7d': 7, '30d': 30 } as const;
 export type UsageRange = keyof typeof USAGE_RANGES;
@@ -94,15 +96,16 @@ export async function usageSummary(userId: string, range: UsageRange, now = new 
   const daily = new Map<string, DailyUsage>();
   for (let i = 0; i < days; i++) {
     const d = new Date(since.getTime() + i * 86_400_000).toISOString().slice(0, 10);
-    daily.set(d, { day: d, tokensIn: 0, tokensOut: 0, costMicros: 0 });
+    daily.set(d, { day: d, tokensIn: 0, tokensOut: 0, unknownCostCalls: 0, costMicros: 0 });
   }
   const models = new Map<string, ModelUsage>();
   for (const r of rows) {
     const d = daily.get(r.createdAt.toISOString().slice(0, 10));
-    if (d) { d.tokensIn += r.tokensIn; d.tokensOut += r.tokensOut; d.costMicros += r.costMicros; }
-    const m = models.get(r.model) ?? { model: r.model, provider: r.provider, tokensIn: 0, tokensOut: 0, costMicros: 0, calls: 0 };
-    m.tokensIn += r.tokensIn; m.tokensOut += r.tokensOut; m.costMicros += r.costMicros; m.calls += 1;
-    models.set(r.model, m);
+    if (d) { d.tokensIn += r.tokensIn; d.tokensOut += r.tokensOut; d.costMicros += r.costMicros ?? 0; d.unknownCostCalls += Number(r.costMicros === null); }
+    const modelKey = JSON.stringify([r.provider, r.model]);
+    const m = models.get(modelKey) ?? { model: r.model, provider: r.provider, tokensIn: 0, tokensOut: 0, unknownCostCalls: 0, costMicros: 0, calls: 0 };
+    m.tokensIn += r.tokensIn; m.tokensOut += r.tokensOut; m.costMicros += r.costMicros ?? 0; m.unknownCostCalls += Number(r.costMicros === null); m.calls += 1;
+    models.set(modelKey, m);
   }
   return { range, daily: [...daily.values()], byModel: [...models.values()].sort((a, b) => b.tokensIn + b.tokensOut - (a.tokensIn + a.tokensOut)) };
 }

@@ -272,10 +272,9 @@ export async function POST(
     if (!requestedModel) {
       const profile = await activeProfile(session.user.id).catch(() => null);
       if (profile) {
-        const ownKeys = new Set((await prisma.userApiKey.findMany({ where: { userId: session.user.id }, select: { provider: true } }).catch(() => [] as Array<{ provider: string }>)).map((k) => k.provider));
         const plan = planRoute(profile.choices, {
           lockedDown: safety.lockedDown, localOnly: isLocalOnlyMode(), dataClass: 'private', needsTools: false,
-          paidAdmitted: paidAdmission(process.env, ownKeys),
+          paidAdmitted: paidAdmission(),
         });
         const first = plan.steps[0];
         await recordActionSafe({
@@ -512,7 +511,7 @@ export async function POST(
           }
 
           // CAI auto-debrief (fire-and-forget)
-          if (fullContent.length > 100) {
+          if (!conversationTainted && fullContent.length > 100) {
             void debriefTurn({
               userId: session.user.id,
               agentId: activePersona.toLowerCase(),

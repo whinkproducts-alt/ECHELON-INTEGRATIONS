@@ -11,10 +11,10 @@ import { BudgetEditor } from './budget-editor';
 import { countdown, fmtCompact, fmtInt, fmtUsd } from './format';
 
 interface Budget { state: 'ok' | 'soft' | 'hard'; used: number; limit: number | null; softPct: number; hardPct: number; resetsAt: string }
-interface ModelRow { model: string; provider: string; tokensIn: number; tokensOut: number; costMicros: number; calls: number }
+interface ModelRow { model: string; provider: string; tokensIn: number; tokensOut: number; unknownCostCalls: number; costMicros: number; calls: number }
 interface UsagePayload {
   range: '7d' | '30d';
-  daily: (DayPoint & { costMicros: number })[];
+  daily: (DayPoint & { unknownCostCalls: number; costMicros: number })[];
   byModel: ModelRow[];
   budget: Budget;
   connectivity: 'online' | 'degraded' | 'offline';
@@ -88,6 +88,8 @@ export function UsageScreen() {
     const b = data.budget;
     const periodTokens = data.daily.reduce((a, d) => a + d.tokensIn + d.tokensOut, 0);
     const periodCost = data.daily.reduce((a, d) => a + d.costMicros, 0);
+    const unknown = data.daily.reduce((a, d) => a + d.unknownCostCalls, 0);
+    const calls = data.byModel.reduce((a, m) => a + m.calls, 0);
     const limited = b.state !== 'ok' && b.limit !== null;
     const pct = b.limit ? Math.round((b.used / b.limit) * 100) : 0;
     const resets = now === null ? null : Math.max(0, Date.parse(b.resetsAt) - now);
@@ -135,8 +137,8 @@ export function UsageScreen() {
           <HoloStat label="Tokens this month" value={b.used} format={(n) => fmtCompact(n)} tone="deep" />
           <HoloPanel tone="neutral">
             <p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-muted-foreground">Cost estimate, {range}</p>
-            <p className="mt-2 font-mono text-3xl tabular-nums text-foreground">{periodCost > 0 ? fmtUsd(periodCost) : 'Not priced'}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{periodCost > 0 ? 'An estimate from configured prices, not a bill.' : 'No model prices are configured on the server, so no cost is guessed.'}</p>
+            <p className="mt-2 font-mono text-3xl tabular-nums text-foreground">{unknown && calls === unknown ? 'Unknown' : fmtUsd(periodCost)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{unknown ? `Excludes ${fmtInt(unknown)} calls with unknown cost.` : 'Estimated from configured prices.'}</p>
           </HoloPanel>
         </HoloGrid>
 
@@ -149,7 +151,7 @@ export function UsageScreen() {
               {data.byModel.map((m) => (
                 <HoloMeter
                   key={`${m.provider}/${m.model}`} value={m.tokensIn + m.tokensOut} max={maxModel}
-                  label={`${m.model} (${m.provider})`} valueText={`${fmtCompact(m.tokensIn + m.tokensOut)} tokens · ${fmtInt(m.calls)} calls${m.costMicros > 0 ? ` · ${fmtUsd(m.costMicros)}` : ''}`}
+                  label={`${m.model} (${m.provider})`} valueText={`${fmtCompact(m.tokensIn + m.tokensOut)} tokens · ${fmtInt(m.calls)} calls${m.unknownCostCalls < m.calls ? ` · ${fmtUsd(m.costMicros)}` : ''}${m.unknownCostCalls ? ` · ${m.unknownCostCalls} unpriced` : ''}`}
                 />
               ))}
             </HoloPanel>

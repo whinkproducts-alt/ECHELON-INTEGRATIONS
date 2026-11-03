@@ -106,12 +106,12 @@ describe('finance', () => {
     db.contract.groupBy.mockResolvedValue([{ subsidiary: 'consult', status: 'ACTIVE', currency: 'CAD', _count: { _all: 1 }, _sum: { valueAmount: dec('2500.00') } }]);
     db.contract.findMany.mockResolvedValueOnce([crow({ id: 'e', endDate: new Date('2026-11-01') })]).mockResolvedValueOnce([crow({ id: 'r', renewalDate: new Date('2026-10-30') })]);
     db.userPreference.findUnique.mockResolvedValue({ monthlyTokenBudget: 1000, budgetSoftPct: 80, budgetHardPct: 100 });
-    db.usageEvent.aggregate.mockResolvedValue({ _sum: { tokensIn: 100, tokensOut: 50, costMicros: 1234 }, _count: { _all: 3 } });
+    db.usageEvent.aggregate.mockResolvedValue({ _sum: { tokensIn: 100, tokensOut: 50, costMicros: 1234 }, _count: { costMicros: 2, _all: 3 } });
     const s = await financeSummary('uA', now);
     expect(s.asOf).toBe(now.toISOString());
     expect(s.contracts.byCurrency).toEqual([{ currency: 'CAD', total: '2500.00', contracts: 1 }]);
     expect(s.upcoming.items.map((i) => [i.kind, i.contractId])).toEqual([['renewal', 'r'], ['end', 'e']]);
-    expect(s.modelSpend).toMatchObject({ calls: 3, tokensIn: 100, tokensOut: 50, costMicros: 1234, budgetState: 'ok' });
+    expect(s.modelSpend).toMatchObject({ calls: 3, tokensIn: 100, tokensOut: 50, costMicros: 1234, unknownCostCalls: 1, budgetState: 'ok' });
     expect(s.omitted[0].field).toBe('spendBySubsidiary');
     expect(db.contract.groupBy.mock.calls[0][0].where).toEqual({ userId: 'uA' });
     for (const call of db.contract.findMany.mock.calls) expect(call[0].where.userId).toBe('uA');

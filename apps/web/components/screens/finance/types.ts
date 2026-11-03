@@ -6,7 +6,7 @@ export interface UpcomingItem {
   status: string; valueAmount: string | null; currency: string;
 }
 export interface ModelSpend {
-  month: string; calls: number; tokensIn: number; tokensOut: number; costMicros: number;
+  month: string; calls: number; tokensIn: number; tokensOut: number; costMicros: number; unknownCostCalls: number;
   monthlyTokenBudget: number | null; budgetState: 'ok' | 'soft' | 'hard'; resetsAt: string;
 }
 export interface FinanceSummary {
