@@ -6,13 +6,25 @@ import * as path from 'path';
 // mock before the global lockdown setup can import the real context dependency graph.
 vi.mock('@/lib/working-memory', () => ({ listWorkingMemory: vi.fn().mockResolvedValue([]) }));
 
+// All imports in this file share one DB boundary, including modules cached by setup.
+const { projectFindFirst, taskCreate } = vi.hoisted(() => ({
+  projectFindFirst: vi.fn(), taskCreate: vi.fn(),
+}));
+vi.mock('@/lib/db', () => ({
+  prisma: {
+    project: { findFirst: projectFindFirst }, projectTask: { create: taskCreate },
+    memorySemantic: { findMany: vi.fn().mockResolvedValue([]) },
+    memoryEpisode: { findMany: vi.fn().mockResolvedValue([]) },
+    entityNode: { findMany: vi.fn().mockResolvedValue([]) },
+    hypothesis: { findMany: vi.fn().mockResolvedValue([]) },
+  },
+}));
+
 describe('project ownership scoping: task_create', () => {
   const recordActionSafe = vi.fn();
   const recordAction = vi.fn();
   const updateActionStatus = vi.fn();
   const checkPermission = vi.fn();
-  const projectFindFirst = vi.fn();
-  const taskCreate = vi.fn();
 
   beforeEach(() => {
     vi.resetModules();
@@ -22,9 +34,6 @@ describe('project ownership scoping: task_create', () => {
     checkPermission.mockReset().mockResolvedValue({ allowed: true, method: 'delegated' });
     projectFindFirst.mockReset();
     taskCreate.mockReset();
-    vi.doMock('@/lib/db', () => ({
-      prisma: { project: { findFirst: projectFindFirst }, projectTask: { create: taskCreate } },
-    }));
     vi.doMock('@/lib/ledger', () => ({ recordAction, recordActionSafe, updateActionStatus }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission }));
     vi.doMock('@/lib/memory-engine', () => ({ writeMemory: vi.fn(), correctMemory: vi.fn(), searchMemory: vi.fn() }));
@@ -55,21 +64,10 @@ describe('project ownership scoping: task_create', () => {
 });
 
 describe('project ownership scoping: context engine', () => {
-  const projectFindFirst = vi.fn();
 
   beforeEach(() => {
     vi.resetModules();
     projectFindFirst.mockReset().mockResolvedValue(null);
-    vi.doMock('@/lib/db', () => ({
-      prisma: {
-        project: { findFirst: projectFindFirst },
-        workingMemory: { findMany: vi.fn().mockResolvedValue([]) },
-        memorySemantic: { findMany: vi.fn().mockResolvedValue([]) },
-        memoryEpisode: { findMany: vi.fn().mockResolvedValue([]) },
-        entityNode: { findMany: vi.fn().mockResolvedValue([]) },
-        hypothesis: { findMany: vi.fn().mockResolvedValue([]) },
-      },
-    }));
   });
 
   it('assembleContext looks up the project with ownerId, not userId', async () => {
