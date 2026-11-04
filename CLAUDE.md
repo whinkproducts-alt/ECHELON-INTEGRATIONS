@@ -1,5 +1,7 @@
 # W.H.I.N.K. Ultimate
 
+> ECHELON continuation, 2026-11-04: read `docs/ECHELON-AUDIT-HANDOFF-2026-11-04.md`, the newest daily sync and `docs/pending-tasks.md` for current status. This file's non-negotiables and protected-action rules remain binding; dated phase/known-issue text is historical and is not proof of present implementation. Source import and main consolidation are complete.
+
 Read this whole file at the start of every session. It is the single source of truth for how this repo is built.
 
 ## What this is
@@ -16,7 +18,7 @@ A persona is never a permission. Switching minds changes voice, never access.
 ## Repo layout
 ```
 apps/web/          Next.js 16 app (the WHINK core). Prisma, Postgres, Tailwind, shadcn.
-services/          Future: voice (ADA V2), gateway config (OpenClaw), recall (AnythingLLM).
+services/          Voice wrappers, gateway (OpenClaw), recall (AnythingLLM); verify enabled runtime separately.
 docs/decisions.md  Every architectural decision, dated, with the reason.
 .claude/agents/    The build team. See below.
 ```
@@ -106,7 +108,7 @@ WHINK and MAMBA can deliver daily (or immediate) updates via:
 - **Telegram** — Bot API. Env: `TELEGRAM_BOT_TOKEN`
 - **Phone call** — Twilio Voice with TwiML. Same credentials as SMS.
 
-All sends go through `lib/comms/delivery.ts` → permission engine (Class B — requires delegation). Preferences stored in `notification_preferences` table. Configure credentials in `.env` (never in git).
+Delivery transports live in `lib/comms/delivery.ts`; callers must enforce permissions/approvals before dispatch. Protected contact messages/calls require Class C owner approval; do not treat every send as Class B or assume the transport itself establishes authorization. Preferences stored in `notification_preferences` table. Configure credentials in `.env` (never in git).
 
 ## How work flows
 1. lead-architect writes the plan and acceptance criteria for the task.
@@ -276,7 +278,9 @@ Victor's checklist:
 - [ ] With AnythingLLM stopped, chat still answered from memory.
 - [ ] Every memory write, skip, upload and block above appears in the ledger.
 
-## Known issues in the inherited code
+## Historical issues in the inherited code
+
+These dated observations are provenance, not today's defect list. Several were subsequently fixed. Inspect owning source and the current audit/backlog before acting; do not undo or repeat completed work.
 Verified against the code on 2026-10-03. Fixed items removed: SQL LIKE memory search (now pgvector hybrid), no automatic memory writes, in-process working memory Map.
 - Tools reach the model on Anthropic only. Other providers stream without tools. `lib/tool-loop.ts` imports the Anthropic SDK directly. (2a)
 - Gateway tools are never registered in the chat path. (2c)

@@ -1,144 +1,78 @@
-# Local Setup & Development
+# ECHELON local setup and desktop-launch requirements
 
-The short path to a first run. README.md has the longer version and the model-switching notes.
+Updated 2026-11-04. This is the setup path for the actual ECHELON repo. It does not mark full personal acceptance complete. Start with the [audit handoff](docs/ECHELON-AUDIT-HANDOFF-2026-11-04.md) and preserve existing private settings/data.
 
-## Prerequisites
-- Node 22 or newer (CI runs 22)
-- pnpm 10 or newer (CI uses 10.28; a fresh install also passes with pnpm 12)
-- Docker Desktop or OrbStack (runs Postgres with pgvector)
-- git
-- Ollama (optional, for local models)
-- Python 3.10+ (only for the optional HOLO gesture bridge)
+## 1. Prerequisites and checkout
 
-Developed on Apple silicon Macs; CI runs on Linux.
+Node 22, pnpm 10.28.0 (CI versions), Git, Docker Desktop or OrbStack for PostgreSQL + pgvector. Use an existing installed Ollama model for local text; optional local voice services require separate model/image preparation. Verify installed versions before adding software. Other versions were used historically but are not freshly certified here.
 
-## 1. Clone and install
 ```sh
-git clone https://github.com/whinkproducts-alt/KAMSI-PRIME.git
-cd KAMSI-PRIME
-pnpm install
+git clone https://github.com/whinkproducts-alt/ECHELON-CORP.git
+cd ECHELON-CORP
+pnpm install --frozen-lockfile
 ```
 
-## 2. Start the database
+If the repository is already present, inspect `git status` and update safely; do not clone over it or discard other work.
+
+## 2. Private settings
+
+For a new instance, copy `apps/web/.env.example` to `apps/web/.env` **only if `.env` does not already exist**, then edit privately. Both `.env` and `.env.local` are ignored by Git. Never print/copy their values to chat, documentation, logs or an audit export.
+
+- Database: `DATABASE_URL` and `DIRECT_URL` must identify this instance's database/port.
+- Auth: `AUTH_SECRET`, `NEXTAUTH_SECRET`, `AUTH_URL`, `NEXTAUTH_URL`; use the actual local origin consistently. Preserve existing secrets rather than rotating them casually.
+- Owner/passkey: `WHINK_OWNER_EMAILS`, `SIGNUP_BOOTSTRAP_TOKEN`, `WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN`; perform controlled owner bootstrap, then keep open signup disabled (`SIGNUP_ENABLED=false`). Do not expose a fresh owner email to public signup.
+- Encryption: valid `ENCRYPTION_KEY` per `.env.example`; changing it can make existing stored secrets/results unreadable. Preserve/backup it securely, outside Git.
+- Local text: set `DEFAULT_MODEL` and `WHINK_LOCAL_MODEL` to the **exact installed tag**, and the correct loopback compatible/Ollama endpoint. Check `ollama list`; no model winner or installed tag is assumed. The example uses `wink-qwen3.5-9b-8k`.
+- For an intended local-only instance, set both `WHINK_LOCAL_ONLY=true` and `NEXT_PUBLIC_WHINK_LOCAL_ONLY=true`; the browser flag is compiled into the client, so rebuild/restart as appropriate. Verify no remote calls across chat/background/embedding/voice, not just the first reply.
+- The example currently selects Deepgram STT and OpenAI TTS. For local speech, clear those cloud selectors and configure the matching loopback `STT_URL`/`TTS_URL` and supported voice/provider (Kokoro requires its voice selection). A local URL alone does not override a cloud selector. No service configured means unavailable/browser fallback as supported, not proof of local audio.
+- Configure optional providers only as needed for acceptance: SMTP/Twilio/Telegram, restricted GitHub provider, MCP hosts. Key presence is not spend authorization.
+
+**Environment loading:** Next.js can load `.env.local` with higher precedence; Prisma CLI and the `dotenv/config` worker normally read `.env` from their working directory. Reconcile conflicting files privately. A value saved only in `.env.local` is not proof the worker/Prisma sees it. Do not delete either file as a shortcut.
+
+## 3. Start this instance's database
+
 ```sh
 docker compose up -d postgres
-docker ps        # the postgres line should say Up
+docker compose ps postgres
 ```
-Start `postgres` only. A plain `docker compose up -d` also starts the optional speech services, which are large downloads.
-If port 5432 is already taken on your machine, see the troubleshooting note at the end.
 
-## 3. Create the settings file
-The file is `apps/web/.env`. It is **not** `.env.local`: Prisma only reads `.env`.
+Start only `postgres`; plain `docker compose up -d` also starts optional speech images/services. The compose database binds to loopback. If 5432 is occupied, do not kill the existing database: set a different `POSTGRES_PORT` in a repo-root private `.env` and match both app database URLs. Do not repurpose an unrelated container or database.
+
+## 4. Check and apply checked-in migrations
+
+Back up any existing personal DB and encryption material, then verify the intended target before writing:
+
 ```sh
-cd apps/web
-S=$(openssl rand -hex 32)
-cat > .env <<EOF
-DATABASE_URL=postgresql://whink:whink_local@127.0.0.1:5432/whink
-DIRECT_URL=postgresql://whink:whink_local@127.0.0.1:5432/whink
-AUTH_SECRET=$S
-NEXTAUTH_SECRET=$S
-AUTH_URL=http://localhost:3000
-NEXTAUTH_URL=http://localhost:3000
-ENCRYPTION_KEY=$(openssl rand -hex 32)
-SIGNUP_BOOTSTRAP_TOKEN=$(openssl rand -hex 16)
-WEBAUTHN_RP_ID=localhost
-WEBAUTHN_ORIGIN=http://localhost:3000
-DEFAULT_MODEL=claude-sonnet-4-6
-ANTHROPIC_API_KEY=PASTE_YOUR_KEY_HERE
-WHINK_OWNER_EMAILS=PASTE_YOUR_EMAIL_HERE
-EOF
+pnpm --filter app exec prisma generate
+pnpm --filter app exec prisma migrate status
+pnpm --filter app exec prisma migrate deploy
 ```
-Then edit the file and replace the two `PASTE_` values. The owner email must be the exact address you will sign up with.
-`DEFAULT_MODEL` can be any model your key can use, or a local Ollama model (see below). `.env.example` lists every other setting.
-Never commit `.env`; it is ignored by git.
 
-## 4. Create the tables
-```sh
-pnpm exec prisma migrate deploy
-```
-This applies the checked-in migrations and never asks questions. (`migrate dev` is for creating new migrations.)
+`migrate deploy` applies existing migrations; `migrate dev` is for creating/developing schema changes on developer data. Do not run `db push`, reset, or test seeds on a personal database. An old note recommending reset after the gateway migration was edited is superseded by inspection/forward-upgrade work in `20261102010000_gateway_constraint_upgrade`. If checksums/schema mismatch, stop and plan a backup/repair; do not force success.
 
-## 5. Run it
+The unknown-cost migration converts ambiguous historical zeros to null; reversal cannot reconstruct them. The reservations migration adds hold fields. Fresh CI migration success does not prove personal-data upgrade/restore safety.
+
+## 5. Start app and worker separately
+
 ```sh
-cd ..            # back to the repo root
+# Terminal 1, repo root; dev binds 127.0.0.1
 pnpm dev
-```
-Open http://localhost:3000, press Create account, and use the owner email from step 3 (and the sign-up code if the form asks for `SIGNUP_BOOTSTRAP_TOKEN`).
-Once your account exists, set `SIGNUP_ENABLED=false` in `apps/web/.env` and restart, so nobody else can register.
-
-## Run tests
-```sh
-cd apps/web
-pnpm exec vitest run
+# Terminal 2, after WORKER_ENABLED=true is set privately:
+pnpm --filter app worker
 ```
 
-## Local Ollama Model
+Open the configured origin, normally `http://localhost:3000`, and verify owner sign-in, passkey and data after restart. Starting the web app does not start the worker, MCP facade, heartbeat sender, Ollama or a speech service. `docs/whink-worker.plist.example` contains historical paths and is not installed by this repo.
 
-WHINK Ultimate defaults to a local Qwen 3.5 9B Q4 model profile with an 8K context. On a 16 GB Mac, this keeps inference local while leaving memory for macOS and the app. From the repository root, install the base model and create the profile:
+For a built local instance use `pnpm --filter app build`, then `pnpm --filter app exec next start -H 127.0.0.1` with the configured port/origin. Keep the process on loopback. Avoid automatic builds/installs/migrations/model downloads on each user launch.
 
-```sh
-ollama pull qwen3.5:9b-q4_K_M
-ollama create wink-qwen3.5-9b-8k -f apps/web/ollama/Modelfile
-```
+If a port is occupied, identify its owner and reuse only a verified healthy ECHELON instance or pick a configured alternate port. Do not run blanket `kill -9` commands. Stop only processes this instance owns, gracefully.
 
-The app uses `wink-qwen3.5-9b-8k` for chat, memory tasks, and specialist work by default. This does not enable Ollama-to-cloud escalation; cloud routing remains a separate, explicitly configured provider path.
+## 6. Desktop icon acceptance — pending implementation
 
-### Gemma and the local workspace agent (optional, off by default)
-Models whose name starts with `gemma` use Ollama's native `/api/chat` (change the prefixes with `WHINK_OLLAMA_NATIVE_MODELS`).
-To let a local model inspect a code folder read-only, set `WHINK_LOCAL_AGENT_TOOLS=true` and `WHINK_WORKSPACE_ROOT=/absolute/path` in `apps/web/.env`;
-only owner accounts can use these tools. `WHINK_LOCAL_ONLY=true` keeps every model call and network surface local.
-The settings are documented in `.env.example` and the design in `docs/security.md`.
+No `.app`/`.command` launcher is tracked. Build a minimal ECHELON.app with approved icon that uses stable absolute paths/PATH, starts or reuses required services and worker, checks readiness before opening the configured URL, avoids duplicate processes, reports safe errors, and provides graceful stop. Keep secrets outside the bundle/logs. Handle Docker stopped, missing model, DB failure, port conflict, double click twice and reboot/login. Do not equate opening a browser tab with the worker or providers being ready.
 
-## HOLO Gestures (Optional Local)
-cd services/holo-bridge
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python3 gesture-recognizer.py
-Runs on localhost:5001, connects to React app via WebSocket.
+Full personal-use gates remain in [the launch checklist](docs/LAUNCH-CHECKLIST.md). The icon does not postpone or close missing functionality. Mac-off operation requires a separately approved remote runtime and actual power-off test.
 
-## Voice Service (Optional)
-cd services/whink-voice
-pnpm install
-pnpm dev
-Runs on localhost:3001.
+## 7. Validation and handoff
 
-## Git Workflow
-Work on a branch and open a pull request, so the checks (type check, tests, migrations on a real Postgres, browser tests,
-dependency audit, gitleaks, CodeQL) run before `main` changes.
-```sh
-git checkout main && git pull origin main
-git checkout -b my-change
-# ... make changes, run the tests ...
-git add -A && git commit -m "feat: short description"
-git push -u origin my-change
-```
-Before adding or upgrading a dependency, check its publish date: pnpm 12 refuses packages less than 24 hours old.
-
-## After You Finish a Session
-Update HANDOFF.md with what you completed, what is blocked, and what the next person or agent should do, then commit it on your branch.
-
-## Troubleshooting
-- Prisma error: `npx prisma generate`, then `pnpm exec prisma migrate deploy`. Do not use `db push` on a shared database.
-- Node version: use Node 22 or newer (`nvm use 22`).
-- Port 3000 in use: Kill with `lsof -i :3000 | grep LISTEN | awk '{print $2}' | xargs kill -9`
-
-## Troubleshooting: port 5432 is already in use
-
-If `docker compose up -d postgres` fails with `bind: address already in use` on 5432, another Postgres is
-running on your machine. Do not stop it. Run this project's database on another port instead:
-
-1. In the repo root (next to docker-compose.yml) create a file named `.env` containing `POSTGRES_PORT=5433`.
-2. In `apps/web/.env` change both `DATABASE_URL` and `DIRECT_URL` to use `127.0.0.1:5433`.
-3. Run `docker compose up -d postgres` again.
-
-## Troubleshooting: `docker-credential-desktop` not found
-
-Docker Desktop's helper tool is not on your PATH. Add `export PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"`
-to `~/.zshrc` and open a new Terminal window.
-
-## Troubleshooting: pnpm 12 `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`
-
-pnpm 12 refuses packages published in the last 24 hours. When bumping dependencies, check each new version's publish
-date first and test with pnpm 12. See docs/decisions.md, 2026-10-27.
-
+Use [testing.md](docs/testing.md) for isolated automated checks; never point tests/seeds at personal data. Record real setup failures and exact environment/receipt evidence without credentials. Before handing to another model, update the latest daily sync, [pending tasks](docs/pending-tasks.md), execution gates and relevant decisions/learnings. Do not package secrets or the personal database for auditors.

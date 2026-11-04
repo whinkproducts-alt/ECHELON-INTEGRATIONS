@@ -25,22 +25,21 @@ Product/design lens: Founder should be able to speak or type an objective, see w
 
 These are review perspectives, not claims of affiliation with Grok, Apple or any real designer. Implementation must receive assurance review by someone other than its builder, per CLAUDE.md.
 
-## 3. Verified starting seams and uncertainties
+## 3. Current implementation starting point (updated 2026-11-04)
 
-Reconciliation update 2026-11-01: the supporting pilot/model code has been merged into the main reconciliation candidate with the newer security fixes retained (pilot merge `fc020b0`). See `../REPOSITORY-ASSESSMENT-2026-11-01.md` and the execution checklist for actual verification and remaining acceptance. The supporting branch is now provenance, not the required implementation starting point.
+This document is the target specification, not a completion report. Use [the audit handoff](../ECHELON-AUDIT-HANDOFF-2026-11-04.md), [execution gates](../ECHELON-READINESS-EXECUTION.md) and owning source for current status. Main code baseline `99f6d7eb3f58cff9d9aae8f59641137faf755a9c` includes reconciled pilot and PRs #23/#24. Do not import/replay the supporting branch.
 
-Use these existing seams; recheck their live behavior before modifying:
-- `apps/web/lib/model-router.ts`, `model-router-tools.ts`: model transport and tool calling. Current default examples target local Ollama; one generic compatible endpoint is not a provider registry.
-- `lib/worker/{scheduler,runner,ear-execution,capability-execution}.ts`: bounded internal analysis and queued gateway execution. Capability jobs are owner-directed calls, not universal autonomous planning.
-- `lib/capability/`, `lib/permission-engine.ts`, `lib/approvals.ts`, `lib/ledger.ts`: provider/grant policy, approval and receipts. Reuse all four.
-- `lib/github-readonly/report.ts`, `scripts/github-readonly-mcp.ts`, `/api/integrations/jobs`: fixed-repository report pilot. App creation/key download were reported in conversation; installation/configuration and live worker acceptance remain unverified. Do not recreate the App without checking.
-- `lib/comms/delivery.ts`: SMTP and Twilio SMS implementations exist. Telegram, WhatsApp and calls contain explicit stubs; iMessage is absent from the channel type.
-- `/api/voice/{stt,tts}`, `lib/hooks/useVoice.ts`: existing cloud/local speech transports and browser behavior need live validation.
-- `components/screens/board/board-screen.tsx`: Board Room meetings exist; daily entrance briefing is absent.
-- `components/avatar/`: mouth and breathing implementation exists; no blinking by previous decision. Prove live audio attachment rather than accepting synthetic cadence as lip sync.
-- `components/screens/kill-team/kill-team-screen.tsx`: objective currently uses local React state; specialists remain visible in view-only mode. This is not sealed mission execution.
-- No global lockdown was found; microphone/camera switches are narrower controls.
-- Latest recorded broad suite is not green: older social real-DB failures, skipped shared-mock suites and an unavailable-model test. Historical documents contradict current code in several places; reconcile evidence instead of copying their statuses.
+- Model transports, registry/profiles and initial selection exist; actual ordered failover and universal dispatch cost admission remain unfinished. NVIDIA trials stay evaluation-only; DeepSeek browser is manual.
+- Existing scheduler/runner implement bounded internal analysis and owner-directed capability jobs, not universal autonomous planning.
+- Capability grants/policy/approval/ledger and fixed-repo GitHub report exist. App/key creation was reported; installation/configuration/live gateway report remains unverified. Locate existing setup before recreating.
+- SMTP, SMS, WhatsApp, Telegram and scripted Twilio call adapters exist. iMessage explicitly unavailable; two-way call/inbound and live channel acceptance remain open.
+- Speech routes support configurable local/cloud transports. Example cloud selectors, real device behavior and cost/privacy controls require verification.
+- Daily source-based Board Room briefing/modal and audio mouth feed exist. Accepted daily-entry motion/voice/video experience is not proven.
+- Mouth/breathing and opt-in blink exist; blink is flag/eye-anchor/reduced-motion gated, not speaking-only. Confirm portrait/audio behavior on the Mac.
+- Kill Team objective uses local React state; non-founder has view-only UI. Durable sealed owner scope is still missing.
+- Persisted lockdown and many server/client boundary checks exist. Whole-flow/in-flight assurance remains open.
+- Main CI is green at the baseline: 2345 passed, 39 skipped, 22 browser passed; skips and mocks are not coverage. Old non-green pilot results do not describe current main.
+- Full personal use plus desktop launch is required; Mac-on first does not remove Mac-off acceptance. Follow the current engineering backlog rather than treating everything as Founder-only setup.
 
 ## 4. Target flow and architecture
 
@@ -90,7 +89,7 @@ Each ticket ends with changed files, migration/config notes, reproducible tests,
 
 | Ticket / pending item | Build scope and existing seam | Acceptance / failure tests |
 |---|---|---|
-| R01 baseline (1) | Snapshot branch/HEAD/dirty state and inspect live config presence without values; clean install from lockfile; isolated test DB migrate/generate; owner sign-in; web+worker startup; reconcile outdated notes. | New isolated DB works without reset of owner DB; real login and worker heartbeat; build/typecheck/lint; exact full-suite baseline recorded. |
+| R01 baseline (1) | Snapshot branch/HEAD/dirty state and inspect live config presence without values; clean install from lockfile; isolated test DB migrate/generate; owner sign-in; web+worker startup; safe desktop icon/launcher and restart path; reconcile outdated notes. | New isolated DB works without reset of owner DB; real login and worker heartbeat; build/typecheck/lint; exact full-suite baseline recorded. |
 | R02 actual mission (2) | Connect authenticated Founder objective to existing planning/admission, persisted tasks and canonical worker. Keep bounded analysis and capability calls separate by declared execution type. | Real harmless task returns persisted result and HOLO receipt; duplicate, crash, cancel, expired/denied/hash-tampered and cross-account tests; no fake dispatch. |
 | R03 GitHub acceptance (3) | Inspect existing private App/install; fixed ECHELON repo/branch configuration; register/review/grant one MCP tool and run through worker. | Commit-pinned live report; missing checks UNVERIFIED; other repos and writes denied before I/O; revoked grant stops next execution; key never in outputs. |
 | R04 models (4) | Registry, saved priority profiles, UI, manual web handoff, local fallback and paid admission. | Shared policy across every inference path; tool compatibility, streaming/cancel, 401/402/429/timeout; Local-Only zero egress; paid-disabled zero paid requests. |
@@ -101,7 +100,7 @@ Each ticket ends with changed files, migration/config notes, reproducible tests,
 | R09 organization + HOLO (9) | Registry validation and actual lifecycle/event projection; lowest competent assignment and bounded qualified substitution. | Preserve 326 identities/163 teams; resolve 15/16 directorates with Founder; reconnect event replay, dedup and account isolation; fixtures DEMO. |
 | R10 readiness/services (10) | Service inventory, dependency fixes, test repair, backups, security assurance, docs and versioned release. | Actual private-use journey checklist passed by Founder; no hidden failures/skips, secret scan, reviewed diff and rollback; no production claim from fixtures. |
 
-Shortest execution path: R01 → R02/R03 → R04 + safety portion of R07 → R06 → R08/R09 → R10 local acceptance. Prepare R05 independently; activate only after provider approval. This sequence does not remove any required channel or Mac-off gate. Finish one representative complete journey early, then extend using the same contracts. Do not spend the session redesigning the shell or adding another framework.
+Current execution priority (Founder update, 2026-11-02; reconciled 2026-11-04): close scoped dispatch cost/admission gaps first (E01), then actual model failover and sealed-scope/lockdown engineering, missing channel/two-way voice work, full personal acceptance and launcher/backup completion. Configure R01 safely alongside engineering and prove a real R02/R03 worker mission. Prepare R05 independently; activate only on an approved host. This does not remove any channel, personal feature or Mac-off gate. See `../pending-tasks.md` for the current ordered backlog; the architecture describes the whole target.
 
 ## 7. Communications, hearing and speaking
 
@@ -109,9 +108,9 @@ All outbound sends use existing approval/permission flow, then `lib/comms/delive
 
 - Email: retain SMTP adapter; prove password reset, ordinary contact mail and staff routing with controlled recipients. Require bounded network timeouts and safe errors.
 - SMS: retain Twilio REST path; verify credentials and approved recipient. Provider acceptance is not delivered; support receipt state/webhook verification if available. No retry on unknown outcome.
-- Telegram: add Bot API adapter using fixed endpoint and secret token outside args. Validate chat ID and message bounds; use one approved synthetic send first. Bot/chat creation and access are Founder setup tasks.
-- WhatsApp: implement approved Business provider adapter (existing Twilio seam if chosen). Verify sender enrollment, recipient eligibility, template/session constraints and costs from current official docs before building. No personal-session scraping.
-- Calls: implement provider call creation, safe callback/TwiML flow, destination/content approval and signed webhook validation. Scripted call acceptance is distinct from two-way voice conversation. For real conversation also build bounded STT→router→TTS, interruption, explicit hangup, call duration/spend cap and no-action-on-transcript ambiguity.
+- Telegram: retain and verify the existing Bot API send adapter; finish any required inbound webhook/polling with authenticated origin/secret, dedup and account/chat binding. Prove receipts and unknown outcomes.
+- WhatsApp: retain and verify the existing Twilio outbound adapter; finish approved incoming message/status webhooks, templates and conversation handling as required. Inspect actual account/number entitlement and pricing before live use; no unofficial session scraper.
+- Calls: retain and verify existing Twilio scripted call creation. Finish signed status/media callbacks, safe TwiML and the required two-way STT→router→TTS conversation path, interruption/hangup, duration/spend caps and destination/content approval. Queued/scripted call acceptance is not a completed conversation; an ambiguous transcript authorizes no action.
 - iMessage: investigate supported Apple-device bridge and current terms before selecting. Model an adapter interface and show unavailable until an approved Mac/device bridge is verified. No invented official public iMessage API; no silent substitution with SMS. Requirement remains open if bridge infeasible.
 - Hearing/speaking: reuse existing local STT/TTS URL adapters or approved cloud providers. Inventory actual configured service; do not infer from .env.example. Local-Only disables vendor browser speech. Verify mic permission, start/stop, interim/final transcript, TTS completion, barge-in, device failure and audio cleanup. Voice approvals still require request identity and expiry; speech never grants blanket authority.
 

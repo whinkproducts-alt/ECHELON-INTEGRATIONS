@@ -1,3 +1,5 @@
+> Current-state update 2026-11-04: gateway and queued worker/report code are already on main. Read [current audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md) for exact CI/mocks/remaining gates. GitHub App creation/key download was reported; installation/configuration/live worker acceptance remain unverified. Later dated setup statements below are historical, not proof that no App exists. At-most-once dispatch, uncertain outcomes, result retention and full in-flight lockdown remain explicit boundaries; physical Mac-off is not proven.
+
 # Capability Gateway (E1 / E4a / E4b)
 
 Status: implemented and tested at **mock/simulation + real-database level**. The physical "Mac fully powered off" acceptance (E5, T8-T10) is **not** done and is blocked on D-1 (no remote host, no spend authorised). Nothing here is deployed.

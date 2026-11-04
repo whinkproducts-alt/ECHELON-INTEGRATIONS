@@ -1,0 +1,739 @@
+{
+  "recorded_on": "2026-11-04",
+  "date_context": "America/Edmonton; GitHub timestamps in UTC",
+  "scope": "Read-only verification of existing main before a documentation-only update. No local application tests, live provider call, deployment, credential inspection or paid operation performed.",
+  "repository": "https://github.com/whinkproducts-alt/ECHELON-CORP",
+  "baseline": {
+    "branch": "main",
+    "sha": "99f6d7eb3f58cff9d9aae8f59641137faf755a9c",
+    "tree": "81a8004d0fff74a27587164db3073be7bd9b7038",
+    "clean_at_start": true,
+    "remote_main_sha": "99f6d7eb3f58cff9d9aae8f59641137faf755a9c"
+  },
+  "unchanged_application_trees": {
+    "apps": "623a600fec374aeeeff867a5c795c80b2f0ec970",
+    "services": "0f1897c1dd477bca00d2610bd1047e85f34068c8",
+    "packages": "f928ee58de468e84778afbc094a42ac76bcd2890",
+    ".github": "fa919762a1659abdca800e9777c18e41f9a16089",
+    "e2e": "e210bc491a112081f42af62dfb1d6da358901524"
+  },
+  "workflows": [
+    {
+      "conclusion": "success",
+      "createdAt": "2026-11-03T03:38:19Z",
+      "databaseId": 41573396721,
+      "event": "pull_request",
+      "headSha": "9f97c6c6358a2bb441fcc9fcfe89aa8c05d6c584",
+      "jobs": [
+        {
+          "completedAt": "2026-11-03T03:45:52Z",
+          "conclusion": "success",
+          "name": "typecheck, lint, migrate, test, build, e2e",
+          "startedAt": "2026-11-03T03:38:21Z",
+          "status": "completed",
+          "steps": [
+            {
+              "name": "Initialize containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "conclusion": "success"
+            },
+            {
+              "name": "Decide whether the code changed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install",
+              "conclusion": "success"
+            },
+            {
+              "name": "Prisma client",
+              "conclusion": "success"
+            },
+            {
+              "name": "Typecheck",
+              "conclusion": "success"
+            },
+            {
+              "name": "Lint",
+              "conclusion": "success"
+            },
+            {
+              "name": "Apply every migration to a real PostgreSQL with pgvector",
+              "conclusion": "success"
+            },
+            {
+              "name": "Seed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Unit tests",
+              "conclusion": "success"
+            },
+            {
+              "name": "Build",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install e2e dependencies and the Chromium browser",
+              "conclusion": "success"
+            },
+            {
+              "name": "E2E (real browser, built app, real database)",
+              "conclusion": "success"
+            },
+            {
+              "name": "Upload e2e report, traces and failure screenshots",
+              "conclusion": "success"
+            }
+          ],
+          "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41573396721/job/125711266046"
+        }
+      ],
+      "status": "completed",
+      "updatedAt": "2026-11-03T03:45:52Z",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41573396721"
+    },
+    {
+      "conclusion": "success",
+      "createdAt": "2026-11-03T03:38:19Z",
+      "databaseId": 41573396832,
+      "event": "pull_request",
+      "headSha": "9f97c6c6358a2bb441fcc9fcfe89aa8c05d6c584",
+      "jobs": [
+        {
+          "completedAt": "2026-11-03T03:38:47Z",
+          "conclusion": "success",
+          "name": "pnpm audit (production dependencies)",
+          "startedAt": "2026-11-03T03:38:22Z",
+          "status": "completed",
+          "steps": [
+            {
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "conclusion": "success"
+            },
+            {
+              "name": "Audit production dependencies (fails on high or critical)",
+              "conclusion": "success"
+            }
+          ],
+          "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41573396832/job/125711266873"
+        },
+        {
+          "completedAt": "2026-11-03T03:39:04Z",
+          "conclusion": "success",
+          "name": "gitleaks secret scan",
+          "startedAt": "2026-11-03T03:38:21Z",
+          "status": "completed",
+          "steps": [
+            {
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install gitleaks 8.24.3 (checksum verified)",
+              "conclusion": "success"
+            },
+            {
+              "name": "Scan full history",
+              "conclusion": "success"
+            }
+          ],
+          "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41573396832/job/125711267095"
+        },
+        {
+          "completedAt": "2026-11-03T03:42:16Z",
+          "conclusion": "success",
+          "name": "CodeQL",
+          "startedAt": "2026-11-03T03:38:22Z",
+          "status": "completed",
+          "steps": [
+            {
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run github/codeql-action/init@4bfa242aa49c5f7c6770b98670d354a7dfac05f8",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run github/codeql-action/analyze@4bfa242aa49c5f7c6770b98670d354a7dfac05f8",
+              "conclusion": "success"
+            },
+            {
+              "name": "Keep the CodeQL report",
+              "conclusion": "success"
+            }
+          ],
+          "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41573396832/job/125711267993"
+        }
+      ],
+      "status": "completed",
+      "updatedAt": "2026-11-03T03:42:17Z",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41573396832"
+    },
+    {
+      "conclusion": "success",
+      "createdAt": "2026-11-03T03:46:43Z",
+      "databaseId": 41574207211,
+      "event": "pull_request",
+      "headSha": "5a571c68ba2ce9999e7bea9fed99b7f7a3636bb2",
+      "jobs": [
+        {
+          "completedAt": "2026-11-03T03:53:48Z",
+          "conclusion": "success",
+          "name": "typecheck, lint, migrate, test, build, e2e",
+          "startedAt": "2026-11-03T03:47:13Z",
+          "status": "completed",
+          "steps": [
+            {
+              "name": "Initialize containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "conclusion": "success"
+            },
+            {
+              "name": "Decide whether the code changed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install",
+              "conclusion": "success"
+            },
+            {
+              "name": "Prisma client",
+              "conclusion": "success"
+            },
+            {
+              "name": "Typecheck",
+              "conclusion": "success"
+            },
+            {
+              "name": "Lint",
+              "conclusion": "success"
+            },
+            {
+              "name": "Apply every migration to a real PostgreSQL with pgvector",
+              "conclusion": "success"
+            },
+            {
+              "name": "Seed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Unit tests",
+              "conclusion": "success"
+            },
+            {
+              "name": "Build",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install e2e dependencies and the Chromium browser",
+              "conclusion": "success"
+            },
+            {
+              "name": "E2E (real browser, built app, real database)",
+              "conclusion": "success"
+            },
+            {
+              "name": "Upload e2e report, traces and failure screenshots",
+              "conclusion": "success"
+            }
+          ],
+          "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574207211/job/125713975535"
+        }
+      ],
+      "status": "completed",
+      "updatedAt": "2026-11-03T03:53:48Z",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574207211"
+    },
+    {
+      "conclusion": "success",
+      "createdAt": "2026-11-03T03:46:43Z",
+      "databaseId": 41574207116,
+      "event": "pull_request",
+      "headSha": "5a571c68ba2ce9999e7bea9fed99b7f7a3636bb2",
+      "jobs": [
+        {
+          "completedAt": "2026-11-03T03:47:31Z",
+          "conclusion": "success",
+          "name": "pnpm audit (production dependencies)",
+          "startedAt": "2026-11-03T03:47:20Z",
+          "status": "completed",
+          "steps": [
+            {
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "conclusion": "success"
+            },
+            {
+              "name": "Audit production dependencies (fails on high or critical)",
+              "conclusion": "success"
+            }
+          ],
+          "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574207116/job/125714015496"
+        },
+        {
+          "completedAt": "2026-11-03T03:48:02Z",
+          "conclusion": "success",
+          "name": "gitleaks secret scan",
+          "startedAt": "2026-11-03T03:47:20Z",
+          "status": "completed",
+          "steps": [
+            {
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install gitleaks 8.24.3 (checksum verified)",
+              "conclusion": "success"
+            },
+            {
+              "name": "Scan full history",
+              "conclusion": "success"
+            }
+          ],
+          "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574207116/job/125714015938"
+        },
+        {
+          "completedAt": "2026-11-03T03:51:22Z",
+          "conclusion": "success",
+          "name": "CodeQL",
+          "startedAt": "2026-11-03T03:47:30Z",
+          "status": "completed",
+          "steps": [
+            {
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run github/codeql-action/init@4bfa242aa49c5f7c6770b98670d354a7dfac05f8",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run github/codeql-action/analyze@4bfa242aa49c5f7c6770b98670d354a7dfac05f8",
+              "conclusion": "success"
+            },
+            {
+              "name": "Keep the CodeQL report",
+              "conclusion": "success"
+            }
+          ],
+          "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574207116/job/125714015965"
+        }
+      ],
+      "status": "completed",
+      "updatedAt": "2026-11-03T03:51:22Z",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574207116"
+    },
+    {
+      "conclusion": "success",
+      "createdAt": "2026-11-03T03:54:38Z",
+      "databaseId": 41574973163,
+      "event": "push",
+      "headSha": "99f6d7eb3f58cff9d9aae8f59641137faf755a9c",
+      "jobs": [
+        {
+          "completedAt": "2026-11-03T04:02:25Z",
+          "conclusion": "success",
+          "name": "typecheck, lint, migrate, test, build, e2e",
+          "startedAt": "2026-11-03T03:55:43Z",
+          "status": "completed",
+          "steps": [
+            {
+              "name": "Initialize containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "conclusion": "success"
+            },
+            {
+              "name": "Decide whether the code changed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install",
+              "conclusion": "success"
+            },
+            {
+              "name": "Prisma client",
+              "conclusion": "success"
+            },
+            {
+              "name": "Typecheck",
+              "conclusion": "success"
+            },
+            {
+              "name": "Lint",
+              "conclusion": "success"
+            },
+            {
+              "name": "Apply every migration to a real PostgreSQL with pgvector",
+              "conclusion": "success"
+            },
+            {
+              "name": "Seed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Unit tests",
+              "conclusion": "success"
+            },
+            {
+              "name": "Build",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install e2e dependencies and the Chromium browser",
+              "conclusion": "success"
+            },
+            {
+              "name": "E2E (real browser, built app, real database)",
+              "conclusion": "success"
+            },
+            {
+              "name": "Upload e2e report, traces and failure screenshots",
+              "conclusion": "success"
+            }
+          ],
+          "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574973163/job/125716565672"
+        }
+      ],
+      "status": "completed",
+      "updatedAt": "2026-11-03T04:02:26Z",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574973163"
+    },
+    {
+      "conclusion": "success",
+      "createdAt": "2026-11-03T03:54:38Z",
+      "databaseId": 41574973158,
+      "event": "push",
+      "headSha": "99f6d7eb3f58cff9d9aae8f59641137faf755a9c",
+      "jobs": [
+        {
+          "completedAt": "2026-11-03T03:55:50Z",
+          "conclusion": "success",
+          "name": "pnpm audit (production dependencies)",
+          "startedAt": "2026-11-03T03:55:39Z",
+          "status": "completed",
+          "steps": [
+            {
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "conclusion": "success"
+            },
+            {
+              "name": "Audit production dependencies (fails on high or critical)",
+              "conclusion": "success"
+            }
+          ],
+          "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574973158/job/125716545504"
+        },
+        {
+          "completedAt": "2026-11-03T03:56:22Z",
+          "conclusion": "success",
+          "name": "gitleaks secret scan",
+          "startedAt": "2026-11-03T03:55:39Z",
+          "status": "completed",
+          "steps": [
+            {
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install gitleaks 8.24.3 (checksum verified)",
+              "conclusion": "success"
+            },
+            {
+              "name": "Scan full history",
+              "conclusion": "success"
+            }
+          ],
+          "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574973158/job/125716545694"
+        },
+        {
+          "completedAt": "2026-11-03T04:01:39Z",
+          "conclusion": "success",
+          "name": "CodeQL",
+          "startedAt": "2026-11-03T03:55:39Z",
+          "status": "completed",
+          "steps": [
+            {
+              "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run github/codeql-action/init@4bfa242aa49c5f7c6770b98670d354a7dfac05f8",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run github/codeql-action/analyze@4bfa242aa49c5f7c6770b98670d354a7dfac05f8",
+              "conclusion": "success"
+            },
+            {
+              "name": "Keep the CodeQL report",
+              "conclusion": "success"
+            }
+          ],
+          "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574973158/job/125716545748"
+        }
+      ],
+      "status": "completed",
+      "updatedAt": "2026-11-03T04:01:40Z",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574973158"
+    }
+  ],
+  "baseline_main_ci_summary": {
+    "run_id": 41574973163,
+    "vitest_files_passed": 158,
+    "vitest_tests_passed": 2345,
+    "vitest_tests_skipped": 39,
+    "playwright_passed": 22,
+    "selected_log_summary": [
+      "Heavy checks: true",
+      "All migrations have been successfully applied.",
+      "Test Files  158 passed (158)",
+      "Tests  2345 passed | 39 skipped (2384)",
+      "22 passed (2.5m)"
+    ],
+    "skipped_files": [
+      {
+        "path": "apps/web/lib/__tests__/social.integration.test.ts",
+        "skipped": 30
+      },
+      {
+        "path": "apps/web/lib/__tests__/model-router.test.ts",
+        "skipped": 1
+      },
+      {
+        "path": "apps/web/lib/__tests__/approvals.integration.test.ts",
+        "skipped": 6
+      },
+      {
+        "path": "apps/web/lib/__tests__/evaluations-tenant-isolation.test.ts",
+        "skipped": 2
+      }
+    ],
+    "skip_reason_boundary": "CI log confirms these skips. DB-probed suites skip when their probe fails; shared mock/probe diagnosis is not a new isolated-DB verification. Ollama integration requires OLLAMA_INTEGRATION_MODEL."
+  },
+  "merged_pull_requests": [
+    {
+      "headRefOid": "92a072eb5699dd4c1c5028c437625e317e7e6fc6",
+      "mergeCommit": {
+        "oid": "ef7e8971c8c8165f6fce900e1b277df2ebd86c90"
+      },
+      "mergedAt": "2026-11-02T03:42:40Z",
+      "number": 21,
+      "state": "MERGED",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/21"
+    },
+    {
+      "headRefOid": "9f97c6c6358a2bb441fcc9fcfe89aa8c05d6c584",
+      "mergeCommit": {
+        "oid": "9b63bce1ed6080429c1cd564fa0487ed0e351988"
+      },
+      "mergedAt": "2026-11-03T03:51:26Z",
+      "number": 23,
+      "state": "MERGED",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/23"
+    },
+    {
+      "headRefOid": "5a571c68ba2ce9999e7bea9fed99b7f7a3636bb2",
+      "mergeCommit": {
+        "oid": "bd58401c43b8c65f1976fac7f79f19f2f6906db0"
+      },
+      "mergedAt": "2026-11-03T03:54:06Z",
+      "number": 24,
+      "state": "MERGED",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/24"
+    }
+  ],
+  "remote_branches_at_inspection": [
+    {
+      "branch": "dependabot/docker/services/openclaw/node-26.13.0-alpine3.24",
+      "sha": "cfbf1e0a087a066fa9c33bdb1e62ca571afafde8"
+    },
+    {
+      "branch": "dependabot/github_actions/actions/checkout-7.0.1",
+      "sha": "acb8f1b41958f27fc318a8bb9824af4a02aedb1d"
+    },
+    {
+      "branch": "dependabot/github_actions/actions/setup-node-7.1.0",
+      "sha": "5953d8ee4c5f294fb8a258ed1d7a3de404ffd008"
+    },
+    {
+      "branch": "dependabot/github_actions/actions/upload-artifact-7.0.2",
+      "sha": "b42383424b0b5189672d5a708c1a9ccb6c637f07"
+    },
+    {
+      "branch": "dependabot/github_actions/github/codeql-action/init-4.39.1",
+      "sha": "0f02b8befd83bc1e3c77174975295e063cdd347b"
+    },
+    {
+      "branch": "dependabot/github_actions/pnpm/action-setup-6.1.0",
+      "sha": "4ee5c8c68ddaf7c3970619a67a2922185bdac98e"
+    },
+    {
+      "branch": "dependabot/npm_and_yarn/framer-motion-14.7.1",
+      "sha": "4bc32a459a697e1205afb94c7a3babe338fc7780"
+    },
+    {
+      "branch": "dependabot/npm_and_yarn/jotai-3.0.1",
+      "sha": "080a33a0d7986e5e130ebf201c9fa207ca84aee9"
+    },
+    {
+      "branch": "dependabot/npm_and_yarn/mapbox-gl-3.33.0",
+      "sha": "e7a02e530fbd4d38e0a4e4a6ac5b3f3d25379a40"
+    },
+    {
+      "branch": "dependabot/npm_and_yarn/minor-and-patch-d374c9c65e",
+      "sha": "2f3c4faa7014ecb78e8264aa06f2e711ddc32b95"
+    },
+    {
+      "branch": "dependabot/npm_and_yarn/react-day-picker-10.0.2",
+      "sha": "54a200fc7cb86ad62c9f57dcd20da40468109152"
+    },
+    {
+      "branch": "fix/remediation-2a68d1fb-185920",
+      "sha": "0105b0deb24c38972b527c171b5af9837affe882"
+    },
+    {
+      "branch": "main",
+      "sha": "99f6d7eb3f58cff9d9aae8f59641137faf755a9c"
+    }
+  ],
+  "open_pull_requests_at_inspection": [
+    {
+      "headRefName": "dependabot/npm_and_yarn/minor-and-patch-d374c9c65e",
+      "number": 22,
+      "title": "Bump the minor-and-patch group across 1 directory with 71 updates",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/22"
+    },
+    {
+      "headRefName": "dependabot/npm_and_yarn/mapbox-gl-3.33.0",
+      "number": 16,
+      "title": "chore(deps): bump mapbox-gl from 1.13.3 to 3.33.0",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/16"
+    },
+    {
+      "headRefName": "dependabot/npm_and_yarn/framer-motion-14.7.1",
+      "number": 15,
+      "title": "chore(deps): bump framer-motion from 12.23.12 to 14.7.1",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/15"
+    },
+    {
+      "headRefName": "dependabot/npm_and_yarn/react-day-picker-10.0.2",
+      "number": 14,
+      "title": "chore(deps): bump react-day-picker from 8.10.1 to 10.0.2",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/14"
+    },
+    {
+      "headRefName": "dependabot/npm_and_yarn/jotai-3.0.1",
+      "number": 13,
+      "title": "chore(deps): bump jotai from 2.10.0 to 3.0.1",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/13"
+    },
+    {
+      "headRefName": "dependabot/github_actions/github/codeql-action/init-4.39.1",
+      "number": 11,
+      "title": "chore(deps): bump github/codeql-action/init from 3.39.1 to 4.39.1",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/11"
+    },
+    {
+      "headRefName": "dependabot/github_actions/actions/checkout-7.0.1",
+      "number": 9,
+      "title": "Bump actions/checkout from 4.4.0 to 7.0.1",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/9"
+    },
+    {
+      "headRefName": "dependabot/github_actions/actions/setup-node-7.1.0",
+      "number": 8,
+      "title": "Bump actions/setup-node from 4.4.0 to 7.1.0",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/8"
+    },
+    {
+      "headRefName": "dependabot/github_actions/actions/upload-artifact-7.0.2",
+      "number": 7,
+      "title": "Bump actions/upload-artifact from 4.6.2 to 7.0.2",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/7"
+    },
+    {
+      "headRefName": "dependabot/docker/services/openclaw/node-26.13.0-alpine3.24",
+      "number": 6,
+      "title": "chore(deps): bump node from 22.23.3-alpine3.24 to 26.13.0-alpine3.24 in /services/openclaw",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/6"
+    },
+    {
+      "headRefName": "dependabot/github_actions/pnpm/action-setup-6.1.0",
+      "number": 5,
+      "title": "Bump pnpm/action-setup from 5.0.0 to 6.1.0",
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/5"
+    }
+  ],
+  "claims_not_established": [
+    "Live owner Mac acceptance",
+    "Live GitHub App installation and gateway report",
+    "Complete universal spend enforcement",
+    "Measured token/billing savings",
+    "Actual model failover",
+    "Live outbound delivery and two-way calls",
+    "Sealed-team isolation",
+    "In-flight lockdown across every dispatch",
+    "Board Room audio and avatar appearance",
+    "Physical Mac-off operation",
+    "Current provider quotas, bills or subscriptions",
+    "No security vulnerabilities"
+  ]
+}

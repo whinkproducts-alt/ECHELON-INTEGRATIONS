@@ -1,20 +1,20 @@
 # ECHELON — Canonical engineering entry point
 **Product:** ECHELON, next-generation personal autonomous organizational operating system for WHINK Group.
 **New home:** `whinkproducts-alt/ECHELON-CORP` (private). **Legacy source:** `whinkproducts-alt/KAMSI-PRIME`, branch `feat/whink-architecture-control-20261030` (read-only reference).
-**Status:** New-repository bootstrap and preserved Founder architecture; **NOT a migrated or operational application until verified source import and tests**.
+**Status (2026-11-04):** source import/main consolidation complete; code baseline `99f6d7eb3f58cff9d9aae8f59641137faf755a9c` passes configured CI/security. Full personal-use acceptance and Mac-off operation remain open. A desktop launcher is pending and does not replace functional readiness.
 
 ## Priority and required reading
-1. Read this file; `docs/migration/IMPORT-LEGACY-SOURCE.md`.
-2. Read all `docs/architecture-control/` documents, beginning with `06-FOUNDER-DECISION-REGISTER.md` and `00-START-HERE-FOR-CODEX.md`. They originate from KAMSI-PRIME and preserve Founder-approved FDR-001..029; interpret any old repository/PR paths as *source provenance*, not target GitHub permissions.
-3. Read `docs/product/MASTER-BUILD-DIRECTIVE.md`, `docs/product/HOLO-FRONTEND-CONTRACT.md`, and `docs/product/OPENCLAW-ADAPTER-CONTRACT.md`.
-4. Verify actual imported source, `CLAUDE.md`, org-kit registry, dependencies and running tests. A historical audit or migration record is not proof that ECHELON currently implements the feature.
+
+1. Read `CLAUDE.md` and applicable `AGENTS.md` for binding rules.
+2. Read `docs/ECHELON-AUDIT-HANDOFF-2026-11-04.md`, latest `docs/daily-syncs/`, `docs/pending-tasks.md` and `docs/ECHELON-READINESS-EXECUTION.md` for current work/evidence. Read only task-relevant source; do not replay the full chat/blueprint by default.
+3. Use `docs/product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md` as the R01–R10 target. Founder decision register FDR-001..029 and `docs/architecture-control/` preserve approved contracts; old repo/PR paths there are provenance.
+4. Consult `docs/product/MASTER-BUILD-DIRECTIVE.md`, `HOLO-FRONTEND-CONTRACT.md` and `OPENCLAW-ADAPTER-CONTRACT.md` for their relevant contracts. Historical handoffs do not override current source/evidence.
 
 ## Safe work sequence
-**First:** import the full legacy application's Git history and source code into a separate branch in THIS repository, preserving this main branch and README. See import runbook. Preserve the source branch's completed M0/M1 execution repair; do not regress to older work/main state.
-**Second:** establish a safe reconciliation merge/PR between bootstrap documents and imported source; do not flatten away user work. Inspect legacy workflows and environment settings BEFORE running them. No data migration or production deployment.
-**Third:** extend the existing HOLO framework, not a generic dashboard; connect real backend events to its motion system and label fixtures as DEMO.
-**Fourth:** implement remaining approved backend/organization/remote-runtime gaps in bounded independently testable slices.
-**Fifth:** verify security, privacy and Mac-off continuity with evidence; request Founder approval for expenditures, protected actions, merges and deployments.
+
+**Next:** finish scoped dispatch admission/accounting before enabling any paid inference, then actual model fallback, sealed scope/lockdown, unfinished channels/two-way voice and full personal acceptance. Configure the existing Mac instance alongside engineering work. Preserve the worker, canonical roster, permission/approval/ledger and HOLO architecture.
+
+The original source import/reconciliation is already complete. Do not reimport history, reset data, recreate reported GitHub credentials or merge dependency proposals blindly. Personal DB migrations need backup/status/checked-in `migrate deploy`, not `db push`/reset. Build and test independently reviewed slices and keep evidence/notes current. Deployment, paid service and live outbound operations need the appropriate Founder approval.
 
 ## Binding goals
 - Exactly **326 specialized identities and 163 teams** remain registered, not 326 simultaneous model instances.

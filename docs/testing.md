@@ -1,66 +1,61 @@
-# Testing
+# ECHELON testing and evidence boundaries
 
-Three layers. Each one catches things the others cannot.
+Updated **2026-11-04**. Exact baseline, run URLs and conclusions are in [the audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md) and [evidence.json](audits/2026-11-04/evidence.json). Current verified main code: `99f6d7eb3f58cff9d9aae8f59641137faf755a9c`.
 
-| Layer | Where | Database | Browser | Command |
-|---|---|---|---|---|
-| Unit and route tests (vitest) | `apps/web/**/__tests__` | None. Prisma, the model router and outbound providers are mocked | No | `pnpm --filter app test` |
-| Migrations and seed | `apps/web/prisma/migrations` | Real PostgreSQL 16 with pgvector | No | `prisma migrate deploy`, `prisma db seed` |
-| End-to-end (Playwright) | `e2e/` | Real PostgreSQL 16 with pgvector | Real Chromium | `cd e2e && npx playwright test` |
+## Recorded current-main results
 
-## What is mocked and what is not
+CI [41574973163](https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574973163) passed full heavy steps: frozen install, Prisma client, typecheck, lint, checked-in migrations and seed on PostgreSQL 16 + pgvector, Vitest, default production build and Chromium E2E. **158 files passed; 2345 tests passed, 39 skipped; 22 browser tests passed.** This result was fetched from GitHub logs, not rerun locally during documentation reconciliation.
 
-Mocked in unit tests: Prisma (so SQL is NOT exercised), the model router (no model is ever called), Twilio/SMTP/Telegram, AnythingLLM, OpenClaw, time (for the 30 second approval window).
+| Skipped test file (under `apps/web/lib/__tests__/`) | Count | Boundary |
+|---|---:|---|
+| `social.integration.test.ts` | 30 | Runtime DB/table probe catches errors and skips. No passing social SQL coverage follows from this run. |
+| `approvals.integration.test.ts` | 6 | Same DB-probe skip behavior; other approval tests/E2E do not make these six passed. |
+| `evaluations-tenant-isolation.test.ts` | 2 | Same DB-probe boundary. |
+| `model-router.test.ts` | 1 | Real Ollama round trip requires explicit `OLLAMA_INTEGRATION_MODEL`; absent in this run. |
 
-Not mocked in e2e: the built Next.js server and its proxy (auth wall, CSRF, CSP, rate limit), Auth.js login with bcrypt, Prisma with real SQL, every migration, the permission engine, the approval flow and the ledger.
+The shared Prisma mock is a known reason DB-probed suites can skip even with a real DB service. Source inspection and earlier notes support investigating it; this documentation pass did not unmock/rerun those suites or certify them. Do not disable assertions, remove consent requirements or relabel skips to obtain a green number. The EAR real-DB suite instead requires an explicit test DB and fails on missing migrations when enabled.
 
-Still not covered anywhere automatic: real model replies (no key is set in e2e, so chat paths that need a model are out of scope), real message delivery (no provider is configured, so approving a message records the approval and reports "not configured"; nothing is sent), voice, AnythingLLM and the gateway, and anything that needs pgvector similarity at scale. The `approve all` e2e test needs no model because the approval handler answers before any model call.
+## Test layers and mocks
 
-## Run on your Mac (OrbStack)
+| Layer | Source / setup | What it establishes |
+|---|---|---|
+| Unit/routes and pure helpers | Vitest includes `lib/__tests__/**/*.test.ts`; global `setup/prisma-mock.ts` and `setup/lockdown-mock.ts` | Default DB and safety are test doubles; many provider/model transports are mocked. Logic/negative cases only, not SQL or live safety/provider success. |
+| Explicit real-DB suites | EAR/capability/worker/readiness and dedicated lockdown suites unmock appropriate modules; examine each file | Their actual SQL/MCP/local socket scope only. EAR requires `M1_EXECUTION_DATABASE_URL == DATABASE_URL` pointing to a test DB. Do not assume every file with `integration` in its name ran SQL. |
+| Migration/seed | `.github/workflows/ci.yml` uses a fresh pgvector Postgres | Fresh-schema install, not personal DB upgrade/restore or migration rollback. |
+| Chromium E2E | `e2e/`, built app and real test DB | Login/authorization, approvals, projects, board roster, Integration Hub lifecycle/events and public hardening. No funded providers or full real-model mission. |
+| Opt-in local Ollama | `model-router.test.ts`, `OLLAMA_INTEGRATION_MODEL` and loopback endpoint | Actual installed-model round trip when explicitly run; not current CI coverage or a model-quality benchmark. |
+| NVIDIA evaluator | `lib/model-router/nvidia-trial.ts`, `scripts/evaluate-nvidia-trial.ts` | Explicit synthetic development evaluation only. Do not enable automatically or send repository/private data. Historical trial note is not production admission. |
+| Manual/physical acceptance | `ECHELON-READINESS-EXECUTION.md`, `LAUNCH-CHECKLIST.md` | Founder Mac, providers, real recipients, hearing/speaking, briefing/avatar appearance, desktop launcher, backup restore and Mac-off gates. Still open. |
 
-One command does everything CI does, with a throwaway database on 127.0.0.1:55432:
+The common unlocked safety mock is not enforcement evidence. Dedicated lockdown tests must use the real module; require cross-process/mid-flight cases for a complete safety claim. Model fixtures, registry eligibility and `runWithFallback` tests do not establish live ordered failover.
 
-    scripts/ci/e2e-local.sh
+## Reproduce with isolated data
 
-It starts `pgvector/pgvector:pg16` in Docker, applies all migrations, seeds, runs unit tests, builds, installs the Playwright Chromium browser and runs the suite. It removes the container at the end (`--keep-db` keeps it).
+Use Node 22 / pnpm 10.28.0 to match CI. From the repo root:
 
-### Step by step
+```sh
+pnpm install --frozen-lockfile
+pnpm --filter app exec prisma generate
+pnpm --filter app typecheck
+pnpm --filter app lint
+# Focused deterministic tests; still subject to the setup mocks:
+pnpm --filter app exec vitest run lib/__tests__/context-budget.test.ts lib/__tests__/context-engine.test.ts lib/__tests__/project-ownership.test.ts lib/__tests__/model-priority.test.ts
+```
 
-1. Database. Either Docker:
+For migration/SQL tests, create a **disposable** PostgreSQL + pgvector test database; set `DATABASE_URL`/`DIRECT_URL` to it, then run `prisma migrate deploy`. Enable EAR integration with `M1_EXECUTION_DATABASE_URL` set to that exact URL. Never expose a personal DB URL or run cleanup/seed against personal data. Dedicated real-DB suites create/delete fixture users; read their guards first.
 
-       docker run -d --name whink-e2e-pg -p 127.0.0.1:55432:5432 -e POSTGRES_USER=whink -e POSTGRES_PASSWORD=local_e2e_only -e POSTGRES_DB=whink_e2e_test pgvector/pgvector:pg16
+`scripts/ci/e2e-local.sh` creates and removes the fixed local test container `whink-e2e-pg`, normally on 55432, installs dependencies, migrates/seeds, runs tests/build and Chromium. Inspect it before running; it removes a preexisting container with that name and does not set the M1 opt-in flag itself. CI's unit step explicitly sets `M1_EXECUTION_DATABASE_URL="$DATABASE_URL"`; reproduce that boundary when claiming the same coverage.
 
-   or Homebrew: `brew install postgresql@16 pgvector`, `brew services start postgresql@16`, then `createdb whink_e2e_test`. The database name must contain `test`, `e2e`, `ci` or `scratch`; the e2e seed refuses anything else.
-2. Environment (these are dummy values, not credentials):
+E2E setup: `e2e/` is a separate package using `npm ci`; the application workspace uses pnpm. `e2e-owner@example.test` and `e2e-user-b@example.test` are throwaway fixture users, not personal accounts. Provider calls remain unconfigured/mocked where specified; no live send should be needed for automated checks.
 
-       export DATABASE_URL=postgresql://whink:local_e2e_only@127.0.0.1:55432/whink_e2e_test
-       export DIRECT_URL=$DATABASE_URL
-       export AUTH_SECRET=local-e2e-dummy-secret-not-real-0123456789 NEXTAUTH_SECRET=$AUTH_SECRET
-       export AUTH_URL=http://127.0.0.1:3100 NEXTAUTH_URL=http://127.0.0.1:3100
-       export WHINK_OWNER_EMAILS=e2e-owner@example.test
+## CI and security semantics
 
-3. `pnpm install`, then `pnpm --filter app exec prisma generate`, `pnpm --filter app exec prisma migrate deploy`, `pnpm --filter app exec prisma db seed`.
-4. `pnpm --filter app build` (the e2e suite tests the production build, so `/dev-preview` is genuinely dead there).
-5. `cd e2e && npm ci && npx playwright install chromium && npx playwright test`. Useful: `--headed`, `--ui`, `npx playwright show-report`.
+CI triggers on PRs and main pushes. Docs-only PRs (`docs/` or root `*.md`, including rename old paths) deliberately skip heavy steps; main pushes still run them. A green docs-only check is not a fresh application test. Concurrency may cancel earlier main runs; cite the run and exact revision, not just the latest green badge.
 
-Never point `DATABASE_URL` at your real WHINK database. `prisma migrate deploy` and the seeds write to it.
+Security [41574973158](https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574973158) passed its configured production audit (high/critical gate), full-history gitleaks with allow-list, and CodeQL analysis. `upload: never`; SARIF artifact retention 14 days, E2E artifact retention 7 days. A passing workflow does not mean zero findings, complete license review or independent security certification. Report expirations and uninspected artifacts honestly.
 
-## CI
+For staged secret checks: `pnpm --filter app security:scan`; `-- --all` scans tracked files. Never weaken a scanner to land a change or print secret files to demonstrate configuration.
 
-`.github/workflows/ci.yml` runs on pull requests and on pushes to `main` (a branch with no pull request is tested when its PR is opened; pushes to `claude/**` no longer trigger it, because that ran every PR commit twice): install, prisma generate, typecheck, lint, `migrate deploy` against a `pgvector/pgvector:pg16` service container, seed, unit tests, build, Playwright. A pull request that changes only files under `docs/` or root-level `*.md` files (both the new and the old path of a rename) skips the heavy steps and still ends green; any other change, a push to `main`, 3000 or more files, or an error runs everything. Failure screenshots, traces and the HTML report are uploaded as the `e2e-report` artifact. Actions are pinned by commit SHA. The workflow has `contents: read` only and uses dummy secrets set in `env`.
+## Record every result honestly
 
-## Test users
-
-`e2e-owner@example.test` (listed in `WHINK_OWNER_EMAILS`) and `e2e-user-b@example.test`, created by `apps/web/scripts/e2e-seed.ts`. The password defaults to a test-only value in that script; override with `E2E_PASSWORD`. These accounts only exist in the throwaway database.
-
-## Playwright stays out of the app
-
-`e2e/` is its own package, outside the pnpm workspace. See docs/decisions.md, 2026-10-26, for the CLAUDE.md D9 interpretation that needs Victor's OK.
-
-## Explicit local-model check
-
-The real Ollama streaming test runs only with `OLLAMA_INTEGRATION_MODEL` set to an
-installed model tag. It restricts the compatible endpoint to loopback and fails if
-the requested model or service is unavailable. Without that opt-in it is reported
-as skipped, not passing. Example from apps/web: `OLLAMA_INTEGRATION_MODEL=wink-qwen3.5-9b-8k:latest pnpm exec vitest run lib/__tests__/model-router.test.ts`.
-Record hardware results separately from mocked router tests.
+Record exact SHA, command, DB/mock/provider scope, passed/failed/skipped counts, environment gates, independent reviewer and unresolved issues. Mark tests not run as not run. Code changes need focused meaningful tests and required CI; docs-only updates need link/path/scope/secret validation and must not claim a fresh full-suite pass.

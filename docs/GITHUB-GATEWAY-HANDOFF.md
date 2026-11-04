@@ -1,64 +1,30 @@
-# GitHub Gateway Handoff
+# Restricted GitHub gateway: current handoff
 
-Reconciliation update 2026-11-01: the supporting pilot is now reconciled with the latest main gateway security fixes. See `REPOSITORY-ASSESSMENT-2026-11-01.md` for current verification. The original verification and setup sections below are historical; live GitHub acceptance is still pending.
+Updated 2026-11-04; source baseline `99f6d7eb3f58cff9d9aae8f59641137faf755a9c`. See [audit evidence](ECHELON-AUDIT-HANDOFF-2026-11-04.md) and [gateway design](CAPABILITY-GATEWAY.md). Pilot code is already reconciled on main; do not replay the old integration branch.
 
-Continuation update, 2026-11-01: read `product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md`
-and `ECHELON-READINESS-EXECUTION.md` before continuing implementation. The Founder
-requested a complete build plan for readiness items 1–10. App creation and private-key
-download were reported after this original note; installation/configuration and live
-worker acceptance must be checked before recreating anything. The historical statement
-below that no App exists is not current evidence. No live pilot pass is recorded here.
+## Implemented and automatically tested
 
-This note describes the local work on `integration/echelon-capability-gateway` after
-baseline commit `fc877121226af09cf9dc71c353e5c015083749db`. Read
-[`CAPABILITY-GATEWAY.md`](CAPABILITY-GATEWAY.md) for the gateway design and limits.
+- Owner queues a named-agent tool call through `/api/integrations/jobs`; existing scheduler/runner dispatches through `lib/worker/capability-execution.ts` and the capability policy/grant/permission/approval/ledger paths.
+- Duplicate submissions reuse a job. Atomic dispatch is at most once; expired dispatch lease/uncertain transport stays UNKNOWN, never auto-replayed. Approval exactly-once consumption is not a guarantee of exactly-once external effects.
+- Queue inputs and successful bounded results are encrypted. Job status is owner-scoped and marks provider result as untrusted. Ledger stores summaries/hashes, not raw result. Approval storage has separate existing semantics; interrupted queue/result retention cleanup remains unfinished.
+- `apps/web/scripts/github-readonly-mcp.ts` is a loopback facade with one no-argument `repo_build_health` tool and a separate local bearer. It rejects extra arguments/methods/tool names.
+- `apps/web/lib/github-readonly/report.ts` uses fixed configuration; verifies one-repo installation-token scope/read permissions, pins branch resolution to a commit, fetches bounded GitHub data reads, refuses redirects and marks incomplete/pending evidence UNVERIFIED. App-token minting is an authentication POST; no repository write operation is provided.
+- Relevant tests: `github-readonly-report.test.ts`, `capability-worker.integration.test.ts`, `capability-gateway.integration.test.ts`, `capability-policy.test.ts`, and `e2e/tests/integrations.spec.ts`. Respect each mock/DB boundary.
 
-## Implemented
+Current main full CI and security pass; 2345 tests passed/39 skipped/22 browser passed. The original broader-suite failures in the old pilot handoff are historical, not current-main results. That does not establish live provider acceptance.
 
-- An owner can queue one agent tool call through `/api/integrations/jobs`. The
-  existing worker runs it as the named agent through the gateway's grants,
-  permission engine, approvals, and ledger. Duplicate submissions reuse a job;
-  uncertain dispatches are not retried automatically.
-- Queued inputs and successful output are encrypted. Owner-only job status
-  returns a bounded result marked as untrusted. Pending inputs are erased after
-  dispatch; the existing approval system still has its own storage behavior.
-- A separate loopback MCP provider exposes only `repo_build_health`. Its fixed
-  owner, repository, and branch come from local configuration. It accepts no
-  repository or method arguments, makes fixed GitHub GET requests, and pins
-  results to one commit. It requires a private GitHub App installed for the
-  intended repository with read permissions only.
+## Current credential and live evidence boundary
 
-## Verification completed locally
+The Founder reported GitHub App creation, email verification and private-key download. **Installation, actual configured credentials and one successful live ECHELON worker report remain unverified.** No key or secret file was read by this documentation pass. Locate/confirm existing setup securely; do not claim no App exists, recreate it blindly, print private keys or treat Codex's authenticated GitHub access as the app connection.
 
-- Typecheck and production build passed; lint had no errors and eight existing
-  warnings.
-- The final focused fixture and real-database test run passed 44 tests across
-  the GitHub report, worker, and gateway suites.
-- A standalone MCP smoke check passed initialization, the single-tool roster,
-  missing-bearer denial, and caller-supplied repository denial using a
-  disposable key. It did not contact GitHub.
-- Earlier Integration Hub browser tests passed, including owner-only queue
-  admission and duplicate-request behavior.
-- The broader suite remains non-green: one pre-existing model test requests a
-  model that is not installed, and 38 older tests skip under the default shared
-  database mock. A separate real-database run exposed 26 failures in older
-  social tests. Do not report those checks as passing.
+## Secure configuration and next acceptance
 
-## Next acceptance work
+1. Confirm the existing private App installation is limited to `whinkproducts-alt/ECHELON-CORP`, with read Contents, Checks, Commit statuses, Actions, Issues and Pull requests (plus GitHub's required metadata). No write permission.
+2. Set the provider's private environment: `ECHELON_GITHUB_OWNER`, `ECHELON_GITHUB_REPO`, `ECHELON_GITHUB_BRANCH` (current chosen baseline normally `main`), `ECHELON_GITHUB_APP_ID`, `ECHELON_GITHUB_INSTALLATION_ID`, `ECHELON_GITHUB_PRIVATE_KEY_PATH`, `ECHELON_GITHUB_PROVIDER_TOKEN`, optional `ECHELON_GITHUB_PROVIDER_PORT` (default 3197). Never commit values. Key stays outside Git with restrictive access; gateway bearer is separate from the GitHub key/token.
+3. Start the facade as a separate process with those settings and its dependencies loaded, e.g. from `apps/web`: `pnpm exec tsx --require dotenv/config scripts/github-readonly-mcp.ts`. Verify intended loopback port and `/mcp` endpoint; no unauthorized upload or broad App access.
+4. Start the existing worker (`WORKER_ENABLED=true`, `pnpm --filter app worker` from repo root). The web server starts neither worker nor provider. Register host/heartbeat and provider, discover, review actual definition/data/cost ceiling, enable and grant only the one tool to the intended canonical agent/mission.
+5. Queue an authorized real report. Record job ID, grant, gateway receipt, resolved commit, report source links and missing/pending/failing checks. Do not fetch raw untrusted build logs into model context.
+6. Prove another repo and writes cannot be requested; revoke grant/provider and show refusal; inspect bounded/untrusted result handling before model use. Verify approval-required calls separately with exact request IDs. A UI status or fixture result cannot replace this journey.
+7. Record failure/UNKNOWN and manual resolution; finish encrypted interrupted input/result retention/cleanup. Mac-off is a later real host/power-off gate, not established by the local run.
 
-1. Create and install a private GitHub App for `whinkproducts-alt/ECHELON-CORP`
-   with read-only Contents, Checks, Commit statuses, Actions, Issues, and Pull
-   requests permissions. Store its private key outside Git. Never paste a key
-   or token into chat. No App or live credential is configured yet.
-2. Configure the provider locally with a fixed repository and branch, App and
-   installation IDs, private-key path, and a separate local bearer. Register,
-   discover, review, and grant its one tool through the Integration Hub.
-3. Run a real worker job and verify its report, receipt, revocation behavior,
-   denial of another public or private repository, and rejection of writes
-   before network I/O. Missing checks must stay `UNVERIFIED`.
-4. Define retention and cleanup for encrypted input left by interrupted jobs
-   and for encrypted results before using sensitive business data. Physical
-   Mac-off operation remains a later milestone.
-
-No GitHub provider live call, deployment, purchase, or Mac-off test has been
-completed. The web server does not start the worker automatically.
+This handoff grants no new spend, deployment or write access. The earlier user authorization for the read-only pilot remains the task scope; check the actual current configuration and approvals before any live step.

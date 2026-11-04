@@ -1,3 +1,11 @@
+# Current security evidence boundary — 2026-11-04
+
+Read [current audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md), [testing](testing.md) and [pending security work](pending-tasks.md). Baseline main `99f6d7e` passes the configured production audit, full-history secret scan and CodeQL jobs; this is not zero-vulnerability or full private-team/lockdown assurance. Universal paid admission, sealed scope and in-flight controls remain open.
+
+The policy/dated history below includes obsolete workflow statements: current security uses the gitleaks **CLI**, not gitleaks-action or a `GITLEAKS_LICENSE`; CodeQL has `upload: never` with a 14-day SARIF artifact; both CI and security run on PRs/main pushes (security also weekly). Repository 2FA/protection/secret-scanning settings and current vulnerability alert totals were not inspected. Do not infer their state from old notes. Read the actual workflows and current source for enforcement; no old statement authorizes disabling protected approvals.
+
+---
+
 # Security
 
 Last updated 2026-10-25. This file separates what the code enforces from what Victor must switch on in GitHub. I cannot change GitHub settings from code or from this repo. Every item under "Victor must switch on" is open until he does it.

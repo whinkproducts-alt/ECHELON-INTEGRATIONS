@@ -1,49 +1,42 @@
-# ECHELON functional readiness
+# ECHELON functional readiness — execution gates
 
+Updated **2026-11-04**. [Audit handoff and source map](ECHELON-AUDIT-HANDOFF-2026-11-04.md) · [Engineering backlog](pending-tasks.md) · [Target architecture](product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md).
 
-Current Founder priority (2026-11-02): reduce token and usage spend first, preserving correctness/security, then continue end-to-end readiness. Read TOKEN-AND-SPEND-PRIORITY.md. Paid-admission/accounting gates remain unfinished until verified.
-
-Updated 2026-11-02. Architecture spec: [product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md](product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md).
-
-Implementation checkpoint: PRs #23 and #24 merged through `bd58401c43b8c65f1976fac7f79f19f2f6906db0`. See the 2026-11-02 daily sync for CI and assurance. The remaining dependency and remediation heads were not merged.
+Baseline `main`: `99f6d7eb3f58cff9d9aae8f59641137faf755a9c`. PRs #23/#24 merged. **Full personal use: NOT ACCEPTED.** Current passing automatic checks are not Founder/device/provider acceptance.
 
 ## Next action
 
-Victor runs own-Mac setup: supply `.env` values, run `npx prisma migrate dev`, run `pnpm dev`, sign in. This is the R01 gate — nothing can be live-accepted until this passes. See pending-tasks.md section A for the full list of what only Victor can do.
+Implement E01 dispatch admission/accounting from `pending-tasks.md` using synthetic providers and isolated DB tests, preserving required learning and request-id approvals. Configure the existing Mac instance alongside that engineering work. Do not imply all engineering waits on Victor's sign-in. Follow with real model fallback, sealed scope/lockdown, channel/voice gaps and acceptance below.
 
-## Founder choices
+## Acceptance register
 
-- Mac running first; Mac-off acceptance remains required later.
-- All communication channels plus hearing and speaking required, including iMessage feasibility and real calls. Do not reduce scope to Telegram/email without asking.
-- Daily Board Room entry briefing from real tasks/approvals, with motion and voice.
-- Model-priority control: selectable first/second/third and saved-order switch. Browser chat is manual handoff; NVIDIA trial restrictions and privacy/cost gates still apply.
-- Avatar: add blinking if it preserves existing behavior; otherwise keep breathing/mouth animation. Blinking is now implemented conditionally (speaks/active states only).
-- Lockdown: stop new jobs, outbound tools, cloud calls, mic/camera; retain local review/audit. Several lockdown boundaries are implemented; whole-flow and in-flight assurance is pending.
-- No elapsed-time estimates. Ask concise A/B/C questions for missing decisions, and keep independent work moving.
+Status vocabulary: **PARTIAL** = code exists but named implementation/acceptance gaps remain; **UNVERIFIED** = no sufficient runtime evidence; **OPEN** = deliverable not completed. No R-ticket below is fully accepted. Owner means the build team unless explicitly Founder/provider dependent.
 
-## Build status
-
-| Ticket | Status | Evidence / next gate |
+| Ticket | Current state and evidence | Required pass condition |
 |---|---|---|
-| R01 baseline | TODO | Victor must supply .env, run `prisma migrate dev`, run `pnpm dev`, sign in |
-| R02 real mission | PARTIAL | Analysis path exists; capability-worker pilot reconciled with main; live full journey needed after R01 |
-| R03 GitHub pilot | PARTIAL | Provider and fixture tests pass; App installation/key setup and live worker report need Victor |
-| R04 models | PARTIAL | Registry, saved profiles and selection exist. Wire failure fallback to actual dispatch and prove the configured order without replaying tools. |
-| R05 Mac-off | TODO / PROVIDER DECISION | Architecture/runbook needed; approved remote host and physical test needed |
-| R06 channels/voice | PARTIAL | Adapters exist; iMessage bridge and two-way calls are unfinished. Verify each authorized channel and real hearing/speaking. |
-| R07 sealed team/lockdown | PARTIAL | Persist sealed objectives and enforce owner-only server access; verify in-flight lockdown while preserving local audit. |
-| R08 briefing/avatars | BUILT — AWAITING LIVE ACCEPTANCE | Commit `cc7a8fa`. Daily briefing logic + API + Board Room UI + conditional avatar blink. Next: Victor tests Board Room in running app |
-| R09 organization/HOLO | PARTIAL | Canonical registry and UI exist; lifecycle coverage and directorate reconciliation pending |
-| R10 readiness/services | TODO | Inventory, independent assurance, backups, all acceptance evidence |
+| R01 personal Mac baseline | PARTIAL / UNVERIFIED. Source, setup instructions and automatic auth checks exist; actual owner configuration/session/restart not verified. No desktop launcher tracked. | Migrations applied safely to the chosen instance; owner signs in, passkey tried, data survives restart. Desktop launcher starts/reuses services/worker, waits for readiness, opens correct origin, handles duplicates/port/dependency errors; backup and restore tested. |
+| R02 real mission | PARTIAL. Bounded internal EAR analysis and owner-directed capability worker implemented. | Founder submits an actual task; persisted job uses canonical agent, scope, permission/budget/approval, worker and durable result/receipt; UI shows genuine states. No tools executed merely by a persona label; no uncertain side-effect retries. |
+| R03 GitHub pilot | PARTIAL. Fixed-repo report provider and real-DB/MCP fixtures exist. App/key creation reported; installation/configuration not verified. | Existing App installed only on ECHELON with six read permissions; provider discovered/reviewed/granted; live worker report pinned to exact commit and receipt; wrong-repo/write attempts denied before data access, revoke and missing/failed/pending checks truthful. |
+| R04 models and spend | PARTIAL. Registry, saved orders and initial selection; bounded context; unknown-price display; local EAR reservations. Production fallback and universal paid admission unfinished. | First/second/third order and manual handoff run through real dispatch, no side-effect replay; policy/data/tool/Local-Only/lockdown respected; every inference/voice path admitted/accounted, failure holds safe; representative quality/cost measurement. Keys do not grant spend. |
+| R05 Mac-off | OPEN. Mac-on first accepted; approved remote host and physical test absent from this evidence. | Authorized remote worker/host with secure configuration, limits, monitoring and backups finishes a task with Mac off; offline-host calls block and recovery works. Separate resilience/restore proof. |
+| R06 communications/voice | PARTIAL. SMTP, SMS, WhatsApp, Telegram and scripted phone adapters; local/cloud STT/TTS routes. iMessage unavailable; two-way calls/inbound journey unfinished. | Every requested channel configured and authorized send/receive/receipt verified with selected recipient; conversational phone and actual hearing/speaking; uncertain outcomes stay unknown, approval/lockdown/spend at final I/O. No silent reduction to a subset. |
+| R07 private team/lockdown | PARTIAL. Persisted safety module and many dispatch/client guards. Kill Team objective is local React state with non-founder view-only UI. | Durable Founder-private scope inaccessible to other accounts/personas/ordinary organization through any query/event/export/recall; real worker execution within scope; mid-flight lockdown stops new dispatch/cloud/mic/camera and leaves audit readable, including DB-failure case. |
+| R08 daily briefing/avatars | PARTIAL / LIVE ACCEPTANCE OPEN. Source-based daily script/API, modal motion/voice, mouth/breathing and opt-in blink code. | Actual account facts and unavailable sources displayed correctly; local-day first entry, replay/skip/mute/autoplay failure/restart tested; real audio mouth feed labelled versus synthetic browser cadence; portrait/eye alignment, reduced motion and no regressions accepted. No encoded video artifact claimed. |
+| R09 organization/HOLO | PARTIAL. Canonical registry and screens, bounded execution paths. 15/16 directorate discrepancy unresolved. | Founder resolves roster ambiguity; task allocation, lifecycle, manager notifications/takeover where approved, receipts and HOLO events reflect durable actual work. Registration is not simultaneous execution. |
+| R10 operations and release | PARTIAL. CI/security and initial [service inventory](SERVICE-INVENTORY.md) available; current subscriptions/entitlements not inspected. | Exact local/free/trial/paid plan, known costs and cap coverage, backup/restore, logs/retention, dependency/license triage, independent findings and evidence for every personal-use gate; public-sale compliance remains separate. |
 
-## Current test baseline (2026-11-02, commit `cc7a8fa`)
+## Current automatic baseline
 
-153 Vitest files, 2273 tests passed, 105 skipped. Lint: 0 errors, 7 pre-existing warnings. `tsc --noEmit`: clean. `next build`: compiled successfully. New migration `20261102120000_readiness_safety_models_briefing` not yet applied to any live DB — Victor must run `npx prisma migrate dev`.
+GitHub main run [41574973163](https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574973163): typecheck, lint, checked-in migrations on PostgreSQL + pgvector, seed, **158 files / 2345 tests passed, 39 skipped**, default production build, **22 browser tests passed**. Security [41574973158](https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41574973158): configured audit/secret scan/CodeQL jobs passed. Fixed revision, mock boundaries and skip file counts: [evidence](audits/2026-11-04/evidence.json) and [testing](testing.md). Not rerun locally in this documentation pass.
 
-## Standing rules
+## Completion record required for each gate
 
-Do not recreate credentials reported as already created; locate/configure securely with the Founder. Never print key contents. Do not deploy, merge, purchase, send real messages or claim Mac-off completion without Victor's explicit approval.
+Record exact app revision, environment/host identity without secrets, actual command/action, pass/fail/skipped, DB/mock/provider boundary, job/approval/receipt IDs and timestamps, negative cases, reviewer and remaining blocker. Source findings and sensitive results stay in approved storage, not audit exports. A flag, screenshot or comment alone does not establish enforcement.
 
-GitHub reports 134 default-branch vulnerability alerts (8 critical, 49 high, 58 moderate, 19 low) — untriaged Dependabot alerts, not independently verified reachable vulnerabilities. R01/R10 must inspect and prioritize; do not claim security readiness from earlier audit notes alone.
+For personal databases: back up, inspect migration status, and apply checked-in migrations with `pnpm --filter app exec prisma migrate deploy`; `migrate dev` is for schema development on disposable developer data. Do not reset data or rotate an existing encryption key for convenience. Live migration state was not inspected.
 
-2026-11-02 continuation: the historical main SHA above predates the efficiency work. Track #23 (bounded context, ownership fixture) and #24 (cost reporting, tainted debrief, scoped EAR reservations). Database-race evidence is local and isolated; no device, cloud failover, dollar cap or Mac-off acceptance follows from it.
+## Scope and authorizations
+
+The Founder wants full personal use and a desktop icon; Mac-on is the first operating milestone, with Mac-off still required. All communication channels, hearing/speaking, real daily Board Room briefing, conditional safe avatar motion, selectable model priorities, sealed team and lockdown remain required. Ask concise A/B/C questions only for genuinely missing decisions; continue independent engineering.
+
+No document authorizes purchase, cloud admission, deployment, real outbound communication or a proprietary export. Locate reported existing GitHub App/key securely before recreating anything. Commit/merge authorization comes from the current Founder request, not this checklist. Keep the current exact-model/per-request approvals and no-spend restrictions.

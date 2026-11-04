@@ -1,3 +1,5 @@
+> Historical assessment, 2026-11-01. Current status, branches, test evidence and remaining work are reconciled in [the 2026-11-04 audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md). Preserve this record as provenance; its branch inventory and counts are not current.
+
 # ECHELON repository assessment and main consolidation
 
 Date: 2026-11-01, America/Edmonton. Requested outcome: assess the repo, refresh notes and consolidate latest app state onto main. This is repository readiness, not production deployment or acceptance of all architecture features.

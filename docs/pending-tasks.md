@@ -1,110 +1,49 @@
-# Pending tasks (updated 2026-11-02)
+# ECHELON pending work — updated 2026-11-04
 
+Read [current audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md) for the fixed baseline, source/test map and CI evidence. `main` was `99f6d7eb3f58cff9d9aae8f59641137faf755a9c`; PRs #23/#24 are merged. Full personal use remains **not accepted**. Existing code, automatic test results, real provider acceptance and Founder acceptance are separate states.
 
-PRs #23/#24 merged; account reservations currently cover local EAR analysis only. Next: explicit paid chat and automatic sidecars at dispatch, then embeddings and voice. See the daily sync for exact CI evidence.
+## Next action and priority
 
-Current Founder priority (2026-11-02): reduce token and usage spend first, preserving correctness/security, then continue end-to-end readiness. Read TOKEN-AND-SPEND-PRIORITY.md. Paid-admission/accounting gates remain unfinished until verified.
+**First: E01, close paid-dispatch/accounting gaps without enabling paid calls.** Preserve functionality, privacy and learning. Configure and test the Mac runtime in parallel where no spend/external action is involved. Then E02–E08 and all R01–R10 gates. Do not wait for the Founder to fix engineering gaps. No calendar estimates or automatic credit top-ups.
 
-Initial R04, R06, R07 and R08 code merged to main 2026-11-02 (2273 tests pass, 0 lint errors, clean typecheck and build). Live acceptance for all four tickets requires Victor's own-Mac run with real credentials. Remaining feature/live acceptance work is tracked in `ECHELON-READINESS-EXECUTION.md`.
+## Engineering backlog
 
-Launch readiness, in order: see `docs/LAUNCH-CHECKLIST.md` (status: not ready; Victor's own-Mac run comes first).
-2026-11-01 continuation: this historical list contains stale implementation claims.
-Use `product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md` and
-`ECHELON-READINESS-EXECUTION.md` for the current Founder-requested build sequence.
-Inspect owning code before acting on any older item below.
+| ID / readiness | Pending implementation and proof | Completion evidence |
+|---|---|---|
+| E01 / R04,R10 | Enforce authenticated account-scoped admission/reservations at real default/explicit/BYOK chat, tool rounds, sidecars, generic worker, skills/swarm/refinement, embeddings and voice. Include known-price limits, unknown-cost refusal policy, durable failure/cancellation settlement and crash/month reconciliation. Current reservations cover local EAR only. | Bypass, concurrency, cross-account, hard-limit, provider-failure and lost-response tests; receipts show estimates vs provider usage and refusals. No paid call needed for fixture tests. |
+| E02 / R04 | Wire actual first/second/third inference failover to dispatch. Handle tools, data class, cooldown, quota, credentials, manual handoff and total deadline. Resolve unset-default inconsistency (`streamChat`: Qwen; `chatOnce`: llama). | Real production-path fixture tests, no action replay, then approved local/provider acceptance. Helper-only tests do not close this. |
+| E03 / R07 | Durable Founder-private objectives/worker scope and private memory/results; owner-only server enforcement. Current Kill Team objective is local state and other users see a view-only screen. | Restart persistence and deny cross-account/non-owner/general WHINK/MAMBA retrieval, tools, SSE, logs and briefing access to sealed data. |
+| E04 / R07 | Independently audit and finish lockdown across in-flight jobs/model/tool/delivery and browser mic/camera/audio; fail closed on DB failure. | Real safety module + DB tests, mid-task activation, no new network/capture after cutoff, local review intact. Document unavoidable already-sent effects. |
+| E05 / R06 | Finish iMessage bridge selection/integration and real two-way phone/audio; identify any required inbound message/reply paths and correlate receipts. Retain SMTP/Twilio/Telegram delivery adapters. | Per-channel configured/unconfigured, approval/denial, unknown outcome and authorized send/receive tests. Scripted Twilio call is not conversational voice. |
+| E06 / R02,R03 | Real mission and restricted GitHub App-to-provider-to-gateway-to-worker acceptance; verify report bounds/injection and revocation. Retention/cleanup for interrupted encrypted inputs/results. | Exact target commit, job and gateway receipt, no writes/other-repo access, pending/failed/incomplete checks stay truthful. |
+| E07 / R08,R09 | Accept Board Room daily motion/voice and avatar mouth/blink on the Mac; finish HOLO task/agent lifecycle and reconcile 15/16 directorates without inventing roles. | Source-accurate daily/replay/mute/skip behavior, actual audio vs synthetic cadence labelled, reduced motion, real lifecycle events; Founder roster decision if unresolved. |
+| E08 / R01,R10 | Desktop ECHELON.app/icon, runtime readiness/start/reuse/stop, safe errors and logs, backup + tested restore. The existing plist is an example, not installed. | Double-click launch twice and after restart, port/dependency failures handled, no secret logs, no automatic reset/spend/download; data and owner session survive; restore verified. |
+| E09 / R05 | Approved Mac-independent runtime, secret/bootstrap/heartbeats, budgets, monitoring, backups and recovery. Mac-on is the first milestone, not removal of Mac-off scope. | Authorized host and worker serve/finish a job with Mac powered off; prove blocked stale host and recovery, costs/privacy recorded. |
 
-Current main consolidation and test evidence: `docs/REPOSITORY-ASSESSMENT-2026-11-01.md`. R04/R06/R07/R08 implementation: `docs/daily-syncs/2026-11-02.md`. Pilot commits have been reconciled; do not replay them. Live provider/owner and R01–R10 acceptance remain open.
+## Founder inputs and live acceptance (request only when needed)
 
-## BUILT AND MERGED 2026-11-02 (pending live acceptance only)
-- **R04 Model Priority**: `lib/model-router/priority.ts`, registry, profile API, settings panel — built, merged, tests pass. Live acceptance: Victor tests model selector in running app.
-- **R06 Channels/Voice**: `lib/comms/delivery.ts` real adapters (SMTP, Twilio SMS, WhatsApp, Telegram, voice), channels API — built, merged. Live acceptance: Victor supplies TWILIO_* and SMTP_* env values and tests a real send.
-- **R07 Lockdown/Sealed Team**: Partial lockdown enforcement (core, client, HTTP enforcement), API, UI — built, merged. Live acceptance: Victor tests lockdown toggle in running app.
-- **R08 Daily Briefing + Avatar Blink**: Briefing logic, API, Board Room UI, conditional avatar blink — built, merged. Live acceptance: Victor tests Board Room in running app.
-- **New migration**: `20261102120000_readiness_safety_models_briefing` — Victor must run `npx prisma migrate dev` on dev DB before starting the app.
+- **F01 — Mac runtime:** confirm the chosen local instance and owner email; securely configure `.env`, required auth/encryption/database/model values, sign in, and test passkey/restart. Do not print values or overwrite existing secrets. Next.js `.env.local` overrides may differ from worker/Prisma `.env` loading.
+- **F02 — GitHub:** App creation/private-key download were reported. Locate existing App installation ID/configuration securely and confirm one-repo read permissions. Do not recreate keys/App unless actually needed. Codex GitHub access is not proof of ECHELON access.
+- **F03 — channels:** supply existing approved SMTP/Twilio/Telegram settings and chosen test recipients privately. Confirm entitlements/costs before a real send/call. iMessage bridge needs an actual compatible host/account/privacy choice; no unsupported promise.
+- **F04 — models:** local/free first, verify installed model and local speech availability. NVIDIA quotas/production entitlement and privacy must be verified before any live application admission; browser DeepSeek stays manual.
+- **F05 — approvals/security:** exact protected action approval stays mandatory. No standing approval for daily proprietary SMS or new expenditure; do not revive a late-approval council or add approval bypasses.
+- **F06 — remote:** select/approve an actual host and any cost before deployment. Domain, Cloudflare and Hetzner were old proposals, not current purchase requirements. Reuse suitable approved infrastructure when verified.
+- **F07 — organization:** reconcile directorate count and board identities/assets only from authoritative Founder data. Generated email addresses do not establish live mailboxes.
+- **F08 — repository settings:** confirm branch protection/required checks, 2FA, push protection and dependency policy in the actual account. No current settings state is claimed by this pass.
 
-Source of truth for what is open. Update it when something is done or decided. Read it at the start of every session.
+## Security, quality and retained work
 
-## A. Waiting on Victor (decisions and actions only he can take)
-1. Buy `whinkgroup.com` (his own purchase); say which registrar so exact email-forwarding steps can be given. Skip the paid email and web hosting add-ons.
-2. Hosting go-ahead (see docs/learnings.md section 13): create Cloudflare and Hetzner accounts with 2FA, scoped API tokens in the environment settings (never in chat), allow those hosts under Allowed domains, attach the repos Wpma, whinkpredict, whink-group and the WhinkOS repo, approve each spend, start a new session.
-3. Tell us what WhinkOS is and where its code lives; which Render services are live (wpma vs Wpma, whinkpredict vs whink-bet); names of each app's settings.
-4. Settings in `apps/web/.env`: WHINK_OWNER_EMAILS, WEBAUTHN_RP_ID and WEBAUTHN_ORIGIN, SIGNUP_BOOTSTRAP_TOKEN, DEFAULT_MODEL plus a provider key (or local Ollama), ENCRYPTION_KEY (needed to store uploaded skills), TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM_NUMBER (SMS), SKILL_PIPELINE_MODEL (optional), WORKER_ENABLED=true and `pnpm worker` running, MEETING_PROVIDER_BASE_URL (optional), CHANGE_REQUEST_GITHUB_REPO and CHANGE_REQUEST_GITHUB_TOKEN (optional), SMTP_* (email). Never commit values.
-5. Run `npx prisma migrate dev`. Migrations are hand-written and never applied to real Postgres. Reset any dev database that applied an earlier commit of this branch.
-6. Decisions: (a) may the daily SMS briefing go to his own verified number without a tap (an exception to rule 10; not granted); (b) is the Playwright browser-test package outside the app acceptable under CLAUDE.md D9; (c) review the assumed Contract fields and the recall taint trusted-source list (user, manual, correction, auto, conversation, mamba); (d) YAML skills get a shape check only: add a YAML parser dependency or not; (e) approve or reject the proposals below in section B.
-7. GitHub settings only he can set: branch protection with required reviews, secret-scanning push protection, 2FA, signed commits; install the Claude GitHub App if he wants change requests picked up automatically.
-8. Confirm the board: bios, committees, and that the generated board emails exist; WHINK Ultimate and WhinkOS logos; Whink Predict logo.
-9. Run Victor's Phase 2 checklist (9 items in CLAUDE.md) on his Mac. A phase is not done until it passes for him.
-10. Merge `claude/loving-archimedes-70hf66` to `main` (Victor asked for this on 2026-10-27; waits on green CI).
-11. Set mail forwarding for whinkgroup.com at the mail provider once the domain exists.
+- Re-evaluate historical CG/CG2/Qodo findings against current source, especially provider output injection, review/discovery races, final receipt update, long execution approval sweeps, OpenClaw DNS/stale routes and password-reset races. See [decision history](decisions.md); these are carry-forward review items, not a new claim that every finding is still present.
+- Retain `fix/remediation-2a68d1fb-185920` until its unique `finish()` behavior is reviewed/integrated or explicitly shown superseded. Keep stuck-approval protections.
+- Eleven dependency PRs remain: #5–9, #11, #13–16, #22. Review separately, including runtime/API compatibility and permitted licenses. Mapbox #16 licensing unresolved; no blanket major upgrade.
+- Current main CI passes **2345 tests with 39 skipped and 22 E2E passed**. Resolve skip/probe coverage separately; skipped social/approval/evaluation/model checks are not acceptance. See [testing](testing.md).
+- Fresh-db CI does not prove safe upgrade/restore of a personal DB. Use `prisma migrate status` / checked-in `migrate deploy`, take backups first. Do not run reset, db push or destructive seeds on personal data.
+- Before wider release: legal/privacy/platform terms and license review, behavior/performance/accessibility/brand assurance, production screenshots, hosting/recovery and personal-data retention. Security CI is not certification.
 
-## B. Proposed, not built (Victor said do not build until approved)
-- Change password screen and a Sign out everywhere action (forgot password is built: see docs/decisions.md 2026-10-27). The first password-change route must call `bumpSessionVersion()`; the reset flow already does, inside its transaction.
-- Installer for Windows or Mac (stage 1: start script plus browser install; stage 2: signed installer).
-- Agents drafting Change Requests for approval.
-- Hosting migration kit (Docker, Caddy, GitHub Actions deploy, backups, runbook) after A2.
+## Longer-term or conditional requests retained
 
-## C. Requested earlier, not built
-- Edit the product websites from the app; update the company website from news and initiatives.
-- Real sending for email: `lib/comms/delivery.ts` is still a stub, so password-reset mail does not leave the server. Needs `nodemailer` (MIT; Victor to approve) and SMTP_* values. Also WhatsApp, Telegram and phone calls (stubs today); Gmail, Google Calendar and Drive adapters; Google Contacts sync.
-- Video room (needs MEETING_PROVIDER_BASE_URL and a server).
-- Phase 3 Recall hardening (embedding dimensions, HNSW index, auto-memory path, AnythingLLM citations): planned, untouched.
+These are not silently closed: product-site editing; Gmail/Calendar/Drive/Contacts; meeting-room provider; password-change and sign-out-everywhere; installer distribution/signing; Change Request reload behavior; abandoned swarm reservations; staff mailbox provisioning and external service consolidation. Reinspect actual source before treating old defects as current. Preserve recall requirements (dimensions, dedup, HNSW, permissioned memory, citation isolation/retrieval): older claims that all of Phase 3 is untouched are false; remaining assurance is not proven. Scope public billing/white-label commercialization separately from full personal use.
 
-## D. Built but unproven or unverified
-- Real-Postgres CI runs on every push. As of 2026-10-27 typecheck, lint, `prisma migrate deploy` on Postgres 16 + pgvector, seed, unit tests and build pass in CI. The Playwright e2e step failed because the login helper clashed with the passkey button and the new login labels; the helper is fixed and public-page specs added (e2e/tests/public.spec.ts), result pending on the next run.
-- Migrations are proven on a throwaway CI database, but the app has not been used signed in by Victor; passkey, SMS and the new screens are untested in a real browser; phone width (390 px) checked only for the landing and auth pages (conversation and onboarding not rendered).
-- Twilio SMS never called against the real API.
-- The last round of fixes (taint allow-list, bootstrap token, migration changes, passkey ordering) had no third independent security review.
-- Not yet run: brand-guardian review of the new screens, compliance review (CASL, PIPEDA) of social, SMS and email, qa-engineer, ai-evaluator, performance benchmarks (Phase 2e E3 to E7).
+## Closed / do not repeat
 
-## E. Known small gaps
-- No password-change route or sign-out-everywhere; session version cache lags up to 15 seconds across processes.
-- Change Request after reload cannot show its approval card (offers submit again); contracts list has no totals; meeting room cannot say why no room was created.
-- Abandoned PLANNED swarm runs count against the budget until cancelled.
-- Approved contact messages by non-SMS channels are stubs; old lib/twilio-adapter.ts remains; the automated briefing reminder still needs BRIEFING_SMS_TO and BRIEFING_REPORTS_DIR.
-- Animated avatars keep the approved portraits; the white-background WHINK and MAMBA images are for the Board Room only.
-- Render has duplicate services (wpma and Wpma, whinkpredict and whink-bet): tidy after the hosting move.
-
-## F. Added 2026-10-27
-- Product-tour screenshots on the landing page show sample-data tells ("Dev", a fake phone number, "Fixture"); recapture with curated demo data before any public release.
-- Terms and Privacy are internal drafts; legal review before external release. Contact address comes from tenant config (`legalContactEmail`).
-- Per-email reset throttle can be used to annoy a victim (3 per 15 min); add a "check again in 5 minutes" hint and an owner alert when SMTP exists.
-- The standalone `openclaw-jarvis` repo (a copy of the open-source OpenClaw) has no approval step for posting; it defaults to exec security `full`, ask `off`. Keep social logins and credentials away from it, or route posting through WHINK's gateway.
-- Remaining dependency audit findings (below the high gate): csv-parse (moderate, needs a major version bump of the `csv` package) and two low. Revisit with the next dependency pass. Keep `pnpm audit --prod --audit-level=high` green.
-
-## G. Local Gemma agent (added 2026-10-28)
-Built and independently reviewed, never run against a real Ollama or on the owner's Mac. All behind flags; nothing runs unless WHINK_LOCAL_AGENT_TOOLS=true and WHINK_WORKSPACE_ROOT is set, and only for owner accounts.
-- Try it on the Mac: ollama pull the Gemma model, set DEFAULT_MODEL to it (or WHINK_LOCAL_MODEL with WHINK_LOCAL_ONLY=true), confirm the 3 to 4 second tool round trip Victor measured. Report timings and any Ollama error text (the 'does not support tools' wording and the malformed-tool-call response are unverified).
-- Not built yet, by design: apply_patch and run_test (need approvals plus another independent security review). git_commit, git_push, rm, network, messaging, money and production tools stay unavailable.
-- streamChat (plain streamed replies without tools) still uses the OpenAI-compatible /v1 path for Gemma; only the tool loop and one-shot chat use native /api/chat.
-- Local-Only mode: spoken approvals in approval-card.tsx still use browser speech (set NEXT_PUBLIC_WHINK_LOCAL_ONLY=true for the voice hook); owner emails are not verified (open signup lets a stranger register a listed owner email that has no account yet; keep SIGNUP_ENABLED false); a hardlink to a secret file is refused only when its link count is above 1; the 50 ms settle in project-access.test.ts works around an in-flight import race in that test file.
-- Apple git 2.39 (Xcode tools) lacks GIT_ATTR_SOURCE; the hostile-config refusal still applies and a warning is logged.
-
-## H. Capability Gateway / Integration Hub (added 2026-11-01)
-MERGED to `main` on 2026-11-01 from `integration/echelon-capability-gateway` (PR #3, merge commit). Design and limits: docs/CAPABILITY-GATEWAY.md. Review fixes: docs/decisions.md, entry "independent security review".
-Waiting on Victor:
-- CodeQL: GitHub offers no code scanning switch for this private repository (checked 2026-11-01). Victor chose option A (analyse, do not upload); DONE and merged (PR #10): CodeQL analyses and keeps a `codeql-sarif` run artifact for 14 days; it is green. Nothing appears in the Security tab. Buying GitHub Code Security is optional spend. Buying GitHub Code Security is spend: needs Victor's approval.
-- Turn on branch protection with required reviews on `main` (item A7).
-- D-1 (hosting for the remote worker) before the physical Mac-off acceptance test E5.
-- Confirm the 12 gitleaks findings allow-listed in `.gitleaksignore` (11 test fixtures, 1 base64 false positive in the master plan). Reviewed from the redacted CI log and file context only.
-- Confirm defaults: heartbeat 30/75/120 s, grants capped at 30 days, one `ENCRYPTION_KEY` for all provider credentials.
-- Reset any dev database that applied an earlier version of migration 20261101120000_capability_gateway_e1 (edited in place before merge).
-Open engineering items:
-- A second independent security-reviewer pass on the review-fix changes (egress, review flow, registry scoping). Not yet done.
-- Before any agent or chat path calls a provider tool: wrap and injection-scan provider output and descriptions (review CG-12).
-- Accepted for now: CG-9 in-flight owner test call survives a revoke; CG-13 ciphertext in old row versions and backups; CG-14 a bland-named money tool relies on the review.
-- Not built: stdio host agent, plugin formats beyond MCP, OpenClaw capability adapter, network-level egress (pf or container on the Mac), OAuth for providers, key rotation and per-host keys, a scheduled worker job for the host sweep.
-- Phase 3 Recall hardening (section C) is still untouched.
-Qodo review of PR #3, not fixed (details in docs/decisions.md, "Qodo code review"): #9 concurrent discovery race; #13 Hub live feed misses final receipt status; #14 pin the gitleaks tarball hash from a trusted source. Imported-baseline findings to verify and fix separately: approvals sweep vs long-running EXECUTING (#2), services/openclaw DNS rebinding and stale routes after outage (#6, #7), concurrent password-reset links (#8).
-
-## I. Branches and Dependabot (added 2026-11-01)
-Waiting on Victor:
-- Delete the three merged branches (`bootstrap/echelon-foundation-20261030`, `import/kamsi-prime-m1`, `integration/echelon-capability-gateway`) in the GitHub UI or with `git push origin --delete ...` from his Mac; the cloud session gets HTTP 403. Tip SHAs and the recreate command are in docs/daily-syncs/2026-11-01.md. Optional: turn on "Automatically delete head branches" in the repository's General settings.
-- Decide on Dependabot: leave it on (it came with the imported `.github/dependabot.yml`), tune or limit it, or turn it off. Dependabot alerts and the dependency graph are Off in Settings.
-Open engineering:
-- Review the 10+ open Dependabot PRs one at a time: Actions bumps first, major npm bumps last, each with a licence check (CLAUDE.md rule 7). Close #16 (mapbox-gl 1 to 3) after verifying the licence. A Dependabot job for `services/anythingllm` failed.
-- Add the `finish()` terminal-update check from Qodo's `fix/remediation-2a68d1fb-185920` as its own change with a test, after the independent security review; then delete that branch. Do not remove the stuck-approval sweep.
-- CI efficiency (2026-11-01): CI now runs once per commit and skips the heavy steps for docs-only PRs. Victor: turn on branch protection with required checks (the CI job, gitleaks, the dependency audit, CodeQL) and allow auto-merge, so green PRs merge without polling. Optional later: cache the Next.js build and the Playwright browser; set Qodo to review once per PR.
-
-Security pass status (2026-11-01): the second independent pass is DONE (one high fixed). Still deferred, low risk: CG2-2 to CG2-7 (see docs/decisions.md, "Second independent security pass"), plus the earlier CG-9, CG-12, CG-13, CG-14 and the imported-code Qodo items. Before any agent or chat path calls provider tools, CG-12 (wrap and injection-scan provider output) is required.
-
-2026-11-02 continuation: #23 fixes ownership test isolation; #24 adds unknown-cost reporting, profile eligibility and the local EAR reservation boundary. Extend admission to explicit chat, sidecars, skills/swarm, embeddings and voice with scoped monetary limits, reliable token provenance, crash reconciliation and refusal receipts. Validate actual priority fallback without replaying tools. R01–R10 live/device and remote acceptance gates remain open as listed in TOKEN-AND-SPEND-PRIORITY.md.
+Source import and PR #21 reconciliation; PRs #23/#24 implementation and merge; the two merged efficiency heads and old bootstrap/import/integration branch cleanup; current-main CI and security verification. Do not rerun source import, recreate the GitHub App blindly, or report old model/DB failures as current-main results. Preserve the [historical backlog](archive/pending-tasks-through-2026-11-02.md) only as provenance.

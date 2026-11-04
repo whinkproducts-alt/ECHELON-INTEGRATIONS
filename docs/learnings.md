@@ -1,3 +1,21 @@
+# Current continuation facts — 2026-11-04
+
+Read [audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md) and [current backlog](pending-tasks.md) before the historical memory below. Product/repo: ECHELON / `whinkproducts-alt/ECHELON-CORP`; older WHINK/KAMSI names are provenance. Main baseline `99f6d7e` is consolidated and passing configured CI/security, with 39 tests still skipped. Full personal-use acceptance remains open.
+
+- Optimize total tokens/cost to verified completion; no calendar estimates or credit guarantees. Decisions use concise A/B/C only when needed.
+- A desktop icon must launch the complete intended personal instance; it cannot stand in for missing functionality. No launcher is tracked yet.
+- Model profiles/registry, real SMTP/Twilio/Telegram adapters, safety controls, daily briefing and opt-in blinking exist. Actual ordered fallback, sealed private missions, iMessage and two-way phone are incomplete; live acceptance is not the only missing work.
+- Blink is gated by flag/eye anchors/reduced motion, not limited to speaking/active states. Preserve breathing/mouth/portraits. Briefing is motion/voice presentation, not a verified rendered movie.
+- Main CI observed 2345 passed / 39 skipped / 22 browser passed. Do not reuse the older 2273/105 or older pilot failure numbers for current main. Global Prisma and unlocked-safety mocks mean test labels alone do not establish SQL/lockdown coverage.
+- `streamChat` and `chatOnce` disagree on the unset default; hints can select Claude independently of profile ordering. Key presence is not cost admission. Local EAR reservation is not a universal paid-call cap.
+- `.env.example` includes cloud voice selectors; loopback URLs alone do not make them local. Next `.env.local` overrides and worker/Prisma `.env` loading can differ. Never print either file to troubleshoot.
+- Source import/PRs #21/#23/#24 and redundant merged-branch cleanup are complete. Eleven dependency heads and separate remediation remain for review. Do not replay old merges/imports.
+- GitHub App creation/key download was reported; install/configuration/live gateway acceptance is unverified, so locate before recreating. Model/host/channel receipts must come from ECHELON, not coding-tool access.
+- Apply checked-in migrations safely with backup/status/`migrate deploy`; do not blindly reset real data or rotate encryption. Unknown-cost migration loses the distinction between old free and unpriced zero entries.
+- Below are dated historical lessons, not automatically current defects, hosting approvals, paid plans or product names. Reinspect source for the task; carry unresolved requirements into the current backlog.
+
+---
+
 # What we have learnt building W.H.I.N.K. Ultimate
 
 Long-term project memory. Read this with `CLAUDE.md`, `docs/decisions.md` and the latest file in `docs/daily-syncs/` at the start of every session. Facts here were stated by Victor, read from his Group website on 2026-10-25, or verified in the code. Anything uncertain is marked "unverified". Last updated 2026-10-26 (second batch added in section 10).
