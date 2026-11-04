@@ -33,6 +33,8 @@ Read [current audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md) for the fixed 
 
 ## Security, quality and retained work
 
+- **Current dependency triage:** During documentation publication GitHub's push banner reported 134 alerts (8 critical, 49 high, 58 moderate, 19 low). A separate paginated read of open Dependabot alerts returned **131** (8 critical, 49 high, 55 medium, 19 low), across six manifests including legacy locks and service packages. The difference is not reconciled; neither count is verified runtime exploitability. The passing configured production audit must be reconciled with those open alerts before security readiness. Manifest/scope counts and high/critical alert IDs are captured in the evidence snapshot. No dependency fix or dismissal was performed.
+
 - Re-evaluate historical CG/CG2/Qodo findings against current source, especially provider output injection, review/discovery races, final receipt update, long execution approval sweeps, OpenClaw DNS/stale routes and password-reset races. See [decision history](decisions.md); these are carry-forward review items, not a new claim that every finding is still present.
 - Retain `fix/remediation-2a68d1fb-185920` until its unique `finish()` behavior is reviewed/integrated or explicitly shown superseded. Keep stuck-approval protections.
 - Eleven dependency PRs remain: #5–9, #11, #13–16, #22. Review separately, including runtime/API compatibility and permitted licenses. Mapbox #16 licensing unresolved; no blanket major upgrade.

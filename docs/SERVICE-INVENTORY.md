@@ -1,6 +1,6 @@
 # ECHELON service and inference inventory
 
-Updated **2026-11-04**, source baseline `99f6d7eb3f58cff9d9aae8f59641137faf755a9c`. This inventories code/configuration choices, not active subscriptions, live credentials, vendor entitlements or current prices. No billing dashboards, secret files or provider accounts were inspected. **Services actually being paid for: not established by this repository inspection.** Importing an SDK or configuring a key does not prove payment or free access.
+Updated **2026-11-04**, source baseline `99f6d7eb3f58cff9d9aae8f59641137faf755a9c`. This inventories code/configuration choices, not active subscriptions, live credentials, vendor entitlements or current prices. No billing dashboards, secret files or model/channel provider account settings were inspected. **Services actually being paid for: not established by this repository inspection.** Importing an SDK or configuring a key does not prove payment or free access.
 
 Prefer existing viable local/free services. A hosted trial is not automatically free production capacity. Verify pricing/quota/privacy/terms from the provider when admitting it; do not infer them from old comments. No provider lookup or new entitlement verification was performed for this documentation-only inventory.
 

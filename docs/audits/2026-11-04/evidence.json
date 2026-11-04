@@ -735,5 +735,168 @@
     "Physical Mac-off operation",
     "Current provider quotas, bills or subscriptions",
     "No security vulnerabilities"
-  ]
+  ],
+  "dependency_alert_snapshot": {
+    "recorded_on": "2026-11-04",
+    "source": "GitHub Dependabot open-alert API, paginated read",
+    "query": "repos/whinkproducts-alt/ECHELON-CORP/dependabot/alerts?state=open&per_page=100",
+    "open_alerts": 131,
+    "by_severity": {
+      "high": 49,
+      "low": 19,
+      "medium": 55,
+      "critical": 8
+    },
+    "by_manifest": {
+      "services/voice/package.json": {
+        "alerts": 11,
+        "severity": {
+          "high": 10,
+          "low": 1
+        },
+        "dependency_scope": {
+          "runtime": 11
+        },
+        "critical_high_alert_numbers": [
+          134,
+          132,
+          131,
+          130,
+          129,
+          128,
+          127,
+          126,
+          125,
+          124
+        ]
+      },
+      "services/openclaw/upstreams/social/package-lock.json": {
+        "alerts": 8,
+        "severity": {
+          "medium": 4,
+          "low": 2,
+          "high": 2
+        },
+        "dependency_scope": {
+          "runtime": 8
+        },
+        "critical_high_alert_numbers": [
+          118,
+          117
+        ]
+      },
+      "services/openclaw/upstreams/ref/package-lock.json": {
+        "alerts": 8,
+        "severity": {
+          "medium": 4,
+          "low": 2,
+          "high": 2
+        },
+        "dependency_scope": {
+          "runtime": 8
+        },
+        "critical_high_alert_numbers": [
+          110,
+          109
+        ]
+      },
+      "services/openclaw/package-lock.json": {
+        "alerts": 24,
+        "severity": {
+          "medium": 14,
+          "low": 3,
+          "high": 3,
+          "critical": 4
+        },
+        "dependency_scope": {
+          "runtime": 8,
+          "development": 16
+        },
+        "critical_high_alert_numbers": [
+          102,
+          101,
+          95,
+          93,
+          92,
+          87,
+          84
+        ]
+      },
+      "pnpm-lock.yaml": {
+        "alerts": 11,
+        "severity": {
+          "medium": 7,
+          "low": 3,
+          "high": 1
+        },
+        "dependency_scope": {
+          "runtime": 11
+        },
+        "critical_high_alert_numbers": [
+          76
+        ]
+      },
+      "apps/web/yarn.lock": {
+        "alerts": 69,
+        "severity": {
+          "high": 31,
+          "medium": 26,
+          "low": 8,
+          "critical": 4
+        },
+        "dependency_scope": {
+          "runtime": 60,
+          "development": 9
+        },
+        "critical_high_alert_numbers": [
+          70,
+          69,
+          68,
+          63,
+          56,
+          55,
+          53,
+          52,
+          46,
+          45,
+          44,
+          43,
+          42,
+          37,
+          36,
+          35,
+          34,
+          33,
+          32,
+          29,
+          25,
+          23,
+          20,
+          19,
+          18,
+          17,
+          16,
+          14,
+          13,
+          12,
+          11,
+          9,
+          8,
+          7,
+          5
+        ]
+      }
+    },
+    "reachability_triage": "NOT PERFORMED; alert existence is not verified runtime exploitability",
+    "production_audit_reconciliation": "OPEN; passing configured pnpm production audit and repository-wide alerts have different inputs/scopes; no cause for discrepancy is assumed",
+    "push_banner_observed": {
+      "pushed_sha": "0ebe4d0591cf47bc1d6c84762b388376cda11e80",
+      "total": 134,
+      "critical": 8,
+      "high": 49,
+      "moderate": 58,
+      "low": 19,
+      "count_difference": "Open-alert API returned a different total/moderate count; reason not established."
+    }
+  }
 }
