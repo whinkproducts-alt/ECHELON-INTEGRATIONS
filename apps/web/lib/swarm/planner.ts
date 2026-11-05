@@ -1,6 +1,6 @@
 /** Planner call: the initiative is untrusted data. The model only ever returns JSON that zod then filters. */
 import { localOnlyModel } from '@/lib/local-only';
-import { chatOnce } from '@/lib/model-router';
+import { admittedChatOnce } from '@/lib/model-router/dispatch';
 import { wrapUntrustedContent, stripFakeUntrustedTags } from '@/lib/content-isolation';
 import { swarmConfig } from './config';
 import { PlannerOutputSchema } from './types';
@@ -20,7 +20,7 @@ export function swarmModel(): string {
   return localOnlyModel(swarmConfig().model ?? process.env.SWARM_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k');
 }
 
-export async function decomposeInitiative(initiative: string, workers: number): Promise<Decomposition> {
+export async function decomposeInitiative(userId: string, initiative: string, workers: number): Promise<Decomposition> {
   const system = [
     'You are the planning step of a work swarm. Split the initiative into independent work packages.',
     'Rules: each package owns ONE exclusive lane (a short kebab-case scope key, unique, no overlap with any other package).',
@@ -31,7 +31,7 @@ export async function decomposeInitiative(initiative: string, workers: number): 
   ].join('\n');
   const user = wrapUntrustedContent(stripFakeUntrustedTags(initiative), 'swarm_initiative', 'user_input');
   const model = swarmModel();
-  const text = await chatOnce({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], maxTokens: 6000, temperature: 0.2 });
+  const text = await admittedChatOnce({ userId, purpose: 'swarm', model }, { model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], maxTokens: 6000, temperature: 0.2 });
   const obj = PlannerOutputSchema.parse(extractJson(text));
   const title = (typeof obj.title === 'string' && obj.title.trim() ? obj.title : initiative).replace(/\s+/g, ' ').trim().slice(0, 120);
   return { title, packages: obj.packages, tokensIn: approxTokens(system + user), tokensOut: approxTokens(text), model };

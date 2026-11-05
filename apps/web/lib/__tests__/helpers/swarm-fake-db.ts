@@ -71,8 +71,18 @@ export function createSwarmFakeDb() {
     delegation: { findFirst: vi.fn(async () => null) },
     project: { findFirst: vi.fn(async () => null) },
     userPreference: { findUnique: vi.fn(async () => null) },
-    usageEvent: { aggregate: vi.fn(async () => ({ _sum: {} })) },
+    usageEvent: {
+      aggregate: vi.fn(async () => ({ _sum: {} })),
+      findFirst: vi.fn(async () => null),
+      findMany: vi.fn(async () => []),
+      create: vi.fn(async ({ data }: { data: Row }) => ({ id: `usage-${++seq}`, ...data })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
+    accountSafetyState: { findUnique: vi.fn(async () => null) },
+    user: { findUnique: vi.fn(async () => ({ id: 'user' })) },
   };
+  db.$transaction = vi.fn(async (fn: (tx: typeof db) => unknown) => fn(db));
+  db.$queryRaw = vi.fn(async () => [{ id: 'user' }]);
   db.reset = () => { (Object.keys(tables) as Array<keyof typeof tables>).forEach((k) => { tables[k] = []; }); seq = 0; };
   // Table accessors for assertions. Getters so reassignment inside deleteMany stays visible.
   Object.defineProperty(db, 'tables', { get: () => tables });

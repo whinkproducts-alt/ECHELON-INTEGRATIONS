@@ -3,7 +3,7 @@
  * digest, all wrapped as untrusted data (user message). Output = strict JSON. Agents get no tools at all;
  * SWARM_TOOL_ALLOWLIST is the most they could ever be given (read-only) and is asserted in tests.
  */
-import { chatOnce } from '@/lib/model-router';
+import { admittedChatOnce } from '@/lib/model-router/dispatch';
 import { wrapUntrustedContent, stripFakeUntrustedTags, scanForInjectionPatterns } from '@/lib/content-isolation';
 import { SECRET_RULES } from '@/lib/secret-scan';
 import type { OrgAgent } from '@/lib/agent-loader';
@@ -125,10 +125,10 @@ export function parseAgentReply(text: string, task: Pick<AssignedTask, 'role' | 
   return { output: { result, learnings, confidence: parsed.confidence, ...(verdicts ? { verdicts } : {}) }, securityEvents: events, droppedLearnings: dropped };
 }
 
-export async function callAgent(input: AgentCallInput): Promise<AgentCallResult> {
+export async function callAgent(input: AgentCallInput, userId: string): Promise<AgentCallResult> {
   const cfg = swarmConfig();
   const messages = buildMessages(input);
-  const text = await chatOnce({
+  const text = await admittedChatOnce({ userId, purpose: 'swarm', model: swarmModel() }, {
     model: swarmModel(), messages, temperature: 0.2,
     maxTokens: Math.min(4000, 600 + 500 * Math.min(Math.max(input.task.estimatedCalls, 1), 3) + cfg.outputMaxChars / 4),
   });

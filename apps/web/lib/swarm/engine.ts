@@ -154,7 +154,7 @@ async function executeTask(task: TaskRow, all: TaskRow[], owner: string): Promis
           .then((r: { count: number }) => { if (r.count !== 1) superseded = true; })
           .catch(() => {});
       }, cfg.heartbeatMs);
-      const res = await withTimeout(callAgent({ task: assigned, agent, deps: depOutputs, failedDeps, learnings }), cfg.taskTimeoutMs);
+      const res = await withTimeout(callAgent({ task: assigned, agent, deps: depOutputs, failedDeps, learnings }, userId), cfg.taskTimeoutMs);
       account(userId, runId, res.tokensIn, res.tokensOut);
       if (superseded) return;
       const done = await prisma.swarmTask.updateMany({

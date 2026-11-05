@@ -7,6 +7,11 @@ const models = new Map<string, Map<string, Fn>>();
 export const db: any = new Proxy({}, {
   get(_t, model: string) {
     if (model === 'then') return undefined;
+    if (model === '$transaction') return (fn: unknown) => typeof fn === 'function' ? (fn as (tx: unknown) => unknown)(db) : Promise.resolve(fn);
+    if (model === '$queryRaw') return async (strings?: TemplateStringsArray) => {
+      const text = Array.isArray(strings) ? Array.from(strings).join(' ') : '';
+      return text.includes('FOR UPDATE') ? [{ id: 'mock-user' }] : [];
+    };
     if (!models.has(model)) models.set(model, new Map());
     const methods = models.get(model)!;
     return new Proxy({}, {

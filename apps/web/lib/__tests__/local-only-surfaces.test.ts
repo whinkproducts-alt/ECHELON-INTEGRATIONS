@@ -54,6 +54,13 @@ describe('voice', () => {
   });
   it('TTS with a loopback service still works', async () => {
     vi.stubEnv('TTS_URL', 'http://127.0.0.1:8880');
+    vi.doMock('@/lib/db', () => ({ prisma: {
+      $queryRaw: async () => [{ id: 'user-1' }],
+      $transaction: async (fn: (tx: unknown) => unknown) => fn({ $queryRaw: async () => [{ id: 'user-1' }], usageEvent: { create: async () => ({ id: 'h' }), findFirst: async () => null, aggregate: async () => ({ _sum: {} }) }, userPreference: { findUnique: async () => null } }),
+      usageEvent: { create: async () => ({ id: 'h' }), updateMany: async () => ({ count: 1 }), findFirst: async () => null, aggregate: async () => ({ _sum: {} }) },
+      userPreference: { findUnique: async () => null },
+      accountSafetyState: { findUnique: async () => null },
+    } }));
     const { POST } = await import('@/app/api/voice/tts/route');
     const res = await POST(ttsReq());
     expect(res.status).toBe(200);

@@ -15,6 +15,7 @@ const createMockDelegate = () => ({
   findMany: vi.fn().mockResolvedValue([]),
   create: vi.fn().mockResolvedValue({}),
   update: vi.fn().mockResolvedValue({}),
+  updateMany: vi.fn().mockResolvedValue({ count: 0 }),
   upsert: vi.fn().mockResolvedValue({}),
   delete: vi.fn().mockResolvedValue({}),
   deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -67,8 +68,23 @@ class MockPrismaClient {
     (fn: ((tx: unknown) => unknown) | unknown[]) =>
       typeof fn === 'function' ? fn(this) : Promise.resolve(fn)
   );
-  $queryRaw = vi.fn().mockResolvedValue([]);
+  $queryRaw = vi.fn().mockImplementation((strings: TemplateStringsArray | string) => {
+    const text = Array.isArray(strings) ? Array.from(strings).join(' ') : String(strings ?? '');
+    if (text.includes('FOR UPDATE') && text.includes('users')) return Promise.resolve([{ id: 'mock-user' }]);
+    return Promise.resolve([]);
+  });
   $executeRaw = vi.fn().mockResolvedValue(0);
+  usageEvent = createMockDelegate();
+  userPreference = createMockDelegate();
+  accountSafetyState = createMockDelegate();
+
+  constructor() {
+    // Admission uses these delegates on the hot path; give them success-shaped defaults.
+    this.usageEvent.create = vi.fn().mockResolvedValue({ id: 'hold-1' });
+    this.usageEvent.updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    this.usageEvent.aggregate = vi.fn().mockResolvedValue({ _sum: {} });
+    this.usageEvent.findFirst = vi.fn().mockResolvedValue(null);
+  }
 }
 
 vi.mock('@prisma/client', () => ({

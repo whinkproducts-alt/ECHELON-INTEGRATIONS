@@ -4,6 +4,7 @@ import { ledgerLocalOnlyBlock } from '@/lib/local-only-guard';
 import { isLockedDown, ledgerLockdownBlock, LOCKDOWN_MESSAGE } from '@/lib/safety/lockdown';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { DispatchBlockedError, runAdmittedVoice } from '@/lib/model-router/dispatch';
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -64,17 +65,17 @@ export async function POST(req: NextRequest) {
 
     let dgRes: Response;
     try {
-      dgRes = await fetch(url, {
+      dgRes = await runAdmittedVoice({ userId: session.user.id, channel: 'stt', units: audio.size }, () => fetch(url, {
         method: 'POST',
         headers: {
           Authorization: `Token ${apiKey}`,
           'Content-Type': audio.type || 'audio/webm',
         },
         body: audio,
-      });
+      }));
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Deepgram unreachable';
-      return NextResponse.json({ error: message }, { status: 502 });
+      if (err instanceof DispatchBlockedError) return NextResponse.json({ error: 'Speech was not admitted.', code: err.code }, { status: 409 });
+      return NextResponse.json({ error: 'STT service unreachable' }, { status: 502 });
     }
 
     if (!dgRes.ok) {
@@ -125,12 +126,13 @@ export async function POST(req: NextRequest) {
 
   let upstreamRes: Response;
   try {
-    upstreamRes = await fetch(`${sttUrl}/audio/transcriptions`, {
+    upstreamRes = await runAdmittedVoice({ userId: session.user.id, channel: 'stt', units: audio.size }, () => fetch(`${sttUrl}/audio/transcriptions`, {
       method: 'POST',
       ...redirectOpt(sttUrl),
       body: upstream,
-    });
-  } catch {
+    }));
+  } catch (err) {
+    if (err instanceof DispatchBlockedError) return NextResponse.json({ error: 'Speech was not admitted.', code: err.code }, { status: 409 });
     // L1: do not leak internal network details to the client
     return NextResponse.json({ error: 'STT upstream unreachable' }, { status: 502 });
   }

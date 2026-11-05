@@ -87,7 +87,7 @@ export async function writeMemory(input: MemoryWriteInput): Promise<MemoryWriteR
       });
       // Fire-and-forget embedding update, stamp embeddingModel
       const embeddingModelName = process.env.EMBEDDING_MODEL ?? 'ollama/nomic-embed-text';
-      generateEmbedding(statement).then(async (vec) => {
+      generateEmbedding(statement, userId).then(async (vec) => {
         if (!vec) return;
         await prisma.$executeRawUnsafe(
           `UPDATE memory_episodes SET embedding = $1::vector, "embeddingModel" = $3 WHERE id = $2`,
@@ -102,7 +102,7 @@ export async function writeMemory(input: MemoryWriteInput): Promise<MemoryWriteR
     case 'semantic': {
       const embeddingModelName = process.env.EMBEDDING_MODEL ?? 'ollama/nomic-embed-text';
       // Generate embedding upfront so we can check for duplicates before inserting.
-      const vec = await generateEmbedding(statement);
+      const vec = await generateEmbedding(statement, userId);
 
       // Semantic dedup: if a near-identical fact exists (cosine sim >= 0.92), upsert instead.
       if (vec) {
@@ -293,7 +293,7 @@ export async function searchMemory(
   projectId?: string | null,
   limit: number = 10
 ) {
-  const queryVec = await generateEmbedding(query);
+  const queryVec = await generateEmbedding(query, userId);
 
   // searchMode is reported on the returned result for observability (3a A10).
   let searchMode: 'vector' | 'fulltext' | 'text' = 'text';

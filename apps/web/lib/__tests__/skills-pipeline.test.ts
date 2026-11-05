@@ -34,8 +34,12 @@ function pick(row: Row | null, select?: Row): Row | null {
 
 vi.mock('@/auth', () => ({ auth: async () => (h.session ? { user: { id: h.session } } : null) }));
 vi.mock('@/lib/rate-limit', () => ({ limitOr429: async () => null }));
-vi.mock('@/lib/db', () => ({
-  prisma: {
+vi.mock('@/lib/db', () => {
+  const prismaMock: Row = {
+    $queryRaw: async () => [{ id: 'mock-user' }],
+    usageEvent: { create: async () => ({ id: 'hold-1' }), updateMany: async () => ({ count: 1 }), findFirst: async () => null, aggregate: async () => ({ _sum: {} }) },
+    userPreference: { findUnique: async () => null },
+    accountSafetyState: { findUnique: async () => null },
     skillSubmission: {
       create: async ({ data }: Row) => {
         if (h.subs.some((s) => s.userId === data.userId && s.sha256 === data.sha256)) throw Object.assign(new Error('dup'), { code: 'P2002' });
@@ -69,8 +73,10 @@ vi.mock('@/lib/db', () => ({
     delegation: { findFirst: async () => null, create: async () => { h.forbiddenWrites.push('delegation.create'); } },
     approvalRequest: { create: async () => { h.forbiddenWrites.push('approvalRequest.create'); }, update: async () => { h.forbiddenWrites.push('approvalRequest.update'); } },
     action: { create: async ({ data }: Row) => { h.ledger.push(data); return { id: `a${h.ledger.length}` }; } },
-  },
-}));
+  };
+  prismaMock.$transaction = async (fn: (tx: Row) => unknown) => fn(prismaMock);
+  return { prisma: prismaMock };
+});
 vi.mock('@/lib/model-router', () => ({ chatOnce: (...a: unknown[]) => h.chat(...a) }));
 vi.mock('@/lib/memory-engine', () => ({
   writeMemory: async (input: Row) => {
@@ -129,7 +135,7 @@ const sub = (id: string) => h.subs.find((s) => s.id === id)!;
 beforeEach(() => {
   h.subs = []; h.ledger = []; h.memWrites = []; h.memRows = []; h.forbiddenWrites = []; h.seq = 0; h.session = 'user-a';
   h.chat.mockReset();
-  process.env.DEFAULT_MODEL = 'claude-test';
+  process.env.DEFAULT_MODEL = 'llama-local';
   process.env.SKILL_ALLOW_PLAINTEXT = 'true';
   delete process.env.SKILL_PIPELINE_MODEL;
 });
@@ -288,7 +294,7 @@ describe('pipeline', () => {
     mockModel();
     const id = await submit(BENIGN);
     await processSubmission('user-a', id);
-    process.env.DEFAULT_MODEL = 'claude-test';
+    process.env.DEFAULT_MODEL = 'llama-local';
     expect(await processSubmission('user-a', id)).toBe('ACCEPTED');
   });
 

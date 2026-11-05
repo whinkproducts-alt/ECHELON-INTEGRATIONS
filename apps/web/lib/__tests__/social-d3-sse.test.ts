@@ -13,6 +13,21 @@ import { sanitiseToolDefinition } from '@/lib/tool-definition';
 import { encryptKey } from '@/lib/key-encryption';
 import { SOCIAL_TOOL_DEFS } from './fixtures/social-tool-defs';
 
+vi.mock('@/lib/model-router/dispatch', () => ({
+  admittedCall: async (_scope: unknown, run: () => Promise<unknown>) => run(),
+  admittedChatOnce: async (_scope: unknown, opts: unknown) => {
+    const { chatOnce } = await import('@/lib/model-router');
+    return chatOnce(opts as never);
+  },
+  reserveDispatch: async () => ({ id: 'test', attemptKey: 'k0000001', userId: 'u1', reservedTokens: 1, reservedMicros: 0 }),
+  settleDispatch: async () => undefined,
+  holdDispatch: async () => undefined,
+  releaseDispatch: async () => undefined,
+  runAdmittedVoice: async (_i: unknown, run: () => Promise<unknown>) => run(),
+  DispatchBlockedError: class extends Error {},
+}));
+
+
 const ACCESS = 'AT-sse-plain-9f8e7d6c';
 const REFRESH = 'RT-sse-plain-1a2b3c4d';
 

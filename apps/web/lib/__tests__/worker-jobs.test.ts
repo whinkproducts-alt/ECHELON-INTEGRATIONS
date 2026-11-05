@@ -45,6 +45,16 @@ beforeEach(() => {
   resetDb();
   recordActionSafe.mockClear(); chatOnce.mockReset(); writeMemory.mockReset().mockResolvedValue({ id: 'm1', deduped: false });
   budgetState.mockReset().mockResolvedValue({ state: 'ok' });
+  raw.queryRaw.mockReset().mockImplementation(async (strings?: TemplateStringsArray) => {
+    const text = Array.isArray(strings) ? Array.from(strings).join(' ') : '';
+    return text.includes('FOR UPDATE') ? [{ id: 'uA' }] : [];
+  });
+  db.usageEvent.create.mockResolvedValue({ id: 'hold' });
+  db.usageEvent.updateMany.mockResolvedValue({ count: 1 });
+  db.usageEvent.findFirst.mockResolvedValue(null);
+  db.usageEvent.aggregate.mockResolvedValue({ _sum: {} });
+  db.userPreference.findUnique.mockResolvedValue(null);
+  db.accountSafetyState.findUnique.mockResolvedValue(null);
   connectivityMode.mockReset().mockResolvedValue('online'); offlineFallbackEnabled.mockReset().mockReturnValue(false); ollamaReachable.mockReset().mockResolvedValue(true);
   db.newsSeen.deleteMany.mockResolvedValue({ count: 0 });
   db.newsSeen.findMany.mockResolvedValue([]);

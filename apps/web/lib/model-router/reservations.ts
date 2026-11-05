@@ -12,7 +12,7 @@ export async function reserveLocalAnalysis(userId: string, model: string, tokens
     const now = new Date();
     const b = await budgetState(userId, now, tx);
     if (b.limit !== null && b.used + b.reserved + tokens > Math.floor(b.limit * b.hardPct / 100)) throw new Error('BLOCKED_COST');
-    return tx.usageEvent.create({ data: { userId, model, provider: 'local-analysis', kind: 'other', usageBasis: 'reserved', reservedTokens: tokens, createdAt: now } });
+    return tx.usageEvent.create({ data: { userId, model, provider: 'local-analysis', kind: 'other', usageBasis: 'reserved', reservedTokens: tokens, createdAt: now, state: 'reserved', purpose: 'worker', costClass: 'local', periodStart: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)) } });
   }, { isolationLevel: 'ReadCommitted' });
 }
 
@@ -20,7 +20,7 @@ export async function settleLocalAnalysis(userId: string, id: string, model: str
   if (![tokensIn, tokensOut].every(value => Number.isSafeInteger(value) && value >= 0 && value <= 2_000_000_000)) throw new Error('BLOCKED_COST');
   const result = await prisma.usageEvent.updateMany({
     where: { id, userId, model, provider: 'local-analysis', usageBasis: 'reserved' },
-    data: { usageBasis: 'estimated', reservedTokens: 0, tokensIn, tokensOut, costMicros: estimateCostMicros(model, tokensIn, tokensOut) },
+    data: { usageBasis: 'estimated', state: 'settled', reservedTokens: 0, tokensIn, tokensOut, costMicros: estimateCostMicros(model, tokensIn, tokensOut), settledAt: new Date() },
   });
   if (result.count !== 1) throw new Error('BLOCKED_COST');
 }

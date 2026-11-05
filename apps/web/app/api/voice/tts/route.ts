@@ -4,6 +4,7 @@ import { ledgerLocalOnlyBlock } from '@/lib/local-only-guard';
 import { isLockedDown, ledgerLockdownBlock, LOCKDOWN_MESSAGE } from '@/lib/safety/lockdown';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { DispatchBlockedError, runAdmittedVoice } from '@/lib/model-router/dispatch';
 
 const MAX_TEXT_LENGTH = 2000;
 
@@ -78,15 +79,16 @@ export async function POST(req: NextRequest) {
 
     let oaiRes: Response;
     try {
-      oaiRes = await fetch('https://api.openai.com/v1/audio/speech', {
+      oaiRes = await runAdmittedVoice({ userId: session.user.id, channel: 'tts', units: text.length }, () => fetch('https://api.openai.com/v1/audio/speech', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({ model: ttsModel, input: text, voice }),
-      });
-    } catch {
+      }));
+    } catch (err) {
+      if (err instanceof DispatchBlockedError) return NextResponse.json({ error: 'Speech was not admitted.', code: err.code }, { status: 409 });
       // L1: do not leak internal network details to the client
       return NextResponse.json({ error: 'TTS service unreachable' }, { status: 502 });
     }
@@ -118,15 +120,16 @@ export async function POST(req: NextRequest) {
     // Kokoro-FastAPI exposes the OpenAI-compatible /audio/speech route.
     // ADA V2 and existing local shims keep using /tts.
     const isKokoro = provider === 'kokoro';
-    upstreamRes = await fetch(`${ttsUrl}${isKokoro ? '/audio/speech' : '/tts'}`, {
+    upstreamRes = await runAdmittedVoice({ userId: session.user.id, channel: 'tts', units: text.length }, () => fetch(`${ttsUrl}${isKokoro ? '/audio/speech' : '/tts'}`, {
       method: 'POST',
       ...redirectOpt(ttsUrl),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(isKokoro
         ? { model: 'kokoro', input: text, voice, response_format: 'mp3' }
         : { model: 'tts-1', input: text, voice }),
-    });
-  } catch {
+    }));
+  } catch (err) {
+    if (err instanceof DispatchBlockedError) return NextResponse.json({ error: 'Speech was not admitted.', code: err.code }, { status: 409 });
     // L1: do not leak internal network details to the client
     return NextResponse.json({ error: 'TTS service unreachable' }, { status: 502 });
   }

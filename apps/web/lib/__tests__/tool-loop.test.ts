@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ToolDefinition } from '../tool-loop';
 
+vi.mock('@/lib/model-router/dispatch', () => ({
+  admittedCall: async (_scope: unknown, run: () => Promise<unknown>) => run(),
+}));
+
 async function drainStream(stream: ReadableStream<Uint8Array>): Promise<string> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();

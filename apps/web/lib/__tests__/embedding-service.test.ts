@@ -85,7 +85,7 @@ describe('generateEmbedding', () => {
   });
 
   it('uses EMBEDDINGS_URL when explicitly configured', async () => {
-    vi.stubEnv('EMBEDDINGS_URL', 'http://custom-embed:8080/v1');
+    vi.stubEnv('EMBEDDINGS_URL', 'http://127.0.0.1:8080/v1');
     vi.stubEnv('EMBEDDINGS_MODEL', 'custom-model');
     vi.stubEnv('OPENAI_API_KEY', '');
     vi.stubEnv('EMBEDDING_DIM', '2');
@@ -102,7 +102,7 @@ describe('generateEmbedding', () => {
 
     expect(result).toEqual(embedding);
     const callArgs = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(callArgs[0]).toBe('http://custom-embed:8080/v1/embeddings');
+    expect(callArgs[0]).toBe('http://127.0.0.1:8080/v1/embeddings');
     const body = JSON.parse(callArgs[1].body as string);
     expect(body.model).toBe('custom-model');
   });

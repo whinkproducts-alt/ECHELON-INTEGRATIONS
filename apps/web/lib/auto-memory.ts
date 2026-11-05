@@ -18,7 +18,7 @@
  */
 
 import { localOnlyModel } from '@/lib/local-only';
-import { chatOnce } from '@/lib/model-router';
+import { admittedChatOnce } from '@/lib/model-router/dispatch';
 import { writeMemory } from '@/lib/memory-engine';
 import { checkPermission } from '@/lib/permission-engine';
 import { recordActionSafe } from '@/lib/ledger';
@@ -512,7 +512,9 @@ Rules:
 
   let rawResult: string;
   try {
-    rawResult = await chatOnce({
+    rawResult = await admittedChatOnce({
+      userId, purpose: 'memory', correlationId, model: extractorModel,
+    }, {
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },

@@ -13,9 +13,9 @@ import { checkPermission } from '@/lib/permission-engine';
 import { classifyProtected } from '@/lib/protected-actions';
 import { recordActionSafe } from '@/lib/ledger';
 import { writeMemory, type MemoryWriteInput } from '@/lib/memory-engine';
-import { chatOnce, type ChatMessage } from '@/lib/model-router';
+import { admittedChatOnce } from '@/lib/model-router/dispatch';
+import type { ChatMessage } from '@/lib/model-router';
 import { applyOfflineFallback } from '@/lib/offline';
-import { recordUsage } from '@/lib/usage';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import type { RosterEntry } from '@/lib/worker/roster';
@@ -130,9 +130,6 @@ export function tierModel(tier: 'fast' | 'standard' | 'deep'): string | undefine
   return v || undefined;
 }
 
-const approxTokens = (s: string) => Math.ceil(s.length / 4);
-
-/** Input character budget for a run, derived from maxTokensPerRun (40% reserved for output). */
 export function inputCharBudget(maxTokensPerRun: number): number {
   return Math.floor(maxTokensPerRun * 0.6) * 4;
 }
@@ -150,12 +147,11 @@ export async function workerAsk(ctx: JobContext, messages: ChatMessage[]): Promi
     model = fb.model; baseUrl = fb.baseUrl;
   }
   ctx.counters.modelCalls++;
-  const out = await chatOnce({ messages, model, maxTokens, temperature: 0.2, baseUrl });
-  recordUsage({
-    userId: ctx.userId, provider: 'worker', model: model ?? process.env.DEFAULT_MODEL ?? 'default',
-    tokensIn: approxTokens(messages.map((m) => m.content).join('\n')), tokensOut: approxTokens(out), kind: 'other',
-  });
-  return out;
+  const modelName = model ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k';
+  return admittedChatOnce(
+    { userId: ctx.userId, purpose: 'worker', correlationId: ctx.correlationId, model: modelName },
+    { messages, model, maxTokens, temperature: 0.2, baseUrl },
+  );
 }
 
 /** One ledger row per run: counts only, never content. */

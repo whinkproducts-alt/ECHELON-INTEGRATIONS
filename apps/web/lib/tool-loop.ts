@@ -19,6 +19,8 @@ import { recordUsage } from '@/lib/usage';
 import { applyOfflineFallback } from '@/lib/offline';
 import { logger } from '@/lib/logger';
 import { streamChat } from '@/lib/model-router';
+import { admittedCall } from '@/lib/model-router/dispatch';
+import { DispatchBlockedError, holdDispatch, preTransportFailure, releaseDispatch, reserveDispatch, settleDispatch, uncertaintyOf } from '@/lib/model-router/admission';
 import { ProviderUserError } from '@/lib/provider-errors';
 
 const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search', 'document_search', 'memory_read', 'calendar_list']);
@@ -99,19 +101,26 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
 
         for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
           let response;
+          const inputChars = history.reduce((n, m) => n + (('content' in m && typeof m.content === 'string') ? m.content.length : 0), 0);
           try {
-            response = await chatWithTools({
+            response = await admittedCall({
+              userId: opts.userId, purpose: 'tool_round', correlationId: opts.correlationId, model,
+              baseUrl, hasByok: Boolean(apiKey), maxTokens: opts.maxTokens ?? 4000, inputChars, kind: 'tool_loop',
+            }, () => chatWithTools({
               messages: history,
               model,
               tools: opts.tools,
               apiKey,
               baseUrl,
               maxTokens: opts.maxTokens,
-            });
+            }), (value) => ({
+              tokensIn: value.usage?.tokensIn ?? Math.ceil(inputChars / 4),
+              tokensOut: value.usage?.tokensOut ?? Math.ceil((value.text ?? '').length / 4),
+              basis: value.usage ? 'provider' as const : 'estimated' as const,
+              model,
+            }));
           } catch (err) {
             if (err instanceof ToolsUnsupportedError && iter === 0) {
-              // Nothing has been emitted yet: fall back to plain streaming, no tools.
-              // A8: record that tools were skipped so the ledger captures the fallback.
               await recordActionSafe({
                 userId: opts.userId,
                 initiator: 'system',
@@ -124,12 +133,39 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
                 outputSummary: `model_does_not_support_tools: ${model}`,
                 latencyMs: 0,
               });
-              const plain = await streamChat({ messages: opts.messages, model, maxTokens: opts.maxTokens, apiKey, baseUrl });
+              const reserved = await reserveDispatch({
+                userId: opts.userId, purpose: 'chat', correlationId: opts.correlationId, model,
+                baseUrl, hasByok: Boolean(apiKey), maxTokens: opts.maxTokens ?? 4000,
+                inputChars: opts.messages.reduce((n, m) => n + m.content.length, 0), kind: 'chat',
+              });
+              let plain: ReadableStream<Uint8Array>;
+              try {
+                plain = await streamChat({ messages: opts.messages, model, maxTokens: opts.maxTokens, apiKey, baseUrl });
+              } catch (streamErr) {
+                if (preTransportFailure(streamErr)) await releaseDispatch({ userId: opts.userId, attemptKey: reserved.attemptKey, externalAttemptStarted: false }).catch(() => undefined);
+                else await holdDispatch({ userId: opts.userId, attemptKey: reserved.attemptKey, uncertainty: uncertaintyOf(streamErr) }).catch(() => undefined);
+                throw streamErr;
+              }
               const reader = plain.getReader();
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                if (!closed) controller.enqueue(value);
+              const dec = new TextDecoder();
+              let seen = '';
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  if (value) seen += dec.decode(value, { stream: true });
+                  if (!closed) controller.enqueue(value);
+                }
+                // A settlement failure leaves the reservation in place for reconciliation; it must not
+                // turn an already-delivered answer into an error event.
+                await settleDispatch({
+                  userId: opts.userId, attemptKey: reserved.attemptKey, model,
+                  tokensIn: Math.ceil(opts.messages.reduce((n, m) => n + m.content.length, 0) / 4),
+                  tokensOut: Math.ceil(seen.length / 4), basis: 'estimated',
+                }).catch(() => undefined);
+              } catch (readErr) {
+                await holdDispatch({ userId: opts.userId, attemptKey: reserved.attemptKey, uncertainty: uncertaintyOf(readErr) }).catch(() => undefined);
+                throw readErr;
               }
               return;
             }
@@ -270,7 +306,7 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
         logger.error('tool loop failed', { userId: opts.userId, error: redactForLog(String(err?.message ?? err)) });
         const status = /\b([1-5]\d\d)\b/.exec(String(err?.message ?? ''))?.[1];
         // A ProviderUserError carries a message written to be shown (no upstream body, no path).
-        send({ type: 'error', error: err instanceof ProviderUserError ? err.userMessage : status ? `Model provider error (${status})` : 'Model provider error' });
+        send({ type: 'error', error: err instanceof DispatchBlockedError ? 'Request was not admitted' : err instanceof ProviderUserError ? err.userMessage : status ? `Model provider error (${status})` : 'Model provider error', ...(err instanceof DispatchBlockedError ? { code: err.code } : {}) });
       } finally {
         close();
       }

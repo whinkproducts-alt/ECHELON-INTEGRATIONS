@@ -1,12 +1,14 @@
 # ECHELON current coding handoff — 2026-11-04
 
-Repository: `whinkproducts-alt/ECHELON-CORP`. [PR #25](https://github.com/whinkproducts-alt/ECHELON-CORP/pull/25) is merged after full checks passed (2348 tests passed, 39 skipped, 22 browser passed). Use current `main` after verifying `git status`, HEAD and remote. Personal checkout: `Documents/ECHELON PROJECT`. Only one builder should mutate a checkout at a time.
+Repository: `whinkproducts-alt/ECHELON-CORP`. [PR #25](https://github.com/whinkproducts-alt/ECHELON-CORP/pull/25) is merged after full checks passed (2348 tests passed, 39 skipped, 22 browser passed). Use current `main` after verifying `git status`, HEAD and remote. Only one builder should mutate a checkout at a time.
+
+> **2026-11-05 checkout warning:** the `Documents/ECHELON PROJECT` copy was iCloud-evicted mid-session (`.git` and sources returned `EDEADLK`). Active work moved to a clean clone at `/Users/victorcheckingin/Developer/ECHELON-CORP`. Keep the active checkout on local disk; do not run a second builder against the iCloud copy.
 
 The old handoff based on `6f08789` was reconciled safely. Its edits are preserved locally on `docs/fixes/20261104-before-merge` (`e54af98ff6ce54565cf3626743b6220c804cc9a6`) and in a verified external backup; do not merge it wholesale or repeat source import. Details: [reconciliation](docs/reconciliation/2026-11-04.md).
 
 **Implement from [the end-to-end completion architecture](docs/product/ECHELON-END-TO-END-COMPLETION-PLAN.md).** Read `CLAUDE.md`/applicable `AGENTS.md`, [pending work](docs/pending-tasks.md), [R01–R10 acceptance](docs/ECHELON-READINESS-EXECUTION.md) and newest daily sync. The architecture is a code execution plan, not a request for another architecture document. Preserve all personal-use requirements and live acceptance gates.
 
-Next: C01 dependency/service triage and C02 universal scoped inference/spend admission, with C04 owner/local configuration alongside them. Then real model fallback, private scope/in-flight safety, real mission/GitHub, all channels and conversational voice, daily briefing/avatars/organization, desktop launch/backup and approved Mac-off proof. Token efficiency remains first; no calendar estimates or unlimited-credit claims.
+Next: C03 real model fallback on the now-admitted dispatch path, then C04 owner/local configuration alongside it. C01 triage and the C02 admission/accounting core are implemented on `feat/c02-dispatch-admission` (see the 2026-11-05 daily sync). Token efficiency remains first; no calendar estimates or unlimited-credit claims.
 
 [Harness inventory](docs/ENGINEERING-HARNESS.md): Codex/Claude Code are development harnesses; the application uses its custom governed TypeScript worker/tool loop with Postgres and MCP, and Vitest/Playwright/GitHub Actions provide the verification harness. There is no proven ready Tauri app or universal autonomous OpenClaw engine.
 

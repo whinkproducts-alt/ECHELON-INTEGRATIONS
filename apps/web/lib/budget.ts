@@ -69,7 +69,17 @@ export async function budgetState(userId: string, now = new Date(), db: Pick<Pri
     where: { userId, createdAt: { gte: start, lt: resetsAt } },
     _sum: { tokensIn: true, tokensOut: true, reservedTokens: true },
   });
-  const reserved = agg?._sum?.reservedTokens ?? 0;
+  // Holds opened before this UTC month still count. A crash must not erase them at rollover.
+  const prior = await db.usageEvent.aggregate({
+    where: {
+      userId,
+      createdAt: { lt: start },
+      reservedTokens: { gt: 0 },
+      OR: [{ state: { in: ['reserved', 'held'] } }, { usageBasis: { in: ['reserved', 'held'] } }],
+    },
+    _sum: { reservedTokens: true },
+  });
+  const reserved = (agg?._sum?.reservedTokens ?? 0) + (prior?._sum?.reservedTokens ?? 0);
   const used = (agg?._sum?.tokensIn ?? 0) + (agg?._sum?.tokensOut ?? 0);
   return { reserved, state: decideBudget(used + reserved, limit, softPct, hardPct), used, limit, softPct, hardPct, resetsAt: resetsAt.toISOString() };
 }

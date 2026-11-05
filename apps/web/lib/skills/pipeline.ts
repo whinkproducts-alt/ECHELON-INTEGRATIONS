@@ -249,7 +249,7 @@ async function runStages(userId: string, id: string, owner: string): Promise<Pro
     try {
       await renew(userId, id, owner);
       const agent = await pickSecurityAgent(text);
-      const verdict = await runSecurityReview(model, agent, id, text);
+      const verdict = await runSecurityReview(userId, model, agent, id, text);
       agentInfo = { id: agent.id, name: agent.name, verdict };
     } catch (e) {
       if (e instanceof LeaseLostError) throw e;
@@ -274,7 +274,7 @@ async function runStages(userId: string, id: string, owner: string): Promise<Pro
   try {
     await renew(userId, id, owner);
     directors = await pickCommittee(text);
-    votes = await Promise.all(directors.map(async (d) => { await renew(userId, id, owner); return runDirectorVote(model, d, id, text); }));
+    votes = await Promise.all(directors.map(async (d) => { await renew(userId, id, owner); return runDirectorVote(userId, model, d, id, text); }));
   } catch (e) {
     if (e instanceof LeaseLostError) throw e;
     return modelTrouble(userId, id, 'ASSESSING', e, {}, owner);

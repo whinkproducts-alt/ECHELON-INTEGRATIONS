@@ -10,6 +10,19 @@ import { join } from 'node:path';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const admitTx = {
+  $queryRaw: async () => [{ id: 'u1' }],
+  usageEvent: {
+    create: async () => ({ id: 'hold-1' }),
+    updateMany: async () => ({ count: 1 }),
+    findFirst: async () => null,
+    aggregate: async () => ({ _sum: {} }),
+  },
+  userPreference: { findUnique: async () => null },
+};
+const admit = { ...admitTx, $transaction: async (fn: (tx: unknown) => unknown) => fn(admitTx) };
+
+
 /** Minimal mocks for a happy-path run. Override individual fns per test. */
 function buildMocks(overrides: Record<string, Record<string, unknown>> = {}) {
   const chatOnce = vi.fn().mockResolvedValue('[]');
@@ -32,7 +45,17 @@ function buildMocks(overrides: Record<string, Record<string, unknown>> = {}) {
     memoryDailyCap: prismaMemoryDailyCap,
     userProfile: prismaUserProfile,
     action: prismaAction,
+    $queryRaw: vi.fn().mockResolvedValue([{ id: 'u1' }]),
+    usageEvent: {
+      create: vi.fn().mockResolvedValue({ id: 'hold-1' }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findFirst: vi.fn().mockResolvedValue(null),
+      aggregate: vi.fn().mockResolvedValue({ _sum: {} }),
+    },
+    userPreference: { findUnique: vi.fn().mockResolvedValue(null) },
+    accountSafetyState: { findUnique: vi.fn().mockResolvedValue(null) },
   };
+  (prisma as unknown as { $transaction: unknown }).$transaction = async (fn: (tx: unknown) => unknown) => fn(prisma);
 
   vi.doMock('@/lib/model-router', () => ({ chatOnce, ...overrides['@/lib/model-router'] }));
   vi.doMock('@/lib/memory-engine', () => ({ writeMemory, ...overrides['@/lib/memory-engine'] }));
@@ -41,7 +64,7 @@ function buildMocks(overrides: Record<string, Record<string, unknown>> = {}) {
     ...overrides['@/lib/permission-engine'],
   }));
   vi.doMock('@/lib/ledger', () => ({ recordActionSafe, ...overrides['@/lib/ledger'] }));
-  vi.doMock('@/lib/db', () => ({ prisma: { ...prisma, ...((overrides['@/lib/db']?.prisma as Record<string, unknown> | undefined) ?? {}) } }));
+  vi.doMock('@/lib/db', () => ({ prisma: { ...admit, ...prisma, ...((overrides['@/lib/db']?.prisma as Record<string, unknown> | undefined) ?? {}) } }));
   vi.doMock('@/lib/logger', () => ({
     logger: { error: vi.fn(), info: vi.fn(), security: vi.fn(), warn: vi.fn() },
   }));
@@ -80,7 +103,7 @@ describe('B1 — detached execution', () => {
     // Make chatOnce throw — should not propagate
     vi.doMock('@/lib/model-router', () => ({ chatOnce: vi.fn().mockRejectedValue(new Error('API down')) }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue(null) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -203,7 +226,7 @@ describe('completed work records (recordCompletedTurn follows the same 3b rules)
 
   it('identical text already stored for the user is not written again (memory_deduplicated)', async () => {
     const findFirst = vi.fn().mockResolvedValue({ id: 'ep-old' });
-    const { writeMemory, recordActionSafe } = buildMocks({ '@/lib/db': { prisma: { memoryEpisode: { findFirst } } } });
+    const { writeMemory, recordActionSafe } = buildMocks({ '@/lib/db': { prisma: { ...admit, memoryEpisode: { findFirst } } } });
     const { recordCompletedTurn } = await import('../auto-memory');
     await recordCompletedTurn(base);
     expect(findFirst.mock.calls[0][0].where.userId).toBe('u1');
@@ -214,7 +237,7 @@ describe('completed work records (recordCompletedTurn follows the same 3b rules)
   it('honours the daily cap: no write, memory_cap_reached ledgered once', async () => {
     vi.stubEnv('MEMORY_DAILY_CAP', '3');
     const { writeMemory, recordActionSafe } = buildMocks({
-      '@/lib/db': { prisma: { memoryDailyCap: { findUnique: vi.fn().mockResolvedValue({ count: 3 }), upsert: vi.fn() } } },
+      '@/lib/db': { prisma: { ...admit, memoryDailyCap: { findUnique: vi.fn().mockResolvedValue({ count: 3 }), upsert: vi.fn() } } },
     });
     const { recordCompletedTurn } = await import('../auto-memory');
     await recordCompletedTurn(base);
@@ -224,7 +247,7 @@ describe('completed work records (recordCompletedTurn follows the same 3b rules)
 
   it('counts a successful write against the daily cap', async () => {
     const upsert = vi.fn().mockResolvedValue({ count: 1 });
-    buildMocks({ '@/lib/db': { prisma: { memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert } } } });
+    buildMocks({ '@/lib/db': { prisma: { ...admit, memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert } } } });
     const { recordCompletedTurn } = await import('../auto-memory');
     await recordCompletedTurn(base);
     expect(upsert).toHaveBeenCalledTimes(1);
@@ -304,7 +327,7 @@ describe('input size and pattern cost (ReDoS)', () => {
 
   it('fails closed when the daily count cannot be read: no write, memory_auto_skipped cap_check_failed', async () => {
     const { writeMemory, recordActionSafe } = buildMocks({
-      '@/lib/db': { prisma: { memoryDailyCap: { findUnique: vi.fn().mockRejectedValue(new Error('db')), upsert: vi.fn() } } },
+      '@/lib/db': { prisma: { ...admit, memoryDailyCap: { findUnique: vi.fn().mockRejectedValue(new Error('db')), upsert: vi.fn() } } },
     });
     const { recordCompletedTurn } = await import('../auto-memory');
     await recordCompletedTurn({ userId: 'u1', conversationId: 'c1', messageId: 'm1', userMessage: 'hello there', assistantReply: 'ok', persona: 'WHINK', correlationId: 'k' });
@@ -362,7 +385,7 @@ describe('B3 — injection attempt produces zero memory writes', () => {
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission }));
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -435,7 +458,7 @@ describe('B4/B5 — sensitivity classification', () => {
     vi.doMock('@/lib/memory-engine', () => ({ writeMemory }));
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -470,7 +493,7 @@ describe('B4/B5 — sensitivity classification', () => {
     vi.doMock('@/lib/memory-engine', () => ({ writeMemory }));
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -533,7 +556,7 @@ describe('B6 — secret dropping', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -580,7 +603,7 @@ describe('B7 — ledger outcomes', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn().mockResolvedValue({ allowed: true, method: 'auto' }) }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -616,7 +639,7 @@ describe('B7 — ledger outcomes', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn().mockResolvedValue({ allowed: true, method: 'auto' }) }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -651,7 +674,7 @@ describe('B7 — ledger outcomes', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn().mockResolvedValue({ allowed: true, method: 'auto' }) }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -714,7 +737,7 @@ describe('B8 — event date resolution', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn().mockResolvedValue({ allowed: true, method: 'auto' }) }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'America/Edmonton' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -757,7 +780,7 @@ describe('B9 — provenance', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn().mockResolvedValue({ allowed: true, method: 'auto' }) }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -804,7 +827,7 @@ describe('B10 — MAMBA output goes to hypothesis store', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn().mockResolvedValue({ allowed: true, method: 'auto' }) }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -843,7 +866,7 @@ describe('B10 — MAMBA output goes to hypothesis store', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn().mockResolvedValue({ allowed: true, method: 'auto' }) }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -881,7 +904,7 @@ describe('B11 — taint rules', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn() }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -918,7 +941,7 @@ describe('B11 — taint rules', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn() }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -967,7 +990,7 @@ describe('B12 — limits', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn().mockResolvedValue({ allowed: true, method: 'auto' }) }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue(null) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) },
@@ -997,7 +1020,7 @@ describe('B12 — limits', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn() }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue({ count: 5 }) }, // count = cap
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(0) }, // no cap row yet today
@@ -1034,7 +1057,7 @@ describe('B12 — limits', () => {
     vi.doMock('@/lib/ledger', () => ({ recordActionSafe }));
     vi.doMock('@/lib/permission-engine', () => ({ checkPermission: vi.fn() }));
     vi.doMock('@/lib/db', () => ({
-      prisma: {
+      prisma: { ...admit,
         memoryDailyCap: { findUnique: vi.fn().mockResolvedValue({ count: 10 }) },
         userProfile: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
         action: { count: vi.fn().mockResolvedValue(1) }, // already has cap row

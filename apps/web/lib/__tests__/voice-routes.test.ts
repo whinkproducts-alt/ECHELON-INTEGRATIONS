@@ -30,6 +30,9 @@ describe('POST /api/voice/stt', () => {
 
   it('Deepgram path: returns transcript on success', async () => {
     process.env.STT_PROVIDER = 'deepgram';
+    process.env.WHINK_PAID_MODELS_ENABLED = 'true';
+    process.env.WHINK_MONTHLY_SPEND_MICROS = '1000000';
+    process.env.WHINK_VOICE_MICROS_PER_REQUEST = '1000';
     process.env.DEEPGRAM_API_KEY = 'dg-test-key';
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -173,6 +176,9 @@ describe('POST /api/voice/tts', () => {
 
   it('OpenAI path: streams audio on success', async () => {
     process.env.TTS_PROVIDER = 'openai';
+    process.env.WHINK_PAID_MODELS_ENABLED = 'true';
+    process.env.WHINK_MONTHLY_SPEND_MICROS = '1000000';
+    process.env.WHINK_VOICE_MICROS_PER_REQUEST = '1000';
     process.env.OPENAI_API_KEY = 'sk-test';
     const fakeAudio = new Uint8Array([1, 2, 3]).buffer;
     // Return a proper Response so arrayBuffer() is a real method

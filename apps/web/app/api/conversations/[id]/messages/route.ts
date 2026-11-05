@@ -17,6 +17,7 @@ import { extractAndStoreMemories, recordCompletedTurn } from '@/lib/auto-memory'
 import { decryptKey } from '@/lib/key-encryption';
 import { recordActionSafe } from '@/lib/ledger';
 import { resolveChatTools } from '@/lib/gateway-chat';
+import { DispatchBlockedError } from '@/lib/model-router/admission';
 import { assertOwnedProject, hasProjectId } from '@/lib/project-access';
 import { normaliseMambaMode } from '@/lib/types';
 import { setWorkingMemory, getWorkingMemory } from '@/lib/working-memory';
@@ -387,6 +388,9 @@ export async function POST(
         initialTaint: orchResult.externalContentThisTurn === true,
       });
     } catch (err: any) {
+      if (err instanceof DispatchBlockedError) {
+        return NextResponse.json({ error: 'This request was not admitted.', code: err.code }, { status: 409 });
+      }
       logger.error('Model router error', { correlationId, error: err?.message });
       return NextResponse.json({ error: 'LLM API failed' }, { status: 502 });
     }

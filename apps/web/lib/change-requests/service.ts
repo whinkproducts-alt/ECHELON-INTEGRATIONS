@@ -80,7 +80,7 @@ export async function refine(userId: string, id: string) {
     { userId, capability: 'change_request_refine', permissionClass: 'A', action: 'change_request_refined', summary: `crId=${id}` },
     async (): Promise<RefineResult> => {
       if (existing.status !== 'DRAFT' && existing.status !== 'REFINED') return { kind: 'conflict' };
-      const out = await refineChangeRequest({ title: existing.title, body: existing.body });
+      const out = await refineChangeRequest({ userId, title: existing.title, body: existing.body });
       if (!out.ok) return { kind: 'unavailable', reason: out.reason, error: out.error };
       const risk = out.spec.touchesSecurityOrMoney ? 'security_or_money' : 'standard';
       // The edit may have raced the model call: only write if title and body are unchanged.

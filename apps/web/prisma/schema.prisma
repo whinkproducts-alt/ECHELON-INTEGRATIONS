@@ -1021,10 +1021,25 @@ model UsageEvent {
   costMicros Int?     // null = unpriced or unavailable
   kind       String   @default("chat") // chat | tool_loop | embed | other
   createdAt  DateTime @default(now())
+  // Dispatch admission. Legacy rows keep null attemptKey and state "recorded".
+  // Open holds (reserved/held) survive the UTC month boundary until settled or released.
+  attemptKey      String?
+  purpose         String    @default("unspecified")
+  state           String    @default("recorded") // recorded | reserved | settled | held | released
+  costClass       String    @default("unknown") // local | metered | trial | unknown
+  priceKnown      Boolean   @default(false)
+  currency        String    @default("USD")
+  reservedMicros  Int       @default(0)
+  estimatedMicros Int?
+  uncertainty     String?
+  periodStart     DateTime?
+  settledAt       DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, attemptKey])
   @@index([userId, createdAt])
+  @@index([userId, state, periodStart])
   @@map("usage_events")
 }
 

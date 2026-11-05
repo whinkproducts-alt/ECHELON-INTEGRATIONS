@@ -266,7 +266,7 @@ export function debriefTurn(params: {
       // Skip debrief when external tool content may have tainted the assistant response
       if (params.externalToolRan) return;
 
-      const { chatOnce } = await import('@/lib/model-router');
+      const { admittedChatOnce } = await import('@/lib/model-router/dispatch');
 
       const prompt = DEBRIEF_EXTRACTION_PROMPT
         .replace('{userMessage}', params.userMessage.substring(0, 500))
@@ -279,7 +279,9 @@ export function debriefTurn(params: {
         return;
       }
 
-      const raw = await chatOnce({
+      const raw = await admittedChatOnce({
+        userId: params.userId, purpose: 'memory', model: localOnlyModel(process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k'),
+      }, {
         messages: [{ role: 'user', content: prompt }],
         model: localOnlyModel(process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k'),
         maxTokens: 256,

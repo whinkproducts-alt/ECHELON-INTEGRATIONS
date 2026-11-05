@@ -113,7 +113,7 @@ export async function createPlan(userId: string, input: PlanInput): Promise<Serv
       let plannerTokens = 0;
       let title: string;
       try {
-        const d = await decomposeInitiative(input.initiative, counts.worker);
+        const d = await decomposeInitiative(userId, input.initiative, counts.worker);
         plannerTokens = d.tokensIn + d.tokensOut;
         title = d.title;
         packages = normalizePackages(d.packages, counts.worker);

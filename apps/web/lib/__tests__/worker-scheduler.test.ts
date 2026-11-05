@@ -109,9 +109,10 @@ describe('workers never get outbound paths', () => {
       expect(src, f).not.toMatch(/@anthropic-ai|from 'openai'|api\.openai\.com/);
     }
   });
-  it('the only model entry point is workerAsk (chatOnce from the router, no tools argument)', () => {
+  it('the only model entry point is workerAsk (admitted chat, no tools argument)', () => {
     const src = readFileSync(path.resolve(__dirname, '../worker/context.ts'), 'utf8');
-    expect(src).toMatch(/import \{ chatOnce[^}]*\} from '@\/lib\/model-router'/);
+    expect(src).toMatch(/admittedChatOnce/);
     expect(src).not.toMatch(/chatOnce\(\{[^}]*tools/);
+    expect(src).not.toMatch(/from '@\/lib\/tool-loop'/);
   });
 });
