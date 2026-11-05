@@ -1,3 +1,5 @@
+> Historical import runbook. Source transfer/reconciliation is already complete on current main; do not execute the import again. See [2026-11-04 reconciliation](../reconciliation/2026-11-04.md) and the [current completion plan](../product/ECHELON-END-TO-END-COMPLETION-PLAN.md). Commands below describe the original migration procedure.
+
 # ECHELON full-source import runbook
 **Purpose:** preserve **all source code and Git history** from KAMSI-PRIME in the independent ECHELON repository without modifying the original, deleting ECHELON's existing main README, or copying production secrets.
 

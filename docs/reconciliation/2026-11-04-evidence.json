@@ -1,0 +1,187 @@
+{
+  "recorded_on": "2026-11-04",
+  "remote_baseline": "a515159fb2581c773c546405cf44249a4753f945",
+  "older_local_head": "6f08789866cb23a298733489a9d266cbfc089ace",
+  "local_preservation_branch": "docs/fixes/20261104-before-merge",
+  "local_preservation_commit": "e54af98ff6ce54565cf3626743b6220c804cc9a6",
+  "backup_directory_name": "ECHELON-RECONCILIATION-BACKUP-2026-11-04-0e0025",
+  "backup_verified": {
+    "working_file_hashes": {
+      "ECHELON-START-HERE.md": "1bc4aaf08090ea6228254a14b5b93cc4a254407269901e2ac533c952d8ae09e1",
+      "HANDOFF-NOTES.md": "a68b1d8fdbe363b5a67336d8b1b975c6206f922ae3776bbcdae362d2969cc5ce",
+      "README.md": "19032de3e82d2eb00c3e5bfbe417a6490e905c5b4637a72c12edf3b5ef97b1a4",
+      "docs/migration/IMPORT-LEGACY-SOURCE.md": "5ac6cde206caea03aff221e4aa579f055f9c3bca16abb182ebfce900828d0703",
+      "docs/migration/SOURCE-PROVENANCE.md": "fa645b82080dcb83f5985f38631a1bc26cc2a25812b499cdedbd8f4a5f6426cc",
+      "docs/product/HOLO-FRONTEND-CONTRACT.md": "59c77531853c981e4c361ce798800c74c21aa4170e4f5d35a4208d30076dd515",
+      "docs/product/MASTER-BUILD-DIRECTIVE.md": "7bc47c605d42056f73ab14172f9c2c644c80e7c18d77f7fd09b32fd5ff563a60",
+      "docs/product/OPENCLAW-ADAPTER-CONTRACT.md": "7420f28600c5d835378752345dd897d3eda132ef1b733c2cfbbf38e01ac77848"
+    },
+    "index_stage_blobs_saved": 8,
+    "original_index_saved": true,
+    "history_before_bundle_verified": true,
+    "history_with_preservation_bundle_verified": true,
+    "secret_files_copied": false
+  },
+  "older_execution_commit_paths": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "older_blob": "89a71516e94c8253d4d31a9e702b2ed42feb028b",
+      "baseline_main_blob": "ec97bcb6e10ac9546185cfb7097334c131c944c7",
+      "same_blob": false
+    },
+    {
+      "path": "apps/web/app/api/executions/[id]/route.ts",
+      "older_blob": "0359da29c957e855669f2d5360b2f747ccaab7d3",
+      "baseline_main_blob": "0359da29c957e855669f2d5360b2f747ccaab7d3",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/app/dashboard/conversation/_components/approval-card.tsx",
+      "older_blob": "892e1eefd38c3abd516a7e9bc8d92040171e2eb1",
+      "baseline_main_blob": "892e1eefd38c3abd516a7e9bc8d92040171e2eb1",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/components/holo/holo-surface.tsx",
+      "older_blob": "8d8c6c8eb2f5e66a924a05f92bd82c118924f67a",
+      "baseline_main_blob": "8d8c6c8eb2f5e66a924a05f92bd82c118924f67a",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/lib/__tests__/approval-state.test.ts",
+      "older_blob": "72cb420f26514ff68c1f1d570fdf8207a636fb55",
+      "baseline_main_blob": "72cb420f26514ff68c1f1d570fdf8207a636fb55",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/lib/__tests__/approvals.test.ts",
+      "older_blob": "c5b0650d12ddecb09d54b6e7901ad19034fc25fe",
+      "baseline_main_blob": "c5b0650d12ddecb09d54b6e7901ad19034fc25fe",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/lib/__tests__/ear-execution.integration.test.ts",
+      "older_blob": "770be923299486978380c1bfcb0e78fcf7ae4ccb",
+      "baseline_main_blob": "7941b80c38798a1c9ff027490c87bdbeaf9e400d",
+      "same_blob": false
+    },
+    {
+      "path": "apps/web/lib/__tests__/execution-routes.test.ts",
+      "older_blob": "d9632bf446c28b1fe81acdbcf6fe0521fd016e94",
+      "baseline_main_blob": "d9632bf446c28b1fe81acdbcf6fe0521fd016e94",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/lib/__tests__/model-router-ollama-native.test.ts",
+      "older_blob": "6328550cf6c7724cb5671be04ec9a520ecb62c9a",
+      "baseline_main_blob": "6328550cf6c7724cb5671be04ec9a520ecb62c9a",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/lib/__tests__/protected-review.test.ts",
+      "older_blob": "6ea514fb10da0504e237eabb7af5fb49d35b4595",
+      "baseline_main_blob": "6ea514fb10da0504e237eabb7af5fb49d35b4595",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/lib/approval-handler.ts",
+      "older_blob": "c7a6af49aa51bb77b8a7ef6a345766105f62b290",
+      "baseline_main_blob": "c7a6af49aa51bb77b8a7ef6a345766105f62b290",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/lib/approvals.ts",
+      "older_blob": "489d022d291b3b32cddaef506ae1939ba3089b2b",
+      "baseline_main_blob": "f667f31acd00dfd4b29db17209e2beaa02d6cee5",
+      "same_blob": false
+    },
+    {
+      "path": "apps/web/lib/hooks/approval-state.ts",
+      "older_blob": "b8a70c32ce62b5fa4c24aa26f50a87f751b43b62",
+      "baseline_main_blob": "b8a70c32ce62b5fa4c24aa26f50a87f751b43b62",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/lib/ledger.ts",
+      "older_blob": "75c6fdcfea7ec989c99a6ae44299260d11d9a6bf",
+      "baseline_main_blob": "8c402b2b40d8601e4d0def6768a476127e5652d1",
+      "same_blob": false
+    },
+    {
+      "path": "apps/web/lib/model-router.ts",
+      "older_blob": "1e70fa7ee862a1fb504cc2f0895ce1d3e33a49df",
+      "baseline_main_blob": "1e70fa7ee862a1fb504cc2f0895ce1d3e33a49df",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/lib/permission-engine.ts",
+      "older_blob": "09f8ca2c2d104b95c4d81bb77563c5189eafe3a7",
+      "baseline_main_blob": "09f8ca2c2d104b95c4d81bb77563c5189eafe3a7",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/lib/task-gate.ts",
+      "older_blob": "c5eafb6503a81e4c5ed8feedc8616f3e75e5a90f",
+      "baseline_main_blob": "c5eafb6503a81e4c5ed8feedc8616f3e75e5a90f",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/lib/usage.ts",
+      "older_blob": "a3b1d4574a8dd27aa0b22d2af8e440a7ac34a8a8",
+      "baseline_main_blob": "93ff9c4d7c424bd45a8d4255f841cbeabdf21fc0",
+      "same_blob": false
+    },
+    {
+      "path": "apps/web/lib/worker/ear-execution.ts",
+      "older_blob": "c2f73abbac1778c5d6b7c06a9b3218ea5956f349",
+      "baseline_main_blob": "c306cff64f148988c0ed04e718e984c77ebb0c7b",
+      "same_blob": false
+    },
+    {
+      "path": "apps/web/lib/worker/runner.ts",
+      "older_blob": "aab53edea6d4fccc0b27e291c0323bbef2a7cd78",
+      "baseline_main_blob": "e43224550169295df450705b82ef357bbd3bdbcf",
+      "same_blob": false
+    },
+    {
+      "path": "apps/web/lib/worker/scheduler.ts",
+      "older_blob": "11351063b0c6af05d6d20ee0e2dc1162dbbfc0ab",
+      "baseline_main_blob": "06f613af5076e148c944accbbec2e8b9a15d7058",
+      "same_blob": false
+    },
+    {
+      "path": "apps/web/prisma/migrations/20261030190000_agent_execution/migration.sql",
+      "older_blob": "aeab5c0bb2f05d500d32ecdb76ed721fdf56b831",
+      "baseline_main_blob": "aeab5c0bb2f05d500d32ecdb76ed721fdf56b831",
+      "same_blob": true
+    },
+    {
+      "path": "apps/web/prisma/schema.prisma",
+      "older_blob": "6b755344cee41885e750700aa776fec2553abdbf",
+      "baseline_main_blob": "663824228fd9f91c7fc3b214bb7986c0059fb57e",
+      "same_blob": false
+    },
+    {
+      "path": "docs/architecture-control/08-M0-M1-EXECUTION-RECORD.md",
+      "older_blob": "b02f1571fc9e8ce340a738ed254e038e4d075180",
+      "baseline_main_blob": "b02f1571fc9e8ce340a738ed254e038e4d075180",
+      "same_blob": true
+    },
+    {
+      "path": "packages/org-kit/src/router.ts",
+      "older_blob": "b0c5c2c582cd47813cc7b81def032015cf23a1cc",
+      "baseline_main_blob": "b0c5c2c582cd47813cc7b81def032015cf23a1cc",
+      "same_blob": true
+    }
+  ],
+  "local_checks": {
+    "approval_race_tests_failed_before_fix": 2,
+    "error_name_leak_test_failed_before_fix": 1,
+    "focused_suites_passed": 6,
+    "focused_tests_passed": 221,
+    "typecheck": "passed",
+    "targeted_lint": "passed"
+  },
+  "remote_check_boundary": "Baseline main CI/security passed. The new PR must pass required checks before merge; use exact PR head/check links from GitHub for final publication proof.",
+  "preserved_remote_work": "11 dependency proposal heads and remediation history retained; no blanket dependency upgrade or whole stale merge."
+}

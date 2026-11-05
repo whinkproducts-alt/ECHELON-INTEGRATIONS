@@ -5,6 +5,8 @@
 
 ## Priority and required reading
 
+Current implementation sequence: `docs/product/ECHELON-END-TO-END-COMPLETION-PLAN.md` (C00–C14). Reconciliation and recovery: `docs/reconciliation/2026-11-04.md`; harness: `docs/ENGINEERING-HARNESS.md`.
+
 1. Read `CLAUDE.md` and applicable `AGENTS.md` for binding rules.
 2. Read `docs/ECHELON-AUDIT-HANDOFF-2026-11-04.md`, latest `docs/daily-syncs/`, `docs/pending-tasks.md` and `docs/ECHELON-READINESS-EXECUTION.md` for current work/evidence. Read only task-relevant source; do not replay the full chat/blueprint by default.
 3. Use `docs/product/ECHELON-FUNCTIONAL-READINESS-ARCHITECTURE.md` as the R01–R10 target. Founder decision register FDR-001..029 and `docs/architecture-control/` preserve approved contracts; old repo/PR paths there are provenance.

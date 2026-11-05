@@ -6,6 +6,9 @@ ECHELON is the Founder-directed AI organization for WHINK Group. The Next.js app
 
 ## Start here
 
+- **[End-to-end coding completion plan](docs/product/ECHELON-END-TO-END-COMPLETION-PLAN.md)** — remaining architecture, implementation order, contracts and acceptance.
+- [Reconciliation evidence](docs/reconciliation/2026-11-04.md) · [Harness explained](docs/ENGINEERING-HARNESS.md) · [Current handoff](HANDOFF-NOTES.md).
+
 - **[Current audit handoff](docs/ECHELON-AUDIT-HANDOFF-2026-11-04.md)** — verified work, exact revisions/checks, source/test map, limitations and four independent audit lanes.
 - **[Pending work](docs/pending-tasks.md)** — current engineering order and specific Founder inputs.
 - **[Readiness acceptance register](docs/ECHELON-READINESS-EXECUTION.md)** — R01–R10, what is implemented and what must still pass.

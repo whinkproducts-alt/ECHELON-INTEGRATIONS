@@ -23,7 +23,17 @@ describe('QODO-1 provider-controlled error text never reaches the logs', () => {
     expect(warn).toHaveBeenCalled();
   });
 
-  it('a transport failure carrying provider text, or a fragment of the credential, is logged by size only', async () => {
+  it('a provider-controlled error name cannot disclose confidential data in logs', async () => {
+    const failure = new Error('transport failed');
+    failure.name = ECHO;
+    callExternalMcpTool.mockRejectedValue(failure);
+    await expect(callProviderTool(conn, 't', {}, 1000)).rejects.toMatchObject({ message: 'Provider request failed' });
+    const logged = JSON.stringify([warn.mock.calls, error.mock.calls]);
+    expect(logged).not.toContain(ECHO.slice(0, 20));
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('a transport failure does not log provider text or credential fragments', async () => {
     callExternalMcpTool.mockRejectedValue(new Error(`HTTP 400 from provider: bad key credential-1234567890 for ${ECHO}`));
     const e = await callProviderTool(conn, 't', {}, 1000).then(() => null, (x) => x);
     expect(e).toBeInstanceOf(ProviderError);

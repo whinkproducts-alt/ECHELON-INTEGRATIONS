@@ -324,10 +324,11 @@ async function finish(
   confirmationMethod: string = 'user_confirmed',
 ): Promise<DecisionOutcome> {
   const capped = capResult(result);
-  await prisma.approvalRequest.updateMany({
+  const won = await prisma.approvalRequest.updateMany({
     where: { id: row.id, userId: row.userId, status: from },
     data: { status, executedAt: now(), result: capped as object },
   });
+  if (won.count !== 1) return explainLoss(row.userId, row.id);
   await ledger(
     row,
     status === 'EXECUTED' ? 'approval_executed' : 'approval_failed',
