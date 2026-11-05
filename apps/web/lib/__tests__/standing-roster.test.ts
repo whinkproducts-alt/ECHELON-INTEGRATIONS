@@ -13,8 +13,8 @@ const roster = getRoster();
 const by = (g: string) => roster.filter((e) => e.group === g);
 
 describe('standing roster', () => {
-  it('has 28 entries with the requested group sizes', () => {
-    expect(roster).toHaveLength(28);
+  it('has 29 entries with the requested group sizes', () => {
+    expect(roster).toHaveLength(29);
     expect(by('innovation_committee')).toHaveLength(5);
     expect(by('news_desk')).toHaveLength(6);
     expect(by('subsidiary_monitor')).toHaveLength(5);
@@ -24,6 +24,7 @@ describe('standing roster', () => {
     expect(by('operations')).toHaveLength(2);
     expect(by('finance_watch')).toHaveLength(1);
     expect(by('legal_compliance_watch')).toHaveLength(1);
+    expect(by('self_improvement')).toHaveLength(1);
   });
 
   it('every agent id exists in the org-kit; every persona id exists in the staff directory', () => {
@@ -54,18 +55,19 @@ describe('standing roster', () => {
   });
 
   it('keys and agent ids are unique, schedules parse, enabled entries have a job', () => {
-    expect(new Set(roster.map((e) => e.key)).size).toBe(28);
-    expect(new Set(roster.map((e) => e.agentId)).size).toBe(28);
+    expect(new Set(roster.map((e) => e.key)).size).toBe(29);
+    expect(new Set(roster.map((e) => e.agentId)).size).toBe(29);
     for (const e of roster) { expect(parseInterval(e.schedule)).not.toBeNull(); if (e.enabled) expect(e.job).not.toBeNull(); }
     expect(() => RosterSchema.parse({ ...raw, roster: [...raw.roster, raw.roster[0]] })).toThrow();
   });
 
   it('counts enabled entries and estimates daily model calls from the schedules', () => {
-    expect(rosterStats()).toEqual({ size: 28, enabled: 21 });
+    expect(rosterStats()).toEqual({ size: 29, enabled: 22 });
     const est = estimateDailyModelCalls();
     expect(est.perJob.news_digest).toBe(288);
     expect(est.perJob.opportunity_scan).toBe(34);
-    expect(est.total).toBeCloseTo(322.14, 1);
+    expect(est.perJob.self_improvement).toBe(4);
+    expect(est.total).toBeCloseTo(326.14, 1);
   });
 
   it('parses intervals and backs off exponentially with a cap', () => {

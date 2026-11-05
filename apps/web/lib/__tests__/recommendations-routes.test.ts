@@ -82,8 +82,8 @@ describe('GET /api/worker/status', () => {
     const res = await GET();
     const body = await res.json();
     expect(res.status).toBe(200);
-    expect(body.rosterSize).toBe(28);
-    expect(body.enabledCount).toBe(21);
+    expect(body.rosterSize).toBe(29);
+    expect(body.enabledCount).toBe(22);
     expect(body.heartbeatAgeSeconds).toBeGreaterThanOrEqual(11);
     expect(body.jobs[0]).toEqual(expect.objectContaining({ jobKey: 'news_digest:news-canada', lastStatus: 'FAILED', runs: 3 }));
     expect(JSON.stringify(body)).not.toMatch(/lastError|leaseOwner|workerId/);

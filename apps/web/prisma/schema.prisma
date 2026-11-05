@@ -66,6 +66,8 @@ model User {
   safetyState             AccountSafetyState?
   modelRoutingProfiles    ModelRoutingProfile[]
   dailyBriefings          DailyBriefing[]
+  sealedObjectives        SealedObjective[]
+  sealedScopes            SealedScope[]
 
   @@map("users")
 }
@@ -118,6 +120,8 @@ model UserProfile {
   workingHoursEnd    String   @default("17:00")
   interruptionBudget String   @default("BALANCED")
   autonomyLevel      Int      @default(1)
+  /** Founder's phone number in E.164 format for urgent SMS/WhatsApp/calls from WHINK, MAMBA, and Board. Encrypted at rest. */
+  urgentPhoneE164Enc String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -1401,18 +1405,56 @@ model SwarmLearning {
   @@map("swarm_learnings")
 }
 
-// ── Durable rate limiter (fixed-window counters, shared across workers/restarts) ──
-// Keys are "<bucket>:<subject>" (subject is a client address or sign-in account, hashed or
-// plain); this table holds no user content and is not tenant data.
+// ── Sealed Founder Scope (C05) ──────────────────────────────────
+// Durable, server-enforced isolation for Marcus/Tunde/Peter/Paul objectives.
+// Ordinary accounts/personas/agents must not expose sealed information through any query/event/export/recall.
 
-model RateLimitBucket {
-  key         String
-  windowStart DateTime
-  count       Int      @default(0)
+model SealedObjective {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  body        String   // sealed content; encrypted at rest when ENCRYPTION_KEY is set
+  directorate String?  // MARCUS | TUNDE | PETER | PAUL | null (cross-directorate)
+  status      String   @default("ACTIVE") // ACTIVE | COMPLETED | ARCHIVED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  completedAt DateTime?
 
-  @@id([key, windowStart])
-  @@index([windowStart])
-  @@map("rate_limit_buckets")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("sealed_objectives")
+}
+
+model SealedScope {
+  id         String   @id @default(cuid())
+  userId     String
+  kind       String   // OBJECTIVE | EXECUTION | RESULT | MEMORY | BRIEFING
+  refId      String   // points to SealedObjective.id, SwarmRun.id, etc.
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([kind, refId])
+  @@index([userId])
+  @@map("sealed_scopes")
+}
+
+// ── Cross-process epoch lock for C06 ────────────────────────────
+
+model SafetyEpochLock {
+  id        String   @id @default(cuid())
+  userId    String
+  epoch     Int
+  scope     String   // DISPATCH | OUTBOUND | TOOL | WORKER | SPEECH
+  heldBy    String   // process id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([userId, epoch, scope])
+  @@index([userId, epoch])
+  @@index([scope, expiresAt])
+  @@map("safety_epoch_locks")
 }
 
 // ── Password reset (only the SHA-256 of the token is stored; single use; 30 minute life) ──

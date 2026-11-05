@@ -433,6 +433,22 @@
       "maxTokensPerRun": 0,
       "modelTier": "fast",
       "enabled": false
+    },
+    {
+      "key": "self-improvement",
+      "kind": "persona",
+      "agentId": "maya-chen",
+      "name": "Maya Chen",
+      "group": "self_improvement",
+      "role": "Self-improvement: analyze patterns, propose and apply procedural improvements",
+      "job": "self_improvement",
+      "params": {
+        "scope": "full_cycle"
+      },
+      "schedule": "every 6h",
+      "maxTokensPerRun": 5000,
+      "modelTier": "standard",
+      "enabled": true
     }
   ]
 }

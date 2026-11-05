@@ -1,9 +1,6 @@
-import { auth } from '@/auth';
-import { redirect } from 'next/navigation';
-import { CommandSurface } from './_components/command-surface';
+import { ECHELONDashboard } from '@/components/premium/ECHELONDashboard';
 
-export default async function DashboardPage() {
-  const session = await auth();
-  if (!session?.user) redirect('/login');
-  return <CommandSurface />;
+// Auth is enforced by app/dashboard/layout.tsx (server redirect to /login).
+export default function DashboardPage() {
+  return <ECHELONDashboard />;
 }

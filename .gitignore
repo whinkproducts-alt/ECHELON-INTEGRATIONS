@@ -49,3 +49,6 @@ apps/web/scripts/secrets-scan.json
 
 # Claude Code local session state
 .claude/
+
+# design audit screenshots (large binaries, reproducible)
+design-audit/screens/

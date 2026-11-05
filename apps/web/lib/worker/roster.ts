@@ -5,6 +5,7 @@ import { intervalOrThrow } from '@/lib/worker/schedule';
 export const JOB_TYPES = [
   'news_digest', 'opportunity_scan', 'weekly_brief', 'project_monitor',
   'memory_curation', 'security_watch', 'skills_sweeper', 'swarm_resume',
+  'self_improvement',
 ] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 
@@ -59,7 +60,7 @@ export function rosterStats() {
 }
 
 /** Estimated model calls per day per user at default schedules (upper bound: every run calls the model). */
-export const MODEL_JOBS: ReadonlySet<JobType> = new Set(['news_digest', 'opportunity_scan', 'weekly_brief']);
+export const MODEL_JOBS: ReadonlySet<JobType> = new Set(['news_digest', 'opportunity_scan', 'weekly_brief', 'self_improvement']);
 export function estimateDailyModelCalls(roster: readonly RosterEntry[] = getRoster()): { total: number; perJob: Record<string, number> } {
   const perJob: Record<string, number> = {};
   let total = 0;

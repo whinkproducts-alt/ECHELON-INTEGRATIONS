@@ -73,6 +73,8 @@ export const STAFF_DIRECTORY: StaffMember[] = [
   agent('priya-raghunathan', 'Priya', 'Raghunathan', 'Market Analyst', 'Strategic Market Analyst', 'amara-okafor'),
   agent('soren-oconnell', 'Soren', "O'Connell", 'Growth Strategist', 'Growth Strategist, Existing Businesses', 'amara-okafor'),
   agent('mei-ling-tan', 'Mei-Ling', 'Tan', 'Venture Scout', 'Venture Scout, New Business Identification', 'amara-okafor'),
+  // Self-Improvement agent
+  agent('maya-chen', 'Maya', 'Chen', 'Self-Improvement Analyst', 'Self-Improvement: Continuous Learning & Pattern Analysis', 'amara-okafor'),
 ];
 
 export function getStaffByEmail(email: string): StaffMember | undefined {

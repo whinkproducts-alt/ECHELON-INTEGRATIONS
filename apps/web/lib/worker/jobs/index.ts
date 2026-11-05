@@ -7,6 +7,7 @@ import { memoryCuration } from '@/lib/worker/jobs/memory-curation';
 import { securityWatch } from '@/lib/worker/jobs/security-watch';
 import { skillsSweeper } from '@/lib/worker/jobs/skills-sweeper';
 import { swarmResume } from '@/lib/worker/jobs/swarm-resume';
+import { selfImprovement } from '@/lib/worker/jobs/self-improvement';
 
 export interface JobDef {
   run: (ctx: JobContext) => Promise<void>;
@@ -25,4 +26,5 @@ export const JOBS: Readonly<Record<JobType, JobDef>> = {
   security_watch: { run: securityWatch, usesModel: false, critical: true },
   skills_sweeper: { run: (c) => skillsSweeper(c), usesModel: false, critical: true },
   swarm_resume: { run: (c) => swarmResume(c), usesModel: false, critical: true },
+  self_improvement: { run: (c) => selfImprovement(c), usesModel: true, critical: false },
 };

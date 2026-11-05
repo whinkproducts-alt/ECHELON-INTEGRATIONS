@@ -13,7 +13,7 @@ import {
 } from '@/components/screens/conversation-helpers/slash-commands';
 import { useVoice } from '@/lib/hooks/useVoice';
 import { speakApprovalRequest } from '@/lib/spoken-approval';
-import { AvatarRenderer } from './avatar-renderer';
+import { AvatarRenderer, type AvatarRendererProps } from './avatar-renderer';
 import { CitationChip, type CitationChipProps } from './citation-chip';
 import { VoiceWaveform } from './voice-waveform';
 import { ObsidianOverlay } from './obsidian-overlay';
@@ -971,6 +971,7 @@ function MessageBubble({ message, onSpeak }: { message: Message; onSpeak?: (text
   const isUser = message.role === 'user';
   const isMamba = message.persona === 'MAMBA';
   const hasCitations = !isUser && Array.isArray(message.citations) && message.citations.length > 0;
+  const isAssistantSpeaking = !isUser && (message.persona === 'WHINK' || message.persona === 'MAMBA');
 
   if (isUser) {
     return (
@@ -984,11 +985,23 @@ function MessageBubble({ message, onSpeak }: { message: Message; onSpeak?: (text
 
   return (
     <div className={`flex gap-3 ${isMamba ? 'mamba-glow' : ''}`}>
-      <div className={`flex-shrink-0 h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold ${
-        isMamba ? 'bg-[hsl(var(--mamba-blood)/0.1)] text-[hsl(var(--mamba-blood))]' : 'bg-primary/10 text-primary'
-      }`}>
-        {isMamba ? 'M' : 'W'}
-      </div>
+      {/* Full-body avatar when WHINK/MAMBA are speaking, otherwise compact indicator */}
+      {isAssistantSpeaking ? (
+        <AvatarRenderer
+          persona={message.persona as AvatarRendererProps['persona']}
+          mambaMode={message.mambaMode ?? null}
+          isSpeaking={true}
+          isListening={false}
+          fullBody={true}
+          size="full"
+        />
+      ) : (
+        <div className={`flex-shrink-0 h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold ${
+          isMamba ? 'bg-[hsl(var(--mamba-blood)/0.1)] text-[hsl(var(--mamba-blood))]' : 'bg-primary/10 text-primary'
+        }`}>
+          {isMamba ? 'M' : 'W'}
+        </div>
+      )}
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
           <span className={`text-xs font-mono font-medium ${

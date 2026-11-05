@@ -12,15 +12,15 @@ import { workerConcurrency, jobTimeoutMs } from '../worker/runner';
 beforeEach(() => { resetDb(); raw.queryRaw.mockReset(); });
 
 describe('job table', () => {
-  it('desired jobs are the 21 enabled roster entries plus the two system jobs (skills sweeper, swarm resume), with unique keys', () => {
+  it('desired jobs are the 22 enabled roster entries plus the two system jobs (skills sweeper, swarm resume), with unique keys', () => {
     const d = desiredJobs();
-    expect(d).toHaveLength(23);
-    expect(new Set(d.map((j) => j.jobKey)).size).toBe(23);
+    expect(d).toHaveLength(24);
+    expect(new Set(d.map((j) => j.jobKey)).size).toBe(24);
     expect(d.find((j) => j.job === 'skills_sweeper')!.critical).toBe(true);
   });
   it('ensureJobs creates only the missing rows for that user, staggered, skipDuplicates', async () => {
     const all = desiredJobs();
-    db.agentJob.findMany.mockResolvedValue(all.slice(0, 20).map((j) => ({ jobKey: j.jobKey })));
+    db.agentJob.findMany.mockResolvedValue(all.slice(0, 21).map((j) => ({ jobKey: j.jobKey })));
     db.agentJob.createMany.mockResolvedValue({ count: 3 });
     const now = new Date('2026-10-26T00:00:00Z');
     expect(await ensureJobs('uA', now)).toBe(3);

@@ -21,7 +21,7 @@ describe('staff directory', () => {
     for (const s of STAFF_DIRECTORY) {
       expect(`${s.firstName} ${s.lastName}`).not.toMatch(/lead|scout|analyst|strategist|innovation/i);
     }
-    expect(STAFF_DIRECTORY.filter((s) => s.kind === 'agent')).toHaveLength(5);
+    expect(STAFF_DIRECTORY.filter((s) => s.kind === 'agent')).toHaveLength(6);
   });
   it('handles apostrophes, hyphens and diacritics', () => {
     expect(staffEmail('Soren', "O'Connell")).toBe('soren.oconnell@whinkgroup.com');
