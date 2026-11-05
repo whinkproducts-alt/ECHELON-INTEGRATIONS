@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import { timingSafeEqual } from 'crypto';
 import { isStrongEnough, PASSWORD_MIN, PASSWORD_MAX_BYTES } from '@/lib/auth/password-policy';
 import { clientKey, limitOr429 } from '@/lib/rate-limit';
+import { prepareUrgentContact, UrgentContactError } from '@/lib/urgent-contact';
 
 const CLOSED = 'Signups are closed on this instance.';
 // Arbitrary constant: serialises first-user bootstrap and signups across processes.
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
   const open = flag === 'true';
   try {
     const body = await req.json();
-    const { email: rawEmail, password, name, bootstrapToken } = body ?? {};
+    const { email: rawEmail, password, name, bootstrapToken, urgentPhone, urgentChannels } = body ?? {};
 
     if (typeof rawEmail !== 'string' || typeof password !== 'string' || !rawEmail.trim() || !password) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
@@ -49,6 +50,11 @@ export async function POST(req: NextRequest) {
     }
     const email = rawEmail.trim().toLowerCase();
     if (email.length > 254) return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+
+    // Optional urgent contact: validated and encrypted before anything is written, so a bad
+    // number never leaves a half-configured account behind.
+    const wantsUrgent = typeof urgentPhone === 'string' && urgentPhone.trim() !== '';
+    const urgent = wantsUrgent ? prepareUrgentContact({ phone: urgentPhone, channels: urgentChannels }) : null;
 
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await prisma.$transaction(async (tx) => {
@@ -74,7 +80,12 @@ export async function POST(req: NextRequest) {
       const created = await tx.user.create({
         data: { email, name: typeof name === 'string' ? name : null, passwordHash, role: 'user' },
       });
-      await tx.userProfile.create({ data: { userId: created.id } });
+      await tx.userProfile.create({
+        data: {
+          userId: created.id,
+          ...(urgent ? { urgentPhoneE164Enc: urgent.enc, urgentChannels: urgent.channels } : {}),
+        },
+      });
       await tx.userPreference.create({ data: { userId: created.id } });
       await tx.personaState.create({ data: { userId: created.id, activePersona: 'WHINK' } });
       return created;
@@ -82,6 +93,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, userId: user.id });
   } catch (error: any) {
+    if (error instanceof UrgentContactError) {
+      return NextResponse.json({ error: error.message }, { status: error.code === 'encryption_unavailable' ? 503 : 400 });
+    }
     if (error instanceof SignupError) {
       if (error.status === 403) logger.security('signup blocked: users exist and SIGNUP_ENABLED is not true', { path: '/api/signup' });
       return NextResponse.json({ error: error.message }, { status: error.status });

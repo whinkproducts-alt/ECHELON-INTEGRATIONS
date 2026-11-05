@@ -122,6 +122,8 @@ model UserProfile {
   autonomyLevel      Int      @default(1)
   /** Founder's phone number in E.164 format for urgent SMS/WhatsApp/calls from WHINK, MAMBA, and Board. Encrypted at rest. */
   urgentPhoneE164Enc String?
+  /** Which of call | sms | whatsapp may be used for urgent issues. Empty = not configured. */
+  urgentChannels     String[] @default([])
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

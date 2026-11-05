@@ -9,7 +9,7 @@ export default defineConfig({
     // Each test file gets an isolated module registry — required for vi.doMock to work correctly
     isolate: true,
     // Mock @prisma/client globally so tests run without a generated Prisma engine binary
-    setupFiles: ['lib/__tests__/setup/prisma-mock.ts', 'lib/__tests__/setup/lockdown-mock.ts'],
+    setupFiles: ['lib/__tests__/setup/env-isolation.ts', 'lib/__tests__/setup/prisma-mock.ts', 'lib/__tests__/setup/lockdown-mock.ts'],
   },
   resolve: {
     alias: {
