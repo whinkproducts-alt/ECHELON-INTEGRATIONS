@@ -5,8 +5,8 @@
  * test C4). This module adds what is specific to registered providers: every byte goes through the
  * egress allow-list (createAllowlistedFetch), the credential is decrypted by the caller for this one
  * call and only ever sent to the provider's own endpoint, and nothing the provider returns is trusted
- * (definitions are sanitised, results are capped and returned as untrusted text, upstream error text
- * is logged server-side only).
+ * (definitions are sanitised, results are capped and returned as untrusted text; provider-controlled
+ * error names/messages are never logged or returned, and transport logs use fixed categories).
  */
 import { callExternalMcpTool, listExternalMcpTools, type ExternalMcpConn } from '@/lib/openclaw-client';
 import { createAllowlistedFetch, type EgressDeps } from '@/lib/capability/egress';
@@ -34,10 +34,6 @@ const MAX_LIST_RESPONSE_BYTES = 256 * 1024;
 const MAX_CALL_RESPONSE_BYTES = 1024 * 1024;
 const TOOL_NAME_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 
-function redact(text: string, secret?: string | null): string {
-  return secret ? text.split(secret).join('[redacted]') : text;
-}
-
 function connFor(conn: ProviderConn, deps: EgressDeps, maxResponseBytes: number): ExternalMcpConn {
   return {
     endpoint: conn.endpoint,
@@ -46,16 +42,24 @@ function connFor(conn: ProviderConn, deps: EgressDeps, maxResponseBytes: number)
   };
 }
 
-/** Map any transport failure to a fixed-text ProviderError. Upstream text is logged (redacted), never returned. */
-function fail(err: unknown, credential?: string | null): never {
+/** Map transport failures to fixed categories; never log provider-controlled names or messages. */
+function fail(err: unknown): never {
   if (err instanceof ProviderError) throw err;
   const name = (err as { name?: string } | null)?.name;
-  const msg = redact(err instanceof Error ? err.message : String(err), credential);
-  // Provider-controlled text can echo the arguments or a fragment of a credential, so it is classified here and never logged.
-  logger.warn('capability provider request failed', { errorName: typeof name === 'string' ? name.slice(0, 40) : 'unknown', messageChars: msg.length });
-  if (/Egress denied/.test(msg)) throw new ProviderError('Provider destination is not on the egress allow-list', 'EGRESS_DENIED');
-  if (/response too large/i.test(msg)) throw new ProviderError('Provider response too large');
-  if (name === 'TimeoutError' || name === 'AbortError' || /timed out|timeout/i.test(msg)) throw new ProviderError('Provider request timed out', 'EXEC_TIMEOUT');
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/Egress denied/.test(msg)) {
+    logger.warn('capability provider request failed', { category: 'egress_denied' });
+    throw new ProviderError('Provider destination is not on the egress allow-list', 'EGRESS_DENIED');
+  }
+  if (/response too large/i.test(msg)) {
+    logger.warn('capability provider request failed', { category: 'response_too_large' });
+    throw new ProviderError('Provider response too large');
+  }
+  if (name === 'TimeoutError' || name === 'AbortError' || /timed out|timeout/i.test(msg)) {
+    logger.warn('capability provider request failed', { category: 'timeout' });
+    throw new ProviderError('Provider request timed out', 'EXEC_TIMEOUT');
+  }
+  logger.warn('capability provider request failed', { category: 'transport' });
   throw new ProviderError('Provider request failed');
 }
 
@@ -78,7 +82,7 @@ export async function discoverTools(conn: ProviderConn, deps: EgressDeps = {}): 
   try {
     raw = await listExternalMcpTools(connFor(conn, deps, MAX_LIST_RESPONSE_BYTES), LIST_TIMEOUT_MS);
   } catch (e) {
-    return fail(e, conn.credential);
+    return fail(e);
   }
 
   const tools: DiscoveredTool[] = [];
@@ -119,7 +123,7 @@ export async function callProviderTool(
   try {
     res = await callExternalMcpTool(connFor(conn, deps, MAX_CALL_RESPONSE_BYTES), toolName, args, timeoutMs);
   } catch (e) {
-    return fail(e, conn.credential);
+    return fail(e);
   }
   if (res.isError) {
     logger.warn('capability provider tool reported an error', { messageChars: res.text.length }); // never the text: it can echo arguments

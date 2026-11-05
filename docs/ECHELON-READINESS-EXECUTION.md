@@ -6,6 +6,8 @@ Baseline `main`: `99f6d7eb3f58cff9d9aae8f59641137faf755a9c`. PRs #23/#24 merged.
 
 ## Next action
 
+Use [the C00–C14 completion architecture](product/ECHELON-END-TO-END-COMPLETION-PLAN.md) as the coding sequence and this R01–R10 table as the acceptance register. [Reconciliation](reconciliation/2026-11-04.md) preserves the older checkout and carries valid fixes; [harness inventory](ENGINEERING-HARNESS.md) explains the existing runtime. This does not close live/device gates.
+
 Implement E01 dispatch admission/accounting from `pending-tasks.md` using synthetic providers and isolated DB tests, preserving required learning and request-id approvals. Configure the existing Mac instance alongside that engineering work. Do not imply all engineering waits on Victor's sign-in. Follow with real model fallback, sealed scope/lockdown, channel/voice gaps and acceptance below.
 
 ## Acceptance register

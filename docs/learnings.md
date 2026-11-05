@@ -1,5 +1,7 @@
 # Current continuation facts — 2026-11-04
 
+Latest reconciliation/completion: [C00–C14 plan](product/ECHELON-END-TO-END-COMPLETION-PLAN.md), [recovery/disposition](reconciliation/2026-11-04.md), [harness](ENGINEERING-HARNESS.md). Personal checkout was stale/conflicted, not evidence current GitHub main was still initial. Preserve before syncing. The older draft is local recovery commit `e54af98`. Valid terminal-CAS and provider-name logging fixes are now in the reconciliation change; the remaining lease/sweep design is open.
+
 Read [audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md) and [current backlog](pending-tasks.md) before the historical memory below. Product/repo: ECHELON / `whinkproducts-alt/ECHELON-CORP`; older WHINK/KAMSI names are provenance. Main baseline `99f6d7e` is consolidated and passing configured CI/security, with 39 tests still skipped. Full personal-use acceptance remains open.
 
 - Optimize total tokens/cost to verified completion; no calendar estimates or credit guarantees. Decisions use concise A/B/C only when needed.

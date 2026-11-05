@@ -4,6 +4,8 @@ Read [current audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md) for the fixed 
 
 ## Next action and priority
 
+Current execution architecture: [C00–C14 completion plan](product/ECHELON-END-TO-END-COMPLETION-PLAN.md). Both working copies are being aligned after preserving the old draft; the valid provenance, approval completion and provider-log fixes are tracked in [reconciliation](reconciliation/2026-11-04.md). C01 triage and C02/E01 admission are next; C04 local configuration can proceed independently.
+
 **First: E01, close paid-dispatch/accounting gaps without enabling paid calls.** Preserve functionality, privacy and learning. Configure and test the Mac runtime in parallel where no spend/external action is involved. Then E02–E08 and all R01–R10 gates. Do not wait for the Founder to fix engineering gaps. No calendar estimates or automatic credit top-ups.
 
 ## Engineering backlog
@@ -36,7 +38,7 @@ Read [current audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md) for the fixed 
 - **Current dependency triage:** During documentation publication GitHub's push banner reported 134 alerts (8 critical, 49 high, 58 moderate, 19 low). A separate paginated read of open Dependabot alerts returned **131** (8 critical, 49 high, 55 medium, 19 low), across six manifests including legacy locks and service packages. The difference is not reconciled; neither count is verified runtime exploitability. The passing configured production audit must be reconciled with those open alerts before security readiness. Manifest/scope counts and high/critical alert IDs are captured in the evidence snapshot. No dependency fix or dismissal was performed.
 
 - Re-evaluate historical CG/CG2/Qodo findings against current source, especially provider output injection, review/discovery races, final receipt update, long execution approval sweeps, OpenClaw DNS/stale routes and password-reset races. See [decision history](decisions.md); these are carry-forward review items, not a new claim that every finding is still present.
-- Retain `fix/remediation-2a68d1fb-185920` until its unique `finish()` behavior is reviewed/integrated or explicitly shown superseded. Keep stuck-approval protections.
+- Retained remediation: terminal `finish()` fencing and fixed-category provider logging are incorporated by the reconciliation change with fail-on-old-code regression tests. The proposed stuck-sweep removal is deliberately not merged; its broader lease/unknown-outcome design remains open. Preserve branch provenance and stuck-approval protections; see the reconciliation record.
 - Eleven dependency PRs remain: #5–9, #11, #13–16, #22. Review separately, including runtime/API compatibility and permitted licenses. Mapbox #16 licensing unresolved; no blanket major upgrade.
 - Current main CI passes **2345 tests with 39 skipped and 22 E2E passed**. Resolve skip/probe coverage separately; skipped social/approval/evaluation/model checks are not acceptance. See [testing](testing.md).
 - Fresh-db CI does not prove safe upgrade/restore of a personal DB. Use `prisma migrate status` / checked-in `migrate deploy`, take backups first. Do not run reset, db push or destructive seeds on personal data.

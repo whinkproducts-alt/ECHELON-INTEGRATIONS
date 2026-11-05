@@ -138,6 +138,24 @@ describe('approvals', () => {
     expect(rows[0].status).toBe('EXECUTED');
   });
 
+  it.each(['returns', 'throws'] as const)('does not overwrite or ledger a terminal result after the sweep wins while the tool %s', async (outcome) => {
+    const { registry, approvals } = await setup();
+    const a = await queue(registry);
+    handler.mockImplementationOnce(async () => {
+      // Another process can sweep a long-running execution before its provider answers.
+      expect(await approvals.sweepApprovals(at(122_000)(), 'u1')).toEqual({ expired: 0, stuckFailed: 1 });
+      if (outcome === 'throws') throw new Error('provider response lost');
+      return { posted: true };
+    });
+    const out = await approvals.decide('u1', a.id, 'approve', { now: at(1000) });
+    expect(out).toMatchObject({ status: 'ALREADY_DECIDED', result: null });
+    expect(rows[0].status).toBe('FAILED');
+    expect(rowsFor('approval_stuck_failed')).toHaveLength(1);
+    expect(rowsFor('approval_executed')).toHaveLength(0);
+    expect(rowsFor('approval_failed')).toHaveLength(0);
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
   it('legacy EAR cannot report dispatched without an executable approved scope', async () => {
     const { approvals } = await setup();
     const ear = { objective: 'Ship it', lead_agent: 'A', supporting_agents: [], team_size: 1, capability_gaps: [] };
