@@ -6,7 +6,7 @@ Read [current audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md) for the fixed 
 
 Current execution architecture: [C00–C14 completion plan](product/ECHELON-END-TO-END-COMPLETION-PLAN.md). C00, the C01 dependency/service triage, the C02 admission/accounting core and the C03 saved-order dispatch path are implemented (2026-11-05 sync). Next: C04 owner/local configuration and C05 founder-private scope; C06 lockdown and a live second-provider acceptance for C03 can proceed alongside.
 
-**First: C04, stand up the owner instance and its real data.** The chat now reserves and settles every inference before transport, and the saved first/second/third order drives real dispatch with no replay after a tool or byte. C04 must configure env precedence, owner sign-in/passkeys, local DB/model, separate web/worker and migrate safely without touching personal data. C05 founder-private scope and C06 lockdown follow; C03 still needs a live second-provider acceptance run. Do not wait for the Founder to fix engineering gaps. No calendar estimates or automatic credit top-ups.
+**First: the Founder creates the owner account and passkey, then C05 founder-private scope and C06 lockdown.** The owner instance is up at `http://localhost:3000` with the personal database migrated (backup verified) and a separate worker loading `.env.local`. Account/passkey creation is the one step that needs the Founder's own credentials in the browser. After that, verify owner role and restart persistence, then persist sealed objectives and complete all-dispatch lockdown. Do not wait for the Founder to fix engineering gaps. No calendar estimates or automatic credit top-ups.
 
 ## Engineering backlog
 

@@ -13,7 +13,7 @@
     "memory:reembed": "tsx scripts/backfill-embeddings.ts",
     "security:scan": "tsx scripts/scan-secrets.ts",
     "board:import": "tsx scripts/import-board.ts",
-    "worker": "tsx --require dotenv/config scripts/worker.ts"
+    "worker": "tsx --env-file-if-exists=.env.local --env-file-if-exists=.env scripts/worker.ts"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/safe-seed.ts"
