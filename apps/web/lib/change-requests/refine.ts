@@ -3,6 +3,7 @@
  * The request text is untrusted: it is wrapped as data and the model is told never to follow it.
  */
 import { localOnlyModel } from '@/lib/local-only';
+import { purposeModel } from '@/lib/model-router/registry';
 import { admittedChatOnce } from '@/lib/model-router/dispatch';
 import { stripFakeUntrustedTags, wrapUntrustedContent } from '@/lib/content-isolation';
 import { SpecSchema, type Spec } from '@/lib/change-requests/schema';
@@ -36,10 +37,10 @@ function extractJson(raw: string): unknown {
 export async function refineChangeRequest(input: { userId: string; title: string; body: string }): Promise<RefineOutcome> {
   if (!modelConfigured()) return { ok: false, reason: 'no_model', error: 'No model configured' };
   const text = stripFakeUntrustedTags(`Title: ${input.title}\n\n${input.body}`);
-  const model = process.env.CHANGE_REQUEST_MODEL || process.env.DEFAULT_MODEL ? localOnlyModel(process.env.CHANGE_REQUEST_MODEL || process.env.DEFAULT_MODEL) : undefined;
+  const model = localOnlyModel(purposeModel(process.env, 'CHANGE_REQUEST_MODEL'));
   let raw: string;
   try {
-    raw = await admittedChatOnce({ userId: input.userId, purpose: 'refinement', model: model ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k' }, {
+    raw = await admittedChatOnce({ userId: input.userId, purpose: 'refinement', model }, {
       messages: [
         { role: 'system', content: SYSTEM },
         { role: 'user', content: wrapUntrustedContent(text, 'change_request', 'owner_draft') },

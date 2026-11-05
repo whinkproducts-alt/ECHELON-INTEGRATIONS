@@ -18,6 +18,7 @@
  */
 
 import { localOnlyModel } from '@/lib/local-only';
+import { purposeModel } from '@/lib/model-router/registry';
 import { admittedChatOnce } from '@/lib/model-router/dispatch';
 import { writeMemory } from '@/lib/memory-engine';
 import { checkPermission } from '@/lib/permission-engine';
@@ -478,8 +479,7 @@ export async function extractAndStoreMemories(
   if (await dailyCapReached(userId, persona, correlationId)) return;
 
   // B2 — Load extraction model from env (no provider SDK here)
-  const extractorModel = localOnlyModel(
-    process.env.EXTRACTION_MODEL ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k');
+  const extractorModel = localOnlyModel(purposeModel(process.env, 'EXTRACTION_MODEL'));
 
   // B8 — Fetch user timezone for relative-date resolution
   let timezone = 'UTC';

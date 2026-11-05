@@ -4,9 +4,9 @@ Read [current audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md) for the fixed 
 
 ## Next action and priority
 
-Current execution architecture: [C00–C14 completion plan](product/ECHELON-END-TO-END-COMPLETION-PLAN.md). C00, the C01 dependency/service triage and the C02 admission/accounting core are implemented on branch `feat/c02-dispatch-admission` (2026-11-05 sync). C03 real model fallback is next; C04 local configuration can proceed independently.
+Current execution architecture: [C00–C14 completion plan](product/ECHELON-END-TO-END-COMPLETION-PLAN.md). C00, the C01 dependency/service triage, the C02 admission/accounting core and the C03 saved-order dispatch path are implemented (2026-11-05 sync). Next: C04 owner/local configuration and C05 founder-private scope; C06 lockdown and a live second-provider acceptance for C03 can proceed alongside.
 
-**First: C03, connect the saved model order to real dispatch without replaying side effects.** C02 now enforces authenticated account-scoped reservation/settlement at chat, tool rounds, worker, skills, swarm, refinement, embeddings and voice, refuses unknown/metered-unpriced calls, and keeps lost-response holds across months. Paid routing remains off. Then E02–E08 and all R01–R10 gates. Do not wait for the Founder to fix engineering gaps. No calendar estimates or automatic credit top-ups.
+**First: C04, stand up the owner instance and its real data.** The chat now reserves and settles every inference before transport, and the saved first/second/third order drives real dispatch with no replay after a tool or byte. C04 must configure env precedence, owner sign-in/passkeys, local DB/model, separate web/worker and migrate safely without touching personal data. C05 founder-private scope and C06 lockdown follow; C03 still needs a live second-provider acceptance run. Do not wait for the Founder to fix engineering gaps. No calendar estimates or automatic credit top-ups.
 
 ## Engineering backlog
 

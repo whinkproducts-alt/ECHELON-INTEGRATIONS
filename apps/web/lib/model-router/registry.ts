@@ -41,6 +41,15 @@ export function localDefaultModel(env: EnvMap = process.env): string {
   return env.WHINK_LOCAL_MODEL?.trim() || env.DEFAULT_MODEL?.trim() || 'wink-qwen3.5-9b-8k';
 }
 
+/**
+ * One unset default for every purpose. A purpose env var overrides it; a missing override
+ * does not invent a second model name. Callers that must stay quiet when nothing is
+ * configured should keep their own null check — this function always returns a name.
+ */
+export function purposeModel(env: EnvMap, key: string): string {
+  return env[key]?.trim() || localDefaultModel(env);
+}
+
 /** Built per call so env changes (tests, restarts) are seen. */
 export function modelRegistry(env: EnvMap = process.env): ModelRegistryEntry[] {
   const list: ModelRegistryEntry[] = [

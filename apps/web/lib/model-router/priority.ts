@@ -19,14 +19,16 @@ export const MAX_CHOICES = 3;
 export const DEFAULT_PROFILE_CHOICES = ['local-default'];
 
 export type SkipReason =
-  | 'unknown_entry' | 'lockdown' | 'local_only' | 'data_class' | 'tools_unsupported' | 'trial_evaluation_only'
-  | 'paid_not_admitted' | 'not_configured' | 'cooldown' | 'credential_rejected';
+  | 'unknown_entry' | 'lockdown' | 'local_only' | 'data_class' | 'tools_unsupported' | 'stream_unsupported'
+  | 'trial_evaluation_only' | 'paid_not_admitted' | 'not_configured' | 'cooldown' | 'credential_rejected';
 
 export interface RouteContext {
   lockedDown: boolean;
   localOnly: boolean;
   dataClass: DataCeiling;
   needsTools: boolean;
+  /** When set, an API entry that cannot stream is skipped before it is called. */
+  needsStream?: boolean;
   /** Spend admission for a metered entry: operator admitted paid models, or the user pays with their own key. */
   paidAdmitted: (e: ModelRegistryEntry) => boolean;
   env?: EnvMap;
@@ -99,13 +101,14 @@ export function planRoute(choices: readonly string[], ctx: RouteContext): RouteP
   return { steps, skipped };
 }
 
-function skipReasonFor(e: ModelRegistryEntry, ctx: RouteContext, env: EnvMap): SkipReason | null {
+export function skipReasonFor(e: ModelRegistryEntry, ctx: RouteContext, env: EnvMap): SkipReason | null {
   // Lockdown and Local-Only allow only models on this machine. A manual handoff is outbound too.
   if (!e.local && ctx.lockedDown) return 'lockdown';
   if (!e.local && ctx.localOnly) return 'local_only';
   if (CEILING_RANK[ctx.dataClass] > CEILING_RANK[e.dataCeiling]) return 'data_class';
   if (ctx.needsTools && !e.capabilities.tools && e.kind === 'api') return 'tools_unsupported';
   if (!e.admitted) return 'trial_evaluation_only';
+  if (ctx.needsStream && !e.capabilities.stream && e.kind === 'api') return 'stream_unsupported';
   if (e.cost === 'metered' && !ctx.paidAdmitted(e)) return 'paid_not_admitted';
   if (!entryConfigured(e, env)) return 'not_configured';
   return healthOf(e.id, ctx.now);

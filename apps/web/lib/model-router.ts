@@ -5,6 +5,7 @@
  */
 
 import { assertLocalOnly, isLocalOnlyMode, isLoopbackUrl, redirectOpt } from '@/lib/local-only';
+import { localDefaultModel } from '@/lib/model-router/registry';
 import { redactForLog } from '@/lib/redact-log';
 import { ollamaStatusError } from '@/lib/provider-errors';
 import { logger } from '@/lib/logger';
@@ -146,8 +147,7 @@ export async function streamChat(opts: StreamChatOptions): Promise<ReadableStrea
   const model =
     opts.model ??
     (opts.hints ? selectModel(opts.messages, opts.hints) : null) ??
-    process.env.DEFAULT_MODEL ??
-    'wink-qwen3.5-9b-8k';
+    localDefaultModel();
   const maxTokens = opts.maxTokens ?? 4000;
   const temperature = opts.temperature ?? 0.7;
   assertLocalOnly(model, { apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -170,8 +170,7 @@ export async function chatOnce(opts: StreamChatOptions): Promise<string> {
   const model =
     opts.model ??
     (opts.hints ? selectModel(opts.messages, opts.hints) : null) ??
-    process.env.DEFAULT_MODEL ??
-    'llama3.1:8b';
+    localDefaultModel();
   const maxTokens = opts.maxTokens ?? 512;
   const temperature = opts.temperature ?? 0.0;
   assertLocalOnly(model, { apiKey: opts.apiKey, baseUrl: opts.baseUrl });

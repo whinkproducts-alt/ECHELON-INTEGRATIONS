@@ -26,7 +26,7 @@ export class ModelStageError extends Error {
 
 /** The model for this pipeline, or null when none is configured (the submission then waits). */
 export function pipelineModel(): string | null {
-  const m = process.env.SKILL_PIPELINE_MODEL || process.env.DEFAULT_MODEL || null;
+  const m = process.env.SKILL_PIPELINE_MODEL?.trim() || process.env.WHINK_LOCAL_MODEL?.trim() || process.env.DEFAULT_MODEL?.trim() || null;
   return m ? localOnlyModel(m) : null;
 }
 

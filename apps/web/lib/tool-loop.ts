@@ -21,6 +21,8 @@ import { logger } from '@/lib/logger';
 import { streamChat } from '@/lib/model-router';
 import { admittedCall } from '@/lib/model-router/dispatch';
 import { DispatchBlockedError, holdDispatch, preTransportFailure, releaseDispatch, reserveDispatch, settleDispatch, uncertaintyOf } from '@/lib/model-router/admission';
+import { fallbackMayContinue, noteCandidateFailure, type HandoffStop, type OrderedCandidate } from '@/lib/model-router/ordered-dispatch';
+import { localDefaultModel } from '@/lib/model-router/registry';
 import { ProviderUserError } from '@/lib/provider-errors';
 
 const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search', 'document_search', 'memory_read', 'calendar_list']);
@@ -46,6 +48,13 @@ export interface ToolLoopOptions {
   /** Decrypted BYOK API key. Passed to the model router to override the server env key. */
   apiKey?: string;
   /**
+   * Saved order, already policy-filtered. Tried only on the first inference, before any tool
+   * runs and before any byte is sent. Absent means the single `model` above.
+   */
+  modelOrder?: OrderedCandidate[];
+  /** If every automatic candidate fails before a side effect, pause here. Nothing after it is called. */
+  handoffAfter?: HandoffStop;
+  /**
    * M1: When true, the conversation was flagged by the injection scanner on a previous turn.
    * Taint is pre-seeded so Class A/B tools that persist or send data outward are upgraded to
    * Class C for the entire run, matching the within-turn taint behaviour.
@@ -62,21 +71,32 @@ const MAX_TOOL_ITERATIONS = 5;
 export const MAX_TOOL_CALLS_PER_TURN = 8;
 
 export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream<Uint8Array>> {
+  const initialModel = opts.model ?? localDefaultModel();
   // Flag-guarded (WHINK_OFFLINE_FALLBACK=true): offline or over the hard budget, prefer the local model.
   const fallback = await applyOfflineFallback({
     userId: opts.userId,
-    model: opts.model ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k',
+    model: initialModel,
     apiKey: opts.apiKey,
     persona: opts.persona,
     correlationId: opts.correlationId,
   });
-  const model = fallback.model;
-  const apiKey = fallback.apiKey;
+  let model = fallback.model;
+  let apiKey = fallback.apiKey;
   const baseUrl = fallback.baseUrl;
+  let order: OrderedCandidate[] = opts.modelOrder?.length
+    ? opts.modelOrder.map((c) => ({ ...c }))
+    : [{ id: initialModel, model: initialModel }];
+  if (fallback.fellBack) {
+    const local = order.find((c) => c.model === fallback.model) ?? { id: 'offline-local', model: fallback.model };
+    order = [{ ...local, apiKey: undefined }];
+    apiKey = undefined;
+    model = fallback.model;
+  }
   const encoder = new TextEncoder();
 
-  // Fail fast (before streaming starts) when the Anthropic key is missing, as before.
-  if (model.startsWith('claude') && !(apiKey ?? process.env.ANTHROPIC_API_KEY)) {
+  // Fail fast only when this turn has no later candidate. A saved second choice must still be reachable.
+  const soleKey = order.length === 1 ? (opts.modelOrder?.length ? order[0].apiKey : apiKey) : undefined;
+  if (order.length === 1 && order[0].model.startsWith('claude') && !(soleKey ?? process.env.ANTHROPIC_API_KEY)) {
     throw new Error('ANTHROPIC_API_KEY not set');
   }
 
@@ -99,74 +119,124 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
         // outbound/persisting tools need a human (see executeTool).
         let tainted = opts.conversationTainted === true || opts.initialTaint === true;
 
+        const plainStream = async (plainModel: string, plainKey: string | undefined) => {
+          await recordActionSafe({
+            userId: opts.userId,
+            initiator: 'system',
+            persona: opts.persona ?? 'WHINK',
+            mambaMode: opts.mambaMode ?? undefined,
+            action: 'tools_skipped',
+            permissionClass: 'A',
+            status: 'VALIDATED',
+            correlationId: opts.correlationId ?? 'unknown',
+            outputSummary: `model_does_not_support_tools: ${plainModel}`,
+            latencyMs: 0,
+          });
+          const reserved = await reserveDispatch({
+            userId: opts.userId, purpose: 'chat', correlationId: opts.correlationId, model: plainModel,
+            baseUrl, hasByok: Boolean(plainKey), maxTokens: opts.maxTokens ?? 4000,
+            inputChars: opts.messages.reduce((n, m) => n + m.content.length, 0), kind: 'chat',
+          });
+          let plain: ReadableStream<Uint8Array>;
+          try {
+            plain = await streamChat({ messages: opts.messages, model: plainModel, maxTokens: opts.maxTokens, apiKey: plainKey, baseUrl });
+          } catch (streamErr) {
+            if (preTransportFailure(streamErr)) await releaseDispatch({ userId: opts.userId, attemptKey: reserved.attemptKey, externalAttemptStarted: false }).catch(() => undefined);
+            else await holdDispatch({ userId: opts.userId, attemptKey: reserved.attemptKey, uncertainty: uncertaintyOf(streamErr) }).catch(() => undefined);
+            throw streamErr;
+          }
+          const reader = plain.getReader();
+          const dec = new TextDecoder();
+          let seen = '';
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              if (value) seen += dec.decode(value, { stream: true });
+              if (!closed) controller.enqueue(value);
+            }
+            await settleDispatch({
+              userId: opts.userId, attemptKey: reserved.attemptKey, model: plainModel,
+              tokensIn: Math.ceil(opts.messages.reduce((n, m) => n + m.content.length, 0) / 4),
+              tokensOut: Math.ceil(seen.length / 4), basis: 'estimated',
+            }).catch(() => undefined);
+          } catch (readErr) {
+            await holdDispatch({ userId: opts.userId, attemptKey: reserved.attemptKey, uncertainty: uncertaintyOf(readErr) }).catch(() => undefined);
+            throw readErr;
+          }
+        };
+
+        let committed = false;
         for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
           let response;
           const inputChars = history.reduce((n, m) => n + (('content' in m && typeof m.content === 'string') ? m.content.length : 0), 0);
+          const callModel = async (candidateModel: string, candidateKey: string | undefined) => admittedCall({
+            userId: opts.userId, purpose: 'tool_round', correlationId: opts.correlationId, model: candidateModel,
+            baseUrl, hasByok: Boolean(candidateKey), maxTokens: opts.maxTokens ?? 4000, inputChars, kind: 'tool_loop',
+          }, () => chatWithTools({
+            messages: history,
+            model: candidateModel,
+            tools: opts.tools,
+            apiKey: candidateKey,
+            baseUrl,
+            maxTokens: opts.maxTokens,
+          }), (value) => ({
+            tokensIn: value.usage?.tokensIn ?? Math.ceil(inputChars / 4),
+            tokensOut: value.usage?.tokensOut ?? Math.ceil((value.text ?? '').length / 4),
+            basis: value.usage ? 'provider' as const : 'estimated' as const,
+            model: candidateModel,
+          }));
           try {
-            response = await admittedCall({
-              userId: opts.userId, purpose: 'tool_round', correlationId: opts.correlationId, model,
-              baseUrl, hasByok: Boolean(apiKey), maxTokens: opts.maxTokens ?? 4000, inputChars, kind: 'tool_loop',
-            }, () => chatWithTools({
-              messages: history,
-              model,
-              tools: opts.tools,
-              apiKey,
-              baseUrl,
-              maxTokens: opts.maxTokens,
-            }), (value) => ({
-              tokensIn: value.usage?.tokensIn ?? Math.ceil(inputChars / 4),
-              tokensOut: value.usage?.tokensOut ?? Math.ceil((value.text ?? '').length / 4),
-              basis: value.usage ? 'provider' as const : 'estimated' as const,
-              model,
-            }));
-          } catch (err) {
-            if (err instanceof ToolsUnsupportedError && iter === 0) {
-              await recordActionSafe({
-                userId: opts.userId,
-                initiator: 'system',
-                persona: opts.persona ?? 'WHINK',
-                mambaMode: opts.mambaMode ?? undefined,
-                action: 'tools_skipped',
-                permissionClass: 'A',
-                status: 'VALIDATED',
-                correlationId: opts.correlationId ?? 'unknown',
-                outputSummary: `model_does_not_support_tools: ${model}`,
-                latencyMs: 0,
-              });
-              const reserved = await reserveDispatch({
-                userId: opts.userId, purpose: 'chat', correlationId: opts.correlationId, model,
-                baseUrl, hasByok: Boolean(apiKey), maxTokens: opts.maxTokens ?? 4000,
-                inputChars: opts.messages.reduce((n, m) => n + m.content.length, 0), kind: 'chat',
-              });
-              let plain: ReadableStream<Uint8Array>;
-              try {
-                plain = await streamChat({ messages: opts.messages, model, maxTokens: opts.maxTokens, apiKey, baseUrl });
-              } catch (streamErr) {
-                if (preTransportFailure(streamErr)) await releaseDispatch({ userId: opts.userId, attemptKey: reserved.attemptKey, externalAttemptStarted: false }).catch(() => undefined);
-                else await holdDispatch({ userId: opts.userId, attemptKey: reserved.attemptKey, uncertainty: uncertaintyOf(streamErr) }).catch(() => undefined);
-                throw streamErr;
-              }
-              const reader = plain.getReader();
-              const dec = new TextDecoder();
-              let seen = '';
-              try {
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  if (value) seen += dec.decode(value, { stream: true });
-                  if (!closed) controller.enqueue(value);
+            if (!committed) {
+              let produced = false;
+              let lastErr: unknown;
+              for (let i = 0; i < order.length; i++) {
+                const candidate = order[i];
+                const candidateKey = opts.modelOrder?.length ? candidate.apiKey : apiKey;
+                try {
+                  response = await callModel(candidate.model, candidateKey);
+                  if (i > 0) {
+                    await recordActionSafe({
+                      userId: opts.userId, initiator: 'system', persona: opts.persona ?? 'WHINK',
+                      mambaMode: opts.mambaMode ?? undefined, action: 'model_route_fallback', tool: 'model_priority',
+                      permissionClass: 'A', status: 'VALIDATED', correlationId: opts.correlationId ?? 'unknown',
+                      inputSummary: `from=${order[0].id} to=${candidate.id}`.slice(0, 500), latencyMs: 0,
+                    });
+                  }
+                  model = candidate.model;
+                  apiKey = candidateKey;
+                  produced = true;
+                  break;
+                } catch (err) {
+                  lastErr = err;
+                  if (err instanceof ToolsUnsupportedError && i < order.length - 1) continue;
+                  if (err instanceof ToolsUnsupportedError && i === order.length - 1) {
+                    await plainStream(candidate.model, candidateKey);
+                    return;
+                  }
+                  noteCandidateFailure(candidate.id, err);
+                  if (!fallbackMayContinue(err) || i === order.length - 1) {
+                    if (opts.handoffAfter && fallbackMayContinue(err)) {
+                      send({
+                        type: 'error',
+                        error: `${opts.handoffAfter.label} is a manual handoff. Open it from Settings > Model priority, or choose Skip to continue with the next model.`,
+                        code: 'MODEL_ROUTE_HANDOFF',
+                        handoffUrl: opts.handoffAfter.url,
+                      });
+                      return;
+                    }
+                    throw err;
+                  }
                 }
-                // A settlement failure leaves the reservation in place for reconciliation; it must not
-                // turn an already-delivered answer into an error event.
-                await settleDispatch({
-                  userId: opts.userId, attemptKey: reserved.attemptKey, model,
-                  tokensIn: Math.ceil(opts.messages.reduce((n, m) => n + m.content.length, 0) / 4),
-                  tokensOut: Math.ceil(seen.length / 4), basis: 'estimated',
-                }).catch(() => undefined);
-              } catch (readErr) {
-                await holdDispatch({ userId: opts.userId, attemptKey: reserved.attemptKey, uncertainty: uncertaintyOf(readErr) }).catch(() => undefined);
-                throw readErr;
               }
+              if (!produced || !response) throw lastErr ?? new Error('no eligible model');
+              committed = true;
+            } else {
+              response = await callModel(model, apiKey);
+            }
+          } catch (err) {
+            if (err instanceof ToolsUnsupportedError && iter === 0 && !committed) {
+              await plainStream(model, apiKey);
               return;
             }
             throw err;
@@ -306,7 +376,8 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
         logger.error('tool loop failed', { userId: opts.userId, error: redactForLog(String(err?.message ?? err)) });
         const status = /\b([1-5]\d\d)\b/.exec(String(err?.message ?? ''))?.[1];
         // A ProviderUserError carries a message written to be shown (no upstream body, no path).
-        send({ type: 'error', error: err instanceof DispatchBlockedError ? 'Request was not admitted' : err instanceof ProviderUserError ? err.userMessage : status ? `Model provider error (${status})` : 'Model provider error', ...(err instanceof DispatchBlockedError ? { code: err.code } : {}) });
+        const blocked = err instanceof DispatchBlockedError || err?.name === 'DispatchBlockedError';
+        send({ type: 'error', error: blocked ? 'Request was not admitted' : err instanceof ProviderUserError ? err.userMessage : status ? `Model provider error (${status})` : 'Model provider error', ...(blocked && err.code ? { code: err.code } : {}) });
       } finally {
         close();
       }

@@ -14,6 +14,7 @@ import { classifyProtected } from '@/lib/protected-actions';
 import { recordActionSafe } from '@/lib/ledger';
 import { writeMemory, type MemoryWriteInput } from '@/lib/memory-engine';
 import { admittedChatOnce } from '@/lib/model-router/dispatch';
+import { purposeModel } from '@/lib/model-router/registry';
 import type { ChatMessage } from '@/lib/model-router';
 import { applyOfflineFallback } from '@/lib/offline';
 import { prisma } from '@/lib/db';
@@ -147,7 +148,7 @@ export async function workerAsk(ctx: JobContext, messages: ChatMessage[]): Promi
     model = fb.model; baseUrl = fb.baseUrl;
   }
   ctx.counters.modelCalls++;
-  const modelName = model ?? process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k';
+  const modelName = model ?? purposeModel(process.env, 'DEFAULT_MODEL');
   return admittedChatOnce(
     { userId: ctx.userId, purpose: 'worker', correlationId: ctx.correlationId, model: modelName },
     { messages, model, maxTokens, temperature: 0.2, baseUrl },

@@ -3,6 +3,8 @@ import { isLocalOnlyMode, localOnlyViolation, localModelNameForLocalOnly } from 
 import { getSafetyState, ledgerLockdownBlock, LOCKDOWN_MESSAGE } from '@/lib/safety/lockdown';
 import { budgetConversation } from '@/lib/model-router/context-budget';
 import { activeProfile, paidAdmission, planRoute } from '@/lib/model-router/priority';
+import { orderedFromPlan, type HandoffStop, type OrderedCandidate } from '@/lib/model-router/ordered-dispatch';
+import { localDefaultModel } from '@/lib/model-router/registry';
 import { isModelAllowed, isModelNameShape } from '@/lib/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
@@ -263,33 +265,51 @@ export async function POST(
 
     // Resolve model: request body > user preference > env default
     const userPrefs = await prisma.userPreference.findUnique({ where: { userId: session.user.id } });
-    const defaultModel = process.env.DEFAULT_MODEL ?? 'wink-qwen3.5-9b-8k';
+    const defaultModel = localDefaultModel();
     let resolvedModel = requestedModel ?? userPrefs?.preferredModel ?? defaultModel;
 
     // R07: read the lockdown state once for this turn (fails closed). R04: when the request names no model, the
-    // Founder's active priority profile decides, using the first eligible choice. A manual handoff or no eligible
-    // choice is shown as a blocked result, never silently replaced by a paid or trial model.
+    // Founder's active priority profile decides the whole eligible order, not only the first name. A manual
+    // handoff or no eligible choice is shown as a blocked result, never silently replaced by a paid or trial model.
     const safety = await getSafetyState(session.user.id);
+    let modelOrder: OrderedCandidate[] | undefined;
+    let handoffAfter: HandoffStop | undefined;
     if (!requestedModel) {
       const profile = await activeProfile(session.user.id).catch(() => null);
       if (profile) {
         const plan = planRoute(profile.choices, {
-          lockedDown: safety.lockedDown, localOnly: isLocalOnlyMode(), dataClass: 'private', needsTools: false,
-          paidAdmitted: paidAdmission(),
+          lockedDown: safety.lockedDown, localOnly: isLocalOnlyMode(), dataClass: 'private', needsTools: true,
+          needsStream: false, paidAdmitted: paidAdmission(),
         });
+        const ordered = orderedFromPlan(plan);
         const first = plan.steps[0];
         await recordActionSafe({
           userId: session.user.id, initiator: 'user', persona: orchResult.newPersona ?? 'WHINK',
           action: 'model_route_selected', tool: 'model_priority', permissionClass: 'A', status: first?.type === 'auto' ? 'VALIDATED' : 'DENIED',
-          correlationId, inputSummary: `profile=${profile.id} rev=${profile.revision} chosen=${first?.entry.id ?? 'none'} skipped=${plan.skipped.map((x) => `${x.id}:${x.reason}`).join(',') || 'none'}`.slice(0, 500),
+          correlationId, inputSummary: `profile=${profile.id} rev=${profile.revision} chosen=${first?.entry.id ?? 'none'} order=${ordered.candidates.map((c) => c.id).join('>') || 'none'} skipped=${plan.skipped.map((x) => `${x.id}:${x.reason}`).join(',') || 'none'}`.slice(0, 500),
         });
-        if (!first) {
+        if (!first || ordered.candidates.length === 0) {
+          if (first?.type === 'handoff') {
+            return NextResponse.json({ error: `${first.entry.label} is a manual handoff. Open it from Settings > Model priority, or choose Skip to continue with the next model.`, code: 'MODEL_ROUTE_HANDOFF', handoffUrl: first.entry.handoffUrl ?? null, skipped: plan.skipped }, { status: 409 });
+          }
           return NextResponse.json({ error: 'No model in your priority list can take this request right now.', code: 'MODEL_ROUTE_BLOCKED', skipped: plan.skipped }, { status: 409 });
         }
-        if (first.type === 'handoff') {
-          return NextResponse.json({ error: `${first.entry.label} is a manual handoff. Open it from Settings > Model priority, or choose Skip to continue with the next model.`, code: 'MODEL_ROUTE_HANDOFF', handoffUrl: first.entry.handoffUrl ?? null, skipped: plan.skipped }, { status: 409 });
+        modelOrder = [];
+        for (const candidate of ordered.candidates) {
+          let key: string | undefined;
+          const provider = candidate.model.startsWith('claude') ? 'anthropic'
+            : candidate.model.startsWith('gpt') || candidate.model.startsWith('o1') || candidate.model.startsWith('o3') ? 'openai'
+            : null;
+          if (provider) {
+            try {
+              const storedKey = await prisma.userApiKey.findUnique({ where: { userId_provider: { userId: session.user.id, provider } } });
+              if (storedKey) key = decryptKey(storedKey.encryptedKey);
+            } catch { /* a missing key skips spend; it does not borrow another model's key */ }
+          }
+          modelOrder.push({ ...candidate, apiKey: key });
         }
-        resolvedModel = first.entry.model;
+        resolvedModel = modelOrder[0].model;
+        handoffAfter = ordered.handoff ?? undefined;
       }
     }
 
@@ -309,7 +329,8 @@ export async function POST(
 
     // A model the user asked for (or saved as a preference) is used only if it is on the operator's
     // allow-list or the user pays for it with their own key. Otherwise use the operator's default.
-    if (resolvedModel !== defaultModel && !isModelAllowed(resolvedModel, { hasOwnKey: Boolean(byokApiKey) })) {
+    // A saved priority order is already a registry choice; collapsing it here would discard second and third.
+    if (!modelOrder && resolvedModel !== defaultModel && !isModelAllowed(resolvedModel, { hasOwnKey: Boolean(byokApiKey) })) {
       await recordActionSafe({
         userId: session.user.id, initiator: 'user', persona: orchResult.newPersona ?? 'WHINK',
         action: 'model_not_allowed', tool: 'model_policy', permissionClass: 'A', status: 'DENIED',
@@ -321,7 +342,22 @@ export async function POST(
 
     // Local-Only mode: model calls may only go to a model on this machine. A cloud model, a per-user
     // key or a non-loopback endpoint is replaced by the local default and the swap is ledgered.
-    if (localOnlyViolation(resolvedModel, { apiKey: byokApiKey })) {
+    if (modelOrder && isLocalOnlyMode()) {
+      const kept = modelOrder.filter((c) => !localOnlyViolation(c.model, { apiKey: c.apiKey }));
+      if (kept.length !== modelOrder.length) {
+        await recordActionSafe({
+          userId: session.user.id, initiator: 'user', persona: orchResult.newPersona ?? 'WHINK',
+          action: 'model_not_allowed', tool: 'model_policy', permissionClass: 'A', status: 'DENIED',
+          correlationId, inputSummary: 'reason=local_only a saved cloud choice was dropped; later local choices remain',
+        });
+      }
+      if (kept.length === 0) {
+        return NextResponse.json({ error: 'No model in your priority list can take this request right now.', code: 'MODEL_ROUTE_BLOCKED' }, { status: 409 });
+      }
+      modelOrder = kept.map((c) => ({ ...c, apiKey: undefined }));
+      resolvedModel = modelOrder[0].model;
+      byokApiKey = undefined;
+    } else if (localOnlyViolation(resolvedModel, { apiKey: byokApiKey })) {
       await recordActionSafe({
         userId: session.user.id, initiator: 'user', persona: orchResult.newPersona ?? 'WHINK',
         action: 'model_not_allowed', tool: 'model_policy', permissionClass: 'A', status: 'DENIED',
@@ -333,7 +369,24 @@ export async function POST(
 
     // R07 lockdown: no cloud model and no per-user key. Use the local model; if even that would leave the machine
     // (non-loopback endpoint), refuse the turn.
-    if (safety.lockedDown) {
+    if (safety.lockedDown && modelOrder) {
+      const lockEnv = { ...process.env, WHINK_LOCAL_ONLY: 'true' };
+      const kept = modelOrder.filter((c) => !localOnlyViolation(c.model, { apiKey: c.apiKey }, lockEnv) && !localOnlyViolation(c.model, {}, lockEnv));
+      if (kept.length !== modelOrder.length) {
+        await recordActionSafe({
+          userId: session.user.id, initiator: 'user', persona: orchResult.newPersona ?? 'WHINK',
+          action: 'model_not_allowed', tool: 'model_policy', permissionClass: 'A', status: 'DENIED',
+          correlationId, inputSummary: 'reason=lockdown a saved cloud choice was dropped',
+        });
+      }
+      if (kept.length === 0 || kept.some((c) => localOnlyViolation(c.model, {}, lockEnv))) {
+        await ledgerLockdownBlock(session.user.id, 'chat_model', correlationId);
+        return NextResponse.json({ error: LOCKDOWN_MESSAGE, code: 'LOCKDOWN_ACTIVE' }, { status: 423 });
+      }
+      modelOrder = kept.map((c) => ({ ...c, apiKey: undefined }));
+      resolvedModel = modelOrder[0].model;
+      byokApiKey = undefined;
+    } else if (safety.lockedDown) {
       const lockEnv = { ...process.env, WHINK_LOCAL_ONLY: 'true' };
       if (localOnlyViolation(resolvedModel, { apiKey: byokApiKey }, lockEnv)) {
         resolvedModel = localModelNameForLocalOnly(lockEnv);
@@ -383,6 +436,8 @@ export async function POST(
         mambaMode: activeMambaMode,
         model: resolvedModel,
         apiKey: byokApiKey,
+        modelOrder,
+        handoffAfter,
         correlationId,
         conversationTainted,
         initialTaint: orchResult.externalContentThisTurn === true,
