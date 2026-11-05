@@ -4,7 +4,7 @@
 
 ## 1. Baseline, scope and source of truth
 
-Starting published revision: `a515159fb2581c773c546405cf44249a4753f945`; CI [41893586859](https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41893586859) and security [41893586660](https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41893586660) succeeded. This reconciliation additionally incorporates the valid source-provenance correction and narrowly tested approval/logging remediation; see [reconciliation record](../reconciliation/2026-11-04.md) for the final change/PR proof. The architecture below is **remaining work**, not a claim those capabilities are finished.
+Starting published revision: `a515159fb2581c773c546405cf44249a4753f945`; CI [41893586859](https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41893586859) and security [41893586660](https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41893586660) succeeded. Merged [PR #25](https://github.com/whinkproducts-alt/ECHELON-CORP/pull/25) incorporates the valid source-provenance correction and reviewed approval/logging remediation (2348 tests passed, 39 skipped, 22 browser passed); see [reconciliation record](../reconciliation/2026-11-04.md) for the final change/PR proof. The architecture below is **remaining work**, not a claim those capabilities are finished.
 
 Read `CLAUDE.md`, applicable `AGENTS.md`, [current audit handoff](../ECHELON-AUDIT-HANDOFF-2026-11-04.md), [backlog](../pending-tasks.md), [R01–R10 gates](../ECHELON-READINESS-EXECUTION.md) and the relevant source. [Harness inventory](../ENGINEERING-HARNESS.md) distinguishes coding, application and testing tools. Do not replay import or merge stale handoff instructions.
 

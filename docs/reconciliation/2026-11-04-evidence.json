@@ -182,6 +182,73 @@
     "typecheck": "passed",
     "targeted_lint": "passed"
   },
-  "remote_check_boundary": "Baseline main CI/security passed. The new PR must pass required checks before merge; use exact PR head/check links from GitHub for final publication proof.",
-  "preserved_remote_work": "11 dependency proposal heads and remediation history retained; no blanket dependency upgrade or whole stale merge."
+  "remote_check_boundary": "PR25 full CI/security passed on the exact head before merge. Subsequent publication notes change documentation only.",
+  "preserved_remote_work": "11 dependency proposal heads and remediation history retained; no blanket dependency upgrade or whole stale merge.",
+  "publication": {
+    "pull_request": {
+      "headRefOid": "eaf5089519e41e50e0f0f6086eacba1f34a211d3",
+      "mergeCommit": {
+        "oid": "e4376e189546ad8dbf07a1cbcbd6b557d36807fd"
+      },
+      "mergedAt": "2026-11-05T04:00:17Z",
+      "number": 25,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-11-05T03:51:28Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41963488337/job/127035039778",
+          "name": "typecheck, lint, migrate, test, build, e2e",
+          "startedAt": "2026-11-05T03:44:46Z",
+          "status": "COMPLETED",
+          "workflowName": "ci"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-11-05T03:44:59Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41963488380/job/127035040228",
+          "name": "pnpm audit (production dependencies)",
+          "startedAt": "2026-11-05T03:44:46Z",
+          "status": "COMPLETED",
+          "workflowName": "security"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-11-05T03:45:35Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41963488380/job/127035040397",
+          "name": "gitleaks secret scan",
+          "startedAt": "2026-11-05T03:44:51Z",
+          "status": "COMPLETED",
+          "workflowName": "security"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-11-05T03:48:37Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41963488380/job/127035040373",
+          "name": "CodeQL",
+          "startedAt": "2026-11-05T03:44:46Z",
+          "status": "COMPLETED",
+          "workflowName": "security"
+        }
+      ],
+      "url": "https://github.com/whinkproducts-alt/ECHELON-CORP/pull/25"
+    },
+    "ci_run": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41963488337",
+    "security_run": "https://github.com/whinkproducts-alt/ECHELON-CORP/actions/runs/41963488380",
+    "vitest_files_passed": 158,
+    "tests_passed": 2348,
+    "tests_skipped": 39,
+    "browser_tests_passed": 22,
+    "application_trees_at_verified_head": {
+      "apps": "6fae02ca41c11659cec1aecdd54613ae20cb064c",
+      "services": "0f1897c1dd477bca00d2610bd1047e85f34068c8",
+      "packages": "f928ee58de468e84778afbc094a42ac76bcd2890",
+      ".github": "fa919762a1659abdca800e9777c18e41f9a16089",
+      "e2e": "e210bc491a112081f42af62dfb1d6da358901524"
+    }
+  }
 }

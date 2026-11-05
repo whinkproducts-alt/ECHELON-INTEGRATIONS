@@ -1,6 +1,6 @@
 # ECHELON current coding handoff — 2026-11-04
 
-Repository: `whinkproducts-alt/ECHELON-CORP`. Use current `main` after verifying `git status`, HEAD and remote. Personal checkout: `Documents/ECHELON PROJECT`. Only one builder should mutate a checkout at a time.
+Repository: `whinkproducts-alt/ECHELON-CORP`. [PR #25](https://github.com/whinkproducts-alt/ECHELON-CORP/pull/25) is merged after full checks passed (2348 tests passed, 39 skipped, 22 browser passed). Use current `main` after verifying `git status`, HEAD and remote. Personal checkout: `Documents/ECHELON PROJECT`. Only one builder should mutate a checkout at a time.
 
 The old handoff based on `6f08789` was reconciled safely. Its edits are preserved locally on `docs/fixes/20261104-before-merge` (`e54af98ff6ce54565cf3626743b6220c804cc9a6`) and in a verified external backup; do not merge it wholesale or repeat source import. Details: [reconciliation](docs/reconciliation/2026-11-04.md).
 
