@@ -1,5 +1,7 @@
 # ECHELON current coding handoff — 2026-11-04
 
+> Local UI work: `ui/dashboard-polish` at base `7ed73d5` in the Codex task checkout. Not pushed, merged or deployed. Read `docs/ui/DASHBOARD-POLISH.md` for fixture evidence, verification limits and next action. Live sign-in remains pending.
+
 Repository: `whinkproducts-alt/ECHELON-CORP`. [PR #25](https://github.com/whinkproducts-alt/ECHELON-CORP/pull/25) is merged after full checks passed (2348 tests passed, 39 skipped, 22 browser passed). Use current `main` after verifying `git status`, HEAD and remote. Only one builder should mutate a checkout at a time.
 
 > **2026-11-05 checkout warning:** the `Documents/ECHELON PROJECT` copy was iCloud-evicted mid-session (`.git` and sources returned `EDEADLK`). Active work moved to a clean clone at `/Users/victorcheckingin/Developer/ECHELON-CORP`. Keep the active checkout on local disk; do not run a second builder against the iCloud copy.
@@ -15,3 +17,10 @@ Next: C03 real model fallback on the now-admitted dispatch path, then C04 owner/
 This change fixes losing terminal approval completion reports and provider error-name leakage, retaining the stuck sweep. Focused tests passed, with fail-on-old-code regressions; use the current PR's checks for full publication proof. Most of the old handoff's listed inherited defects were already addressed; inspect current source before rebuilding.
 
 No code/document authorizes new paid calls, live sends, proprietary disclosure, deployment or changing approval policy. Do not print secrets, reset owner data, auto-merge major dependencies or weaken tests to finish. Record exact revision/commands/results/skips, assurance, limitations and one next action for each implemented slice.
+
+
+Local UI continuation: dedicated Conversation and WHINK/MAMBA presence screens now share governed history/streaming and backend-confirmed persona state. Details and acceptance evidence: `docs/ui/CONVERSATION-PASS.md`. All 34 nav page files exist; live authenticated workflow verification remains pending. No publication or paid demonstration.
+
+Local futuristic system pass: shared styling across 34 navigation presentations, responsive corrections and governed HOLO Obsidian switch. Final typecheck/lint/38 focused tests/webpack build passed. See `docs/ui/FUTURISTIC-PASS.md`; live authenticated acceptance remains pending.
+
+2026-11-06 release: user authorized main publication and all branch cleanup. All 13 non-main remote tips archived then deleted; UI plus local Mac installer candidate prepared. Full unit suite/typecheck/lint/webpack build pass. See `docs/releases/2026-11-06-local-package.md` and `packaging/README.md`. Docker/live installation/signing remain blocked or unverified; do not claim one-click readiness.

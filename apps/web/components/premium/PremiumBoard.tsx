@@ -1,144 +1,63 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { ArrowUpRight, ArrowRight, ShieldCheck, Check, Users } from 'lucide-react';
+import { PersonaAvatar } from '@/components/ui/persona-avatar';
+import { STAFF_DIRECTORY } from '@/lib/staff-directory';
+import { officialAssets } from '@/lib/brand/official-assets';
 import { PERSONAS, type PersonaType } from '@/lib/personas';
 
-/**
- * Board hierarchy as a dense table. Rows, not marketing cards.
- * Each row carries a small full-body silhouette, reporting line, and the
- * persona's declared capabilities. Selecting a row opens the conversation.
- */
+const SPECIALISTS: PersonaType[] = ['AMARA', 'MATEO', 'PRIYA', 'SOREN', 'MEI_LING', 'MAYA'];
 
-type Group = { label: string; note: string; members: PersonaType[] };
-
-const GROUPS: Group[] = [
-  {
-    label: 'Board',
-    note: 'Equal authority · report to the Founder',
-    members: ['WHINK', 'MAMBA', 'AMARA'],
-  },
-  {
-    label: 'Innovation Committee',
-    note: 'Report to AMARA',
-    members: ['MATEO', 'PRIYA', 'SOREN', 'MEI_LING'],
-  },
-  {
-    label: 'Self-improvement',
-    note: 'Reports to WHINK · every 6h',
-    members: ['MAYA'],
-  },
-];
-
-export function PremiumBoard({
-  activePersona,
-  onSelect,
-}: {
-  activePersona: PersonaType;
+export function PremiumBoard({ activePersona, onSelect, busy = false }: {
+  activePersona: PersonaType | null;
   onSelect: (p: PersonaType) => void;
+  busy?: boolean;
 }) {
+  const [selectedProfile, setSelectedProfile] = useState<PersonaType | null>(null);
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-5 py-6 sm:px-8">
-      <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Board</h1>
-      <p className="mt-1 font-mono text-xs text-muted-foreground">
-        {GROUPS.reduce((n, g) => n + g.members.length, 0)} agents · equal authority where declared · select a row to open its conversation
-      </p>
-
-      <div className="mt-8 space-y-10">
-        {GROUPS.map((group) => (
-          <section key={group.label} aria-label={group.label}>
-            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-2">
-              <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{group.label}</h2>
-              <p className="font-mono text-[11px] text-muted-foreground/80">{group.note}</p>
-            </div>
-            <ul className="divide-y divide-border/60">
-              {group.members.map((p) => {
-                const c = PERSONAS[p];
-                const active = p === activePersona;
-                return (
-                  <li key={p}>
-                    <motion.button
-                      type="button"
-                      onClick={() => onSelect(p)}
-                      whileHover={{ backgroundColor: 'hsl(var(--secondary) / 0.4)' }}
-                      className="flex w-full items-start gap-4 py-4 text-left"
-                    >
-                      <Silhouette persona={p} gradient={c.gradient} accent={c.accent} active={active} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                          <span className="text-sm font-medium text-foreground">{c.name}</span>
-                          <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                            {c.title}
-                          </span>
-                          {active && (
-                            <span className="rounded-sm border border-border px-1.5 py-px font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--whink-accent))]">
-                              active
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 max-w-[70ch] text-sm leading-relaxed text-muted-foreground">{c.description}</p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {c.capabilities.slice(0, 4).map((cap) => (
-                            <span
-                              key={cap}
-                              className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
-                            >
-                              {cap}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <span className="mt-1 hidden shrink-0 font-mono text-[11px] text-muted-foreground sm:inline">
-                        {c.reportsTo === 'FOUNDER' ? '→ founder' : `→ ${PERSONAS[c.reportsTo]?.name ?? c.reportsTo}`}
-                      </span>
-                    </motion.button>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ))}
+    <div className="operations-page board-page">
+      <div className="operations-heading">
+        <div><p className="workspace-kicker">People & perspective</p><h1 className="workspace-title">Your advisory board<span className="text-primary">.</span></h1><p className="workspace-description">Two executive perspectives. A specialist directory. One governed workspace.</p></div>
+        <Link href="/dashboard/directory" className="workspace-button workspace-button-secondary">Full directory <ArrowUpRight size={16} aria-hidden /></Link>
       </div>
+      <div className="board-executives">
+        {(['WHINK', 'MAMBA'] as const).map((p) => {
+          const c = PERSONAS[p]; const active = activePersona === p;
+          return <article key={p} className="board-executive" data-persona={p}>
+            <div className="board-executive-art"><Image src={p === 'WHINK' ? officialAssets.whink : officialAssets.mamba} alt={`${c.name}, official executive portrait`} width={1122} height={1402} sizes="(min-width: 1100px) 240px, (min-width: 640px) 200px, 110px" priority /></div>
+            <div className="board-executive-copy">
+              <div className="flex items-center justify-between gap-3"><span className="workspace-kicker">{p === 'WHINK' ? 'Intelligence & synthesis' : 'Challenge & strategy'}</span>{active && <span className="board-active"><Check size={12} aria-hidden />Selected</span>}</div>
+              <h2>{c.name}</h2><p className="board-executive-role">{c.title}</p>
+              <p className="board-executive-description">{c.description}</p>
+              <button type="button" disabled={busy} onClick={() => onSelect(p)} className="workspace-button workspace-button-secondary">Open conversation <ArrowRight size={16} aria-hidden /></button>
+            </div>
+          </article>;
+        })}
+      </div>
+      <div className="board-governance"><ShieldCheck size={17} aria-hidden /><p>Selecting an executive changes the perspective. Your permissions, approvals and spending limits still apply.</p></div>
+      <section aria-labelledby="specialists-heading" className="board-specialists">
+        <div className="workspace-section-heading"><div><p className="workspace-kicker">Specialist perspectives</p><h2 id="specialists-heading" className="workspace-section-title">The wider team</h2></div><span className="workspace-count"><Users size={14} aria-hidden />6 directory profiles</span></div>
+        <div className="board-specialist-grid">{SPECIALISTS.map((p) => {
+          const c = PERSONAS[p]; const selected = selectedProfile === p;
+          const staff = STAFF_DIRECTORY.find((member) => member.firstName.toUpperCase().replace('-', '_') === p);
+          const name = staff ? `${staff.firstName} ${staff.lastName}` : c.name;
+          return <article key={p} className="board-specialist" data-selected={selected}>
+            <button type="button" className="board-specialist-select" aria-expanded={selected} aria-controls={`profile-${p}`} onClick={() => setSelectedProfile(selected ? null : p)}>
+              <PersonaAvatar name={name} imageUrl={staff?.imageUrl} size="md" role={c.title} /><span className="min-w-0 flex-1"><span className="block text-sm font-medium text-foreground">{name}</span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{c.title}</span></span><ArrowUpRight size={17} className="text-muted-foreground" aria-hidden />
+            </button>
+            <p className="board-specialist-summary">{c.description}</p>
+            <div hidden={!selected} id={`profile-${p}`} className="board-profile-details">
+              {staff && <p className="break-all font-mono text-xs text-muted-foreground">{staff.email}</p>}
+              <div className="mt-3 flex flex-wrap gap-2">{c.capabilities.map(cap => <span key={cap} className="board-capability">{cap}</span>)}</div>
+              <p className="mt-3 text-xs text-muted-foreground">Direct conversation unavailable for this profile.</p>
+            </div>
+            <span className="board-profile-label">Directory profile</span>
+          </article>;
+        })}</div>
+      </section>
     </div>
-  );
-}
-
-function Silhouette({
-  persona,
-  gradient,
-  accent,
-  active,
-}: {
-  persona: PersonaType;
-  gradient: string;
-  accent: string;
-  active: boolean;
-}) {
-  const uid = `sb-${persona}`;
-  return (
-    <svg
-      viewBox="0 0 60 90"
-      className="mt-0.5 h-[54px] w-9 shrink-0"
-      role="img"
-      aria-label={`${PERSONAS[persona].name} mark`}
-    >
-      <defs>
-        <linearGradient id={uid} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" style={{ stopColor: gradient.split(',')[0].split('(')[1] }} />
-          <stop offset="100%" style={{ stopColor: gradient.split(',')[2].split(')')[0] }} />
-        </linearGradient>
-      </defs>
-      <path
-        d="M30 4 C44 4 53 15 53 28 C53 48 44 72 30 86 C16 72 7 48 7 28 C7 15 16 4 30 4 Z"
-        fill={`url(#${uid})`}
-        opacity={active ? 1 : 0.88}
-        stroke={accent}
-        strokeWidth="0.8"
-      />
-      <g fill="#0B0B0C" opacity="0.55">
-        <ellipse cx="23" cy="28" rx="2.6" ry="3.6" />
-        <ellipse cx="37" cy="28" rx="2.6" ry="3.6" />
-      </g>
-      <path d="M24 44 Q30 47 36 44" stroke={accent} strokeWidth="0.9" fill="none" opacity="0.65" />
-    </svg>
   );
 }

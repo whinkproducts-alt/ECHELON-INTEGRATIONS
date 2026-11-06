@@ -4,7 +4,7 @@
     {
       "id": "consult",
       "name": "Whink Consult",
-      "logo": "/brand/subsidiaries/consult.webp",
+      "logo": "/assets/official/subsidiaries/whink-consult.webp",
       "intro": "IT services, implementation, and practical support for business change.",
       "about": "Whink Consult helps organizations turn technology decisions into working solutions. Our focus spans IT services, implementation planning, delivery coordination, and helping teams adopt new ways of working.",
       "services": [
@@ -21,7 +21,7 @@
     {
       "id": "real-estate",
       "name": "Whink Real Estate",
-      "logo": "/brand/subsidiaries/real-estate.webp",
+      "logo": "/assets/official/subsidiaries/whink-real-estate.webp",
       "intro": "Property flipping, development work, and commercial rentals.",
       "about": "Whink Real Estate focuses on the potential of places: improving properties, progressing development opportunities, and providing commercial rental space.",
       "services": [
@@ -38,7 +38,7 @@
     {
       "id": "trades",
       "name": "Whink Trades & Investments",
-      "logo": "/brand/subsidiaries/trades.webp",
+      "logo": "/assets/official/subsidiaries/whink-trades-investment.webp",
       "intro": "The trading arm of Whink Group.",
       "about": "Whink Trades is the trading arm of Whink Group. The company is no longer accepting investors. A trading bot is planned, with further details to be announced.",
       "services": [
@@ -54,7 +54,7 @@
     {
       "id": "apps",
       "name": "Whink Apps",
-      "logo": "/brand/subsidiaries/apps.webp",
+      "logo": "/assets/official/subsidiaries/whink-apps.webp",
       "intro": "Application development, AI, robotics, and technology that advances the way the world works.",
       "about": "Whink Apps is a subsidiary of The WHINK Group. It builds innovative apps, including Whink Ultimate.",
       "services": [],
@@ -67,7 +67,7 @@
     {
       "id": "frontliners",
       "name": "Whink Frontliners",
-      "logo": "/brand/subsidiaries/frontliners.webp",
+      "logo": "/assets/official/subsidiaries/whink-frontliners.webp",
       "intro": "Construction and procurement. A Whink Group subsidiary in Nigeria.",
       "about": "Whink Frontliners is our Nigeria-based construction and procurement firm. It brings construction delivery and sourcing requirements together to support projects from planning through execution.",
       "services": [

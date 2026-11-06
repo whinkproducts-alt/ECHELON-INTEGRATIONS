@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { acquireMicrophone } from './microphone-capture';
 import { beginSpeech, endSpeech } from '@/lib/hooks/speech-activity';
 import { isClientLockedDown, onClientLockdown, trackMedia } from '@/lib/safety/client-lockdown';
 
@@ -41,25 +42,31 @@ const LOCAL_ONLY_CLIENT = process.env.NEXT_PUBLIC_WHINK_LOCAL_ONLY === 'true';
 export const SPEECH_NOTICE = 'Speech is not available in Local-Only mode';
 
 export function useVoice(): UseVoiceReturn {
+  const listeningIntent = useRef(false);
+  const captureVersion = useRef(0);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [lipSyncAmplitude, setLipSyncAmplitude] = useState(0);
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
 
-  const [supported] = useState<VoiceSupport>(() => {
-    if (typeof window === 'undefined') return { stt: false, tts: false, serverStt: false };
+  // Match the server snapshot; discover browser capabilities only after hydration.
+  const [supported, setSupported] = useState<VoiceSupport>({ stt:false, tts:false, serverStt:false });
+  useEffect(() => {
+    const initial = setTimeout(() => {
     const hasSpeechRecognition = !LOCAL_ONLY_CLIENT && (
       typeof window.SpeechRecognition !== 'undefined' ||
       typeof window.webkitSpeechRecognition !== 'undefined');
     const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
     const hasSpeechSynthesis = LOCAL_ONLY_CLIENT || typeof window.speechSynthesis !== 'undefined';
-    return {
+    setSupported({
       stt: hasSpeechRecognition || hasMediaRecorder,
       tts: hasSpeechSynthesis,
       serverStt: !hasSpeechRecognition && hasMediaRecorder,
-    };
-  });
+    });
+    }, 0);
+    return () => clearTimeout(initial);
+  }, []);
 
   // ── Browser Web Speech path ───────────────────────────────────────────────
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -112,16 +119,28 @@ export function useVoice(): UseVoiceReturn {
 
   // Clean up on unmount
   useEffect(() => {
+    const epoch = captureVersion;
     return () => {
+      listeningIntent.current = false; epoch.current += 1;
+      try { recognitionRef.current?.abort(); } catch { /* already stopped */ }
+      const recorder = mediaRecorderRef.current;
+      if (recorder) {
+        recorder.onstop = null;
+        try { if(recorder.state !== 'inactive') recorder.stop(); } catch { /* already stopped */ }
+        recorder.stream.getTracks().forEach(track => track.stop());
+      }
       stopLipSync();
     };
   }, [stopLipSync]);
 
   const startListening = useCallback(() => {
-    if (isListening || isClientLockedDown()) return;
+    if (isListening || listeningIntent.current || isClientLockedDown()) return;
+    listeningIntent.current = true;
+    const version = ++captureVersion.current;
+    accumulatedRef.current = '';
 
     const SpeechRecognitionCtor =
-      typeof window !== 'undefined'
+      !LOCAL_ONLY_CLIENT && typeof window !== 'undefined'
         ? window.SpeechRecognition ?? window.webkitSpeechRecognition
         : null;
 
@@ -151,6 +170,7 @@ export function useVoice(): UseVoiceReturn {
       };
 
       recognition.onend = () => {
+        listeningIntent.current = false;
         setIsListening(false);
         const t = accumulatedRef.current;
         setTranscript(t);
@@ -159,21 +179,22 @@ export function useVoice(): UseVoiceReturn {
       };
 
       recognition.onerror = () => {
+        listeningIntent.current = false;
         setIsListening(false);
         resolveListenRef.current?.(accumulatedRef.current);
         resolveListenRef.current = null;
       };
 
       recognitionRef.current = recognition;
-      recognition.start();
-      setIsListening(true);
+      try { recognition.start(); setIsListening(true); } catch { listeningIntent.current = false; }
       return;
     }
 
     // ── MediaRecorder → server STT path ──────────────────────────────────
-    if (typeof MediaRecorder === 'undefined') return;
+    if (typeof MediaRecorder === 'undefined') { listeningIntent.current = false; return; }
 
-    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then((stream) => {
+    acquireMicrophone(() => navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }), () => listeningIntent.current && captureVersion.current === version && !isClientLockedDown()).then((stream) => {
+      if (!stream) return;
       // R07: lockdown may have started while the permission prompt was open.
       if (isClientLockedDown()) { stream.getTracks().forEach((t) => t.stop()); return; }
       trackMedia(stream);
@@ -181,16 +202,20 @@ export function useVoice(): UseVoiceReturn {
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : 'audio/webm';
-      const recorder = new MediaRecorder(stream, { mimeType });
+      let recorder: MediaRecorder;
+      try { recorder = new MediaRecorder(stream, { mimeType }); }
+      catch (error) { stream.getTracks().forEach(track => track.stop()); throw error; }
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
       recorder.onstop = async () => {
+        listeningIntent.current = false;
         stream.getTracks().forEach((t) => t.stop());
         setIsListening(false);
 
+        if (isClientLockedDown()) { resolveServerSttRef.current?.(''); resolveServerSttRef.current = null; return; }
         const blob = new Blob(audioChunksRef.current, { type: mimeType });
         let text = '';
         try {
@@ -214,11 +239,12 @@ export function useVoice(): UseVoiceReturn {
       recorder.start();
       setIsListening(true);
     }).catch(() => {
-      // Microphone denied — silently fail
+      if(captureVersion.current === version) { listeningIntent.current = false; setVoiceNotice('Microphone unavailable. Check your browser permissions.'); }
     });
   }, [isListening]);
 
   const stopListening = useCallback((): Promise<string> => {
+    listeningIntent.current = false; ++captureVersion.current;
     return new Promise((resolve) => {
       // MediaRecorder path
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -233,7 +259,10 @@ export function useVoice(): UseVoiceReturn {
         return;
       }
       resolveListenRef.current = resolve;
-      recognitionRef.current.stop();
+      const recognition = recognitionRef.current;
+      recognitionRef.current = null;
+      try { recognition.stop(); }
+      catch { resolveListenRef.current = null; resolve(accumulatedRef.current); }
     });
   }, []);
 
@@ -328,6 +357,7 @@ export function useVoice(): UseVoiceReturn {
   // R07: on lockdown stop listening and speaking immediately. The tracks themselves are stopped by client-lockdown.
   useEffect(() => onClientLockdown((locked) => {
     if (!locked) return;
+    listeningIntent.current = false; ++captureVersion.current;
     try { recognitionRef.current?.abort?.(); } catch { /* not running */ }
     try { if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop(); } catch { /* not running */ }
     try { playingRef.current?.pause(); } catch { /* not playing */ }

@@ -30,8 +30,9 @@ function score(item: NavItem, q: string): number {
   return q.split(/\s+/).every((w) => hay.includes(w)) ? 1 : 0;
 }
 
-export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+export function CommandPalette({ open, onOpenChange, returnFocusTo }: { open: boolean; onOpenChange: (o: boolean) => void; returnFocusTo?: React.RefObject<HTMLElement | null> }) {
   const router = useRouter();
+  const returnFocus = React.useRef<HTMLElement | null>(null);
   const [query, setQuery] = React.useState('');
   const [index, setIndex] = React.useState(0);
   const uid = React.useId();
@@ -58,7 +59,9 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     <Dialog.Root open={open} onOpenChange={handleOpen}>
       <Dialog.Portal>
         <Dialog.Overlay className="holo-overlay" />
-        <Dialog.Content className="holo-modal holo-panel holo-tone-accent p-0" data-glow="soft" style={{ '--holo-modal-w': '36rem' } as React.CSSProperties} onKeyDown={onKey}>
+        <Dialog.Content className="holo-modal holo-panel holo-tone-accent p-0" data-glow="soft" style={{ '--holo-modal-w': '36rem' } as React.CSSProperties} onKeyDown={onKey}
+          onOpenAutoFocus={() => { returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
+          onCloseAutoFocus={(event) => { const target = returnFocusTo?.current ?? returnFocus.current; if (target?.isConnected) { event.preventDefault(); target.focus(); } }}>
           <Dialog.Title className="sr-only">Command palette</Dialog.Title>
           <Dialog.Description className="sr-only">Type to search every screen. Use arrow keys and Enter.</Dialog.Description>
           <div className="flex items-center gap-3 border-b border-border px-4">

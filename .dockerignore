@@ -1,0 +1,14 @@
+.git
+**/node_modules
+**/.next
+**/.build*
+**/.env
+**/.env.*
+**/*.log
+**/*.tsbuildinfo
+.claude
+backups
+outputs
+dist
+design-audit
+MARKETING VIDEOS

@@ -2,8 +2,9 @@
 // This file is only reachable through /dev-preview, which 404s unless NODE_ENV is 'development'.
 
 export type PreviewState = 'ready' | 'loading' | 'error' | 'empty';
-export interface Mocked { status: number; body: unknown; delayMs?: number }
+export interface Mocked { status: number; body: unknown; delayMs?: number; sse?: boolean }
 
+import { answerDashboard } from './fixtures-dashboard';
 import catalog from '@/config/connectors.catalog.json';
 import { answerWave } from './fixtures-wave-contracts';
 import { answerOps } from './fixtures-ops';
@@ -157,10 +158,13 @@ function report(id: string) {
 
 const BOARD: unknown[] = [];
 
-export interface MockCtx { state: PreviewState; now: () => number; counters: { casl: boolean } }
+export interface MockCtx { state: PreviewState; now: () => number; screen?: string; fault?: string | null; counters: { casl: boolean; persona?: string; dashboardLoads?: Record<string, number> } }
 
 /** Returns null when the URL is not one the harness knows (the caller answers 404). */
 export function answer(method: string, url: URL, body: unknown, ctx: MockCtx): Mocked | null {
+  if (url.pathname === '/api/safety/lockdown' && method === 'GET') return ctx.state === 'error' ? {status:503,body:{error:'Fixture safety unavailable'}} : {status:200,body:{state:{lockedDown:false,epoch:1,reason:null,changedAt:null}}};
+  const dashboard = answerDashboard(method, url, body, ctx);
+  if (dashboard) return dashboard;
   const landing = answerLanding(method, url, body, ctx);
   if (landing) return landing;
   const ops = answerOps(method, url, body, ctx);

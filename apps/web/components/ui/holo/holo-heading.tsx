@@ -20,19 +20,12 @@ export function HoloHeading({ title, eyebrow, description, actions, level = 1, t
   const H = `h${level}` as 'h1' | 'h2' | 'h3';
   const size = level === 1 ? 'text-3xl sm:text-4xl' : level === 2 ? 'text-2xl' : 'text-xl';
   return (
-    <header className={cn('flex flex-wrap items-end justify-between gap-4', toneClass(tone), className)}>
+    <header className={cn('holo-heading flex flex-wrap items-end justify-between gap-4', toneClass(tone), className)}>
       <div className="min-w-0">
-        {eyebrow && (
-          <p className="mb-1 font-mono text-[0.6875rem] uppercase tracking-[0.28em]" style={{ color: 'hsl(var(--holo-c))' }}>
-            <span className="holo-reveal inline-block">{eyebrow}</span>
-          </p>
-        )}
-        <div className="holo-scanline inline-block max-w-full">
-          <H className={cn('holo-reveal holo-text-glow font-display font-semibold tracking-tight text-foreground', size)}>{title}</H>
-        </div>
+        <div className="holo-heading-title-row"><H className={cn('font-display font-semibold tracking-tight text-foreground', size)}>{title}</H>{eyebrow && <span className="holo-heading-context">{eyebrow}</span>}</div>
         {description && <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="holo-heading-actions flex shrink-0 items-center gap-2">{actions}</div>}
     </header>
   );
 }

@@ -12,7 +12,7 @@ const nextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   outputFileTracingRoot: process.env.NEXT_OUTPUT_MODE ? path.join(__dirname, '../') : '/',
-  images: { unoptimized: true },
+  images: { unoptimized: true, qualities: [75, 90] },
   // Transpile the org-kit workspace package (TypeScript source, no build step)
   transpilePackages: ['@whink/org-kit'],
   // Next 16 BLOCKS unlisted origins on /_next/* and /__nextjs* in dev — including the /_next/hmr

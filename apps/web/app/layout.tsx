@@ -1,4 +1,5 @@
 import './globals.css';
+import './futuristic.css';
 import { Providers } from './providers';
 import type { Metadata, Viewport } from 'next';
 import tenantDefaults from '@/config/tenant-defaults.json';

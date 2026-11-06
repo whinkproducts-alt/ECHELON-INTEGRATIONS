@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BrandMark } from '@/components/brand';
+import { LogoRotator } from '@/components/brand/logo-rotator';
 import { HoloOrbBackdrop } from '@/components/ui/holo';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 
@@ -117,7 +118,7 @@ export function SubmitButton({ busy, busyLabel, disabled, children }: { busy: bo
 export function AuthShell({ title, lead, children, footer }: { title: string; lead?: string; children: React.ReactNode; footer?: React.ReactNode }) {
   const { productName, acronymExpansion } = useTenantConfig();
   return (
-    <div className="relative min-h-[100dvh] overflow-hidden bg-background">
+    <div className="auth-surface relative min-h-[100dvh] overflow-hidden bg-background">
       <HoloOrbBackdrop stars={36} floor={false} className="opacity-40" />
       <div className="relative z-10 mx-auto grid min-h-[100dvh] w-full max-w-6xl grid-cols-1 gap-10 px-6 py-10 lg:grid-cols-[1.1fr_minmax(0,26rem)] lg:items-center lg:gap-20 lg:py-16">
         <div className="flex flex-col gap-6">
@@ -129,10 +130,11 @@ export function AuthShell({ title, lead, children, footer }: { title: string; le
             <p className="font-mono text-xs uppercase tracking-[0.22em] text-muted-foreground">{acronymExpansion}</p>
             <h1 className="font-display text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-5xl lg:text-6xl">{title}</h1>
             {lead && <p className="max-w-md text-base text-muted-foreground">{lead}</p>}
+            <div className="hidden lg:block"><LogoRotator /></div>
           </div>
         </div>
         <div className="flex flex-col gap-6">
-          <div className="rounded-lg border border-border bg-card p-6 sm:p-8">{children}</div>
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-[0_20px_80px_#00000020] sm:p-8">{children}</div>
           {footer && <div className="text-sm text-muted-foreground">{footer}</div>}
         </div>
       </div>

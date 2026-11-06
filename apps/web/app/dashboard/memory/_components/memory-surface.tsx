@@ -255,7 +255,7 @@ export function MemorySurface() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-border">
+      <div className="flex flex-wrap gap-1 border-b border-border" role="group" aria-label="Memory categories">
         {tabs.map(t => (
           <button
             key={t.id}

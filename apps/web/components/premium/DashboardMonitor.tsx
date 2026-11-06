@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { ArrowUpRight, RefreshCw, ShieldCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { PERSONAS, type PersonaType } from '@/lib/personas';
+import { dashboardJson } from '@/lib/dashboard-client';
 import { SubsidiaryChip } from '@/components/subsidiaries/subsidiary-chip';
 import { projectReportHref } from '@/components/subsidiaries/subsidiary-map';
 
@@ -160,50 +162,57 @@ function dotClass(status: string | null): string {
 
 export function DashboardMonitor({
   onOpenConversation,
-  onOpenBoard,
 }: {
   onOpenConversation: () => void;
-  onOpenBoard: () => void;
 }) {
   const [status, setStatus] = useState<WorkerStatus | null>(null);
   const [activity, setActivity] = useState<ActivityRow[] | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [workerUpdatedAt, setWorkerUpdatedAt] = useState<number | null>(null);
+  const inFlight = useRef(false);
   const [now, setNow] = useState(() => Date.now());
 
-  const load = useCallback(async () => {
-    try {
-      const [s, a, p] = await Promise.all([
-        fetch('/api/worker/status', { cache: 'no-store' })
-          .then((r) => (r.ok ? r.json() : Promise.reject(new Error('worker status')))),
-        fetch('/api/ledger?limit=15', { cache: 'no-store' })
-          .then((r) => (r.ok ? r.json() : []))
-          .catch(() => []),
-        fetch('/api/projects', { cache: 'no-store' })
-          .then((r) => (r.ok ? r.json() : []))
-          .catch(() => []),
-      ]);
-      setStatus(s as WorkerStatus);
-      setActivity(Array.isArray(a) ? (a as ActivityRow[]) : []);
-      setProjects(Array.isArray(p) ? (p as ProjectSummary[]) : []);
-      setError(null);
-    } catch {
-      setError('Could not load worker status.');
-    }
+  const load = useCallback(async (signal?: AbortSignal) => {
+    if (inFlight.current) return;
+    inFlight.current = true; setRefreshing(true);
+    const array = <T,>(data: T[]): T[] => {
+      if (!Array.isArray(data)) throw new Error('Unexpected service response.');
+      return data;
+    };
+    const result = await Promise.allSettled([
+      dashboardJson<WorkerStatus>('/api/worker/status', { signal }).then((data) => {
+        if (!Array.isArray(data.jobs) || typeof data.rosterSize !== 'number' || typeof data.enabledCount !== 'number') throw new Error('Unexpected service response.');
+        return data;
+      }),
+      dashboardJson<ActivityRow[]>('/api/ledger?limit=15', { signal }).then(array),
+      dashboardJson<ProjectSummary[]>('/api/projects', { signal }).then(array),
+    ]);
+    inFlight.current = false;
+    if (signal?.aborted) return;
+    const [worker, ledger, project] = result;
+    const message = (reason: unknown) => typeof navigator !== 'undefined' && !navigator.onLine
+      ? 'Offline. Reconnect and refresh.'
+      : reason instanceof Error ? reason.message : 'Service unavailable. Try again.';
+    if (worker.status === 'fulfilled') { setStatus(worker.value); setWorkerUpdatedAt(Date.now()); setError(null); }
+    else setError(message(worker.reason));
+    if (ledger.status === 'fulfilled') { setActivity(ledger.value); setActivityError(null); }
+    else setActivityError(message(ledger.reason));
+    if (project.status === 'fulfilled') { setProjects(project.value); setProjectsError(null); }
+    else setProjectsError(message(project.reason));
+    setRefreshing(false);
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const run = () => { if (!cancelled) void load(); };
+    const controller = new AbortController();
+    const run = () => { if (!document.hidden) void load(controller.signal); };
     const kick = setTimeout(run, 0);
     const poll = setInterval(run, 30_000);
     const tick = setInterval(() => setNow(Date.now()), 1000);
-    return () => {
-      cancelled = true;
-      clearTimeout(kick);
-      clearInterval(poll);
-      clearInterval(tick);
-    };
+    return () => { controller.abort(); clearTimeout(kick); clearInterval(poll); clearInterval(tick); };
   }, [load]);
 
   const rows = useMemo(() => {
@@ -218,52 +227,50 @@ export function DashboardMonitor({
 
   const failing = rows.filter((j) => j.lastStatus === 'FAILED' || j.lastStatus === 'TIMEOUT').length;
   const healthy = rows.filter((j) => j.lastStatus === 'OK').length;
-  const heartbeat = status?.heartbeatAgeSeconds ?? null;
+  const heartbeat = status?.heartbeatAgeSeconds == null ? null
+    : status.heartbeatAgeSeconds + Math.max(0, Math.floor((now - (workerUpdatedAt ?? now)) / 1000));
+  const unavailable = error ? (status ? 'stale' : 'unavailable') : 'loading';
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-5 py-6 sm:px-8">
+    <div className="operations-page">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="operations-heading">
         <div>
-          <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Operations</h1>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">
-            {status ? `${status.enabledCount} agents enabled · roster ${status.rosterSize}` : 'loading roster…'}
+          <p className="workspace-kicker">Observe · decide · direct</p>
+          <h1 className="workspace-title">Operations monitor<span className="text-primary">.</span></h1>
+          <p className="workspace-description">
+            Worker health, scheduled jobs, and the work in motion.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => void load()}
-            className="rounded-md border border-border px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            disabled={refreshing}
+            className="workspace-button workspace-button-secondary"
           >
-            Refresh
+            <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} aria-hidden />{refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
           <button
             type="button"
             onClick={onOpenConversation}
-            className="rounded-md bg-primary px-3 py-1.5 font-mono text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            className="workspace-button workspace-button-primary"
           >
-            New conversation
+            New conversation <ArrowUpRight size={16} aria-hidden />
           </button>
-          <button
-            type="button"
-            onClick={onOpenBoard}
-            className="rounded-md border border-border px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-          >
-            Board
-          </button>
+
         </div>
       </div>
 
       {/* Status strip — hairline separated, mono numbers */}
-      <dl className="mt-6 grid grid-cols-2 divide-x divide-border border-y border-border sm:grid-cols-4">
+      <dl className="operations-metrics">
         <Metric
-          label="Worker"
-          value={heartbeat === null ? 'no heartbeat' : heartbeat < 60 ? `live · ${heartbeat}s` : `${Math.round(heartbeat / 60)}m behind`}
-          tone={heartbeat === null ? 'bad' : heartbeat < 300 ? 'good' : 'warn'}
+          label={error && status ? 'Worker · stale' : 'Worker heartbeat'}
+          value={!status ? unavailable : heartbeat === null ? 'no heartbeat' : heartbeat < 60 ? (error ? `${heartbeat}s ago` : `live · ${heartbeat}s`) : `${Math.round(heartbeat / 60)}m behind`}
+          tone={error && status ? 'warn' : !status ? 'plain' : heartbeat === null ? 'bad' : heartbeat < 300 ? 'good' : 'warn'}
         />
-        <Metric label="Healthy" value={`${healthy}/${rows.length || '—'}`} tone={failing > 0 ? 'warn' : 'good'} />
-        <Metric label="Failures" value={String(failing)} tone={failing > 0 ? 'bad' : 'plain'} />
+        <Metric label="Successful last runs" value={status ? `${healthy}/${rows.length}` : '—'} tone={status && !error ? (failing > 0 ? 'warn' : 'good') : 'plain'} />
+        <Metric label="Needs attention" value={status ? String(failing) : '—'} tone={failing > 0 ? 'bad' : 'plain'} />
         <Metric
           label="Next cycle"
           value={rows.length ? until(rows.filter((r) => r.nextRunAt).map((r) => r.nextRunAt!).sort()[0] ?? null, now) : '—'}
@@ -272,23 +279,24 @@ export function DashboardMonitor({
       </dl>
 
       {error && (
-        <p className="mt-4 border-l-2 border-[hsl(var(--denial))] pl-3 font-mono text-xs text-[hsl(var(--denial))]">{error}</p>
+        <p role="status" className="mt-4 border-l-2 border-[hsl(var(--denial))] pl-3 font-mono text-xs text-[hsl(var(--denial))]">{error}{status ? ' Showing last known worker data.' : ''}</p>
       )}
 
       {/* Attention — what needs a decision today */}
-      <section aria-label="Attention" className="mt-8">
-        <div className="flex items-baseline justify-between gap-3 border-b border-border pb-2">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            What requires your attention
+      <section aria-label="Attention" className="workspace-panel operations-projects">
+        <div className="workspace-section-heading">
+          <h2 className="workspace-section-title">
+            Active projects
           </h2>
           <Link
             href="/dashboard/projects"
-            className="font-mono text-[11px] text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
+            className="workspace-text-link"
           >
-            All projects
+            All projects <ArrowUpRight size={14} aria-hidden />
           </Link>
         </div>
-        {projects === null ? (
+        {projectsError && <ResourceError message={projectsError} stale={projects !== null} />}
+        {projects === null && projectsError ? null : projects === null ? (
           <div className="divide-y divide-border/60 border-b border-border/60">
             {[0, 1].map((i) => (
               <div key={i} className="py-3">
@@ -311,20 +319,21 @@ export function DashboardMonitor({
               .slice(0, 5)
               .map((p) => {
                 const sid = subsidiaryIdOf(p);
-                const pct = Math.max(0, Math.min(100, Math.round(p.progress?.percent ?? 0)));
+                const pct = typeof p.progress?.percent === 'number' ? Math.max(0, Math.min(100, Math.round(p.progress.percent))) : null;
                 return (
                   <li key={p.id}>
                     <Link
                       href={projectReportHref(p.id, sid)}
-                      className="flex items-center justify-between gap-3 py-2.5 transition-colors hover:bg-secondary/40"
+                      className="operations-project-row"
                     >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm text-foreground">{p.name}</span>
+                      <span className="operations-project-identity">
+                        <span className="break-words text-sm leading-relaxed text-foreground">{p.name}</span>
                         <SubsidiaryChip id={sid} />
                       </span>
-                      <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
-                        {pct}% · {p.openTaskCount ?? 0} open
-                      </span>
+                      <span className="operations-project-progress">
+                        <span className="flex items-center justify-between gap-4 text-xs text-muted-foreground"><span>{pct === null ? 'Progress unavailable' : `${pct}% complete`}</span><span>{p.openTaskCount === undefined ? 'Task count unavailable' : `${p.openTaskCount} open`}</span></span>
+                        {pct !== null && <span className="operations-progress-track" role="progressbar" aria-label={`${p.name} progress`} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><span style={{width:`${pct}%`}} /></span>}
+                      </span><ArrowUpRight size={17} className="hidden shrink-0 text-muted-foreground sm:block" aria-hidden />
                     </Link>
                   </li>
                 );
@@ -333,25 +342,25 @@ export function DashboardMonitor({
         )}
       </section>
 
-      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="operations-grid">
         {/* Agent roster table */}
-        <section aria-label="Agent roster">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Research team</h2>
-          <table className="mt-3 w-full border-collapse text-left">
+        <section aria-label="Agent roster" className="workspace-panel min-w-0">
+          <div className="workspace-section-heading"><div><p className="workspace-kicker">Execution</p><h2 className="workspace-section-title">Scheduled work</h2></div><span className="workspace-count">{status ? rows.length : '—'} jobs</span></div>
+          <table className="operations-table w-full table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-border font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                <th className="py-2 pr-3 font-normal">Agent</th>
+                <th className="w-[45%] py-3 pr-3 font-normal sm:w-auto">Agent</th>
                 <th className="hidden py-2 pr-3 font-normal sm:table-cell">Last run</th>
-                <th className="py-2 pr-3 font-normal">Next</th>
+                <th className="w-[25%] py-3 pr-2 font-normal sm:w-auto">Next</th>
                 <th className="hidden py-2 pr-3 text-right font-normal md:table-cell">Runs</th>
-                <th className="py-2 text-right font-normal">Status</th>
+                <th className="w-[30%] py-3 text-right font-normal sm:w-auto">Status</th>
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && !error && (
+              {rows.length === 0 && (
                 <tr>
                   <td colSpan={5} className="py-10 text-center font-mono text-xs text-muted-foreground">
-                    {status ? 'No scheduled jobs yet.' : 'Loading…'}
+                    {error ? 'Worker data unavailable.' : status ? 'No scheduled jobs yet.' : 'Loading…'}
                   </td>
                 </tr>
               )}
@@ -368,7 +377,7 @@ export function DashboardMonitor({
                     <td className="py-2.5 pr-3">
                       <div className="flex items-center gap-2.5">
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass(job.lastStatus)}`} aria-hidden />
-                        <span className="truncate text-sm text-foreground">{name}</span>
+                        <span className="break-words text-sm text-foreground">{name}</span>
                       </div>
                       <span className="ml-4 block font-mono text-[11px] text-muted-foreground">{sub}</span>
                     </td>
@@ -390,10 +399,11 @@ export function DashboardMonitor({
         </section>
 
         {/* Right rail — activity */}
-        <aside aria-label="Recent activity">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Activity</h2>
-          <ul className="mt-3 divide-y divide-border/60 border-y border-border">
-            {activity === null && (
+        <aside aria-label="Recent activity" className="workspace-panel min-w-0">
+          <div className="workspace-section-heading"><div><p className="workspace-kicker">Audit trail</p><h2 className="workspace-section-title">Recent activity</h2></div><ShieldCheck size={18} className="text-muted-foreground" aria-hidden /></div>
+          <ul className="operations-activity-list">
+            {activityError && <li><ResourceError message={activityError} stale={activity !== null} /></li>}
+            {activity === null && !activityError && (
               <>
                 {[0, 1, 2, 3].map((i) => (
                   <li key={i} className="py-3">
@@ -406,7 +416,7 @@ export function DashboardMonitor({
               <li className="py-6 font-mono text-xs text-muted-foreground">No recorded actions yet. Start a conversation.</li>
             )}
             {activity?.map((a) => (
-              <li key={a.id} className="flex items-start gap-2.5 py-2.5">
+              <li key={a.id} className="operations-activity-row">
                 <span
                   className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
                     a.status === 'FAILED' || a.status === 'DENIED'
@@ -418,8 +428,8 @@ export function DashboardMonitor({
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-mono text-xs text-foreground">{a.action}</p>
-                  <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                  <p className="break-words font-mono text-xs leading-relaxed text-foreground [overflow-wrap:anywhere]">{a.action}</p>
+                  <p className="mt-2 text-xs text-muted-foreground"><span className="mr-2">{a.status}</span>
                     {a.persona ? `${a.persona} · ` : ''}
                     {relative(a.createdAt, now)}
                   </p>
@@ -428,23 +438,23 @@ export function DashboardMonitor({
             ))}
           </ul>
 
-          <div className="mt-8">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Self-improvement</h2>
+          <div className="operations-learning">
+            <h2 className="workspace-section-title">Self-improvement</h2>
             {(() => {
               const m = rows.find((r) => r.jobKey.startsWith('self_improvement'));
               return (
                 <dl className="mt-3 space-y-1.5 border-y border-border py-3 font-mono text-xs">
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">last cycle</dt>
-                    <dd className="tabular-nums text-foreground">{relative(m?.lastRunAt ?? null, now)}</dd>
+                    <dd className="tabular-nums text-foreground">{status ? relative(m?.lastRunAt ?? null, now) : '—'}</dd>
                   </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">cycles</dt>
-                    <dd className="tabular-nums text-foreground">{m?.runs ?? 0}</dd>
+                    <dd className="tabular-nums text-foreground">{m?.runs ?? '—'}</dd>
                   </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">state</dt>
-                    <dd className={statusTone(m?.lastStatus ?? null)}>{m?.lastStatus ?? 'pending'}</dd>
+                    <dd className={statusTone(m?.lastStatus ?? null)}>{status ? m?.lastStatus ?? 'not scheduled' : 'unavailable'}</dd>
                   </div>
                 </dl>
               );
@@ -466,9 +476,14 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: 'g
           ? 'text-[hsl(var(--denial))]'
           : 'text-foreground';
   return (
-    <div className="px-4 py-3 first:pl-0">
-      <dt className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</dt>
-      <dd className={`mt-1 font-mono text-sm tabular-nums ${toneClass}`}>{value}</dd>
+    <div className={`operations-stat operations-stat-${tone}`}>
+      <dt className="operations-stat-label">{label}</dt>
+      <dd className={`operations-stat-value ${toneClass}`}>{value}</dd>
     </div>
   );
+}
+function ResourceError({ message, stale }: { message: string; stale: boolean }) {
+  return <p role="status" className="border-l-2 border-[hsl(var(--denial))] py-3 pl-3 text-sm text-muted-foreground">
+    {message} {stale ? 'Showing last known data.' : 'Data unavailable.'}
+  </p>;
 }

@@ -11,6 +11,21 @@ import type { PreviewState } from './fixtures';
 type Loader = () => Promise<Record<string, unknown>>;
 /** Client screens, loaded through explicit imports. Server-prop screens arrive as children from the page. */
 const LOADERS: Record<string, Loader> = {
+  memory: () => import('@/app/dashboard/memory/_components/memory-surface').then(m => ({default:m.MemorySurface})),
+  projects: () => import('@/app/dashboard/projects/_components/projects-surface').then(m => ({default:m.ProjectsSurface})),
+  tasks: () => import('@/app/dashboard/tasks/_components/tasks-surface').then(m => ({default:m.TasksSurface})),
+  settings: () => import('@/app/dashboard/settings/_components/settings-surface').then(m => ({default:m.SettingsSurface})),
+  integrations: () => import('@/app/dashboard/integrations/_components/integration-hub').then(m => ({default:m.IntegrationHub})),
+  'kill-team': () => import('@/components/screens/kill-team/kill-team-screen').then(m => ({default:() => <m.KillTeamScreen founder={false} />})),
+  holo: () => import('@/components/holo/holo-surface').then(m => ({default:m.HoloSurface})),
+  news: () => import('@/components/holo/news-surface').then(m => ({default:m.NewsSurface})),
+  documents: () => import('@/app/dashboard/documents/_components/upload-panel').then(m => ({default:() => <div className="p-6 max-w-3xl mx-auto space-y-6"><h1 className="font-display text-2xl">Documents</h1><p className="text-sm text-muted-foreground">Upload documents to include in recall. Answers will cite the source and page.</p><m.UploadPanel /></div>})),
+  billing: () => import('@/app/dashboard/settings/billing/_components/billing-surface').then(m => ({default:() => <div className="p-6 max-w-3xl mx-auto space-y-6"><h1 className="font-display text-2xl">Billing</h1><m.BillingSurface /></div>})),
+  'connected-apps': () => import('@/app/dashboard/settings/connected-apps/_components/connected-apps-surface').then(m => ({default:() => <div className="p-6 max-w-3xl mx-auto space-y-6"><m.ConnectedAppsSurface initialNotice={null} /></div>})),
+  conversation: () => import('@/app/dashboard/conversation/_components/conversation-surface').then(m => ({default:m.ConversationSurface})),
+  presence: () => import('@/components/holo/presence-surface').then(m => ({default:m.PresenceSurface})),
+  obsidian: () => import('@/components/holo/obsidian-surface').then(m => ({default:m.ObsidianSurface})),
+  dashboard: () => import('@/components/premium/ECHELONDashboard').then((m) => ({ default: m.ECHELONDashboard })),
   connectors: () => import('@/components/screens/connectors/connectors-screen'),
   usage: () => import('@/components/screens/usage/usage-screen'),
   security: () => import('@/components/screens/security/security-screen'),
@@ -82,9 +97,10 @@ export function PreviewClient({ screen, state, entityId, extraProps, children }:
   const q = entityId ? `&id=${encodeURIComponent(entityId)}` : '';
   // Remount (and re-install the mock) whenever the state changes.
   return (
-    <MockFetch key={state} state={state}>
+    <MockFetch key={state} state={state} screen={screen}>
       <DashboardShell user={{ email: 'dev.preview@example.test' }}>
-        <div className="border-b border-border bg-background/60 px-4 py-2 sm:px-8">
+        <div className={['dashboard','conversation','presence','obsidian'].includes(screen) ? 'flex h-full min-h-0 flex-col' : undefined}>
+        <div className="shrink-0 border-b border-border bg-background/60 px-4 py-2 sm:px-8">
           <p className="mb-1 font-mono text-[0.625rem] uppercase tracking-[0.25em] text-muted-foreground">Dev preview, fixtures only</p>
           <nav aria-label="Preview state" className="flex flex-wrap gap-2">
             {STATES.map((s) => (
@@ -93,7 +109,8 @@ export function PreviewClient({ screen, state, entityId, extraProps, children }:
             ))}
           </nav>
         </div>
-        {children ?? <Loaded id={screen} ids={ids} extra={extraProps} />}
+        <div className={['dashboard','conversation','presence','obsidian'].includes(screen) ? 'min-h-0 flex-1' : undefined}>{children ?? <Loaded id={screen} ids={ids} extra={extraProps} />}</div>
+        </div>
       </DashboardShell>
     </MockFetch>
   );

@@ -7,6 +7,7 @@ export interface Company {
   name: string;
   role: string;
   logo: string;
+  logoVariants?: string[];
   /** width / height of the logo file */
   aspect: number;
   /** Official website. Null until Victor supplies one; never guessed. */

@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import type { PersonaType } from '@/lib/personas';
+import Link from 'next/link';
+import { Activity, MessageSquare, Users, Orbit, ArrowUpRight } from 'lucide-react';
+import { PERSONAS, type PersonaType } from '@/lib/personas';
+import { useDashboardPersona } from '@/components/shell/persona-context';
 import { DashboardMonitor } from './DashboardMonitor';
 import { PremiumConversation } from './PremiumConversation';
 import { PremiumBoard } from './PremiumBoard';
@@ -22,76 +24,40 @@ const TABS: Array<{ id: View; label: string }> = [
  */
 export function ECHELONDashboard() {
   const [view, setView] = useState<View>('monitor');
-  const [activePersona, setActivePersona] = useState<PersonaType>('WHINK');
+  const persona = useDashboardPersona();
+  const [conversationBusy, setConversationBusy] = useState(false);
+  const activePersona = persona.state?.activePersona && persona.state.activePersona in PERSONAS
+    ? persona.state.activePersona as PersonaType : null;
+  const choosePersona = async (p: PersonaType) => {
+    if (!conversationBusy && await persona.select(p)) setView('conversation');
+  };
 
   const openConversation = useCallback(() => setView('conversation'), []);
-  const openBoard = useCallback(() => setView('board'), []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      {/* Segmented view switch — small, text-only, sits under the top bar */}
-      <div className="shrink-0 border-b border-border px-5 sm:px-8">
-        <nav className="-mb-px flex gap-6" aria-label="Dashboard view">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setView(t.id)}
-              aria-current={view === t.id ? 'page' : undefined}
-              className={`relative py-3 font-mono text-xs uppercase tracking-[0.14em] transition-colors ${
-                view === t.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {t.label}
-              {view === t.id && (
-                <motion.span
-                  layoutId="dash-tab"
-                  className="absolute inset-x-0 -bottom-px h-px bg-[hsl(var(--whink-accent))]"
-                  transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                />
-              )}
-            </button>
-          ))}
+    <div className="executive-workspace flex h-full min-h-0 flex-col">
+      <div className="workspace-switcher">
+        <span className="workspace-switcher-label">Executive workspace</span>
+        <nav aria-label="Dashboard view" className="workspace-tabs">
+          {TABS.map((t) => {
+            const Icon = t.id === 'monitor' ? Activity : t.id === 'conversation' ? MessageSquare : Users;
+            return <button key={t.id} type="button" onClick={() => setView(t.id)} aria-current={view === t.id ? 'page' : undefined}
+              className="workspace-tab"><Icon size={16} aria-hidden /><span>{t.label}</span></button>;
+          })}
         </nav>
+        <Link href="/dashboard/holo" aria-label="Enter HOLO" className="workspace-holo-link"><Orbit size={16} aria-hidden /><span>Enter HOLO</span><ArrowUpRight size={14} aria-hidden /></Link>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <AnimatePresence mode="wait" initial={false}>
-          {view === 'monitor' && (
-            <motion.div
-              key="monitor"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
-              <DashboardMonitor onOpenConversation={openConversation} onOpenBoard={openBoard} />
-            </motion.div>
-          )}
-          {view === 'conversation' && (
-            <motion.div
-              key="conversation"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="h-full"
-            >
-              <PremiumConversation activePersona={activePersona} onPersonaChange={setActivePersona} />
-            </motion.div>
-          )}
-          {view === 'board' && (
-            <motion.div
-              key="board"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
-              <PremiumBoard activePersona={activePersona} onSelect={(p) => { setActivePersona(p); setView('conversation'); }} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div hidden={view !== 'monitor'}>
+          <DashboardMonitor onOpenConversation={openConversation} />
+        </div>
+        <div hidden={view !== 'conversation'} className="h-full">
+          <PremiumConversation activePersona={activePersona} onPersonaChange={choosePersona} personaBusy={persona.busy} personaError={persona.error} onSendingChange={setConversationBusy} onComplete={persona.refresh} />
+        </div>
+        <div hidden={view !== 'board'}>
+          <PremiumBoard activePersona={activePersona} onSelect={choosePersona} busy={persona.busy || conversationBusy} />
+        </div>
       </div>
     </div>
   );

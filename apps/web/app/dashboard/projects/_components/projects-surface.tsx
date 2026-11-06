@@ -53,7 +53,7 @@ export function ProjectsSurface() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-display font-bold tracking-tight">Projects</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage active projects and their context</p>
@@ -101,18 +101,18 @@ export function ProjectsSurface() {
             <button
               key={p.id}
               onClick={() => router.push(`/dashboard/projects/${p.id}`)}
-              className="bg-card rounded-lg border border-border p-5 text-left hover:border-primary/30 transition-colors w-full"
+              className="project-list-card min-w-0 bg-card rounded-lg border border-border p-5 text-left hover:border-primary/30 transition-colors w-full"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FolderKanban className="h-5 w-5 text-primary" />
+                <div className="flex min-w-0 items-start gap-3">
+                  <FolderKanban className="h-5 w-5 shrink-0 text-primary" />
                   <div>
-                    <h3 className="font-medium text-foreground">{p.name}</h3>
+                    <h3 className="break-words font-medium text-foreground">{p.name}</h3>
                     {p.goal && <p className="text-xs text-muted-foreground mt-0.5">{p.goal}</p>}
                     <div className="mt-1.5"><SubsidiaryChip id={p.subsidiary ?? null} /></div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-4 sm:shrink-0">
                   <span className={`text-xs px-2 py-0.5 rounded font-mono ${p.status === 'ACTIVE' ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>{p.status}</span>
                   <span className="text-xs text-muted-foreground font-mono">{p.openTaskCount} open</span>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />

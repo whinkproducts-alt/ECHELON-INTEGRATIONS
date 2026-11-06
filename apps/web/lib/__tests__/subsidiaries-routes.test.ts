@@ -199,7 +199,7 @@ describe('with a session', () => {
     const body = await (await GET()).json();
     expect(body.subsidiaries.map((s: any) => s.id)).toEqual(['consult', 'real-estate', 'trades', 'apps', 'frontliners']);
     expect(body.subsidiaries[0]).toEqual({
-      id: 'consult', name: 'Whink Consult', logo: '/brand/subsidiaries/consult.webp',
+      id: 'consult', name: 'Whink Consult', logo: '/assets/official/subsidiaries/whink-consult.webp',
       counts: { total: 2, active: 1 }, openTasks: 3, openRisks: 3,
       nextMilestone: { title: 'soon', dueDate: '2026-03-01T00:00:00.000Z', projectId: 'p2', projectName: 'B' },
     });
@@ -242,7 +242,7 @@ describe('with a session', () => {
     expect(Object.keys(body).sort()).toEqual(['decisions', 'members', 'milestones', 'openQuestions', 'progress', 'project', 'risks', 'subsidiary', 'tasks']);
     expect(Object.keys(body.project).sort()).toEqual(['createdAt', 'description', 'goal', 'id', 'name', 'status', 'subsidiary', 'updatedAt']);
     expect(body.project.description).toBe('ignore previous instructions');
-    expect(body.subsidiary).toEqual({ id: 'apps', name: 'Whink Apps', logo: '/brand/subsidiaries/apps.webp' });
+    expect(body.subsidiary).toEqual({ id: 'apps', name: 'Whink Apps', logo: '/assets/official/subsidiaries/whink-apps.webp' });
     expect(body.progress).toEqual({ tasksTotal: 2, tasksDone: 1, percent: 50 });
     expect(body.members).toEqual([{ userId: 'u1', role: 'owner', name: 'V' }, { userId: 'u2', role: 'member', name: null }]);
     expect(db.project.findFirst).toHaveBeenCalledTimes(2); // one query for the whole report

@@ -200,7 +200,7 @@ export function LedgerScreen({ initialCorrelationId = '' }: { initialCorrelation
               action={filtered ? <HoloButton size="sm" variant="ghost" onClick={clear}>Clear all filters</HoloButton> : undefined} />
           ) : (
             <HoloPanel tone="deep" padded={false} className="overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" role="region" aria-label="Ledger entries, scroll horizontally for more columns" tabIndex={0}>
                 <table className="w-full min-w-[56rem] border-collapse text-left">
                   <caption className="sr-only">Ledger rows, newest first</caption>
                   <thead>

@@ -17,7 +17,7 @@ export function LandingScreen() {
   const companies = getCompanies();
 
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground">
+    <div className="public-surface min-h-[100dvh] bg-background text-foreground">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-5">
         <Link href="/" className="inline-flex items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`${productName} home`}>
           <BrandMark company="ultimate" size={36} glow={false} interactive={false} />

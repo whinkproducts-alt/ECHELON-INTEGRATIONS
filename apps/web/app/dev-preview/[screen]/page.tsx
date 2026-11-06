@@ -5,6 +5,7 @@ import { BoardScreen } from '@/components/screens/board/board-screen';
 import { getBoardMembers } from '@/lib/board';
 import { getSubsidiary } from '@/lib/subsidiaries';
 import { toMeetingProps } from '@/components/screens/meeting/props';
+import { WorkforceScreen } from '@/components/screens/workforce/workforce-screen';
 import { RosterScreen } from '@/components/screens/roster/roster-screen';
 import { getRosterView } from '@/components/screens/roster/server-data';
 import { PreviewClient } from '../_components/preview-client';
@@ -14,7 +15,6 @@ export const dynamic = 'force-dynamic';
 
 const SERVER_PAGES: Record<string, () => Promise<{ default: () => unknown }>> = {
   directory: () => import('@/app/dashboard/directory/page'),
-  workforce: () => import('@/app/dashboard/workforce/page'),
   companies: () => import('@/app/dashboard/companies/page'),
 };
 
@@ -35,7 +35,7 @@ export default async function DevPreviewPage({ params, searchParams }: {
   const loadPage = SERVER_PAGES[screen];
   const Page = loadPage ? ((await loadPage()).default as unknown as React.ComponentType) : null;
   // The real board page is owner-gated through auth(); the dev preview renders the screen directly.
-  const body = screen === 'board' ? <BoardScreen members={getBoardMembers()} /> : screen === 'roster' ? <RosterScreen {...getRosterView()} /> : Page ? <Page /> : undefined;
+  const body = screen === 'workforce' ? <WorkforceScreen data={{directorates:[{name:'Fixture engineering',director:null,departments:{}}],manifest:{agentCount:1,skillCount:0,teamCount:0},mismatches:[],agents:[{id:'synthetic-layout-agent',name:'Synthetic layout agent',title:'Isolated preview only',directorate:'Fixture engineering',department:'Layout verification',team:'Preview',state:'DORMANT',autonomy:1,mission:'Verify responsive directory layout. This is not a real worker.',responsibilities:[],skills:[],approvalsRequiredFor:[],reportsToHuman:'Fixture owner'}]}} /> : screen === 'board' ? <BoardScreen members={getBoardMembers()} /> : screen === 'roster' ? <RosterScreen {...getRosterView()} /> : Page ? <Page /> : undefined;
   // SubsidiaryScreen takes its config row from the server page; the harness supplies it the same way.
   const extraProps = screen === 'subsidiary' ? { subsidiary: getSubsidiary(entityId ?? 'consult') }
     : screen === 'meeting' ? { ...toMeetingProps(getBoardMembers()) } : undefined;

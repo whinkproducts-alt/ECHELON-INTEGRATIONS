@@ -1,8 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Bell, RefreshCw, Search } from 'lucide-react';
+import { AlertTriangle, Bell, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { OBSIDIAN_PERSONA } from '@/lib/dashboard-client';
+import { useDashboardPersona } from '@/components/shell/persona-context';
+import { BrandMark } from '@/components/brand';
 import { useSession } from 'next-auth/react';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import { ClientOnly } from '@/components/client-only';
@@ -72,24 +76,12 @@ function Greeting() {
 }
 
 // Primary persona wordmark SVG: no product name in markup; the name comes from tenant config
-function WhinkLogoMark() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden>
-      <circle cx="14" cy="14" r="13" stroke="hsl(var(--whink-accent))" strokeWidth="1.5" />
-      <path
-        d="M7 9l3 7 4-5 4 5 3-7"
-        stroke="hsl(var(--whink-accent))"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-    </svg>
-  );
-}
+
 
 export function HoloSurface() {
   const config = useTenantConfig();
+  const router = useRouter();
+  const persona = useDashboardPersona();
   const productName = config.loading ? 'Your assistant' : config.productName;
   const { data: sessionData } = useSession();
   const userName = sessionData?.user?.name ?? '';
@@ -186,7 +178,7 @@ export function HoloSurface() {
     { label: 'BLOCKED', value: String(blocked) },
   ], [counts.working, awaiting, blocked]);
 
-  // Priority checklist fixture
+  // Example priorities fixture
   const priorities = [
     { done: false, text: 'Review investor deck draft' },
     { done: true,  text: 'Send partnership proposal' },
@@ -196,7 +188,7 @@ export function HoloSurface() {
 
   return (
     <div
-      className="relative min-h-screen"
+      className="holo-overview relative min-h-screen"
       style={{
         background: 'hsl(var(--base))',
       }}
@@ -214,27 +206,27 @@ export function HoloSurface() {
 
         {/* ── Header ─────────────────────────────────────────────── */}
         <header
-          className="flex items-center gap-4 px-5 py-3"
+          className="holo-overview-header flex flex-wrap items-center gap-4 px-5 py-3"
           style={glassPanel}
         >
           {/* Logo + product name — name always from tenant config */}
           <span className="text-xs text-muted-foreground" role="status">DEMO agent activity</span>
           <Link href="/dashboard/holo" className="flex items-center gap-2 shrink-0" aria-label={`${productName} home`}>
-            <WhinkLogoMark />
+            <BrandMark company="ultimate" size={28} interactive={false} />
             <span className="font-display font-bold text-sm tracking-widest uppercase" style={{ color: 'hsl(var(--whink-accent))' }}>
               {productName}
             </span>
           </Link>
 
           {/* Nav */}
-          <nav className="flex items-center gap-1 ml-4 flex-1" aria-label="Main navigation">
+          <nav className="flex min-w-0 flex-wrap items-center gap-1 flex-1" aria-label="HOLO navigation">
             {[
               { label: 'Home', href: '/dashboard/holo' },
               { label: 'Voice', href: '/dashboard/holo/presence' },
               { label: 'Brain', href: '/dashboard/memory' },
               { label: 'Projects', href: '/dashboard' },
               { label: 'Ledger', href: '/dashboard/ledger' },
-              { label: 'Connections', href: '/dashboard/connections' },
+              { label: 'Connections', href: '/dashboard/connectors' },
             { label: 'News', href: '/dashboard/holo/news' },
               { label: 'Today', href: '/dashboard/today' },
               { label: 'Board', href: '/dashboard/board' },
@@ -250,29 +242,13 @@ export function HoloSurface() {
             ))}
           </nav>
 
-          {/* Search */}
-          <div className="relative hidden md:flex items-center">
-            <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-            <input
-              type="search"
-              placeholder="Search  ⌘K"
-              aria-label="Search"
-              className="h-8 w-48 rounded-md border bg-transparent pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:ring-1"
-              style={{ borderColor: 'rgba(56,182,255,0.2)', '--tw-ring-color': 'hsl(var(--whink-accent))' } as React.CSSProperties}
-            />
-          </div>
+          <Link href="/dashboard/conversation" className="workspace-text-link">Ask {productName}</Link>
 
           {/* Obsidian toggle */}
           <button
             type="button"
-            onClick={async () => {
-              await fetch('/api/persona/switch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mambaMode: 'OBSIDIAN' }),
-              });
-              window.location.href = '/dashboard/holo/obsidian';
-            }}
+            onClick={async () => { if(await persona.select(OBSIDIAN_PERSONA)) router.push('/dashboard/holo/obsidian'); }}
+            disabled={persona.busy}
             className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors shrink-0"
             style={{
               border: '1px solid hsl(var(--mamba-blood))',
@@ -316,8 +292,10 @@ export function HoloSurface() {
           </Link>
         </header>
 
+        {persona.error && <p role="alert" className="text-sm text-foreground">{persona.error}</p>}
+
         {/* ── Three-column layout ─────────────────────────────────── */}
-        <div className="grid gap-4" style={{ gridTemplateColumns: '320px 1fr 300px' }}>
+        <div className="holo-overview-grid grid gap-4">
 
           {/* ── Left column ──────────────────────────────────────── */}
           <div className="space-y-4">
@@ -383,9 +361,9 @@ export function HoloSurface() {
               </div>
             </div>
 
-            {/* Priority checklist */}
+            {/* Example priorities */}
             <div className="p-4 space-y-3" style={glassPanel}>
-              <h2 className="font-display text-sm font-semibold tracking-tight">Priority checklist</h2>
+              <h2 className="font-display text-sm font-semibold tracking-tight">Example priorities</h2>
               <ul className="space-y-2">
                 {priorities.map((item, i) => (
                   <li key={i} className="flex items-start gap-2 text-xs">
@@ -437,7 +415,7 @@ export function HoloSurface() {
           </div>
 
           {/* ── Center column — avatar orbit panel ───────────────── */}
-          <div className="space-y-4">
+          <div className="holo-overview-main space-y-4">
             <div
               className="relative overflow-hidden"
               style={{
@@ -511,7 +489,7 @@ export function HoloSurface() {
                 </div>
 
                 {/* Avatar label + status chip */}
-                <div className="flex items-center gap-3 mb-4">
+                <div className="holo-avatar-caption flex items-center gap-3 mb-4">
                   <p className="font-display text-sm font-semibold tracking-wide" style={{ color: 'hsl(var(--whink-accent))' }}>
                     {productName} · Chief of Staff
                   </p>
@@ -523,7 +501,7 @@ export function HoloSurface() {
                       color: 'hsl(var(--whink-accent))',
                     }}
                   >
-                    Listening for "{productName}"
+                    Voice and presence
                   </span>
                 </div>
 

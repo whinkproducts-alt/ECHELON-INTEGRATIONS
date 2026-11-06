@@ -20,7 +20,7 @@ export interface HoloButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLBut
 }
 
 export const HoloButton = React.forwardRef<HTMLElement, HoloButtonProps>(function HoloButton(
-  { variant = 'primary', size = 'md', loading = false, href, tone = 'accent', magnetic = true, leftIcon, rightIcon, className, children, disabled, onPointerMove, onPointerLeave, type = 'button', ...rest },
+  { variant = 'primary', size = 'md', loading = false, href, tone = 'accent', magnetic = false, leftIcon, rightIcon, className, children, disabled, onPointerMove, onPointerLeave, type = 'button', ...rest },
   ref,
 ) {
   const localRef = React.useRef<HTMLElement | null>(null);

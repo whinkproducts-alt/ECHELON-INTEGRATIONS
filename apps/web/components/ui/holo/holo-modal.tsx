@@ -19,6 +19,7 @@ interface BaseProps {
   tone?: HoloTone;
   width?: string;
   className?: string;
+  returnFocusTo?: React.RefObject<HTMLElement | null>;
 }
 
 function Body({ title, description, children, footer }: Pick<BaseProps, 'title' | 'description' | 'children' | 'footer'>) {
@@ -39,12 +40,12 @@ function Body({ title, description, children, footer }: Pick<BaseProps, 'title' 
   );
 }
 
-export function HoloModal({ open, onOpenChange, tone = 'accent', width = '32rem', className, ...body }: BaseProps) {
+export function HoloModal({ open, onOpenChange, tone = 'accent', width = '32rem', className, returnFocusTo, ...body }: BaseProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="holo-overlay" />
-        <Dialog.Content className={cn('holo-modal holo-panel p-6', toneClass(tone), className)} data-glow="soft" style={{ '--holo-modal-w': width } as React.CSSProperties}>
+        <Dialog.Content onCloseAutoFocus={event => { if(returnFocusTo?.current?.isConnected) {event.preventDefault(); returnFocusTo.current.focus();} }} className={cn('holo-modal holo-panel p-6', toneClass(tone), className)} data-glow="soft" style={{ '--holo-modal-w': width } as React.CSSProperties}>
           <Body {...body} />
         </Dialog.Content>
       </Dialog.Portal>
@@ -52,12 +53,12 @@ export function HoloModal({ open, onOpenChange, tone = 'accent', width = '32rem'
   );
 }
 
-export function HoloDrawer({ open, onOpenChange, tone = 'accent', width = '28rem', side = 'right', className, ...body }: BaseProps & { side?: 'right' | 'left' | 'bottom' }) {
+export function HoloDrawer({ open, onOpenChange, tone = 'accent', width = '28rem', side = 'right', className, returnFocusTo, ...body }: BaseProps & { side?: 'right' | 'left' | 'bottom' }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="holo-overlay" />
-        <Dialog.Content data-side={side} className={cn('holo-drawer holo-panel p-6', toneClass(tone), className)} style={{ '--holo-drawer-w': width, borderRadius: 0 } as React.CSSProperties}>
+        <Dialog.Content onCloseAutoFocus={event => { if(returnFocusTo?.current?.isConnected) {event.preventDefault(); returnFocusTo.current.focus();} }} data-side={side} className={cn('holo-drawer holo-panel p-6', toneClass(tone), className)} style={{ '--holo-drawer-w': width, borderRadius: 0 } as React.CSSProperties}>
           <Body {...body} />
         </Dialog.Content>
       </Dialog.Portal>
