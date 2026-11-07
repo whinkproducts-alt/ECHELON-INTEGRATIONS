@@ -24,3 +24,5 @@ Local UI continuation: dedicated Conversation and WHINK/MAMBA presence screens n
 Local futuristic system pass: shared styling across 34 navigation presentations, responsive corrections and governed HOLO Obsidian switch. Final typecheck/lint/38 focused tests/webpack build passed. See `docs/ui/FUTURISTIC-PASS.md`; live authenticated acceptance remains pending.
 
 2026-11-06 release: user authorized main publication and all branch cleanup. All 13 non-main remote tips archived then deleted; UI plus local Mac installer candidate prepared. Full unit suite/typecheck/lint/webpack build pass. See `docs/releases/2026-11-06-local-package.md` and `packaging/README.md`. Docker/live installation/signing remain blocked or unverified; do not claim one-click readiness.
+
+Windows installer continuation: native IExpress EXE source and Windows-runner build/install/uninstall checks added under `packaging/windows`; runtime model/WSL2 acceptance remains separate. Prior CI E2E failure traced to stale dashboard heading assertion, now aligned with Operations monitor. Unrelated untracked iCloud duplicate files preserved.

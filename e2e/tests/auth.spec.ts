@@ -11,7 +11,7 @@ test.describe('authentication', () => {
   test('right password reaches the dashboard', async ({ page }) => {
     await login(page, OWNER.email);
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByRole('heading', { name: 'What requires your attention' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Operations monitor.', exact: true })).toBeVisible();
   });
 
   test('unauthenticated /dashboard redirects to /login', async ({ page }) => {

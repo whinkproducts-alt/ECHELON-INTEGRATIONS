@@ -1,0 +1,37 @@
+name: Windows installer
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/windows/**'
+      - '.github/workflows/windows-installer.yml'
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Compile the EXE with built-in Windows IExpress
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "$env:WINDIR\System32\iexpress.exe")) { throw 'Windows IExpress unavailable' }
+          python packaging/windows/build.py --output "$env:RUNNER_TEMP\whink-windows"
+          if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
+      - name: Test PowerShell, credentials, actual EXE installation and data-preserving uninstall
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -File packaging/windows/test.ps1 -OutputDirectory "$env:RUNNER_TEMP\whink-windows"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows installer verification failed' }
+      - name: Upload verified installer candidate and evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: whink-windows-installer
+          path: |
+            ${{ runner.temp }}/whink-windows/Whink-Ultimate-Windows-Setup.exe
+            ${{ runner.temp }}/whink-windows/README.md
+            ${{ runner.temp }}/whink-windows/release.json
+            ${{ runner.temp }}/whink-windows/verification.json
+          if-no-files-found: error
