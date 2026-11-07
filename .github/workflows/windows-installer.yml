@@ -9,6 +9,49 @@ on:
 permissions:
   contents: read
 jobs:
+  runtime:
+    name: Linux container first-boot smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build and boot the packaged stack with disposable local-only configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          export WHINK_RELEASE_ID=installer-ci
+          export WHINK_RUNTIME_ENV="$RUNNER_TEMP/runtime.env"
+          python3 - <<'PY'
+          import os, secrets
+          from pathlib import Path
+          password = secrets.token_hex(32)
+          auth = secrets.token_hex(32)
+          values = {
+            'WHINK_DB_PASSWORD': password,
+            'DATABASE_URL': f'postgresql://whink:{password}@postgres:5432/whink',
+            'DIRECT_URL': f'postgresql://whink:{password}@postgres:5432/whink',
+            'AUTH_SECRET': auth, 'NEXTAUTH_SECRET': auth,
+            'AUTH_URL': 'http://localhost:3211', 'NEXTAUTH_URL': 'http://localhost:3211',
+            'AUTH_TRUST_HOST': 'true', 'ENCRYPTION_KEY': secrets.token_hex(32),
+            'WHINK_OWNER_EMAILS': 'owner@example.test',
+            'SIGNUP_BOOTSTRAP_TOKEN': secrets.token_hex(32),
+            'WORKER_ENABLED': 'true', 'WORKER_CONCURRENCY': '1',
+            'OLLAMA_URL': 'http://127.0.0.1:9',
+            'OPENAI_COMPATIBLE_BASE_URL': 'http://127.0.0.1:9/v1',
+            'NVIDIA_TRIAL_ENABLED': 'false',
+          }
+          Path(os.environ['WHINK_RUNTIME_ENV']).write_text(''.join(f'{k}={v}\n' for k,v in values.items()))
+          PY
+          compose=(docker compose --env-file "$WHINK_RUNTIME_ENV" -f packaging/local/compose.yaml)
+          "${compose[@]}" up --build --wait --wait-timeout 180
+          curl --fail --silent http://localhost:3211/login >/dev/null
+          code=$(curl --silent -o /dev/null -w '%{http_code}' http://localhost:3211/dev-preview/dashboard)
+          test "$code" = 404
+          worker=$("${compose[@]}" ps -q worker)
+          test -n "$worker"
+          test "$(docker inspect --format '{{.State.Running}}' "$worker")" = true
+          echo 'PASS: Linux image built; migrations completed; web healthy; worker running; dev preview unavailable in production. No accounts, jobs, model calls or live integrations exercised.'
   package:
     runs-on: windows-2025
     timeout-minutes: 15
