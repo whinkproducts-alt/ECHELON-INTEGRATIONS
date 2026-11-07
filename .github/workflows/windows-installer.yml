@@ -57,10 +57,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - name: Compile the EXE with built-in Windows IExpress
+      - name: Compile the EXE with built-in Windows .NET compiler
         shell: pwsh
         run: |
-          if (-not (Test-Path "$env:WINDIR\System32\iexpress.exe")) { throw 'Windows IExpress unavailable' }
+          if (-not (Test-Path "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe")) { throw 'Windows .NET Framework compiler unavailable' }
           python packaging/windows/build.py --output "$env:RUNNER_TEMP\whink-windows"
           if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
       - name: Test PowerShell, credentials, actual EXE installation and data-preserving uninstall

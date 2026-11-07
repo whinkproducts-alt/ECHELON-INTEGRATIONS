@@ -51,7 +51,7 @@ is required for a signed distribution build.
 
 ## Build and verification
 
-The EXE is compiled with Windows' built-in IExpress on the standard Windows
+The EXE is compiled with Windows' built-in .NET Framework compiler on the standard Windows
 GitHub runner. No additional installer framework or runtime dependency is added.
 `python packaging/windows/build.py --output OUTPUT` builds on Windows;
 `--stage-only` verifies the same source payload on other hosts. Only allowed

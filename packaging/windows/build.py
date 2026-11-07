@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage a secret-free local-system payload and compile it with Windows IExpress."""
+"""Stage a secret-free local-system payload and compile it with the Windows .NET Framework compiler."""
 from pathlib import Path
 import argparse
 import hashlib
@@ -21,7 +21,7 @@ def build(output: Path, stage_only: bool):
     tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
     selected = []
     for name in filter(None, tracked):
-        if name not in {'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.dockerignore'} and not name.startswith(('apps/web/', 'packages/', 'packaging/local/')):
+        if name not in {'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.dockerignore', 'services/openclaw/upstreams/social/src/tools.ts'} and not name.startswith(('apps/web/', 'packages/', 'packaging/local/')):
             continue
         parts = Path(name).parts
         if any(p.startswith(('.env', '.build')) or p in {'node_modules', '.next', '.git'} for p in parts):
@@ -50,23 +50,22 @@ def build(output: Path, stage_only: bool):
     if os.name != 'nt':
         raise RuntimeError('The EXE compiler requires Windows; use --stage-only for source/payload verification elsewhere.')
     executable = output / 'Whink-Ultimate-Windows-Setup.exe'
-    files = sorted(p.name for p in stage.iterdir() if p.is_file())
-    lines = ['[Version]', 'Class=IEXPRESS', 'SEDVersion=3', '[Options]', 'PackagePurpose=InstallApp',
-             'ShowInstallProgramWindow=1', 'HideExtractAnimation=0', 'UseLongFileName=1',
-             'InsideCompressed=0', 'CAB_FixedSize=0', 'CAB_ResvCodeSigning=0', 'RebootMode=N',
-             'InstallPrompt=', 'DisplayLicense=', 'FinishMessage=',
-             'FriendlyName=Whink Ultimate Local System', 'TargetName=' + str(executable),
-             'AppLaunched=cmd.exe /d /c Install.cmd', 'PostInstallCmd=<None>', 'AdminQuietInstCmd=', 'UserQuietInstCmd=',
-             'SourceFiles=SourceFiles', '[Strings]']
-    lines += [f'FILE{i}="{name}"' for i, name in enumerate(files)]
-    lines += ['[SourceFiles]', 'SourceFiles0=' + str(stage) + '\\', '[SourceFiles0]']
-    lines += [f'%FILE{i}%=' for i in range(len(files))]
-    sed = output / 'installer.sed'
-    sed.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-    compiler = Path(os.environ['WINDIR']) / 'System32/iexpress.exe'
-    subprocess.run([str(compiler), '/N', '/Q', str(sed)], check=True, timeout=180)
+    bundle = output / 'installer-payload.zip'
+    with zipfile.ZipFile(bundle, 'w', zipfile.ZIP_DEFLATED) as archive:
+        for file in sorted(stage.iterdir()):
+            if file.is_file():
+                archive.write(file, file.name)
+    framework = Path(os.environ['WINDIR']) / 'Microsoft.NET/Framework64/v4.0.30319'
+    compiler = framework / 'csc.exe'
+    subprocess.run([str(compiler), '/nologo', '/target:exe', '/platform:anycpu', '/optimize+',
+                    '/out:' + str(executable), '/win32manifest:' + str(ROOT / 'packaging/windows/installer.manifest'),
+                    '/resource:' + str(bundle) + ',Whink.Payload',
+                    '/reference:' + str(framework / 'System.IO.Compression.dll'),
+                    '/reference:' + str(framework / 'System.IO.Compression.FileSystem.dll'),
+                    '/reference:' + str(framework / 'System.Windows.Forms.dll'),
+                    str(ROOT / 'packaging/windows/Installer.cs')], check=True, timeout=180)
     if not executable.exists() or executable.stat().st_size < 100000:
-        raise RuntimeError('IExpress did not produce an installer.')
+        raise RuntimeError('The Windows compiler did not produce an installer.')
     metadata['installer_sha256'] = hashlib.sha256(executable.read_bytes()).hexdigest()
     (output / 'release.json').write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
     shutil.copy(ROOT / 'packaging/windows/README.md', output / 'README.md')

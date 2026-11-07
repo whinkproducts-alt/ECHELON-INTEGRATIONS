@@ -21,7 +21,7 @@ def build(destination):
     destination.mkdir(parents=True, exist_ok=True)
     files = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
     allowed_roots = ('apps/web/', 'packages/', 'packaging/local/')
-    allowed_files = {'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.dockerignore'}
+    allowed_files = {'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.dockerignore', 'services/openclaw/upstreams/social/src/tools.ts'}
     payload = []
     for name in filter(None, files):
         p = ROOT / name

@@ -46,7 +46,10 @@ $checks.Add('Payload checksum success and mismatch rejection passed')
 # The disposable Windows runner is the only target of this install/uninstall test.
 $exe = Join-Path $OutputDirectory 'Whink-Ultimate-Windows-Setup.exe'
 $process = Start-Process -FilePath $exe -ArgumentList '/Q' -PassThru
-Assert ($process.WaitForExit(120000)) 'Installer exceeded 120 seconds'
+if (-not $process.WaitForExit(120000)) {
+    & taskkill.exe /PID $process.Id /T /F | Out-Null
+    throw 'Installer exceeded 120 seconds; its test process tree was stopped.'
+}
 Assert ($process.ExitCode -eq 0) 'Installer returned an error'
 $installed = Join-Path $env:LOCALAPPDATA 'Programs\Whink Ultimate'
 $menu = Join-Path ([Environment]::GetFolderPath('Programs')) 'Whink Ultimate'
