@@ -20,3 +20,6 @@ e8b68698a4e1fea21cbbbd0fbce3eebaeff02d7d:apps/web/.secret-scan-allow:aws-access-
 # Master plan archive: line 70697 sits inside an embedded base64 block (lines 70000 to 70800 are all
 # base64 characters only); the "square-access-token" pattern matched encoded data by chance.
 8aee29df0d971ab6073fec919f7d00e899a1683d:docs/ECHELON_ALL_IN_ONE_FOUNDER_BLUEPRINT_ASSETS_DECISIONS.txt:square-access-token:70697
+
+# Reviewed Windows installer line: generated $token variable followed by literal SIGNUP_ENABLED flag; no stored credential.
+8381dc53e0c8b4abe0e9bb9fe7b6c772d6750c01:packaging/windows/Runtime.psm1:generic-api-key:44

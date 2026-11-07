@@ -46,8 +46,13 @@ jobs:
           compose=(docker compose --env-file "$WHINK_RUNTIME_ENV" -f packaging/local/compose.yaml)
           "${compose[@]}" up --build --wait --wait-timeout 180
           curl --fail --silent http://localhost:3211/login >/dev/null
-          code=$(curl --silent -o /dev/null -w '%{http_code}' http://localhost:3211/dev-preview/dashboard)
-          test "$code" = 404
+          code=$(curl --silent -D "$RUNNER_TEMP/preview-headers" -o /dev/null -w '%{http_code}' http://localhost:3211/dev-preview/dashboard)
+          echo "Production anonymous preview response: $code"
+          if [ "$code" != 404 ]; then
+            # Production proxy denies anonymous preview access before the page's notFound guard.
+            test "$code" = 307
+            tr -d '\r' < "$RUNNER_TEMP/preview-headers" | grep -iE '^location: http://[^/]+/login([?]|$)' >/dev/null
+          fi
           worker=$("${compose[@]}" ps -q worker)
           test -n "$worker"
           test "$(docker inspect --format '{{.State.Running}}' "$worker")" = true
