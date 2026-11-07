@@ -56,7 +56,7 @@ def build(output: Path, stage_only: bool):
              'InsideCompressed=0', 'CAB_FixedSize=0', 'CAB_ResvCodeSigning=0', 'RebootMode=N',
              'InstallPrompt=', 'DisplayLicense=', 'FinishMessage=',
              'FriendlyName=Whink Ultimate Local System', 'TargetName=' + str(executable),
-             'AppLaunched=Install.cmd', 'PostInstallCmd=<None>', 'AdminQuietInstCmd=', 'UserQuietInstCmd=',
+             'AppLaunched=cmd.exe /d /c Install.cmd', 'PostInstallCmd=<None>', 'AdminQuietInstCmd=', 'UserQuietInstCmd=',
              'SourceFiles=SourceFiles', '[Strings]']
     lines += [f'FILE{i}="{name}"' for i, name in enumerate(files)]
     lines += ['[SourceFiles]', 'SourceFiles0=' + str(stage) + '\\', '[SourceFiles0]']
