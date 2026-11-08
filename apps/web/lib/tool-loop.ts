@@ -25,7 +25,7 @@ import { fallbackMayContinue, noteCandidateFailure, type HandoffStop, type Order
 import { localDefaultModel } from '@/lib/model-router/registry';
 import { ProviderUserError } from '@/lib/provider-errors';
 
-const EXTERNAL_TOOLS = new Set(['web_fetch', 'web_search', 'document_search', 'memory_read', 'calendar_list']);
+const EXTERNAL_TOOLS = new Set(['media_quote', 'media_generate', 'media_status', 'web_fetch', 'web_search', 'document_search', 'memory_read', 'calendar_list']);
 // Workspace tools read local files and git output: untrusted data, so a turn that used one is tainted.
 const WORKSPACE_EXTERNAL_TOOLS = new Set(['get_cwd', 'read_file', 'list_files', 'search_files', 'git_status', 'git_diff', 'git_log']);
 export const isExternalTool = (name: string) => EXTERNAL_TOOLS.has(name) || WORKSPACE_EXTERNAL_TOOLS.has(name) || name.startsWith('openclaw__');
@@ -391,6 +391,21 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ReadableStream
  * Class B/C tools are offered only when autonomy level supports them.
  */
 export const STANDARD_TOOLS: ToolDefinition[] = [
+  {
+    name: 'media_quote',
+    description: 'Media production: request account-specific image/video pricing from Higgsfield. Sends exact prompt externally; always requires explicit Class C owner approval. Does not generate or spend.',
+    inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: ['image', 'video'] }, prompt: { type: 'string', maxLength: 4000 } }, required: ['kind', 'prompt'], additionalProperties: false },
+  },
+  {
+    name: 'media_generate',
+    description: 'Media production: request generation using an executed media_quote approval ID. The server binds exact prompt, model options and provider-estimated USD amount (not a guaranteed final invoice) into a new Class C owner approval. Never invent prices.',
+    inputSchema: { type: 'object', properties: { quoteApprovalId: { type: 'string' } }, required: ['quoteApprovalId'], additionalProperties: false },
+  },
+  {
+    name: 'media_status',
+    description: 'Read image/video progress and output links for an executed generation approval belonging to this account. Use the approval ID, never a raw provider request ID.',
+    inputSchema: { type: 'object', properties: { generationApprovalId: { type: 'string' } }, required: ['generationApprovalId'], additionalProperties: false },
+  },
   {
     name: 'memory_read',
     description: 'Search WHINK memory for relevant facts, episodes, or hypotheses.',

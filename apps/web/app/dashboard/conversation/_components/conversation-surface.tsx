@@ -127,7 +127,7 @@ export function ConversationSurface({ initialPrompt = '', presentation = 'standa
   const streamCitationsRef = useRef<CitationChipProps[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { startListening, stopListening, speak, isListening, isSpeaking, supported, lipSyncAmplitude, voiceNotice } = useVoice();
+  const { startListening, stopListening, speak, isListening, isSpeaking, supported, lipSyncAmplitude, voiceNotice } = useVoice({ speakerId: activePersona ?? 'WHINK' });
 
   // Approvals: cards live in the stream; state per id via a pure reducer.
   const [approvals, setApprovals] = useState<ApprovalView[]>([]);
@@ -353,7 +353,7 @@ export function ConversationSurface({ initialPrompt = '', presentation = 'standa
       const capturedCitations = [...streamCitationsRef.current];
       if (fullText) setMessages(previous => [...previous,{id:`reply-${Date.now()}`,role:'assistant',content:fullText,persona:replyPersona,mambaMode,functionalMode:null,createdAt:new Date().toISOString(),citations:capturedCitations}]);
       setStreamText(''); setStreamCitations([]); streamCitationsRef.current = [];
-      if (voiceMode && fullText && !approvalArrived && !hasPendingApproval()) void speak(fullText).catch(() => {});
+      if (voiceMode && fullText && !approvalArrived && !hasPendingApproval()) void speak(fullText, replyPersona).catch(() => {});
     } catch (error) {
       if (!attempted || rejected) {
         setInput(text); setMessages(previous => previous.filter(message => message.id !== tempId));

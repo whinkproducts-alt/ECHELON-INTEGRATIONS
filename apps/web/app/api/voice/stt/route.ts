@@ -6,6 +6,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { DispatchBlockedError, runAdmittedVoice } from '@/lib/model-router/dispatch';
 
+import { selectedSpeech, signSpeechTurn } from '@/lib/speech-services';
+import { transcribeSpeech } from '@/lib/speech-transport';
+import { audioFilename, localSpeechHeaders } from '@/lib/local-speech';
+
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 export async function POST(req: NextRequest) {
@@ -18,6 +22,23 @@ export async function POST(req: NextRequest) {
   if (await isLockedDown(session.user.id)) {
     await ledgerLockdownBlock(session.user.id, 'voice_stt');
     return NextResponse.json({ error: LOCKDOWN_MESSAGE, code: 'LOCKDOWN_ACTIVE' }, { status: 423 });
+  }
+
+  try {
+    const selected = await selectedSpeech(req, session.user.id);
+    if (selected === null) return NextResponse.json({ error: 'No verified local speech pair is available. Use text or check speech settings.' }, { status: 503 });
+    if (selected) {
+      const length = Number(req.headers.get('content-length'));
+      if (!Number.isSafeInteger(length) || length <= 0 || length > MAX_BYTES) return NextResponse.json({ error: 'Invalid or oversized audio request' }, { status: 413 });
+      const form = await req.formData();
+      const audio = form.get('audio');
+      if (!(audio instanceof Blob) || !audio.size || audio.size > MAX_BYTES) return NextResponse.json({ error: 'Invalid audio' }, { status: 400 });
+      const text = await transcribeSpeech(session.user.id, selected, audio, req.signal);
+      return NextResponse.json({ text, service: selected.service, turnToken: signSpeechTurn(session.user.id, selected.service) }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+  } catch (error) {
+    if (error instanceof DispatchBlockedError) return NextResponse.json({ error: 'Speech was not admitted.', code: error.code }, { status: 409 });
+    return NextResponse.json({ error: 'Local speech is unavailable. Check speech settings; no cloud fallback was used.' }, { status: 503 });
   }
 
   const provider = (process.env.STT_PROVIDER ?? '').toLowerCase().trim();
@@ -121,7 +142,7 @@ export async function POST(req: NextRequest) {
   }
 
   const upstream = new FormData();
-  upstream.append('file', audio, 'audio.webm');
+  upstream.append('file', audio, audioFilename(audio.type));
   upstream.append('model', 'whisper-1');
 
   let upstreamRes: Response;
@@ -129,6 +150,8 @@ export async function POST(req: NextRequest) {
     upstreamRes = await runAdmittedVoice({ userId: session.user.id, channel: 'stt', units: audio.size }, () => fetch(`${sttUrl}/audio/transcriptions`, {
       method: 'POST',
       ...redirectOpt(sttUrl),
+      headers: localSpeechHeaders(sttUrl, provider === 'local-whisper'),
+      signal: AbortSignal.timeout(90_000),
       body: upstream,
     }));
   } catch (err) {

@@ -2,6 +2,10 @@
 
 Read [current audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md) for the fixed baseline, source/test map and CI evidence. `main` was `99f6d7eb3f58cff9d9aae8f59641137faf755a9c`; PRs #23/#24 are merged. Full personal use remains **not accepted**. Existing code, automatic test results, real provider acceptance and Founder acceptance are separate states.
 
+## 2026-11-08 delivery candidate
+
+Media/speech/navigation architecture is implemented on delivery/media-voice-performance; see [release evidence](releases/2026-11-08-media-speech-performance.md) and [build contract](product/ECHELON-MEDIA-SPEECH-PERFORMANCE-BUILD-PLAN.md).2,409 tests pass,112 skipped; independent mockedbrowser/security checks pass. No Mac acceptance/real inference is claimed. Runtime GPL/LGPL exception and model setup, Prisma engine network access/database proof, Mac audio/avatar/performance and funded individuallyapproved media test remain pending. These do not close the broader historical backlog below.
+
 ## Next action and priority
 
 Current execution architecture: [C00–C14 completion plan](product/ECHELON-END-TO-END-COMPLETION-PLAN.md). C00, the C01 dependency/service triage, the C02 admission/accounting core and the C03 saved-order dispatch path are implemented (2026-11-05 sync). Next: C04 owner/local configuration and C05 founder-private scope; C06 lockdown and a live second-provider acceptance for C03 can proceed alongside.

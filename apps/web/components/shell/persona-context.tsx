@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { isConversationPersona, dashboardJson } from '@/lib/dashboard-client';
+import { DISPLAY_FRESHNESS_MS } from '@/lib/dashboard-query-cache';
 
 interface PersonaState {
   activePersona: string;
@@ -26,6 +27,7 @@ export function PersonaProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const version = useRef(0);
   const switching = useRef(false);
+  const lastConfirmed = useRef<number | null>(null);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     const current = ++version.current;
@@ -33,9 +35,11 @@ export function PersonaProvider({ children }: { children: React.ReactNode }) {
       const data = await dashboardJson<PersonaState>('/api/persona/state', { signal });
       if (current !== version.current || signal?.aborted) return;
       if (typeof data.activePersona !== 'string') throw new Error('Agent state unavailable.');
+      lastConfirmed.current = Date.now();
       setState(data); setError(null);
     } catch {
       if (!signal?.aborted && current === version.current) {
+        lastConfirmed.current = null;
         setState(null); setError('Agent state unavailable. Select an available agent to retry.');
       }
     }
@@ -43,8 +47,11 @@ export function PersonaProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    const initial = setTimeout(() => { void refresh(controller.signal); }, 0);
-    const onFocus = () => { if (!switching.current) void refresh(controller.signal); };
+    const refreshIfStale = () => {
+      if (!switching.current && (lastConfirmed.current === null || Date.now() - lastConfirmed.current >= DISPLAY_FRESHNESS_MS)) void refresh(controller.signal);
+    };
+    const initial = setTimeout(refreshIfStale, 0);
+    const onFocus = refreshIfStale;
     window.addEventListener('focus', onFocus);
     return () => { clearTimeout(initial); controller.abort(); window.removeEventListener('focus', onFocus); };
   }, [pathname, refresh]);
@@ -59,10 +66,12 @@ export function PersonaProvider({ children }: { children: React.ReactNode }) {
       });
       if (data.activePersona !== persona) throw new Error('Agent selection was not confirmed.');
       // Switch response omits founder metadata; retain only the previously confirmed flag.
+      lastConfirmed.current = Date.now();
       setState(previous => ({ ...data, isFounder: previous?.isFounder }));
       return true;
     } catch {
       // The write may have reached the server. Do not keep claiming the previous state.
+      lastConfirmed.current = null;
       setState(null); setError('Agent selection could not be confirmed. Select an available agent to retry.');
       return false;
     } finally { switching.current = false; setBusy(false); }

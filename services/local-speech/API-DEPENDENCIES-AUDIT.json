@@ -1,0 +1,96 @@
+{
+  "checkedAt": "2026-11-08",
+  "source": "PyPI per-version JSON advisories; not a complete security audit",
+  "runtime": [
+    {
+      "name": "annotated-doc",
+      "version": "0.0.5",
+      "license": "MIT",
+      "advisories": []
+    },
+    {
+      "name": "annotated-types",
+      "version": "0.8.0",
+      "license": "MIT",
+      "advisories": []
+    },
+    {
+      "name": "anyio",
+      "version": "4.16.0",
+      "license": "MIT",
+      "advisories": []
+    },
+    {
+      "name": "click",
+      "version": "8.5.1",
+      "license": "BSD-3-Clause",
+      "advisories": []
+    },
+    {
+      "name": "fastapi",
+      "version": "0.162.2",
+      "license": "MIT",
+      "advisories": []
+    },
+    {
+      "name": "h11",
+      "version": "0.16.0",
+      "license": "MIT",
+      "advisories": []
+    },
+    {
+      "name": "idna",
+      "version": "3.20",
+      "license": "BSD-3-Clause",
+      "advisories": []
+    },
+    {
+      "name": "opentelemetry-api",
+      "version": "1.45.2",
+      "license": "Apache-2.0",
+      "advisories": []
+    },
+    {
+      "name": "pydantic",
+      "version": "2.14.3",
+      "license": "MIT",
+      "advisories": []
+    },
+    {
+      "name": "pydantic-core",
+      "version": "2.50.4",
+      "license": "MIT",
+      "advisories": []
+    },
+    {
+      "name": "python-multipart",
+      "version": "0.0.33",
+      "license": "Apache-2.0",
+      "advisories": []
+    },
+    {
+      "name": "starlette",
+      "version": "1.10.0",
+      "license": "BSD-3-Clause",
+      "advisories": []
+    },
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "license": "PSF-2.0",
+      "advisories": []
+    },
+    {
+      "name": "typing-inspection",
+      "version": "0.4.5",
+      "license": "MIT",
+      "advisories": []
+    },
+    {
+      "name": "uvicorn",
+      "version": "0.34.2",
+      "license": "BSD-3-Clause",
+      "advisories": []
+    }
+  ]
+}

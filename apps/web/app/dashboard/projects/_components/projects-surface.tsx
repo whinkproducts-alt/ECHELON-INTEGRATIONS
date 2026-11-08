@@ -1,6 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useDashboardDataClient } from '@/components/shell/dashboard-data-provider';
+import { DASHBOARD_KEYS } from '@/lib/dashboard-query-cache';
+import { fetchDashboardProjects } from '@/lib/dashboard-projects';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { FolderKanban, Plus, ArrowRight } from 'lucide-react';
@@ -23,8 +27,11 @@ interface Project {
 
 export function ProjectsSurface() {
   const router = useRouter();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const client = useDashboardDataClient();
+  const { data: projects = [], isPending: loading, error, refetch, isFetching } = useQuery({
+    queryKey: DASHBOARD_KEYS.projects,
+    queryFn: ({ signal }) => fetchDashboardProjects<Project>(signal),
+  }, client);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newGoal, setNewGoal] = useState('');
@@ -32,23 +39,22 @@ export function ProjectsSurface() {
   const [newSub, setNewSub] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch('/api/projects').then(r => r.json()).then(d => { setProjects(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
-
   const createProject = async () => {
     if (!newName.trim()) return;
     if (!newSub) { setCreateError('Choose a subsidiary for this project.'); return; }
     setCreateError(null);
-    const res = await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName, goal: newGoal || null, description: newDesc || null, subsidiary: newSub }),
-    });
-    const p = await res.json();
-    if (!res.ok) { setCreateError(typeof p?.error === 'string' ? p.error : 'Could not create the project.'); return; }
-    setProjects(prev => [{ ...p, openTaskCount: 0 }, ...(prev ?? [])]);
-    setNewName(''); setNewGoal(''); setNewDesc(''); setNewSub(''); setShowCreate(false);
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, goal: newGoal || null, description: newDesc || null, subsidiary: newSub }),
+      });
+      const p = await res.json();
+      if (!res.ok) { setCreateError(typeof p?.error === 'string' ? p.error : 'Could not create the project.'); return; }
+      client.setQueryData<Project[]>(DASHBOARD_KEYS.projects, prev => [{ ...p, openTaskCount: 0 }, ...(prev ?? [])]);
+      void client.invalidateQueries({ queryKey: DASHBOARD_KEYS.projects });
+      setNewName(''); setNewGoal(''); setNewDesc(''); setNewSub(''); setShowCreate(false);
+    } catch { setCreateError('Project creation could not be confirmed. Refresh before trying again.'); }
   };
 
   return (
@@ -88,6 +94,7 @@ export function ProjectsSurface() {
         </div>
       )}
 
+      {error && <p role="alert" className="text-sm text-destructive">{error.message} <button onClick={() => void refetch()} disabled={isFetching} className="underline">Retry</button>{projects.length > 0 && ' Showing last known projects.'}</p>}
       {loading ? (
         <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 bg-card animate-pulse rounded-lg" />)}</div>
       ) : (projects ?? []).length === 0 ? (

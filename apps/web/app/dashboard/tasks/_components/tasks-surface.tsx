@@ -1,6 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useDashboardDataClient } from '@/components/shell/dashboard-data-provider';
+import { DASHBOARD_KEYS } from '@/lib/dashboard-query-cache';
+import { dashboardJson } from '@/lib/dashboard-client';
 import { CheckSquare, Circle, CheckCircle2, Clock } from 'lucide-react';
 import { SafeDate } from '@/components/safe-format';
 
@@ -17,22 +21,33 @@ interface Task {
 }
 
 export function TasksSurface() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const client = useDashboardDataClient();
+  const { data: tasks = [], isPending: loading, error, refetch, isFetching } = useQuery({
+    queryKey: DASHBOARD_KEYS.tasks,
+    queryFn: async ({ signal }) => {
+      const data = await dashboardJson<Task[]>('/api/tasks', { signal });
+      if (!Array.isArray(data)) throw new Error('Unexpected service response.');
+      return data;
+    },
+  }, client);
   const [filter, setFilter] = useState('ALL');
-
-  useEffect(() => {
-    fetch('/api/tasks').then(r => r.json()).then(d => { setTasks(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   const toggleStatus = async (task: Task) => {
     const newStatus = task.status === 'DONE' ? 'TODO' : 'DONE';
-    await fetch(`/api/tasks/${task.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    setTasks(prev => (prev ?? []).map((t: Task) => t.id === task.id ? { ...t, status: newStatus } : t));
+    setMutationError(null);
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!response.ok) throw new Error('Task update could not be confirmed. Refresh before trying again.');
+      client.setQueryData<Task[]>(DASHBOARD_KEYS.tasks, prev => (prev ?? []).map((t: Task) => t.id === task.id ? { ...t, status: newStatus } : t));
+      void client.invalidateQueries({ queryKey: DASHBOARD_KEYS.tasks });
+      void client.invalidateQueries({ queryKey: DASHBOARD_KEYS.projects });
+      void client.invalidateQueries({ queryKey: DASHBOARD_KEYS.projectDetails });
+    } catch { setMutationError('Task update could not be confirmed. Refresh before trying again.'); }
   };
 
   const filtered = filter === 'ALL' ? tasks : (tasks ?? []).filter((t: Task) => t.status === filter);
@@ -58,6 +73,7 @@ export function TasksSurface() {
         ))}
       </div>
 
+      {(error || mutationError) && <p role="alert" className="text-sm text-destructive">{mutationError ?? error?.message} <button onClick={() => void refetch()} disabled={isFetching} className="underline">Refresh</button>{tasks.length > 0 && ' Showing last known tasks.'}</p>}
       {loading ? (
         <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 bg-card animate-pulse rounded" />)}</div>
       ) : (filtered ?? []).length === 0 ? (

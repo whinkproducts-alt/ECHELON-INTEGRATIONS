@@ -5,6 +5,7 @@ import { MotionConfig } from 'framer-motion';
 import { usePathname } from 'next/navigation';
 import { PersonaProvider, useDashboardPersona } from '@/components/shell/persona-context';
 import { ConversationWorkspaceProvider } from '@/components/shell/conversation-workspace-context';
+import { DashboardDataProvider } from '@/components/shell/dashboard-data-provider';
 import { signOut } from 'next-auth/react';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import { HoloDrawer, HoloOrbBackdrop } from '@/components/ui/holo';
@@ -23,7 +24,7 @@ const connectionSnapshot = () => navigator.onLine;
 const serverConnectionSnapshot = () => true;
 
 export function DashboardShell(props: { children: React.ReactNode; user: any; connection?: ConnectionState }) {
-  return <PersonaProvider><ConversationWorkspaceProvider key={props.user?.id ?? props.user?.email}><MotionConfig reducedMotion="user"><DashboardShellContent {...props} /></MotionConfig></ConversationWorkspaceProvider></PersonaProvider>;
+  return <DashboardDataProvider key={props.user?.id ?? props.user?.email}><PersonaProvider><ConversationWorkspaceProvider><MotionConfig reducedMotion="user"><DashboardShellContent {...props} /></MotionConfig></ConversationWorkspaceProvider></PersonaProvider></DashboardDataProvider>;
 }
 
 function DashboardShellContent({ children, user, connection = 'online' }: { children: React.ReactNode; user: any; connection?: ConnectionState }) {

@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useDashboardDataClient } from '@/components/shell/dashboard-data-provider';
+import { DASHBOARD_KEYS } from '@/lib/dashboard-query-cache';
+import { dashboardJson } from '@/lib/dashboard-client';
 import type { SocialPlatform } from '@/lib/social-ui';
 import tenantDefaults from '@/config/tenant-defaults.json';
 
@@ -109,60 +112,55 @@ const DEFAULT_CONFIG: TenantConfig = {
 };
 
 export function useTenantConfig(): TenantConfig {
-  const [config, setConfig] = useState<TenantConfig>(DEFAULT_CONFIG);
-
-  useEffect(() => {
-    fetch('/api/tenant/config')
-      .then((r) => r.json())
-      .then((data) => {
-        setConfig({
-          productName: data.productName ?? DEFAULT_CONFIG.productName,
-          appName: data.appName ?? data.productName ?? DEFAULT_CONFIG.appName,
-          fullName: data.fullName ?? DEFAULT_CONFIG.fullName,
-          companyName: data.companyName ?? DEFAULT_CONFIG.companyName,
-          studioName: data.studioName ?? DEFAULT_CONFIG.studioName,
-          acronymExpansion: data.acronymExpansion ?? DEFAULT_CONFIG.acronymExpansion,
-          tagline: data.tagline ?? DEFAULT_CONFIG.tagline,
-          legalContactEmail: data.legalContactEmail ?? DEFAULT_CONFIG.legalContactEmail,
-          logoUrl: data.logoUrl ?? null,
-          accentColor: data.accentColor ?? null,
-          supportUrl: data.supportUrl ?? null,
-          privacyUrl: data.privacyUrl ?? null,
-          termsUrl: data.termsUrl ?? null,
-          platformLabels: {
-            x: data.platformLabels?.x ?? DEFAULT_PLATFORM_LABELS.x,
-            instagram: data.platformLabels?.instagram ?? DEFAULT_PLATFORM_LABELS.instagram,
-            tiktok: data.platformLabels?.tiktok ?? DEFAULT_PLATFORM_LABELS.tiktok,
-          },
-          platformNotes: {
-            x: Array.isArray(data.platformNotes?.x) ? data.platformNotes.x : DEFAULT_PLATFORM_NOTES.x,
-            instagram: Array.isArray(data.platformNotes?.instagram) ? data.platformNotes.instagram : DEFAULT_PLATFORM_NOTES.instagram,
-            tiktok: Array.isArray(data.platformNotes?.tiktok) ? data.platformNotes.tiktok : DEFAULT_PLATFORM_NOTES.tiktok,
-          },
-          loading: false,
-          memoryAutoLabel: data.memoryAutoLabel ?? DEFAULT_CONFIG.memoryAutoLabel,
-          viewSourceConversation: data.viewSourceConversation ?? DEFAULT_CONFIG.viewSourceConversation,
-          memoryTabSemantic: data.memoryTabSemantic ?? DEFAULT_CONFIG.memoryTabSemantic,
-          memoryTabEpisodic: data.memoryTabEpisodic ?? DEFAULT_CONFIG.memoryTabEpisodic,
-          memoryTabEntities: data.memoryTabEntities ?? DEFAULT_CONFIG.memoryTabEntities,
-          memoryTabHypotheses: data.memoryTabHypotheses ?? DEFAULT_CONFIG.memoryTabHypotheses,
-          memoryLabelSource: data.memoryLabelSource ?? DEFAULT_CONFIG.memoryLabelSource,
-          memoryLabelConf: data.memoryLabelConf ?? DEFAULT_CONFIG.memoryLabelConf,
-          memoryLabelImportance: data.memoryLabelImportance ?? DEFAULT_CONFIG.memoryLabelImportance,
-          memoryLabelHypothesis: data.memoryLabelHypothesis ?? DEFAULT_CONFIG.memoryLabelHypothesis,
-          memoryLabelMamba: data.memoryLabelMamba ?? DEFAULT_CONFIG.memoryLabelMamba,
-          memoryLabelConfirm: data.memoryLabelConfirm ?? DEFAULT_CONFIG.memoryLabelConfirm,
-          memoryLabelCorrect: data.memoryLabelCorrect ?? DEFAULT_CONFIG.memoryLabelCorrect,
-          memoryLabelDelete: data.memoryLabelDelete ?? DEFAULT_CONFIG.memoryLabelDelete,
-          memoryLabelDeleteConfirm: data.memoryLabelDeleteConfirm ?? DEFAULT_CONFIG.memoryLabelDeleteConfirm,
-          citationLabel: data.citationLabel ?? DEFAULT_CONFIG.citationLabel,
-          uploadDocumentLabel: data.uploadDocumentLabel ?? DEFAULT_CONFIG.uploadDocumentLabel,
-          documentsPageTitle: data.documentsPageTitle ?? DEFAULT_CONFIG.documentsPageTitle,
-          obsidianLabel: data.obsidianLabel ?? null,
-        });
-      })
-      .catch(() => setConfig((c) => ({ ...c, loading: false })));
-  }, []);
-
-  return config;
+  const client = useDashboardDataClient();
+  const { data, isPending } = useQuery({
+    queryKey: DASHBOARD_KEYS.tenant,
+    queryFn: ({ signal }) => dashboardJson<Record<string, any>>('/api/tenant/config', { signal }),
+  }, client);
+  if (!data) return { ...DEFAULT_CONFIG, loading: isPending };
+  return {
+    productName: data.productName ?? DEFAULT_CONFIG.productName,
+    appName: data.appName ?? data.productName ?? DEFAULT_CONFIG.appName,
+    fullName: data.fullName ?? DEFAULT_CONFIG.fullName,
+    companyName: data.companyName ?? DEFAULT_CONFIG.companyName,
+    studioName: data.studioName ?? DEFAULT_CONFIG.studioName,
+    acronymExpansion: data.acronymExpansion ?? DEFAULT_CONFIG.acronymExpansion,
+    tagline: data.tagline ?? DEFAULT_CONFIG.tagline,
+    legalContactEmail: data.legalContactEmail ?? DEFAULT_CONFIG.legalContactEmail,
+    logoUrl: data.logoUrl ?? null,
+    accentColor: data.accentColor ?? null,
+    supportUrl: data.supportUrl ?? null,
+    privacyUrl: data.privacyUrl ?? null,
+    termsUrl: data.termsUrl ?? null,
+    platformLabels: {
+      x: data.platformLabels?.x ?? DEFAULT_PLATFORM_LABELS.x,
+      instagram: data.platformLabels?.instagram ?? DEFAULT_PLATFORM_LABELS.instagram,
+      tiktok: data.platformLabels?.tiktok ?? DEFAULT_PLATFORM_LABELS.tiktok,
+    },
+    platformNotes: {
+      x: Array.isArray(data.platformNotes?.x) ? data.platformNotes.x : DEFAULT_PLATFORM_NOTES.x,
+      instagram: Array.isArray(data.platformNotes?.instagram) ? data.platformNotes.instagram : DEFAULT_PLATFORM_NOTES.instagram,
+      tiktok: Array.isArray(data.platformNotes?.tiktok) ? data.platformNotes.tiktok : DEFAULT_PLATFORM_NOTES.tiktok,
+    },
+    loading: false,
+    memoryAutoLabel: data.memoryAutoLabel ?? DEFAULT_CONFIG.memoryAutoLabel,
+    viewSourceConversation: data.viewSourceConversation ?? DEFAULT_CONFIG.viewSourceConversation,
+    memoryTabSemantic: data.memoryTabSemantic ?? DEFAULT_CONFIG.memoryTabSemantic,
+    memoryTabEpisodic: data.memoryTabEpisodic ?? DEFAULT_CONFIG.memoryTabEpisodic,
+    memoryTabEntities: data.memoryTabEntities ?? DEFAULT_CONFIG.memoryTabEntities,
+    memoryTabHypotheses: data.memoryTabHypotheses ?? DEFAULT_CONFIG.memoryTabHypotheses,
+    memoryLabelSource: data.memoryLabelSource ?? DEFAULT_CONFIG.memoryLabelSource,
+    memoryLabelConf: data.memoryLabelConf ?? DEFAULT_CONFIG.memoryLabelConf,
+    memoryLabelImportance: data.memoryLabelImportance ?? DEFAULT_CONFIG.memoryLabelImportance,
+    memoryLabelHypothesis: data.memoryLabelHypothesis ?? DEFAULT_CONFIG.memoryLabelHypothesis,
+    memoryLabelMamba: data.memoryLabelMamba ?? DEFAULT_CONFIG.memoryLabelMamba,
+    memoryLabelConfirm: data.memoryLabelConfirm ?? DEFAULT_CONFIG.memoryLabelConfirm,
+    memoryLabelCorrect: data.memoryLabelCorrect ?? DEFAULT_CONFIG.memoryLabelCorrect,
+    memoryLabelDelete: data.memoryLabelDelete ?? DEFAULT_CONFIG.memoryLabelDelete,
+    memoryLabelDeleteConfirm: data.memoryLabelDeleteConfirm ?? DEFAULT_CONFIG.memoryLabelDeleteConfirm,
+    citationLabel: data.citationLabel ?? DEFAULT_CONFIG.citationLabel,
+    uploadDocumentLabel: data.uploadDocumentLabel ?? DEFAULT_CONFIG.uploadDocumentLabel,
+    documentsPageTitle: data.documentsPageTitle ?? DEFAULT_CONFIG.documentsPageTitle,
+    obsidianLabel: data.obsidianLabel ?? null,
+  };
 }

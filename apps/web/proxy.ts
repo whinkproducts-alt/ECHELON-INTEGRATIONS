@@ -5,8 +5,10 @@ import { checkCsrf } from '@/lib/csrf';
 import { buildCsp, generateNonce, isHttpsDeployment } from '@/lib/csp';
 import { applySecurityHeaders } from '@/lib/security-headers';
 import { limitAuthRequest } from '@/lib/rate-limit';
+import { isOnboardingComplete } from '@/lib/onboarding-readiness';
 
 export default auth(async function middleware(req: NextRequest & { auth: any }) {
+  const started = performance.now();
   const nonce = generateNonce();
   const csp = buildCsp({
     nonce,
@@ -15,6 +17,8 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
   });
   const https = isHttpsDeployment(process.env.AUTH_URL ?? process.env.NEXTAUTH_URL);
   const res = await handle(req, nonce, csp);
+  // Timing only: no account IDs, request bodies, settings or credentials.
+  res.headers.append('Server-Timing', `proxy;dur=${(performance.now() - started).toFixed(1)}`);
   res.headers.set('Content-Security-Policy', csp);
   applySecurityHeaders(res, { https, pathname: req.nextUrl.pathname });
   return res;
@@ -81,20 +85,22 @@ async function handle(req: NextRequest & { auth: any }, nonce: string, csp: stri
   }
 
   const session = req.auth;
-  if (!session?.user) {
+  if (!session?.user?.id) {
     return NextResponse.redirect(new URL('/login', req.url));
   }
 
   // Onboarding redirect: if displayName is missing and not already on /onboarding
   if (!pathname.startsWith('/onboarding') && !pathname.startsWith('/api')) {
-    const profileRes = await fetch(new URL('/api/settings', req.url), {
-      headers: { cookie: req.headers.get('cookie') ?? '' },
-    });
-    if (profileRes.ok) {
-      const data = await profileRes.json();
-      if (!data?.profile?.displayName) {
+    try {
+      if (!await isOnboardingComplete(session.user.id)) {
         return NextResponse.redirect(new URL('/onboarding', req.url));
       }
+    } catch {
+      // A failed readiness lookup is not evidence that admission is allowed.
+      return new NextResponse('Account setup is temporarily unavailable. Please try again.', {
+        status: 503,
+        headers: { 'Cache-Control': 'no-store', 'Retry-After': '5' },
+      });
     }
   }
 

@@ -556,7 +556,14 @@ describe('routes', () => {
   it('413 for an oversized body', async () => {
     const big = 'a'.repeat(11 * 262144 + 100000);
     const fd = new FormData(); fd.append('file', new File([big], 'a.md'));
-    expect((await listRoute.POST(new Request('http://x', { method: 'POST', body: fd }))).status).toBe(413);
+    const multipart = new Request('http://x', { method: 'POST', body: fd });
+    // Materialize this synthetic producer first: Node 24's Undici multipart encoder
+    // enqueues after cancellation when the capped reader rejects a streaming FormData.
+    // The route still reads/counts the same oversized multipart bytes and must return 413.
+    const bytes = await multipart.arrayBuffer();
+    expect((await listRoute.POST(new Request('http://x', {
+      method: 'POST', headers: multipart.headers, body: bytes,
+    }))).status).toBe(413);
   });
 
   it('daily cap returns 429', async () => {

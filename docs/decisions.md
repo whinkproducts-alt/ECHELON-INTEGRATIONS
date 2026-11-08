@@ -496,3 +496,10 @@ Checked-in migrations use safe backup/status/`migrate deploy`; do not copy histo
 Founder authorized safe reconciliation/merging plus an architectural plan to finish full personal use and asked what harness the project uses. Preserve the older working/index/history state and local recovery branch before switching its main; do not merge stale handoff claims or infer a model winner from a configured default. Carry the actual provenance correction and reviewed approval/logging remediation, retaining the stuck sweep. No blanket dependency update.
 
 Keep the existing custom Postgres-backed worker, model/tool loop, permission/approval/ledger and MCP integrations. Codex/Claude Code are development harnesses, not the deployed worker; Vitest/Playwright/Postgres/GitHub Actions are the verification harness. No new orchestration framework or Tauri rewrite is required for the desktop icon. C00–C14 in docs/product/ECHELON-END-TO-END-COMPLETION-PLAN.md is the implementation contract; full requested features and actual Mac-off proof remain mandatory.
+
+
+## 2026-11-08 — Selectable speech, daily readiness and governed media
+
+Owner ended plan-only work and authorized the final architecture end to end. Keep additive Whisper+Kokoro and external VoiceStudio choices, daily 5 a.m. confirmed profile timezone readiness, manual override and signed turn pinning. Save roster-backed per-service voices. Preserve permission/approval rules; no fabricated ASR confidence or cloud fallback. Externally hosted Higgsfield stays media-only with separately approved price lookup and exactgeneration, budgetholds and accountresults. Official account estimates enable admission but are labeled estimates, not guaranteed invoices.
+
+Implementation is isolated from acceptance: model licenses, Prisma downloads, actual Mac audio/avatar/performance and paid provider tests remain gates. Do not copy AGPL VoiceStudio code; proposed GPL/LGPL runtimes stay disabled pending owner exception. Keep navigation cache display-only and account-owned. No actual proprietary export, paid generation, merge/deployment or database reset was authorized by the build request.

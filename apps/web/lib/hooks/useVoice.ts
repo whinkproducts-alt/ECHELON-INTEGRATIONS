@@ -1,379 +1,184 @@
 'use client';
-
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState,useRef,useCallback,useEffect } from 'react';
+import { CaptureTurn } from '@/lib/capture-turn';
+import { recordingWav,recorderMime } from '@/lib/voice-audio';
 import { acquireMicrophone } from './microphone-capture';
-import { beginSpeech, endSpeech } from '@/lib/hooks/speech-activity';
-import { isClientLockedDown, onClientLockdown, trackMedia } from '@/lib/safety/client-lockdown';
+import { beginSpeech,endSpeech } from './speech-activity';
+import { isClientLockedDown,onClientLockdown,trackMedia } from '@/lib/safety/client-lockdown';
+import { createAnalyserFeed,type AudioFeed } from '@/components/avatar/avatar-audio-feed';
 
-declare global {
-  interface Window {
-    SpeechRecognition: SpeechRecognitionConstructor;
-    webkitSpeechRecognition: SpeechRecognitionConstructor;
-  }
-}
-
-export interface VoiceSupport {
-  stt: boolean;
-  tts: boolean;
-  /** true when STT is via server (MediaRecorder → /api/voice/stt) rather than browser Web Speech */
-  serverStt: boolean;
-}
-
+declare global { interface Window { SpeechRecognition:SpeechRecognitionConstructor; webkitSpeechRecognition:SpeechRecognitionConstructor } }
+export interface VoiceSupport { stt:boolean;tts:boolean;serverStt:boolean }
 export interface UseVoiceReturn {
-  startListening: () => void;
-  stopListening: () => Promise<string>;
-  speak: (text: string) => Promise<void>;
-  isListening: boolean;
-  isSpeaking: boolean;
-  transcript: string;
-  supported: VoiceSupport;
-  /** 0–1 amplitude derived from live AnalyserNode on TTS audio, 0 when not speaking */
-  lipSyncAmplitude: number;
-  /** Set when speech is switched off on purpose (Local-Only mode), to show the user why. */
-  voiceNotice?: string | null;
+  startListening:()=>void;stopListening:()=>Promise<string>;speak:(text:string,speakerId?:string)=>Promise<void>;
+  isListening:boolean;isSpeaking:boolean;transcript:string;supported:VoiceSupport;lipSyncAmplitude:number;audioFeed:AudioFeed|null;voiceNotice?:string|null;
 }
+const LOCAL_ONLY_CLIENT=process.env.NEXT_PUBLIC_WHINK_LOCAL_ONLY==='true';
+export const SPEECH_NOTICE='Speech is not available in Local-Only mode';
+interface Turn { mode:'local'|'legacy';serverStt:boolean;turnToken?:string }
+export function useVoice(options:{ speakerId?:string }={}):UseVoiceReturn {
+  const [isListening,setIsListening]=useState(false);const [isSpeaking,setIsSpeaking]=useState(false);
+  const [transcript,setTranscript]=useState('');const [voiceNotice,setVoiceNotice]=useState<string|null>(null);
+  const [lipSyncAmplitude,setLipSyncAmplitude]=useState(0);const [audioFeed,setAudioFeed]=useState<AudioFeed|null>(null);
+  const [supported,setSupported]=useState<VoiceSupport>({ stt:false,tts:false,serverStt:true });
+  const mounted=useRef(true);const captureEpoch=useRef(0);const playbackEpoch=useRef(0);const intent=useRef(false);
+  const recorder=useRef<MediaRecorder|null>(null);const recognition=useRef<SpeechRecognition|null>(null);
+  const capturedText=useRef('');const turn=useRef<Turn|null>(null);const captureAbort=useRef<AbortController|null>(null);
+  const playbackAbort=useRef<AbortController|null>(null);const pendingCapture=useRef<CaptureTurn|null>(null);
+  const playbackResolve=useRef<(()=>void)|null>(null);const audio=useRef<HTMLAudioElement|null>(null);
+  const audioUrl=useRef<string|null>(null);const context=useRef<AudioContext|null>(null);const animation=useRef<number|null>(null);
+  const captureTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const speaker=useRef(options.speakerId??'whink');
+  useEffect(()=> { speaker.current=options.speakerId??'whink'; },[options.speakerId]);
 
-/**
- * Local-Only mode (NEXT_PUBLIC_WHINK_LOCAL_ONLY, set together with WHINK_LOCAL_ONLY). Browser speech recognition
- * (for example Chrome's webkitSpeechRecognition) sends audio to a vendor's servers and some browser voices are
- * network voices, so neither is used. Speech then goes only through the server routes, which allow a loopback service.
- */
-const LOCAL_ONLY_CLIENT = process.env.NEXT_PUBLIC_WHINK_LOCAL_ONLY === 'true';
-export const SPEECH_NOTICE = 'Speech is not available in Local-Only mode';
-
-export function useVoice(): UseVoiceReturn {
-  const listeningIntent = useRef(false);
-  const captureVersion = useRef(0);
-  const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [lipSyncAmplitude, setLipSyncAmplitude] = useState(0);
-  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
-
-  // Match the server snapshot; discover browser capabilities only after hydration.
-  const [supported, setSupported] = useState<VoiceSupport>({ stt:false, tts:false, serverStt:false });
-  useEffect(() => {
-    const initial = setTimeout(() => {
-    const hasSpeechRecognition = !LOCAL_ONLY_CLIENT && (
-      typeof window.SpeechRecognition !== 'undefined' ||
-      typeof window.webkitSpeechRecognition !== 'undefined');
-    const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
-    const hasSpeechSynthesis = LOCAL_ONLY_CLIENT || typeof window.speechSynthesis !== 'undefined';
-    setSupported({
-      stt: hasSpeechRecognition || hasMediaRecorder,
-      tts: hasSpeechSynthesis,
-      serverStt: !hasSpeechRecognition && hasMediaRecorder,
-    });
-    }, 0);
-    return () => clearTimeout(initial);
-  }, []);
-
-  // ── Browser Web Speech path ───────────────────────────────────────────────
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const resolveListenRef = useRef<((t: string) => void) | null>(null);
-  const accumulatedRef = useRef('');
-
-  // ── MediaRecorder path (server STT fallback) ──────────────────────────────
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const playingRef = useRef<HTMLAudioElement | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const resolveServerSttRef = useRef<((t: string) => void) | null>(null);
-
-  // ── Lipsync (AnalyserNode on TTS audio) ──────────────────────────────────
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const rafRef = useRef<number | null>(null);
-
-  /** Start RAF loop reading RMS from analyser and writing to lipSyncAmplitude. */
-  const startLipSync = useCallback((analyser: AnalyserNode) => {
-    const buf = new Uint8Array(analyser.frequencyBinCount);
-    const tick = () => {
-      analyser.getByteTimeDomainData(buf);
-      // Compute RMS (root mean square) of signal centred on 128
-      let sumSq = 0;
-      for (let i = 0; i < buf.length; i++) {
-        const v = (buf[i] - 128) / 128;
-        sumSq += v * v;
-      }
-      const rms = Math.sqrt(sumSq / buf.length);
-      // Scale: rms typically peaks ~0.3 for loud speech, map to 0–1 clamped
-      setLipSyncAmplitude(Math.min(rms * 3.5, 1));
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-  }, []);
-
-  const stopLipSync = useCallback(() => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+  const finishCapture=useCallback((text:string,version=captureEpoch.current)=> { if(version===captureEpoch.current) capturedText.current=text;if(pendingCapture.current?.version===version) pendingCapture.current.complete(text); },[]);
+  const stopMotion=useCallback(()=> {
+    if (animation.current!==null) cancelAnimationFrame(animation.current);animation.current=null;
+    if (mounted.current) { setAudioFeed(null);setLipSyncAmplitude(0); }
+  },[]);
+  const stopPlayback=useCallback(()=> {
+    playbackEpoch.current++;playbackAbort.current?.abort();playbackAbort.current=null;
+    try { audio.current?.pause(); } catch { /* already stopped */ } audio.current=null;
+    playbackResolve.current?.();playbackResolve.current=null;
+    if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);audioUrl.current=null;
+    if (context.current && context.current.state!=='closed') void context.current.close().catch(()=>{});context.current=null;
+    if (typeof window!=='undefined') window.speechSynthesis?.cancel();
+    stopMotion();if (mounted.current) setIsSpeaking(false);
+  },[stopMotion]);
+  const cancelCapture=useCallback(()=> {
+    pendingCapture.current?.complete('');captureEpoch.current++;intent.current=false;captureAbort.current?.abort();captureAbort.current=null;
+    if (captureTimer.current) clearTimeout(captureTimer.current);captureTimer.current=null;
+    try { recognition.current?.abort(); } catch { /* already stopped */ } recognition.current=null;
+    if (recorder.current) {
+      recorder.current.onstop=null;
+      try { if (recorder.current.state!=='inactive') recorder.current.stop(); } catch { /* already stopped */ }
+      recorder.current.stream.getTracks().forEach(track=>track.stop());recorder.current=null;
     }
-    setLipSyncAmplitude(0);
-    // Close AudioContext to release hardware resource
-    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
-      audioCtxRef.current.close().catch(() => {});
-      audioCtxRef.current = null;
-      analyserRef.current = null;
-    }
-  }, []);
+    finishCapture('');turn.current=null;if (mounted.current) setIsListening(false);
+  },[finishCapture]);
+  useEffect(()=> {
+    mounted.current=true;
+    const timer=setTimeout(()=>setSupported({ stt:typeof MediaRecorder!=='undefined'||(!LOCAL_ONLY_CLIENT&&!!(window.SpeechRecognition??window.webkitSpeechRecognition)),tts:true,serverStt:true }),0);
+    return ()=> { mounted.current=false;clearTimeout(timer);cancelCapture();stopPlayback(); };
+  },[cancelCapture,stopPlayback]);
+  useEffect(()=>onClientLockdown(locked=> { if (locked) { cancelCapture();stopPlayback(); } }),[cancelCapture,stopPlayback]);
 
-  // Clean up on unmount
-  useEffect(() => {
-    const epoch = captureVersion;
-    return () => {
-      listeningIntent.current = false; epoch.current += 1;
-      try { recognitionRef.current?.abort(); } catch { /* already stopped */ }
-      const recorder = mediaRecorderRef.current;
-      if (recorder) {
-        recorder.onstop = null;
-        try { if(recorder.state !== 'inactive') recorder.stop(); } catch { /* already stopped */ }
-        recorder.stream.getTracks().forEach(track => track.stop());
+  const fetchTurn=useCallback(async(controller:AbortController):Promise<Turn>=> {
+    const response=await fetch('/api/voice/session',{ method:'POST',signal:controller.signal });
+    const value=await response.json();
+    if (!response.ok) throw new Error(typeof value.error==='string'?value.error:'Speech is unavailable.');
+    if (value.mode==='local' && typeof value.turnToken==='string') return { mode:'local',serverStt:true,turnToken:value.turnToken };
+    if (value.mode==='legacy') return { mode:'legacy',serverStt:LOCAL_ONLY_CLIENT||value.serverStt===true };
+    throw new Error('Invalid speech configuration');
+  },[]);
+
+  const startListening=useCallback(()=> {
+    if (intent.current||isListening||isClientLockedDown()) return;
+    pendingCapture.current?.complete('');if(captureTimer.current) clearTimeout(captureTimer.current);captureTimer.current=null;recorder.current=null;intent.current=true;const version=++captureEpoch.current;pendingCapture.current=new CaptureTurn(version);capturedText.current='';turn.current=null;
+    captureAbort.current?.abort();const controller=new AbortController();captureAbort.current=controller;
+    setVoiceNotice('Checking speech service…');
+    const active=()=>mounted.current&&intent.current&&version===captureEpoch.current&&!controller.signal.aborted&&!isClientLockedDown();
+    void (async()=> {
+      const selected=await fetchTurn(controller);if (!active()) return;turn.current=selected;setVoiceNotice(null);
+      const BrowserRecognition=selected.mode==='legacy'&&!selected.serverStt&&!LOCAL_ONLY_CLIENT?(window.SpeechRecognition??window.webkitSpeechRecognition):null;
+      if (BrowserRecognition) {
+        const recognizer=new BrowserRecognition();recognition.current=recognizer;recognizer.continuous=true;recognizer.interimResults=true;recognizer.lang='en-US';
+        recognizer.onresult=event=> {
+          if (!mounted.current||version!==captureEpoch.current||isClientLockedDown()) return;
+          let interim='';for (let i=event.resultIndex;i<event.results.length;i++) { if (event.results[i].isFinal) capturedText.current+=event.results[i][0].transcript;else interim+=event.results[i][0].transcript; }
+          setTranscript(capturedText.current+interim);
+        };
+        const complete=()=> { if(version!==captureEpoch.current) return;intent.current=false;if (mounted.current) setIsListening(false);finishCapture(capturedText.current,version); };
+        recognizer.onend=complete;recognizer.onerror=complete;recognizer.start();setIsListening(true);setSupported(previous=>({...previous,serverStt:false}));return;
       }
-      stopLipSync();
-    };
-  }, [stopLipSync]);
-
-  const startListening = useCallback(() => {
-    if (isListening || listeningIntent.current || isClientLockedDown()) return;
-    listeningIntent.current = true;
-    const version = ++captureVersion.current;
-    accumulatedRef.current = '';
-
-    const SpeechRecognitionCtor =
-      !LOCAL_ONLY_CLIENT && typeof window !== 'undefined'
-        ? window.SpeechRecognition ?? window.webkitSpeechRecognition
-        : null;
-
-    // ── Web Speech path ───────────────────────────────────────────────────
-    if (SpeechRecognitionCtor) {
-      accumulatedRef.current = '';
-      setTranscript('');
-
-      const recognition = new SpeechRecognitionCtor();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let interim = '';
-        let final = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            final += result[0].transcript;
-          } else {
-            interim += result[0].transcript;
-          }
-        }
-        if (final) accumulatedRef.current += final;
-        setTranscript(accumulatedRef.current + interim);
+      const stream=await acquireMicrophone(()=>navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true,noiseSuppression:true } }),active);
+      if (!stream) return;trackMedia(stream);
+      const mime=recorderMime();let recording:MediaRecorder;
+      try { recording=new MediaRecorder(stream,mime?{ mimeType:mime }:undefined); } catch(error) { stream.getTracks().forEach(track=>track.stop());throw error; }
+      const chunks:Blob[]=[];let size=0;recorder.current=recording;
+      recording.ondataavailable=event=> { size+=event.data.size;if (size<=10*1024*1024&&event.data.size) chunks.push(event.data);else if (recording.state!=='inactive') recording.stop(); };
+      recording.onstop=()=> {
+        stream.getTracks().forEach(track=>track.stop());
+        if(version!==captureEpoch.current||!mounted.current) return;
+        intent.current=false;if (captureTimer.current) clearTimeout(captureTimer.current);captureTimer.current=null;
+        stream.getTracks().forEach(track=>track.stop());if (mounted.current) setIsListening(false);
+        void (async()=> {
+          let text='';
+          try {
+            const wav=await recordingWav(new Blob(chunks,{ type:recording.mimeType }));
+            if (!mounted.current||version!==captureEpoch.current||controller.signal.aborted||isClientLockedDown()) return;
+            const form=new FormData();form.append('audio',wav,'audio.wav');
+            const response=await fetch('/api/voice/stt',{ method:'POST',headers:selected.turnToken?{ 'X-Speech-Turn':selected.turnToken }:{},body:form,signal:controller.signal });
+            const value=await response.json();
+            if (!mounted.current||version!==captureEpoch.current||controller.signal.aborted||isClientLockedDown()) return;
+            if (!response.ok) throw new Error(value.error??'Speech recognition unavailable.');
+            text=typeof value.text==='string'?value.text:'';
+            if (typeof value.turnToken==='string') turn.current={...selected,turnToken:value.turnToken};
+            setTranscript(text);
+          } catch(error) { if (mounted.current&&!controller.signal.aborted) setVoiceNotice(error instanceof Error?error.message:'Recording unavailable.'); }
+          finally { if (version===captureEpoch.current) finishCapture(text); }
+        })();
       };
-
-      recognition.onend = () => {
-        listeningIntent.current = false;
-        setIsListening(false);
-        const t = accumulatedRef.current;
-        setTranscript(t);
-        resolveListenRef.current?.(t);
-        resolveListenRef.current = null;
-      };
-
-      recognition.onerror = () => {
-        listeningIntent.current = false;
-        setIsListening(false);
-        resolveListenRef.current?.(accumulatedRef.current);
-        resolveListenRef.current = null;
-      };
-
-      recognitionRef.current = recognition;
-      try { recognition.start(); setIsListening(true); } catch { listeningIntent.current = false; }
-      return;
-    }
-
-    // ── MediaRecorder → server STT path ──────────────────────────────────
-    if (typeof MediaRecorder === 'undefined') { listeningIntent.current = false; return; }
-
-    acquireMicrophone(() => navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }), () => listeningIntent.current && captureVersion.current === version && !isClientLockedDown()).then((stream) => {
-      if (!stream) return;
-      // R07: lockdown may have started while the permission prompt was open.
-      if (isClientLockedDown()) { stream.getTracks().forEach((t) => t.stop()); return; }
-      trackMedia(stream);
-      audioChunksRef.current = [];
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
-      let recorder: MediaRecorder;
-      try { recorder = new MediaRecorder(stream, { mimeType }); }
-      catch (error) { stream.getTracks().forEach(track => track.stop()); throw error; }
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = async () => {
-        listeningIntent.current = false;
-        stream.getTracks().forEach((t) => t.stop());
-        setIsListening(false);
-
-        if (isClientLockedDown()) { resolveServerSttRef.current?.(''); resolveServerSttRef.current = null; return; }
-        const blob = new Blob(audioChunksRef.current, { type: mimeType });
-        let text = '';
-        try {
-          const form = new FormData();
-          form.append('audio', blob, 'audio.webm');
-          const res = await fetch('/api/voice/stt', { method: 'POST', body: form });
-          if (res.ok) {
-            const data = await res.json();
-            text = data.text ?? '';
-          } else if (res.status === 503 && LOCAL_ONLY_CLIENT) {
-            setVoiceNotice(SPEECH_NOTICE);
-          }
-        } catch { /* non-blocking */ }
-
-        setTranscript(text);
-        resolveServerSttRef.current?.(text);
-        resolveServerSttRef.current = null;
-      };
-
-      mediaRecorderRef.current = recorder;
-      recorder.start();
-      setIsListening(true);
-    }).catch(() => {
-      if(captureVersion.current === version) { listeningIntent.current = false; setVoiceNotice('Microphone unavailable. Check your browser permissions.'); }
+      recording.start(1000);setIsListening(true);setSupported(previous=>({...previous,serverStt:true}));
+      captureTimer.current=setTimeout(()=> { if(recording.state!=='inactive') recording.stop(); },60000);
+    })().catch(error=> {
+      if (version===captureEpoch.current) { intent.current=false;finishCapture('');if(mounted.current&&!controller.signal.aborted) setVoiceNotice(error instanceof Error?error.message:'Microphone unavailable.'); }
     });
-  }, [isListening]);
+  },[fetchTurn,finishCapture,isListening]);
 
-  const stopListening = useCallback((): Promise<string> => {
-    listeningIntent.current = false; ++captureVersion.current;
-    return new Promise((resolve) => {
-      // MediaRecorder path
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        resolveServerSttRef.current = resolve;
-        mediaRecorderRef.current.stop();
-        mediaRecorderRef.current = null;
-        return;
-      }
-      // Web Speech path
-      if (!recognitionRef.current) {
-        resolve(accumulatedRef.current);
-        return;
-      }
-      resolveListenRef.current = resolve;
-      const recognition = recognitionRef.current;
-      recognitionRef.current = null;
-      try { recognition.stop(); }
-      catch { resolveListenRef.current = null; resolve(accumulatedRef.current); }
-    });
-  }, []);
-
-  // ── TTS: server first, browser fallback ──────────────────────────────────
-  const speakInner = useCallback(async (text: string): Promise<void> => {
-
-    try {
-      const res = await fetch('/api/voice/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        playingRef.current = audio;
-
-        // ── Wire up AnalyserNode for lipsync ───────────────────────────
-        let didStartLipSync = false;
-        try {
-          if (typeof AudioContext !== 'undefined') {
-            const ctx = new AudioContext();
-            const analyser = ctx.createAnalyser();
-            analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.6;
-            const source = ctx.createMediaElementSource(audio);
-            source.connect(analyser);
-            analyser.connect(ctx.destination);
-            audioCtxRef.current = ctx;
-            analyserRef.current = analyser;
-
-            audio.addEventListener('play', () => {
-              if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-              startLipSync(analyser);
-              didStartLipSync = true;
-            }, { once: true });
-          }
-        } catch {
-          // Web Audio unavailable — lipsync degrades gracefully to CSS pulse
-        }
-
-        setIsSpeaking(true);
-        await new Promise<void>((resolve, reject) => {
-          audio.onended = () => resolve();
-          audio.onerror = () => reject(new Error('Audio playback error'));
-          audio.play().catch(reject);
-        });
-
-        if (didStartLipSync) stopLipSync();
-        URL.revokeObjectURL(url);
-        setIsSpeaking(false);
-        return;
-      }
-
-      // 501 = no TTS provider configured, fall through to browser
-      if (res.status !== 501) {
-        throw new Error(`TTS server error ${res.status}`);
-      }
-    } catch {
-      // Fall through to browser synthesis
+  const stopListening=useCallback(():Promise<string>=> {
+    intent.current=false;
+    if (recorder.current) {
+      if (recorder.current.state!=='inactive') recorder.current.stop();
+      return pendingCapture.current?.promise??Promise.resolve(capturedText.current);
     }
+    if (recognition.current) {
+      try { recognition.current.stop(); } catch { finishCapture(capturedText.current); }
+      return pendingCapture.current?.promise??Promise.resolve(capturedText.current);
+    }
+    // Release during a session/permission prompt invalidates that pending capture.
+    captureEpoch.current++;captureAbort.current?.abort();pendingCapture.current?.complete('');
+    return Promise.resolve(capturedText.current);
+  },[finishCapture]);
 
-    // Local-Only: no browser synthesis fallback.
-    if (LOCAL_ONLY_CLIENT) { setVoiceNotice(SPEECH_NOTICE); return; }
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    setIsSpeaking(true);
-    // Browser synthesis: no audio element access, simulate amplitude with a simple sine wave
-    const startTime = Date.now();
-    const simTick = () => {
-      const t = (Date.now() - startTime) / 1000;
-      // Modulate between 0.3–0.8 at ~4 Hz to suggest mouth movement
-      const sim = 0.55 + 0.25 * Math.sin(t * Math.PI * 8);
-      setLipSyncAmplitude(sim);
-    };
-    const simInterval = setInterval(simTick, 50);
-
-    await new Promise<void>((resolve) => {
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
-      window.speechSynthesis.speak(utterance);
-    });
-
-    clearInterval(simInterval);
-    setLipSyncAmplitude(0);
-    setIsSpeaking(false);
-  }, [startLipSync, stopLipSync]);
-
-  // R07: on lockdown stop listening and speaking immediately. The tracks themselves are stopped by client-lockdown.
-  useEffect(() => onClientLockdown((locked) => {
-    if (!locked) return;
-    listeningIntent.current = false; ++captureVersion.current;
-    try { recognitionRef.current?.abort?.(); } catch { /* not running */ }
-    try { if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop(); } catch { /* not running */ }
-    try { playingRef.current?.pause(); } catch { /* not playing */ }
-    setIsListening(false);
-    setIsSpeaking(false);
-  }), []);
-
-  const speak = useCallback(async (text: string): Promise<void> => {
-    if (!text.trim() || isClientLockedDown()) return;
+  const speak=useCallback(async(text:string,explicitSpeaker?:string):Promise<void>=> {
+    if (!text.trim()||isClientLockedDown()) return;
+    stopPlayback();const version=playbackEpoch.current;const controller=new AbortController();playbackAbort.current=controller;
+    const active=()=>mounted.current&&version===playbackEpoch.current&&!controller.signal.aborted&&!isClientLockedDown();
     beginSpeech();
     try {
-      await speakInner(text);
-    } finally {
+      const selected=turn.current??await fetchTurn(controller);if(!active()) return;
+      const response=await fetch('/api/voice/tts',{ method:'POST',headers:{ 'Content-Type':'application/json',...(selected.turnToken?{ 'X-Speech-Turn':selected.turnToken }:{}) },body:JSON.stringify({ text,speakerId:explicitSpeaker??speaker.current }),signal:controller.signal });
+      if(!active()) return;
+      if(response.status===501&&selected.mode==='legacy'&&!LOCAL_ONLY_CLIENT&&window.speechSynthesis) {
+        const utterance=new SpeechSynthesisUtterance(text);
+        // Browser synthesis provides no verifiable playback audio feed: keep avatar neutral.
+        await new Promise<void>(resolve=> { playbackResolve.current=resolve;utterance.onend=()=>resolve();utterance.onerror=()=>resolve();window.speechSynthesis.speak(utterance);if(active()) setIsSpeaking(true); });
+        return;
+      }
+      if(!response.ok) throw new Error('Speech unavailable. Text remains available.');
+      const notice=response.headers.get('x-speech-notice');
+      if(notice==='stored_voice_unavailable') setVoiceNotice('The saved voice is unavailable; the service default is being used. Choose a voice in Settings.');
+      if(notice==='distinct_voice_profiles_unavailable') setVoiceNotice('VoiceStudio has no distinct agent profiles; its default voice is being used.');
+      const blob=await response.blob();if(!active()) return;
+      const url=URL.createObjectURL(blob);audioUrl.current=url;const playing=new Audio(url);audio.current=playing;
+      try {
+        const ctx=new AudioContext();context.current=ctx;const analyser=ctx.createAnalyser();analyser.fftSize=256;analyser.smoothingTimeConstant=0.6;
+        ctx.createMediaElementSource(playing).connect(analyser);analyser.connect(ctx.destination);
+        const feed=createAnalyserFeed(analyser,playing);
+        playing.onplaying=()=> {
+          if(!active()) { playing.pause();return; } void ctx.resume().catch(()=>{});setAudioFeed(feed);setIsSpeaking(true);
+          const update=()=> { if(!active()||playing.paused||playing.ended||playing.readyState<3) { stopMotion();return; }setLipSyncAmplitude(feed.read().rms);animation.current=requestAnimationFrame(update); };
+          if(animation.current!==null) cancelAnimationFrame(animation.current);animation.current=requestAnimationFrame(update);
+        };
+      } catch { /* Audio remains usable without an animation feed. */ }
+      playing.onpause=()=> { if(version===playbackEpoch.current) stopMotion(); };playing.onwaiting=()=> { if(version===playbackEpoch.current) stopMotion(); };
+      await new Promise<void>((resolve,reject)=> { playbackResolve.current=resolve;playing.onended=()=>resolve();playing.onerror=()=>reject(new Error('Playback unavailable.'));if(!active()) { resolve();return; }void playing.play().then(()=> { if(active()) setIsSpeaking(true);else playing.pause(); }).catch(reject); });
+    } catch(error) { if(active()) setVoiceNotice(error instanceof Error?error.message:'Speech unavailable.'); }
+    finally {
+      if(version===playbackEpoch.current) { turn.current=null;stopPlayback(); }
       endSpeech();
     }
-  }, [speakInner]);
-
-  return { startListening, stopListening, speak, isListening, isSpeaking, transcript, supported, lipSyncAmplitude, voiceNotice };
+  },[fetchTurn,stopMotion,stopPlayback]);
+  return { startListening,stopListening,speak,isListening,isSpeaking,transcript,supported,lipSyncAmplitude,audioFeed,voiceNotice };
 }

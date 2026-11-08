@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@/lib/db', () => ({
   prisma: {
     tenantConfig: {
+      findUnique: vi.fn(),
       upsert: vi.fn(),
     },
   },
@@ -19,6 +20,7 @@ import { auth } from '@/auth';
 import { GET, PATCH } from '@/app/api/tenant/config/route';
 
 const mockUpsert = prisma.tenantConfig.upsert as ReturnType<typeof vi.fn>;
+const mockFind = prisma.tenantConfig.findUnique as ReturnType<typeof vi.fn>;
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 
 const DEFAULT_CONFIG = {
@@ -47,6 +49,7 @@ describe('GET /api/tenant/config', () => {
 
   it('returns 200 with default config when none exists', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user1' } });
+    mockFind.mockResolvedValue(null);
     mockUpsert.mockResolvedValue(DEFAULT_CONFIG);
 
     const res = await GET();
@@ -54,6 +57,8 @@ describe('GET /api/tenant/config', () => {
     const body = await res.json();
     expect(body.productName).toBe('WHINK');
     expect(body.accentColor).toBe('#38B6FF');
+    expect(mockFind).toHaveBeenCalledExactlyOnceWith({ where: { tenantId: 'user1' } });
+    expect(mockUpsert).toHaveBeenCalledExactlyOnceWith({ where: { tenantId: 'user1' }, create: { tenantId: 'user1' }, update: {} });
   });
 });
 

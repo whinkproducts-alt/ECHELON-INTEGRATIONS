@@ -2,10 +2,18 @@
 // NavRail props: pathname: string|null, expanded?: boolean, onToggle?: ()=>void, onNavigate?: ()=>void, onSignOut: ()=>void.
 // Renders NAV_GROUPS/NAV_ITEMS from nav-config.ts. Slim (icons) by default, labels when expanded. Active item has a glowing marker.
 import * as React from 'react';
-import Link from 'next/link';
-import { ChevronsLeft, ChevronsRight, LogOut, PanelsTopLeft } from 'lucide-react';
+import Link, { useLinkStatus } from 'next/link';
+import { ChevronsLeft, ChevronsRight, LoaderCircle, LogOut, PanelsTopLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { activeNavId, navByGroup } from './nav-config';
+
+function NavigationPending({ label }: { label: string }) {
+  const { pending } = useLinkStatus();
+  return <span role="status" aria-live="polite" className="absolute right-1 top-1">
+    <LoaderCircle aria-hidden className={cn('h-3 w-3 motion-safe:animate-spin', !pending && 'invisible')} />
+    <span className="sr-only">{pending ? `Opening ${label}…` : ''}</span>
+  </span>;
+}
 
 export function NavRail({ pathname, expanded = false, onToggle, onNavigate, onSignOut }: {
   pathname: string | null; expanded?: boolean; onToggle?: () => void; onNavigate?: () => void; onSignOut: () => void;
@@ -42,6 +50,7 @@ export function NavRail({ pathname, expanded = false, onToggle, onNavigate, onSi
                       <Icon className="h-4 w-4 shrink-0" aria-hidden />
                       {expanded && <span className="truncate">{item.label}</span>}
                       {expanded && item.status === 'soon' && <span className="ml-auto font-mono text-[0.5625rem] uppercase tracking-widest text-muted-foreground">Soon</span>}
+                      <NavigationPending label={item.label} />
                     </Link>
                   </li>
                 );
