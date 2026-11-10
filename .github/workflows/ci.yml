@@ -49,7 +49,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
       CI: 'true'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Docs-only pull requests skip the heavy steps below but still finish this job green, so a required check is
       # always satisfied. Only files under docs/ and root-level *.md count as docs (nothing in the app or its tests
