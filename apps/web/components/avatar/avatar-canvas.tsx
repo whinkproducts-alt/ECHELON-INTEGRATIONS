@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AVATAR_STATE_LABELS, BlinkScheduler, MouthTracker, blinkFlagEnabled, breathing, easeLook, transitionPath,
-  type AvatarLook, type AvatarState, type EyeAnchor, type MouthShape, type PersonaAnimation,
+  AVATAR_STATE_LABELS, BlinkScheduler, MouthTracker, blinkFlagEnabled, breathing, easeLook, transitionPath, portraitMouthPose,
+  type AvatarLook, type AvatarState, type EyeAnchor, type PersonaAnimation,
 } from './avatar-engine';
 import type { AudioFeed } from './avatar-audio-feed';
 import { readTokenRgb, rgbCss, type Rgb } from '../holo/holo-color';
@@ -18,7 +18,7 @@ export interface AvatarCanvasProps {
   state: AvatarState;
   /** Accessible name. Comes from tenant config, never hardcoded here. */
   name: string;
-  /** Live audio. When absent and state is speaking, a gentle synthetic cadence is used. */
+  /** Actual playing audio. Without a feed the portrait stays neutral. */
   audio?: AudioFeed | null;
   /** Live data drawn into the HUD by the interface. Never baked into the art. */
   hud?: readonly HudReadout[];
@@ -27,11 +27,6 @@ export interface AvatarCanvasProps {
 }
 
 type Status = 'loading' | 'ready' | 'error';
-
-// Sprite sheet: 3 columns x 2 rows of 128 x 64 mouth cells, painted once from the portrait's own lip colour.
-const CELL_W = 128;
-const CELL_H = 64;
-const SHEET_ORDER: MouthShape[] = ['rest', 'closed', 'open', 'wide', 'round', 'teeth'];
 
 function sampleColor(img: HTMLImageElement, fx: number, fy: number, fw: number): Rgb {
   const c = document.createElement('canvas');
@@ -47,35 +42,24 @@ function sampleColor(img: HTMLImageElement, fx: number, fy: number, fw: number):
   return [r / n, gr / n, b / n];
 }
 
-function buildMouthSheet(img: HTMLImageElement, anim: PersonaAnimation, teeth: Rgb): HTMLCanvasElement {
-  const lip = sampleColor(img, anim.mouth.x, anim.mouth.y, anim.mouth.width);
-  const dark: Rgb = [lip[0] * 0.18, lip[1] * 0.1, lip[2] * 0.1];
-  const sheet = document.createElement('canvas');
-  sheet.width = CELL_W * 3; sheet.height = CELL_H * 2;
-  const g = sheet.getContext('2d');
-  if (!g) return sheet;
-  SHEET_ORDER.forEach((shape, i) => {
-    if (shape === 'rest') return; // the portrait's own lips are the rest pose
-    g.save();
-    g.translate((i % 3) * CELL_W + CELL_W / 2, Math.floor(i / 3) * CELL_H + CELL_H / 2);
-    const spec = {
-      closed: { w: 40, h: 3, teeth: false },
-      open: { w: 40, h: 20, teeth: false },
-      wide: { w: 46, h: 11, teeth: true },
-      round: { w: 22, h: 18, teeth: false },
-      teeth: { w: 42, h: 9, teeth: true },
-    }[shape];
-    g.fillStyle = rgbCss(lip);
-    g.beginPath(); g.ellipse(0, 0, spec.w + 4, spec.h + 5, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = rgbCss(dark);
-    g.beginPath(); g.ellipse(0, 0, spec.w, spec.h, 0, 0, Math.PI * 2); g.fill();
-    if (spec.teeth) {
-      g.fillStyle = rgbCss(teeth, 0.92);
-      g.beginPath(); g.ellipse(0, -spec.h * 0.45, spec.w * 0.82, spec.h * 0.42, 0, 0, Math.PI * 2); g.fill();
-    }
-    g.restore();
-  });
-  return sheet;
+/** Feathered patch from the original portrait; no painted lips, teeth or dark mouth stamp. */
+function buildMouthPatch(img: HTMLImageElement, anim: PersonaAnimation): HTMLCanvasElement {
+  const patch = document.createElement('canvas');
+  patch.width = Math.round(img.naturalWidth * anim.mouth.width * 1.35);
+  patch.height = Math.round(patch.width * 0.62);
+  const g = patch.getContext('2d');
+  if (!g) return patch;
+  g.drawImage(img, img.naturalWidth * anim.mouth.x - patch.width / 2,
+    img.naturalHeight * anim.mouth.y - patch.height / 2, patch.width, patch.height,
+    0, 0, patch.width, patch.height);
+  // The unchanged outer edge blends back into the face instead of making a rectangular seam.
+  g.globalCompositeOperation = 'destination-in';
+  g.translate(patch.width / 2, patch.height / 2);
+  g.scale(patch.width / 2, patch.height / 2);
+  const mask = g.createRadialGradient(0, 0, 0.45, 0, 0, 1);
+  mask.addColorStop(0, 'rgba(0,0,0,1)'); mask.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = mask; g.fillRect(-1, -1, 2, 2);
+  return patch;
 }
 
 /**
@@ -126,6 +110,9 @@ export function AvatarCanvas({ animation, state, name, audio = null, hud = [], w
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [status, setStatus] = useState<Status>('loading');
   const [attempt, setAttempt] = useState(0);
+  const [motionEnabled, setMotionEnabled] = useState(true);
+  const motionRef = useRef(motionEnabled);
+  useEffect(() => { motionRef.current = motionEnabled; }, [motionEnabled]);
   const height = Math.round(width * 1.22);
 
   // Props are read inside the animation loop through refs, so the loop never restarts.
@@ -149,11 +136,11 @@ export function AvatarCanvas({ animation, state, name, audio = null, hud = [], w
       canvas.width = width * dpr; canvas.height = height * dpr;
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       const tokens = readTokens(canvas, animation.hudToken);
-      const sheet = buildMouthSheet(img, animation, tokens.fg);
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const mouthPatch = buildMouthPatch(img, animation);
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
       const tracker = new MouthTracker();
       // R08 conditional blink: flag on, eye anchors present, motion allowed. Otherwise nothing changes.
-      const blink = blinkFlagEnabled() && animation.eyes && !reduced ? new BlinkScheduler() : null;
+      const blink = blinkFlagEnabled() && animation.eyes ? new BlinkScheduler() : null;
       const lash: Rgb = (() => { const c = sampleColor(img, animation.mouth.x, animation.mouth.y, animation.mouth.width); return [c[0] * 0.15, c[1] * 0.1, c[2] * 0.1]; })();
       let look: AvatarLook = { ...animation.targets.idle };
       let shown: AvatarState = stateRef.current;
@@ -183,13 +170,14 @@ export function AvatarCanvas({ animation, state, name, audio = null, hud = [], w
         if (queue.length && sinceStep > animation.tauMs * 1.6) { shown = queue.shift() as AvatarState; sinceStep = 0; }
         look = easeLook(look, animation.targets[shown], dt, animation.tauMs);
 
-        const speaking = shown === 'speaking';
+        // Mouth follows playback immediately, independently of the eased decorative HUD state.
+        const motion = !reducedMotion.matches && motionRef.current ? 1 : 0;
+        const speaking = stateRef.current === 'speaking' && motion === 1;
         const sample = speaking ? (audioRef.current?.read() ?? null) : null;
         const mouth = tracker.update(dt, now, speaking, sample);
-        const motion = reduced ? 0 : 1;
         ring += dt / 1000 * look.ringSpeed * motion;
         const b = breathing(now / 1000, animation.breathPeriodSec, animation.breathAmp * motion, tracker.loudness);
-        const closure = blink ? blink.update(dt) : 0;
+        const closure = blink && motion ? blink.update(dt) : 0;
         const accent = accentFor(shown, tokens);
 
         g.clearRect(0, 0, width, height);
@@ -214,14 +202,14 @@ export function AvatarCanvas({ animation, state, name, audio = null, hud = [], w
         g.translate(-cx, -by + b.dy * ph);
         if (supportsFilter) g.filter = `grayscale(${look.desaturate.toFixed(2)})`;
         g.drawImage(img, px, py, pw, ph);
-        if (mouth !== 'rest') {
-          const idx = SHEET_ORDER.indexOf(mouth);
-          const mw = animation.mouth.width * pw * 1.25 * animation.mouthScale;
-          const mh = mw / 2;
-          g.drawImage(
-            sheet, (idx % 3) * CELL_W, Math.floor(idx / 3) * CELL_H, CELL_W, CELL_H,
-            px + animation.mouth.x * pw - mw / 2, py + animation.mouth.y * ph - mh / 2, mw, mh,
-          );
+        const pose = portraitMouthPose(tracker.loudness * animation.mouthScale, mouth);
+        if (pose.opacity > 0) {
+          const mw = mouthPatch.width * scale * pose.xScale;
+          const mh = mouthPatch.height * scale * pose.yScale;
+          g.save(); g.globalAlpha = pose.opacity;
+          g.drawImage(mouthPatch, px + animation.mouth.x * pw - mw / 2,
+            py + animation.mouth.y * ph - mh / 2, mw, mh);
+          g.restore();
         }
         if (closure > 0 && animation.eyes) {
           drawLid(g, img, animation.eyes.left, closure, px, py, pw, ph, lash);
@@ -280,7 +268,7 @@ export function AvatarCanvas({ animation, state, name, audio = null, hud = [], w
   const retry = useCallback(() => { setStatus('loading'); setAttempt((n) => n + 1); }, []);
 
   return (
-    <figure className={`relative inline-block ${className ?? ''}`} style={{ width }} data-avatar-state={state}>
+    <figure className={`relative inline-block ${className ?? ''}`} style={{ width }} data-avatar-state={state} data-motion-enabled={motionEnabled}>
       <canvas ref={canvasRef} aria-hidden="true" style={{ width, height }} className="block" />
       {status === 'loading' && (
         <div role="status" aria-busy="true" className="absolute inset-0 animate-pulse rounded-lg bg-card" style={{ height }}>
@@ -297,6 +285,11 @@ export function AvatarCanvas({ animation, state, name, audio = null, hud = [], w
         <span className="font-medium text-foreground">{name}</span>
         <span className="font-mono text-muted-foreground" data-testid="avatar-state-label">{AVATAR_STATE_LABELS[state]}</span>
       </figcaption>
+      <button type="button" onClick={() => setMotionEnabled((enabled) => !enabled)} aria-pressed={motionEnabled}
+        aria-label={`${motionEnabled ? 'Turn off' : 'Turn on'} avatar animation`}
+        className="mt-1 rounded px-1 py-0.5 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        Animation {motionEnabled ? 'on' : 'off'}
+      </button>
     </figure>
   );
 }

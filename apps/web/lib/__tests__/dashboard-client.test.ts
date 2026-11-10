@@ -1,13 +1,39 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canConverse, dashboardJson, readConversationStream, readConversationEvents, isConversationPersona } from '../dashboard-client';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 const stream = (...chunks: string[]) => new ReadableStream<Uint8Array>({ start(controller) {
   for (const chunk of chunks) controller.enqueue(new TextEncoder().encode(chunk));
   controller.close();
 } });
 
 describe('dashboard transport', () => {
+  it('bounds a stalled read including body parsing and aborts its transport', async () => {
+    vi.useFakeTimers();
+    let signal!: AbortSignal;
+    vi.stubGlobal('fetch', vi.fn((_url, init) => {
+      signal = init.signal;
+      return Promise.resolve({ ok: true, json: () => new Promise(() => {}) });
+    }));
+    const pending = expect(dashboardJson('/api/projects')).rejects.toThrow('timed out');
+    await vi.advanceTimersByTimeAsync(15_000);
+    await pending;
+    expect(signal.aborted).toBe(true);
+  });
+  it('preserves caller cancellation and does not add read timeouts or retries to writes', async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    let signal!: AbortSignal;
+    const fetcher = vi.fn((_url, init) => { signal = init.signal; return Promise.resolve(Response.json({ ok: true })); });
+    vi.stubGlobal('fetch', fetcher);
+    controller.abort();
+    await dashboardJson('/api/projects', { signal: controller.signal });
+    expect(signal.aborted).toBe(true);
+    await dashboardJson('/api/persona/switch', { method: 'POST', signal: controller.signal });
+    expect(signal).toBe(controller.signal);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it.each([401, 403, 429, 500])('does not turn HTTP %i into empty data', async (status) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('[]', { status })));
     await expect(dashboardJson('/api/projects')).rejects.toMatchObject({ status });

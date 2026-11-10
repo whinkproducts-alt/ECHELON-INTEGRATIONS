@@ -1,0 +1,11 @@
+# Private speech runtime. Owner-approved GPL/LGPL exception, 2026-11-10.
+# Keep third-party notices with the private installation; see LICENSES.md.
+faster-whisper==1.2.1
+kokoro==0.9.4
+spacy==3.8.7
+misaki[en]==0.9.4
+transformers==4.51.3
+huggingface-hub==0.30.2
+numpy==1.26.4
+# Official spaCy English pronunciation assets; fixed distribution and SHA-256.
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85

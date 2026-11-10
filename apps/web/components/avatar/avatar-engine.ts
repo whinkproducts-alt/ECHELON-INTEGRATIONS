@@ -161,13 +161,6 @@ export interface AudioSample {
   centroid?: number;
 }
 
-/** Deterministic stand in when only loudness is known. Same input time gives the same shape. */
-export function pseudoCentroid(tMs: number): number {
-  const bucket = Math.floor(tMs / 90);
-  const x = Math.sin(bucket * 12.9898) * 43758.5453;
-  return x - Math.floor(x);
-}
-
 export function classifyMouth(level: number, centroid: number): MouthShape {
   if (level < 0.05) return 'closed';
   if (centroid > 0.62) return level < 0.25 ? 'teeth' : 'wide';
@@ -182,21 +175,27 @@ export class MouthTracker {
   private heldMs = 0;
   private silentMs = 0;
 
-  constructor(private readonly minHoldMs = 70, private readonly attackMs = 35, private readonly releaseMs = 110) {}
+  constructor(private readonly minHoldMs = 90, private readonly attackMs = 45, private readonly releaseMs = 65) {}
 
-  update(dtMs: number, tMs: number, speaking: boolean, sample: AudioSample | null): MouthShape {
-    this.heldMs += dtMs;
-    if (!speaking) {
+  update(dtMs: number, _tMs: number, speaking: boolean, sample: AudioSample | null): MouthShape {
+    const dt = Math.max(0, Math.min(Number.isFinite(dtMs) ? dtMs : 0, 100));
+    this.heldMs += dt;
+    // No playback feed is not evidence of speech. Keep the approved portrait neutral.
+    if (!speaking || !sample || !Number.isFinite(sample.rms)) {
       this.level = 0;
       this.silentMs = 0;
       return this.set('rest', true);
     }
-    const target = sample ? Math.min(1, Math.max(0, sample.rms)) : 0.45 + 0.35 * Math.sin(tMs / 130);
+    const target = Math.min(1, Math.max(0, sample.rms));
+    // A pause closes the lips promptly; do not let a previous loud syllable hold them open.
+    if (target < 0.035) {
+      this.silentMs += dt;
+      this.level *= Math.exp(-dt / this.releaseMs);
+      if (this.silentMs >= 65) { this.level = 0; return this.set('rest', true); }
+    } else this.silentMs = 0;
     const tau = target > this.level ? this.attackMs : this.releaseMs;
-    this.level += (target - this.level) * (1 - Math.exp(-dtMs / tau));
-    if (this.level < 0.05) this.silentMs += dtMs; else this.silentMs = 0;
-    if (this.silentMs > 400) return this.set('rest', true);
-    const centroid = sample?.centroid ?? pseudoCentroid(tMs);
+    this.level += (target - this.level) * (1 - Math.exp(-dt / tau));
+    const centroid = Number.isFinite(sample.centroid) ? Math.min(1, Math.max(0, sample.centroid!)) : 0.5;
     return this.set(classifyMouth(this.level, centroid), false);
   }
 
@@ -209,6 +208,17 @@ export class MouthTracker {
     }
     return this.shape;
   }
+}
+
+/** Restrained audio-reactive portrait deformation, not phoneme/viseme alignment. */
+export function portraitMouthPose(level: number, shape: MouthShape): { xScale: number; yScale: number; opacity: number } {
+  const amount = Number.isFinite(level) ? Math.min(1, Math.max(0, level)) : 0;
+  if (shape === 'rest' || shape === 'closed' || amount < 0.035) return { xScale: 1, yScale: 1, opacity: 0 };
+  return {
+    xScale: 1 + (shape === 'round' ? -0.025 : shape === 'wide' ? 0.018 : 0) * amount,
+    yScale: 1 + Math.min(amount, 0.75) * 0.16,
+    opacity: Math.min(1, amount * 5),
+  };
 }
 
 export function lookFromBase(base: AvatarLook, over: Partial<AvatarLook>): AvatarLook {

@@ -1,3 +1,4 @@
+import { dispatchMedia, quoteMedia, mediaStatus, prepareMediaGeneration } from '@/lib/model-router/higgsfield/dispatch';
 import { prisma } from '@/lib/db';
 import { isLocalOnlyMode, localOnlyModel } from '@/lib/local-only';
 import { localDefaultModel } from '@/lib/model-router/registry';
@@ -204,6 +205,9 @@ export interface ToolExecutionResult {
 
 // Use null-prototype objects to prevent __proto__ injection
 const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<ToolExecutionResult>> = Object.assign(Object.create(null), {
+  media_quote: async (userId: string, params: unknown) => ({ success: true, data: await quoteMedia(userId, params), timestamp: new Date().toISOString(), toolVersion: '1.0.0' }),
+  media_generate: async (userId: string, params: unknown) => ({ success: true, data: await dispatchMedia(userId, params), timestamp: new Date().toISOString(), toolVersion: '1.0.0' }),
+  media_status: async (userId: string, params: unknown) => ({ success: true, data: await mediaStatus(userId, params), timestamp: new Date().toISOString(), toolVersion: '1.0.0' }),
   memory_write: async (userId: string, params: any) => {
     let projectId: string | null = null;
     if (hasProjectId(params.projectId)) {
@@ -663,6 +667,9 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
 const TOOL_RISK_MAP: Record<string, PermissionClass> = Object.assign(Object.create(null), {
   // Class C always: runs only through an approval of kind 'scheduled_post' (never as a direct call).
   [SCHEDULE_TOOL_NAME]: 'C',
+  media_generate: 'C',
+  media_quote: 'C',
+  media_status: 'A',
   contact_message: 'C',
   contact_call: 'C',
   sms_briefing_send: 'C',
@@ -957,6 +964,7 @@ function summariseSocialResult(result: ToolExecutionResult): string {
 
 function summariseOutput(toolName: string, result: ToolExecutionResult): string {
   if (isWorkspaceTool(toolName)) return summariseWorkspaceResult(result);
+  if (toolName.startsWith('media_')) return result.success ? 'Media provider operation completed (receipt in account-scoped approval)' : 'Media provider operation failed';
   return isSocialTool(toolName) ? summariseSocialResult(result) : safeJson(result.data ?? result.error);
 }
 
@@ -1002,7 +1010,7 @@ export async function executeTool(
   const initiator = opts.initiator ?? 'system';
   const startTime = Date.now();
   // Workspace tools never put file, diff or match text in the ledger: names, paths and patterns only.
-  const safeJson = (v: unknown): string => (isWorkspaceTool(toolName) ? summariseWorkspaceInput(toolName, v) : safeJsonOuter(v));
+  const safeJson = (v: unknown): string => (toolName.startsWith('media_') ? 'Media request (exact content in approval)' : isWorkspaceTool(toolName) ? summariseWorkspaceInput(toolName, v) : safeJsonOuter(v));
   const nowIso = () => new Date().toISOString();
 
   // Local-Only mode: anything outside the local allow-list is denied by name, whatever the model asked for.
@@ -1084,6 +1092,15 @@ export async function executeTool(
       latencyMs: Date.now() - startTime,
     });
     return { success: false, error: `Unknown tool: ${toolName}`, timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  }
+
+  // Generation drafts are expanded from a successful account-scoped provider quote BEFORE approval hashing.
+  if (toolName === 'media_generate') {
+    try { params = await prepareMediaGeneration(userId, params); }
+    catch {
+      await recordActionSafe({ userId, initiator, persona, tool: toolName, action: 'tool_execution_denied', permissionClass: 'C', status: 'DENIED', outputSummary: 'Valid unexpired media quote required', correlationId: cid });
+      return { success: false, error: 'Valid unexpired media quote required', timestamp: nowIso(), toolVersion: '1.0.0' };
+    }
   }
 
   // Check permission. A registered tool with no explicit risk entry is treated as Class C.
@@ -1241,7 +1258,7 @@ export async function executeTool(
 
     // Fire-and-forget postmortem — only for successful executions. Never for social tools:
     // their output is private message and feed content and must not be sent to a model for a ledger note.
-    if (result.success && !isSocialTool(toolName) && !isWorkspaceTool(toolName)) {
+    if (result.success && !toolName.startsWith('media_') && !isSocialTool(toolName) && !isWorkspaceTool(toolName)) {
       const actionId = actionRow.id;
       const capturedTool = toolName;
       const capturedParams = params;
@@ -1410,7 +1427,7 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
       confirmationMethod: 'user_confirmed',
       status: 'SUBMITTED',
       // The SMS briefing text and the full number stay out of the ledger; the approval row holds them.
-      inputSummary: approval.tool === 'sms_briefing_send' ? 'sms briefing (content in the approval request)' : approval.tool === 'contact_message' || approval.tool === 'contact_call' ? `${approval.tool} (recipient and content are in the approval request)` : safeJson(callParams),
+      inputSummary: approval.tool.startsWith('media_') ? 'Media request (exact content in approval)' : approval.tool === 'sms_briefing_send' ? 'sms briefing (content in the approval request)' : approval.tool === 'contact_message' || approval.tool === 'contact_call' ? `${approval.tool} (recipient and content are in the approval request)` : safeJson(callParams),
       validationResult: JSON.stringify({ approvalId: approval.id }),
       latencyMs: 0,
     });

@@ -6,7 +6,8 @@
  */
 import { randomUUID } from 'crypto';
 import { logger } from '../lib/logger';
-import { tick, type TickState } from '../lib/worker/runner';
+import { tick, workerConcurrency, type TickState } from '../lib/worker/runner';
+import { runDueSpeechChecks } from '../lib/speech-services';
 
 const LOOP_MS = 15_000;
 const SHUTDOWN_GRACE_MS = 30_000;
@@ -21,6 +22,8 @@ async function main(): Promise<void> {
   const startedAt = new Date();
   const state: TickState = { lastDiscoverAt: 0, inFlight: new Set() };
   let stopping = false;
+  let lastSpeechSweepAt = 0;
+  let speechSweep: Promise<unknown> | null = null;
   const stop = () => { stopping = true; };
   process.on('SIGTERM', stop);
   process.on('SIGINT', stop);
@@ -28,6 +31,17 @@ async function main(): Promise<void> {
 
   while (!stopping) {
     try {
+      if (!stopping && !speechSweep && state.inFlight.size < workerConcurrency() && Date.now() - lastSpeechSweepAt >= 60_000) {
+        lastSpeechSweepAt = Date.now();
+        // Keep the standing worker responsive; durable per-account leases prevent duplicates.
+        // One account per sweep bounds work, while updatedAt ordering rotates account discovery.
+        const work = runDueSpeechChecks(new Date(), 1).catch(() => {
+          logger.warn('speech readiness sweep unavailable', { workerId });
+        });
+        speechSweep = work;
+        state.inFlight.add(work);
+        void work.finally(() => { state.inFlight.delete(work); speechSweep = null; });
+      }
       await tick(workerId, startedAt, state);
     } catch (e) {
       logger.error('worker tick failed', { workerId, error: (e as Error)?.message });

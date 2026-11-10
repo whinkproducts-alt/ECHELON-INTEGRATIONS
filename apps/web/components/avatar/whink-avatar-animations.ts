@@ -18,8 +18,8 @@ const targets: StateTargets = {
 export const whinkAvatarAnimation: PersonaAnimation = {
   portrait: '/avatar/whink-portrait.webp',
   portraitSize: { width: 630, height: 770 },
-  // Mouth located on the cropped portrait (source 545,612 minus crop 250,230).
-  mouth: { x: 295 / 630, y: 382 / 770, width: 118 / 630 },
+  // Lip patch centred on the approved cropped portrait; live visual acceptance still required.
+  mouth: { x: 305 / 630, y: 393 / 770, width: 104 / 630 },
   // Eyes located on the same cropped portrait (behind the glasses lenses).
   eyes: { left: { x: 245 / 630, y: 271 / 770, w: 54 / 630, h: 26 / 770 }, right: { x: 363 / 630, y: 271 / 770, w: 54 / 630, h: 26 / 770 } },
   hudToken: '--hud-whink',

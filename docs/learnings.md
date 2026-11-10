@@ -184,3 +184,14 @@ Open items added by this batch:
 ## Main reconciliation (2026-11-01)
 
 Fetch all branch heads before claiming a branch is current. Main had newer security changes than the architecture branch, while the separate pilot had useful unmerged application work. Preserve both. An existing test DB can retain old foreign-key rules after an upstream migration was edited in place; validate on a fresh isolated DB. Turbopack local port permissions failed here; webpack build passed. Record both outcomes; GitHub CI still validates the default compiler. Run resource-heavy verification sequentially on this Mac; unconstrained parallel tests produced timeouts, while serial verification retained all assertions and passed.
+
+
+## 2026-11-08 — Speech and packaging verification
+
+The free OpenHiggsfield studio sends all 38 catalog choices to an external API; selectable open weights do not create a local inference engine. Official Higgsfield docs now include /estimate/{model} with authenticated exact parameters; treat it as account pricing, not final billing receipt.
+
+A local speech pair must be selected for the entire STT-to-TTS turn and use per-service roster voice IDs. Discovery200 does not prove loaded engines; probe owned known speech and playable WAV, bound memory/deadlines and avoid silent browser fallback. Audio-reactive mouth motion is not phonemealignment; preserve neutral fallback and visible limitations.
+
+Docker COPY preserves restrictive600host modes; non-root runtime could not read root-owned source until COPY --chown. Worker and web require the same loopback namespace for scheduled speech checks. Threaded relay needs bounds/timeouts before header parsing. An unsigned root-installed pkg also needs readable755/644 bundlemodes despite build-host umask.
+
+Node24 Undici's synthetic multipart encoder can enqueue after readBodyCapped cancellation; an oversized test fixture can materialize bytes beforeconstructing the bounded-reader request without changing the production limit. Ignore all custom .build* output in source/lint/artifacts.

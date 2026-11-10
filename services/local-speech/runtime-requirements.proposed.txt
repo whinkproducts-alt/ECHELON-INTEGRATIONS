@@ -1,0 +1,4 @@
+# NOT installed by default. Requires owner license exception.
+# PyAV includes LGPL FFmpeg. Kokoro pulls GPL phonemizer/espeak + LGPL num2words.
+faster-whisper==1.2.1
+kokoro==0.9.4

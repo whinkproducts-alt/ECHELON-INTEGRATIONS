@@ -19,6 +19,7 @@ export const LOCAL_ONLY_ALLOWED: ReadonlySet<string> = new Set([
 
 /** Reach the network, a person, a third party service or the document service. */
 export const LOCAL_ONLY_DENIED: ReadonlySet<string> = new Set([
+  'media_generate', 'media_quote', 'media_status',
   'web_search', 'web_fetch',
   'document_search', 'document_upload', 'document_delete',
   'contact_message', 'contact_call', 'sms_briefing_send',

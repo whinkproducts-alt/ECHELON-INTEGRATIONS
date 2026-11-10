@@ -50,7 +50,7 @@ export function ECHELONDashboard() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div hidden={view !== 'monitor'}>
-          <DashboardMonitor onOpenConversation={openConversation} />
+          <DashboardMonitor active={view === 'monitor'} onOpenConversation={openConversation} />
         </div>
         <div hidden={view !== 'conversation'} className="h-full">
           <PremiumConversation activePersona={activePersona} onPersonaChange={choosePersona} personaBusy={persona.busy} personaError={persona.error} onSendingChange={setConversationBusy} onComplete={persona.refresh} />
