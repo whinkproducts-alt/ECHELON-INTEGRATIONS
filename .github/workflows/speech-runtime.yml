@@ -1,0 +1,33 @@
+name: private speech runtime
+
+on:
+  pull_request:
+    paths:
+      - 'services/local-speech/**'
+      - 'packaging/local/compose.yaml'
+      - '.github/workflows/speech-runtime.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/local-speech/**'
+      - 'packaging/local/compose.yaml'
+      - '.github/workflows/speech-runtime.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  cpu-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build private CPU speech runtime
+        run: docker build --progress=plain -f services/local-speech/Dockerfile.runtime -t whink-speech-runtime:ci services/local-speech
+      - name: Validate installed engine imports and dependencies
+        run: |
+          docker run --rm --read-only --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --entrypoint python whink-speech-runtime:ci -c \
+            'import torch, spacy; from faster_whisper import WhisperModel; from kokoro import KPipeline; assert not torch.cuda.is_available(); assert spacy.util.is_package("en_core_web_sm")'
+          docker run --rm --entrypoint python whink-speech-runtime:ci -m pip check
