@@ -42,7 +42,7 @@ def build(destination, output_format='auto'):
     for name, p in sorted(payload):
         digest.update(name.encode() + b'\0' + p.read_bytes())
     # Launcher changes must produce a new release even when application source is unchanged.
-    for name in ('packaging/macos/Start.command', 'packaging/macos/Configure Speech.command', 'packaging/README.md'):
+    for name in ('packaging/macos/Start.command', 'packaging/macos/Configure Speech.command', 'packaging/macos/Prepare Speech.command', 'packaging/README.md'):
         digest.update(name.encode() + b'\0' + (ROOT / name).read_bytes())
     release = digest.hexdigest()[:16]
     stage = destination / 'stage'
@@ -63,6 +63,8 @@ def build(destination, output_format='auto'):
     os.chmod(resources / 'Start.command', 0o755)
     shutil.copy(ROOT / 'packaging/macos/Configure Speech.command', resources / 'Configure Speech.command')
     os.chmod(resources / 'Configure Speech.command', 0o755)
+    shutil.copy(ROOT / 'packaging/macos/Prepare Speech.command', resources / 'Prepare Speech.command')
+    os.chmod(resources / 'Prepare Speech.command', 0o755)
     launcher = macos / 'WhinkUltimate'
     launcher.write_text('#!/bin/bash\nexec /usr/bin/open -a Terminal "$(dirname "$0")/../Resources/Start.command"\n')
     os.chmod(launcher, 0o755)
@@ -71,7 +73,7 @@ def build(destination, output_format='auto'):
         plistlib.dump({'CFBundleIdentifier': 'com.whinkgroup.ultimate.local',
                       'CFBundleName': 'Whink Ultimate', 'CFBundleDisplayName': 'Whink Ultimate',
                       'CFBundleExecutable': 'WhinkUltimate', 'CFBundlePackageType': 'APPL',
-                      'CFBundleShortVersionString': '0.2.0', 'CFBundleVersion': '2',
+                      'CFBundleShortVersionString': '0.3.0', 'CFBundleVersion': '3',
                       'LSMinimumSystemVersion': '12.0'}, file)
     # A pkg is installed by root; restrictive build-host umask must not make
     # Applications/Whink Ultimate.app unreadable to the actual Mac user.
@@ -83,13 +85,13 @@ def build(destination, output_format='auto'):
     if output_format == 'auto':
         output_format = 'pkg' if shutil.which('pkgbuild') else 'zip'
     if output_format == 'pkg':
-        package = destination / 'Whink-Ultimate-Local-0.2.0.pkg'
+        package = destination / 'Whink-Ultimate-Local-0.3.0.pkg'
         subprocess.run(['pkgbuild', '--root', str(stage), '--install-location', '/',
-                        '--identifier', 'com.whinkgroup.ultimate.local', '--version', '0.2.0',
+                        '--identifier', 'com.whinkgroup.ultimate.local', '--version', '0.3.0',
                         str(package)], check=True)
     else:
         # A portable candidate can be prepared on Linux without pretending pkgbuild ran.
-        package = destination / 'Whink-Ultimate-Local-0.2.0.zip'
+        package = destination / 'Whink-Ultimate-Local-0.3.0.zip'
         with zipfile.ZipFile(package, 'w', zipfile.ZIP_DEFLATED) as archive:
             for path in sorted(app.rglob('*')):
                 if path.is_file():
@@ -99,6 +101,7 @@ def build(destination, output_format='auto'):
             for title, command in (
                 ('Start.command', 'Start.command'),
                 ('Configure Speech.command', 'Configure Speech.command'),
+                ('Prepare Speech.command', 'Prepare Speech.command'),
             ):
                 info = zipfile.ZipInfo(title)
                 info.create_system = 3

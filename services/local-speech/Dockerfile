@@ -5,6 +5,6 @@ COPY requirements.txt .
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export PIP_CERT=/run/secrets/proxy_ca; fi; \
     pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home speech
-COPY --chown=speech:speech app.py .
+COPY --chown=speech:speech app.py prepare_models.py .
 USER 10001:10001
 CMD ["python", "app.py"]

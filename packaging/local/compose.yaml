@@ -52,6 +52,8 @@ services:
     profiles: [speech]
     build:
       context: ../../services/local-speech
+      dockerfile: Dockerfile.runtime
+    image: whink-local-speech:${WHINK_RELEASE_ID:?release id required}
     network_mode: service:web
     restart: unless-stopped
     init: true
@@ -59,8 +61,8 @@ services:
     cap_drop: [ALL]
     environment:
       LOCAL_SPEECH_TOKEN: ${LOCAL_SPEECH_TOKEN:-}
-      WHISPER_MODEL_PATH: /models/whisper
-      HF_HOME: /models/huggingface
+      WHISPER_MODEL_PATH: /models/whisper-small.en
+      HF_HOME: /models/hf
     volumes: ["speech_models:/models:ro"]
     depends_on:
       web: {condition: service_healthy}

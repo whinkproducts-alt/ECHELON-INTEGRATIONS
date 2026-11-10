@@ -66,6 +66,8 @@ class LocalEngine:
         os.environ['TRANSFORMERS_OFFLINE'] = '1'
         os.environ['DO_NOT_TRACK'] = '1'
         try:
+            from prepare_models import verify_assets
+            verify_assets(Path('/models'))
             from faster_whisper import WhisperModel
             from kokoro import KPipeline
             import torch
