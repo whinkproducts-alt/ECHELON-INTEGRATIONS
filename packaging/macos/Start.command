@@ -3,7 +3,16 @@ set -euo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 umask 077
 resources="$(cd "$(dirname "$0")" && pwd)"
-state="$HOME/Library/Application Support/Whink Ultimate"
+if [ "${WHINK_INSTALL_KIND:-}" = sandbox ]; then
+  state="$HOME/Library/Application Support/ECHELON Integrations Sandbox"
+  export WHINK_PROJECT_NAME=echelon-integrations-sandbox
+  export WHINK_DB_VOLUME=echelon-integrations-sandbox-data
+  export WHINK_SPEECH_VOLUME=echelon-integrations-sandbox-speech
+  first_port=3311
+else
+  state="$HOME/Library/Application Support/Whink Ultimate"
+  first_port=3211
+fi
 mkdir -p "$state"
 chmod 700 "$state"
 fail() { printf '\n%s\n' "$1"; read -r -p 'Press Return to close.' _; exit 1; }
@@ -47,7 +56,7 @@ if [ ! -f "$WHINK_RUNTIME_ENV" ]; then
   auth_secret="$(openssl rand -hex 32)"
   encryption_key="$(openssl rand -hex 32)"
   setup_token="$(openssl rand -hex 32)"
-  http_port=3211
+  http_port="$first_port"
   # First installation only: preserve existing origins/passkeys on later starts.
   if /usr/sbin/lsof -nP -iTCP:"$http_port" -sTCP:LISTEN >/dev/null 2>&1; then
     for ((candidate=0; candidate<30; candidate++)); do
@@ -109,9 +118,12 @@ append_default SPEECH_SELECTION_ENABLED true
 append_default LOCAL_SPEECH_URL http://127.0.0.1:8765
 append_default VOICESTUDIO_URL http://127.0.0.1:8766
 append_default VOICESTUDIO_ACCOUNT_USER_ID ''
+if [ "${WHINK_INSTALL_KIND:-}" = sandbox ]; then
+  append_default WHINK_AUTH_COOKIE_NAMESPACE echelon-integrations-sandbox
+fi
 # Parse only this numeric key; never source/evaluate the private dotenv file.
 http_port="$(awk -F= '$1 == "WHINK_HTTP_PORT" { value=$2 } END { print value }' "$WHINK_RUNTIME_ENV")"
-http_port="${http_port:-3211}"
+http_port="${http_port:-$first_port}"
 [[ "$http_port" =~ ^[0-9]{4,5}$ ]] && ((http_port >= 1024 && http_port <= 65535)) || fail 'Invalid configured local HTTP port.'
 export WHINK_HTTP_PORT="$http_port"
 studio_url="http://localhost:$http_port"

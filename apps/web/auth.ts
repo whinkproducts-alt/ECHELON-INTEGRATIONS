@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { applyLifetime, parseRemember, SESSION_TTL_REMEMBER_SECONDS } from '@/lib/auth/session-lifetime';
 import { redeemLoginTicket } from '@/lib/passkeys/challenges';
 import { getSessionVersion } from '@/lib/auth/session-version';
+import { sandboxAuthCookies } from '@/lib/auth/sandbox-cookies';
 
 /** Emails are case-insensitive: exact lowercase match first, then a unique case-insensitive match for legacy rows. */
 async function findUserByEmail(raw: string) {
@@ -19,6 +20,9 @@ async function findUserByEmail(raw: string) {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma) as any,
   trustHost: true,
+  cookies: process.env.WHINK_AUTH_COOKIE_NAMESPACE === 'echelon-integrations-sandbox'
+    ? sandboxAuthCookies
+    : undefined,
   // maxAge is the ceiling; the real (shorter) limit for non-remembered sessions is enforced in the jwt callback.
   session: { strategy: 'jwt', maxAge: SESSION_TTL_REMEMBER_SECONDS },
   pages: {

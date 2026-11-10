@@ -1,4 +1,4 @@
-name: whink-personal
+name: ${WHINK_PROJECT_NAME:-whink-personal}
 x-runtime: &runtime
   image: whink-personal:${WHINK_RELEASE_ID:?release id required}
   env_file: ${WHINK_RUNTIME_ENV:?private runtime env required}
@@ -84,6 +84,6 @@ services:
 volumes:
   personal_data:
     # A separate persistent database; never points at the existing developer DB.
-    name: whink-personal-data
+    name: ${WHINK_DB_VOLUME:-whink-personal-data}
   speech_models:
-    name: whink-personal-speech-models
+    name: ${WHINK_SPEECH_VOLUME:-whink-personal-speech-models}
