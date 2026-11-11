@@ -119,6 +119,10 @@ jobs:
         if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: M1_EXECUTION_DATABASE_URL="$DATABASE_URL" pnpm --filter app test
 
+      - name: Validate Mac sandbox launch package
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
+        run: python3 packaging/macos/test_always_on.py
+
       - name: Build
         if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: pnpm --filter app build

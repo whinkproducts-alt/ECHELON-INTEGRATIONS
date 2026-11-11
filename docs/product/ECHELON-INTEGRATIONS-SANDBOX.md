@@ -10,7 +10,7 @@ database, credentials or provider keys. The interface listens on this Mac only.
 1. Run Docker Desktop or OrbStack. Allow substantial free storage for the web
    image, Postgres and optional speech models; 15 GiB is a prudent starting
    allowance, not a measured minimum. The Mac must be awake while you test.
-2. Extract `ECHELON-Integrations-Sandbox-0.1.0.zip` and open
+2. Extract `ECHELON-Integrations-Sandbox-0.1.1.zip` and open
    `ECHELON Integrations Sandbox.app`, or run `Start Sandbox.command` from the
    extracted folder. The package is unsigned and unnotarized; macOS may ask you
    to confirm opening it. Do not disable system security controls.
@@ -30,6 +30,36 @@ bound to `127.0.0.1` and is not a public website. Other devices and users cannot
 reach it with this package. Nothing is deployed to the main Echelon instance.
 The sandbox also uses distinct authentication cookie names, so signing into it
 in the same browser does not replace the main local app's session.
+
+## Keep the local address available
+
+After the first successful launch, move `ECHELON Integrations Sandbox.app` to
+`/Applications`, then run **Enable Sandbox Always On.command** from the
+extracted folder. This installs two user-level macOS LaunchAgents: one checks
+the existing Docker services every two minutes and restarts them if needed;
+the other prevents idle system sleep **while the Mac is on AC power**. The
+watchdog can reopen the Docker engine selected by your current Docker context
+after login. It does not rebuild images, apply a new release, change your port,
+open a browser, or touch the main app's database.
+
+The URL is normally `http://localhost:3311`. If that port was occupied on
+first setup, use the different address printed by the launcher; it is saved
+with this sandbox's login and passkey settings. The watchdog will not silently
+move it again. A Mac that is powered off, logged out, sleeping on battery, or
+closed with its lid down cannot serve this local address. A network outage or
+unavailable Docker engine also interrupts access. For access without relying
+on this Mac, use a separate always-powered host with private HTTPS and its own
+database after testing here.
+If recovery fails, open **Start Sandbox.command** to see Docker's error; the
+automatic check will not change your configuration or discard the database.
+
+**Disable Sandbox Always On.command** removes both LaunchAgents. It leaves
+the running sandbox services and saved data intact. Disable it before using
+`Start Sandbox.command --stop`; otherwise the watchdog will restart the
+services on its next check.
+After replacing the app with a newer sandbox package, open it once to install
+that release before relying on the watchdog again. It never applies new code
+without that interactive launch.
 
 ## Test the new features
 

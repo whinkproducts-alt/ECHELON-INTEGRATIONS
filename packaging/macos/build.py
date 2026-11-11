@@ -42,7 +42,13 @@ def build(destination, output_format='auto', sandbox=False):
     for name, p in sorted(payload):
         digest.update(name.encode() + b'\0' + p.read_bytes())
     # Launcher changes must produce a new release even when application source is unchanged.
-    for name in ('packaging/macos/Start.command', 'packaging/macos/Configure Speech.command', 'packaging/macos/Prepare Speech.command', 'packaging/README.md'):
+    launch_files = ['packaging/macos/Start.command', 'packaging/macos/Configure Speech.command',
+                    'packaging/macos/Prepare Speech.command', 'packaging/README.md']
+    if sandbox:
+        launch_files.extend(('packaging/macos/Keep Sandbox Running.command',
+                             'packaging/macos/Enable Sandbox Always On.command',
+                             'packaging/macos/Disable Sandbox Always On.command'))
+    for name in launch_files:
         digest.update(name.encode() + b'\0' + (ROOT / name).read_bytes())
     if sandbox:
         digest.update(b'echelon-integrations-sandbox-v1')
@@ -50,7 +56,7 @@ def build(destination, output_format='auto', sandbox=False):
     app_name = 'ECHELON Integrations Sandbox' if sandbox else 'Whink Ultimate'
     executable_name = 'EchelonIntegrationsSandbox' if sandbox else 'WhinkUltimate'
     identifier = 'com.whinkgroup.echelon.integrations.sandbox' if sandbox else 'com.whinkgroup.ultimate.local'
-    version = '0.1.0' if sandbox else '0.3.0'
+    version = '0.1.1' if sandbox else '0.3.0'
     filename = 'ECHELON-Integrations-Sandbox' if sandbox else 'Whink-Ultimate-Local'
     stage = destination / 'stage'
     if stage.exists():
@@ -82,6 +88,11 @@ def build(destination, output_format='auto', sandbox=False):
             helper = resources / title
             helper.write_text('#!/bin/bash\nexport WHINK_INSTALL_KIND=sandbox\nexec bash "$(cd "$(dirname "$0")" && pwd)/' + target + '" "$@"\n')
             helper.chmod(0o755)
+        for title in ('Keep Sandbox Running.command', 'Enable Sandbox Always On.command', 'Disable Sandbox Always On.command'):
+            shutil.copy(ROOT / 'packaging/macos' / title, resources / title)
+            os.chmod(resources / title, 0o755)
+        command_names['Enable Sandbox Always On.command'] = 'Enable Sandbox Always On.command'
+        command_names['Disable Sandbox Always On.command'] = 'Disable Sandbox Always On.command'
     else:
         command_names = {
             'Start.command': 'Start.command',
@@ -126,7 +137,12 @@ def build(destination, output_format='auto', sandbox=False):
                 info = zipfile.ZipInfo(title)
                 info.create_system = 3
                 info.external_attr = 0o100755 << 16
-                script = '#!/bin/bash\nexec bash "$(cd "$(dirname "$0")" && pwd)/' + app_name + '.app/Contents/Resources/' + title + '" "$@"\n'
+                if sandbox:
+                    script = ('#!/bin/bash\nbundle="$(cd "$(dirname "$0")" && pwd)/' + app_name + '.app"\n'
+                              '[ -d "$bundle" ] || bundle="/Applications/' + app_name + '.app"\n'
+                              'exec bash "$bundle/Contents/Resources/' + title + '" "$@"\n')
+                else:
+                    script = '#!/bin/bash\nexec bash "$(cd "$(dirname "$0")" && pwd)/' + app_name + '.app/Contents/Resources/' + title + '" "$@"\n'
                 archive.writestr(info, script)
     metadata = {'payload_id': release, 'kind': 'sandbox' if sandbox else 'personal', 'source_base': subprocess.check_output(
         ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
