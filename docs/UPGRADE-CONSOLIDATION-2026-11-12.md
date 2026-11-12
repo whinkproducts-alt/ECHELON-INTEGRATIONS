@@ -1,6 +1,6 @@
 # Pending upgrade consolidation (2026-11-12)
 
-This local branch starts from ECHELON-INTEGRATIONS PR #12 (governed media, speech, navigation and Mac sandbox). It brings overlapping open dependency and CI PRs from ECHELON-CORP into the ECHELON-INTEGRATIONS test branch. No change has been pushed or merged into either repository by this consolidation.
+This candidate starts from ECHELON-INTEGRATIONS PR #12 (governed media, speech, navigation and Mac sandbox). It brings overlapping open dependency and CI PRs from ECHELON-CORP into the ECHELON-INTEGRATIONS test branch. The candidate was pushed as [Integrations PR #13](https://github.com/whinkproducts-alt/ECHELON-INTEGRATIONS/pull/13). ECHELON-CORP has not been changed by this consolidation.
 
 ## Included in this branch
 
@@ -26,4 +26,4 @@ These PRs remain open at their original repositories. Their requested versions w
 - TypeScript and production build remain unverified because Prisma Client could not be generated. The OpenClaw Node 26 image build failed when this workspace ran out of disk space; the temporary pnpm cache was removed afterward.
 - `git diff --check` passed.
 
-Before pushing this branch, run frozen install, Prisma generate, typecheck, full tests, production build, OpenClaw image build, and the Mac sandbox acceptance workflow in an environment that can fetch official Prisma engines and has sufficient disk space. Then review all updated dependencies and action runtime requirements. Do not promote to ECHELON-CORP until the Integrations sandbox passes acceptance.
+Before merging PR #13 to Integrations main, require its CI and security checks to pass against a runner that can fetch official Prisma engines and has sufficient disk space. Then install the CI-built sandbox artifact on the M3 Mac and complete the live launch, speech, avatar, navigation and recovery checks. Do not promote to ECHELON-CORP until the Integrations sandbox passes acceptance.
