@@ -56,7 +56,7 @@ def build(destination, output_format='auto', sandbox=False):
     app_name = 'ECHELON Integrations Sandbox' if sandbox else 'Whink Ultimate'
     executable_name = 'EchelonIntegrationsSandbox' if sandbox else 'WhinkUltimate'
     identifier = 'com.whinkgroup.echelon.integrations.sandbox' if sandbox else 'com.whinkgroup.ultimate.local'
-    version = '0.1.1' if sandbox else '0.3.0'
+    version = '0.1.2' if sandbox else '0.3.0'
     filename = 'ECHELON-Integrations-Sandbox' if sandbox else 'Whink-Ultimate-Local'
     stage = destination / 'stage'
     if stage.exists():
@@ -108,7 +108,7 @@ def build(destination, output_format='auto', sandbox=False):
         plistlib.dump({'CFBundleIdentifier': identifier,
                       'CFBundleName': app_name, 'CFBundleDisplayName': app_name,
                       'CFBundleExecutable': executable_name, 'CFBundlePackageType': 'APPL',
-                      'CFBundleShortVersionString': version, 'CFBundleVersion': '1' if sandbox else '3',
+                      'CFBundleShortVersionString': version, 'CFBundleVersion': '2' if sandbox else '3',
                       'LSMinimumSystemVersion': '12.0'}, file)
     # A pkg is installed by root; restrictive build-host umask must not make
     # Applications/Whink Ultimate.app unreadable to the actual Mac user.

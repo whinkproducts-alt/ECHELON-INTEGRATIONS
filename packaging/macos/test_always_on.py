@@ -33,7 +33,7 @@ class SandboxPackageTests(unittest.TestCase):
         with TemporaryDirectory() as folder:
             subprocess.run([sys.executable, str(MACOS / 'build.py'), '--sandbox',
                             '--output', folder, '--format', 'zip'], check=True, capture_output=True)
-            with ZipFile(Path(folder) / 'ECHELON-Integrations-Sandbox-0.1.1.zip') as archive:
+            with ZipFile(Path(folder) / 'ECHELON-Integrations-Sandbox-0.1.2.zip') as archive:
                 app = 'ECHELON Integrations Sandbox.app/Contents/Resources/'
                 for command in ('Start Sandbox.command', 'Enable Sandbox Always On.command',
                                 'Disable Sandbox Always On.command', 'Keep Sandbox Running.command'):

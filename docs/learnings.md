@@ -195,3 +195,6 @@ A local speech pair must be selected for the entire STT-to-TTS turn and use per-
 Docker COPY preserves restrictive600host modes; non-root runtime could not read root-owned source until COPY --chown. Worker and web require the same loopback namespace for scheduled speech checks. Threaded relay needs bounds/timeouts before header parsing. An unsigned root-installed pkg also needs readable755/644 bundlemodes despite build-host umask.
 
 Node24 Undici's synthetic multipart encoder can enqueue after readBodyCapped cancellation; an oversized test fixture can materialize bytes beforeconstructing the bounded-reader request without changing the production limit. Ignore all custom .build* output in source/lint/artifacts.
+# 2026-11-12 — Consolidation and sandbox handoff
+
+Overlapping Dependabot PRs in the two repos can request different versions of the same package; use the newer Integrations versions only after regenerating a single lockfile and checking affected code. react-resizable-panels v4 renamed the group and handle exports, requiring wrapper changes. Prisma engine download failures prevent generated-client suites and type checking; they do not prove a source regression. A local Linux build cannot certify Mac launch, Docker recovery, speech models or microphone behavior. Preserve those as explicit acceptance gates.

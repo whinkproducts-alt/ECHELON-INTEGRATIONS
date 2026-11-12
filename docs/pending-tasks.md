@@ -1,4 +1,14 @@
-# ECHELON pending work — updated 2026-11-04
+# ECHELON pending work — updated 2026-11-12
+
+## Current Integrations sandbox handoff (2026-11-12)
+
+The pending media/speech/navigation delivery and compatible dependency/CI upgrades are consolidated on the Integrations candidate branch. [Consolidation details](UPGRADE-CONSOLIDATION-2026-11-12.md) record exactly which PRs were included. This branch does not change ECHELON-CORP. The Integrations `main` branch is the test baseline, not a production promotion.
+
+Before calling the sandbox accepted: GitHub CI and security checks on the promoted head, Mac first launch and restart, Docker recovery, microphone input and audible output for Whisper/Kokoro and VoiceStudio, saved voice IDs, daily speech check, navigation/visual acceptance, and exact approval/spend behavior. The optional hosted Higgsfield generation test needs the owner's separate in-app approval and funded configuration. No Mac runtime or paid call is inferred from a package build. [Mac install and test instructions](product/ECHELON-INTEGRATIONS-SANDBOX.md) identify the package and launch steps.
+
+Prisma CLI/Client 7 (Integrations #9/#11, Corp #37) and TypeScript 7 (Corp #40) are held for coordinated migrations. The Prisma engine download returned 403 in the cloud environment, and TypeScript 7 conflicts with the installed `@typescript-eslint` support range. Do not merge those version-only PRs into the sandbox baseline until code and verification catch up.
+
+**Next product priority:** [spoken initiative to execution](product/VOICE-INITIATIVE-EXECUTION-PRIORITY.md) for WHINK, MAMBA and owner-private Marcus Vale. First make speech reliable in the Mac sandbox; then implement durable initiative acceptance, authorized worker dispatch, visible/spoken progress, cancellation and exact protected approvals. This flow is not yet completed by selectable speech alone.
 
 Read [current audit handoff](ECHELON-AUDIT-HANDOFF-2026-11-04.md) for the fixed baseline, source/test map and CI evidence. `main` was `99f6d7eb3f58cff9d9aae8f59641137faf755a9c`; PRs #23/#24 are merged. Full personal use remains **not accepted**. Existing code, automatic test results, real provider acceptance and Founder acceptance are separate states.
 

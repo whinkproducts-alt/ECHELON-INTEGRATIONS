@@ -1,6 +1,6 @@
 # ECHELON-INTEGRATIONS Mac test sandbox
 
-This package runs the delivery branch of ECHELON-INTEGRATIONS locally on your
+This package runs the ECHELON-INTEGRATIONS source snapshot locally on your
 Mac. It is a test installation. It uses its own account, database, model cache,
 configuration, Docker project and web port. It does not copy the main Echelon
 database, credentials or provider keys. The interface listens on this Mac only.
@@ -10,7 +10,7 @@ database, credentials or provider keys. The interface listens on this Mac only.
 1. Run Docker Desktop or OrbStack. Allow substantial free storage for the web
    image, Postgres and optional speech models; 15 GiB is a prudent starting
    allowance, not a measured minimum. The Mac must be awake while you test.
-2. Extract `ECHELON-Integrations-Sandbox-0.1.1.zip` and open
+2. Extract `ECHELON-Integrations-Sandbox-0.1.2.zip` and open
    `ECHELON Integrations Sandbox.app`, or run `Start Sandbox.command` from the
    extracted folder. The package is unsigned and unnotarized; macOS may ask you
    to confirm opening it. Do not disable system security controls.
@@ -22,6 +22,12 @@ database, credentials or provider keys. The interface listens on this Mac only.
 4. Create your sandbox account with the one-time setup token opened locally
    by the launcher. Configure a local Ollama model if you want assistant replies;
    the default model names are only placeholders until the model is present.
+
+If the launcher reports an error, keep its Terminal window open and use the
+printed error. A localhost page cannot load when the Docker services did not
+start. The port is chosen at first setup and printed; do not assume it remains
+3311 if that port was occupied. The launcher does not ask for a Higgsfield key
+to run the app. Do not paste credentials into chat or add them to the ZIP.
 
 The sandbox state is in
 `~/Library/Application Support/ECHELON Integrations Sandbox/`. Its private
@@ -79,6 +85,10 @@ without that interactive launch.
   selection and avatar lips while audio plays. The 5 a.m. check uses the
   timezone confirmed in your sandbox profile. A sleeping Mac catches up when
   the stack runs again.
+- A conversation test is distinct from an execution test. The current sandbox
+  has not completed an end-to-end spoken initiative for WHINK, MAMBA or Marcus
+  Vale. Use the [voice-to-initiative brief](VOICE-INITIATIVE-EXECUTION-PRIORITY.md)
+  as the acceptance contract for that next priority.
 - Higgsfield media uses a hosted provider. It is disabled in the initial
   sandbox configuration. Add a newly rotated key privately only when you want
   to test its approval and spending controls; actual generation may use credits.
@@ -100,4 +110,5 @@ Iterate on a branch of ECHELON-INTEGRATIONS and review its CI and security
 checks. Install a candidate in this sandbox, then test the real flows on the
 Mac. After acceptance, promote the reviewed commits to ECHELON-CORP through a
 separate PR and migration/rollback review. The sandbox does not auto-push or
-auto-deploy to the main Echelon repository.
+auto-deploy to the main Echelon repository. The `main` branch here is the
+sandbox baseline; it is not the production ECHELON-CORP branch.
