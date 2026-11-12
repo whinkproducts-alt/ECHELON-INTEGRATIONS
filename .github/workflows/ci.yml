@@ -123,6 +123,22 @@ jobs:
         if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: python3 packaging/macos/test_always_on.py
 
+      - name: Build Mac sandbox download
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
+        run: python3 packaging/macos/build.py --sandbox --output dist/sandbox --format zip
+
+      - name: Upload Mac sandbox download
+        if: ${{ !cancelled() && steps.scope.outputs.heavy == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: echelon-integrations-sandbox-mac
+          path: |
+            dist/sandbox/ECHELON-Integrations-Sandbox-0.1.2.zip
+            dist/sandbox/READ-ME-FIRST.md
+            dist/sandbox/release.json
+          retention-days: 14
+          if-no-files-found: error
+
       - name: Build
         if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: pnpm --filter app build

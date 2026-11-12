@@ -7,6 +7,14 @@ database, credentials or provider keys. The interface listens on this Mac only.
 
 ## First launch
 
+Download the `echelon-integrations-sandbox-mac` artifact from the successful
+ECHELON-INTEGRATIONS `main` CI run in GitHub Actions. Extract that artifact
+first; it contains `ECHELON-Integrations-Sandbox-0.1.2.zip`,
+`READ-ME-FIRST.md` and `release.json`. Compare the ZIP's SHA-256 with
+`package_sha256` in `release.json` before opening it. The same ZIP can also be
+built from the reviewed source with
+`python3 packaging/macos/build.py --sandbox --output ./dist/sandbox --format zip`.
+
 1. Run Docker Desktop or OrbStack. Allow substantial free storage for the web
    image, Postgres and optional speech models; 15 GiB is a prudent starting
    allowance, not a measured minimum. The Mac must be awake while you test.
