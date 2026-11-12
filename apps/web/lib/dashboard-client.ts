@@ -6,9 +6,34 @@ export class DashboardRequestError extends Error {
 }
 
 export async function dashboardJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, { cache: 'no-store', ...init });
-  if (!response.ok) throw new DashboardRequestError(response.status);
-  return response.json() as Promise<T>;
+  const read = !init?.method || ['GET', 'HEAD'].includes(init.method.toUpperCase());
+  if (!read) {
+    const response = await fetch(url, { cache: 'no-store', ...init });
+    if (!response.ok) throw new DashboardRequestError(response.status);
+    return response.json() as Promise<T>;
+  }
+  const controller = new AbortController();
+  const abort = () => controller.abort(init?.signal?.reason);
+  if (init?.signal?.aborted) abort();
+  else init?.signal?.addEventListener('abort', abort, { once: true });
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      controller.abort();
+      reject(new Error('The read timed out. Refresh to try again.'));
+    }, 15_000);
+  });
+  try {
+    const request = (async () => {
+      const response = await fetch(url, { cache: 'no-store', ...init, signal: controller.signal });
+      if (!response.ok) throw new DashboardRequestError(response.status);
+      return response.json() as Promise<T>;
+    })();
+    return await Promise.race([request, deadline]);
+  } finally {
+    clearTimeout(timeout);
+    init?.signal?.removeEventListener('abort', abort);
+  }
 }
 
 // These are the premium directory identities accepted by /api/persona/switch.

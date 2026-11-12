@@ -1,50 +1,27 @@
 # ECHELON-INTEGRATIONS
 
-Browser permission and organizational tier integration for the WHINK autonomous agent system.
+Private test sandbox for ECHELON. This repository contains the WHINK application, its integration services, and the isolated Mac sandbox launcher. Changes are tested here before a separate review and promotion to [ECHELON-CORP](https://github.com/whinkproducts-alt/ECHELON-CORP).
 
-## Overview
+## Available for testing
 
-This repository contains the integration code for browser permissions and organization tier approval workflows for the ECHELON agent system. It is a fork of ECHELON-CORP focused on browser and org-tier integration development.
+- Faster navigation with immediate loading feedback.
+- Selectable Whisper + Kokoro and VoiceStudio speech paths, daily health checks, and saved per-agent voice IDs. Models and VoiceStudio are installed separately; opening the interface alone does not prove microphone or speech output works.
+- Audio-reactive Board and Holo avatar lips. Visual timing still needs Mac acceptance.
+- Higgsfield media integration behind account permissions, exact approvals and spending controls. It calls a hosted provider and is disabled until configured; no free local video engine is bundled.
+- An isolated Mac sandbox with its own database, configuration, port, Docker project, cookies and optional local recovery. It does not point at ECHELON-CORP data.
 
-## Structure
+See the [Mac sandbox installation and test guide](docs/product/ECHELON-INTEGRATIONS-SANDBOX.md). The [upgrade consolidation record](docs/UPGRADE-CONSOLIDATION-2026-11-12.md) names held major-version upgrades and verification limits. Current work and handoff state are in [pending tasks](docs/pending-tasks.md).
 
-```
-src/
-├── browser/
-│   ├── browser-tool.ts          # Firefox automation wrapper via Playwright
-│   ├── browser-tool-exec.ts     # Executable browser actions (navigate, click, type, screenshot, close)
-│   └── browser-tools.ts         # OpenClaw tool definitions (all Class C)
-├── lib/
-│   └── org-approval.ts          # Org-tier approval logic (8 tiers, C1-H classes)
-└── config/
-    └── tool-classes.json        # Browser tool registrations (all Class C)
-```
+## Development
 
-## Key Features
+From the repository root, install with `pnpm install --frozen-lockfile`, then configure a private `.env` from the examples. Never commit credentials. Run the web app with `pnpm dev`. CI checks TypeScript, lint, tests, database migrations, production build and browser flows. A green CI run does not replace real Mac microphone, speech, avatar or provider acceptance.
 
-- **8-tier org approval hierarchy** (founder → Wink/Mamba → Board → ... → Agent)
-- **Progressive approval classes** (C1–C7 + H founder-only)
-- **URL whitelist auto-allow** (C1)
-- **Team lead notification without blocking** (C2)
-- **Local-only enforcement** for $0 inference cost
-- **Defensive-by-default** — all browser actions Class C
-- **Founder-only visibility** for money/reputational/destructive risks (H)
+The standalone browser integration modules under `src/browser/` are retained in this repository but are not automatically activated by the Mac app bundle.
 
-## Getting Started
+## Next priority
 
-```bash
-# Install dependencies
-pnpm install
-
-# Setup Playwright (Firefox)
-npx playwright install firefox
-
-# Set environment variables
-WHINK_LOCAL_ONLY=true
-OLLAMA_HOST=http://<windows-ip>:11434
-BROWSER_WHITELISTED_URLS=https://github.com,https://docs.openclaw.io
-```
+The [voice-to-initiative execution brief](docs/product/VOICE-INITIATIVE-EXECUTION-PRIORITY.md) defines the requested flow: speak to WHINK, MAMBA or Marcus Vale, give an initiative, receive an execution receipt and follow progress. Existing permission, owner-private and approval rules still apply. This end-to-end flow is a priority to build and test; it is not claimed complete by the current sandbox.
 
 ## License
 
-Proprietary — WHINK Apps
+Proprietary — WHINK Apps. The optional private speech runtime has its own [dependency and model license notices](services/local-speech/LICENSES.md).

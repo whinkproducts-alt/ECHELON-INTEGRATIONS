@@ -16,6 +16,8 @@ export const CAPABILITY_CLASSES: Readonly<Record<string, PermissionClass>> = Obj
   board_minutes_write: 'A',
   connector_manage: 'B',
   usage_budget_set: 'A',
+  speech_preferences_set: 'A',
+  speech_health_check: 'A',
   contact_create: 'A',
   contact_update: 'A',
   contact_delete: 'A',

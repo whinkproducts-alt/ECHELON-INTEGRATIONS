@@ -2,7 +2,7 @@
 // R08 daily Board Room briefing. GET /api/briefing/daily gives today's script (built from the account's own records,
 // every line linked to its source screen). It opens once per local day on entry; the Founder can Replay, Skip, Mute or
 // Refresh it. Speech goes through /api/voice/tts; the avatar mouth follows the real audio through an AnalyserNode.
-// When only a browser voice is available the mouth uses a synthetic cadence and the screen says so. Autoplay that the
+// Browser voices have no accessible audio feed, so the portrait stays neutral. Autoplay that the
 // browser blocks shows a Play button instead. Lockdown, Local-Only or no speech service leave the transcript only.
 import * as React from 'react';
 import Link from 'next/link';
@@ -34,11 +34,12 @@ export function DailyBriefing() {
   const [synthetic, setSynthetic] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const run = React.useRef(0); // playback generation; a new one cancels the old
-  const media = React.useRef<{ audio?: HTMLAudioElement; ctx?: AudioContext; url?: string }>({});
+  const media = React.useRef<{ audio?: HTMLAudioElement; ctx?: AudioContext; url?: string; cancel?: () => void }>({});
 
   const stopAudio = React.useCallback(() => {
     run.current++;
     const m = media.current;
+    m.cancel?.();
     try { m.audio?.pause(); } catch { /* not playing */ }
     if (m.url) URL.revokeObjectURL(m.url);
     void m.ctx?.close().catch(() => {});
@@ -67,10 +68,12 @@ export function DailyBriefing() {
 
   /** Speak one line. Resolves when finished; throws 'blocked' when the browser refused autoplay. */
   const speakLine = React.useCallback(async (text: string, gen: number): Promise<'ok' | 'unavailable'> => {
-    const res = await fetch('/api/voice/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+    const res = await fetch('/api/voice/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, speakerId: 'WHINK' }) });
     if (gen !== run.current) return 'ok';
     if (res.ok) {
-      const url = URL.createObjectURL(await res.blob());
+      const blob = await res.blob();
+      if (gen !== run.current) return 'ok';
+      const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       media.current.url = url; media.current.audio = audio;
       try {
@@ -82,21 +85,41 @@ export function DailyBriefing() {
           ctx.createMediaElementSource(audio).connect(analyser);
           analyser.connect(ctx.destination);
           if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
-          setFeed(createAnalyserFeed(analyser)); setSynthetic(false);
+          if (gen !== run.current) return 'ok';
+          setFeed(createAnalyserFeed(analyser, audio)); setSynthetic(false);
         }
       } catch { setFeed(null); }
-      await new Promise<void>((resolve, reject) => {
-        audio.onended = () => resolve();
-        audio.onerror = () => reject(new Error('playback'));
-        audio.play().catch((e: unknown) => reject((e as Error)?.name === 'NotAllowedError' ? new Error('blocked') : e));
-      });
-      URL.revokeObjectURL(url); media.current.url = undefined;
+      if (gen !== run.current || isClientLockedDown()) {
+        audio.pause(); URL.revokeObjectURL(url);
+        if (media.current.audio === audio) {
+          void media.current.ctx?.close().catch(() => {});
+          media.current = {}; setFeed(null);
+        }
+        return 'ok';
+      }
+      try {
+        await new Promise<void>((resolve, reject) => {
+          media.current.cancel = resolve;
+          audio.onended = () => resolve();
+          audio.onerror = () => reject(new Error('playback'));
+          audio.play().catch((e: unknown) => reject((e as Error)?.name === 'NotAllowedError' ? new Error('blocked') : e));
+        });
+      } finally {
+        audio.onended = null; audio.onerror = null;
+        audio.pause(); URL.revokeObjectURL(url);
+        // A canceled old turn must not clear a newer turn's feed or resources.
+        if (media.current.audio === audio) {
+          void media.current.ctx?.close().catch(() => {});
+          media.current = {}; setFeed(null);
+        }
+      }
       return 'ok';
     }
     if (res.status === 501 && !LOCAL_ONLY_CLIENT && typeof window !== 'undefined' && window.speechSynthesis) {
-      // No server voice: browser voice. Its audio is not reachable, so the mouth cadence is synthetic.
+      // Browser voice has no audio feed: preserve a neutral mouth instead of inventing lip sync.
       setFeed(null); setSynthetic(true);
       await new Promise<void>((resolve) => {
+        media.current.cancel = resolve;
         const u = new SpeechSynthesisUtterance(text);
         u.onend = () => resolve(); u.onerror = () => resolve();
         window.speechSynthesis.speak(u);
@@ -181,7 +204,7 @@ export function DailyBriefing() {
             <div className="mx-auto">
               <WhinkAvatar name={name} state={avatarState} audio={feed} width={220}
                 hud={[{ label: 'DATE', value: b.localDate }, { label: 'LINES', value: String(b.lines.length) }]} />
-              {synthetic && voice === 'playing' && <p className="mt-2 max-w-[220px] text-xs text-muted-foreground">Browser voice: mouth movement is approximate, not driven by the audio.</p>}
+              {synthetic && voice === 'playing' && <p className="mt-2 max-w-[220px] text-xs text-muted-foreground">Browser voice: lip animation is unavailable, so the portrait stays neutral.</p>}
             </div>
             <div className="space-y-2" aria-live="polite">
               {voice === 'blocked' && <p role="status" className="text-sm text-[hsl(var(--pending-amber))]">Your browser needs a click before it plays sound. Press Play.</p>}

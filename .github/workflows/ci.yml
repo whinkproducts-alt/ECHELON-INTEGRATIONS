@@ -49,7 +49,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
       CI: 'true'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Docs-only pull requests skip the heavy steps below but still finish this job green, so a required check is
       # always satisfied. Only files under docs/ and root-level *.md count as docs (nothing in the app or its tests
@@ -81,11 +81,11 @@ jobs:
           echo "heavy=$heavy" >> "$GITHUB_OUTPUT"
           echo "Heavy checks: $heavy"
 
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         if: ${{ steps.scope.outputs.heavy == 'true' }}
         with:
           version: 10.28.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: ${{ steps.scope.outputs.heavy == 'true' }}
         with:
           node-version: 22
@@ -119,6 +119,26 @@ jobs:
         if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: M1_EXECUTION_DATABASE_URL="$DATABASE_URL" pnpm --filter app test
 
+      - name: Validate Mac sandbox launch package
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
+        run: python3 packaging/macos/test_always_on.py
+
+      - name: Build Mac sandbox download
+        if: ${{ steps.scope.outputs.heavy == 'true' }}
+        run: python3 packaging/macos/build.py --sandbox --output dist/sandbox --format zip
+
+      - name: Upload Mac sandbox download
+        if: ${{ !cancelled() && steps.scope.outputs.heavy == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: echelon-integrations-sandbox-mac
+          path: |
+            dist/sandbox/ECHELON-Integrations-Sandbox-0.1.2.zip
+            dist/sandbox/READ-ME-FIRST.md
+            dist/sandbox/release.json
+          retention-days: 14
+          if-no-files-found: error
+
       - name: Build
         if: ${{ steps.scope.outputs.heavy == 'true' }}
         run: pnpm --filter app build
@@ -133,6 +153,9 @@ jobs:
       - name: E2E (real browser, built app, real database)
         if: ${{ steps.scope.outputs.heavy == 'true' }}
         working-directory: e2e
+        env:
+          # Exercise the sandbox's runtime cookie namespace against real auth.
+          WHINK_AUTH_COOKIE_NAMESPACE: echelon-integrations-sandbox
         run: npx playwright test
 
       - name: Upload e2e report, traces and failure screenshots

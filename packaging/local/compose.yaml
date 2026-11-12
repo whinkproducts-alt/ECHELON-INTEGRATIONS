@@ -1,4 +1,4 @@
-name: whink-personal
+name: ${WHINK_PROJECT_NAME:-whink-personal}
 x-runtime: &runtime
   image: whink-personal:${WHINK_RELEASE_ID:?release id required}
   env_file: ${WHINK_RUNTIME_ENV:?private runtime env required}
@@ -32,7 +32,7 @@ services:
       postgres: {condition: service_healthy}
   web:
     <<: *runtime
-    ports: ["127.0.0.1:3211:3000"]
+    ports: ["127.0.0.1:${WHINK_HTTP_PORT:-3211}:3000"]
     depends_on:
       migrate: {condition: service_completed_successfully}
     healthcheck:
@@ -43,10 +43,47 @@ services:
       start_period: 20s
   worker:
     <<: *runtime
+    # Daily speech probes must reach the same loopback adapters as web requests.
+    network_mode: service:web
     command: [pnpm, --filter, app, worker]
+    depends_on:
+      web: {condition: service_healthy}
+  local-speech:
+    profiles: [speech]
+    build:
+      context: ../../services/local-speech
+      dockerfile: Dockerfile.runtime
+    image: whink-local-speech:${WHINK_RELEASE_ID:?release id required}
+    network_mode: service:web
+    restart: unless-stopped
+    init: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    environment:
+      LOCAL_SPEECH_TOKEN: ${LOCAL_SPEECH_TOKEN:-}
+      WHISPER_MODEL_PATH: /models/whisper-small.en
+      HF_HOME: /models/hf
+    volumes: ["speech_models:/models:ro"]
+    depends_on:
+      web: {condition: service_healthy}
+  voicestudio-bridge:
+    profiles: [voicestudio]
+    build:
+      context: ../../services/voicestudio-bridge
+    network_mode: service:web
+    restart: unless-stopped
+    init: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    environment:
+      VOICESTUDIO_API_KEY: ${VOICESTUDIO_API_KEY:-}
+      VOICESTUDIO_HOST_PORT: ${VOICESTUDIO_HOST_PORT:-3900}
+    extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:
       web: {condition: service_healthy}
 volumes:
   personal_data:
     # A separate persistent database; never points at the existing developer DB.
-    name: whink-personal-data
+    name: ${WHINK_DB_VOLUME:-whink-personal-data}
+  speech_models:
+    name: ${WHINK_SPEECH_VOLUME:-whink-personal-speech-models}

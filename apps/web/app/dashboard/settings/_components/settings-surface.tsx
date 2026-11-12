@@ -7,9 +7,13 @@ import Link from 'next/link';
 import { BillingSurface } from '../billing/_components/billing-surface';
 import { AutonomyApprovalPanel } from './autonomy-approval-panel';
 import { PasskeysPanel } from './passkeys-panel';
+import { SpeechServicePanel } from './speech-service-panel';
 import { ModelPriorityPanel } from './model-priority-panel';
 import { ChannelsPanel, SafetyPanel } from './safety-panel';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
+import { useDashboardDataClient } from '@/components/shell/dashboard-data-provider';
+import { DASHBOARD_KEYS } from '@/lib/dashboard-query-cache';
+import { dashboardJson } from '@/lib/dashboard-client';
 import {
   interpretPatchResponse, pickPendingAutonomy, resolveDecision, type AutonomyApproval,
 } from '@/lib/autonomy-approval';
@@ -18,6 +22,7 @@ import type { DecisionStatus } from '@/lib/hooks/approval-state';
 type Tab = 'profile' | 'billing' | 'apikeys' | 'whitelabel';
 
 export function SettingsSurface() {
+  const queryClient = useDashboardDataClient();
   const [activeTab, setActiveTab] = useState<Tab>('profile');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -52,7 +57,7 @@ export function SettingsSurface() {
   useEffect(() => {
     Promise.all([
       fetch('/api/settings').then(r => r.json()),
-      fetch('/api/tenant/config').then(r => r.json()),
+      queryClient.fetchQuery({ queryKey: DASHBOARD_KEYS.tenant, queryFn: ({ signal }) => dashboardJson<Record<string, any>>('/api/tenant/config', { signal }) }),
       fetch('/api/approvals?status=pending').then(r => (r.ok ? r.json() : null)).catch(() => null),
     ])
       .then(([d, tc, pend]) => {
@@ -71,7 +76,7 @@ export function SettingsSurface() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [queryClient]);
 
   const othersKey = () => {
     const { autonomyLevel: _l, ...rest } = profile;
@@ -146,6 +151,7 @@ export function SettingsSurface() {
       });
       if (r.status === 403) { toast.error('Admin access required'); return; }
       if (!r.ok) throw new Error();
+      await queryClient.invalidateQueries({ queryKey: DASHBOARD_KEYS.tenant });
       toast.success('White label settings saved');
     } catch {
       toast.error('Failed to save');
@@ -347,6 +353,9 @@ export function SettingsSurface() {
           {/* R04 / R07 / R06: these save on their own, not with Save Settings. */}
           <Section title="Model priority" icon={<Cpu className="h-4 w-4" />}>
             <ModelPriorityPanel />
+          </Section>
+          <Section title="Speech services" icon={<Radio className="h-4 w-4" />}>
+            <SpeechServicePanel />
           </Section>
           <Section title="Lockdown" icon={<ShieldAlert className="h-4 w-4" />}>
             <SafetyPanel />

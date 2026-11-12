@@ -6,6 +6,10 @@ import { ArrowUpRight, RefreshCw, ShieldCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { PERSONAS, type PersonaType } from '@/lib/personas';
 import { dashboardJson } from '@/lib/dashboard-client';
+import { loadMonitorSection, startMonitorPolling } from '@/lib/dashboard-monitor-refresh';
+import { useDashboardDataClient } from '@/components/shell/dashboard-data-provider';
+import { DASHBOARD_KEYS } from '@/lib/dashboard-query-cache';
+import { readMonitorProjects } from '@/lib/dashboard-projects';
 import { SubsidiaryChip } from '@/components/subsidiaries/subsidiary-chip';
 import { projectReportHref } from '@/components/subsidiaries/subsidiary-map';
 
@@ -162,8 +166,10 @@ function dotClass(status: string | null): string {
 
 export function DashboardMonitor({
   onOpenConversation,
+  active = true,
 }: {
   onOpenConversation: () => void;
+  active?: boolean;
 }) {
   const [status, setStatus] = useState<WorkerStatus | null>(null);
   const [activity, setActivity] = useState<ActivityRow[] | null>(null);
@@ -173,47 +179,42 @@ export function DashboardMonitor({
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [workerUpdatedAt, setWorkerUpdatedAt] = useState<number | null>(null);
-  const inFlight = useRef(false);
+  const inFlight = useRef<AbortSignal | null>(null);
+  const polling = useRef<ReturnType<typeof startMonitorPolling> | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const queryClient = useDashboardDataClient();
 
-  const load = useCallback(async (signal?: AbortSignal) => {
-    if (inFlight.current) return;
-    inFlight.current = true; setRefreshing(true);
+  const load = useCallback(async (signal: AbortSignal) => {
+    if (signal.aborted || (inFlight.current && !inFlight.current.aborted)) return;
+    inFlight.current = signal; setRefreshing(true);
     const array = <T,>(data: T[]): T[] => {
       if (!Array.isArray(data)) throw new Error('Unexpected service response.');
       return data;
     };
-    const result = await Promise.allSettled([
-      dashboardJson<WorkerStatus>('/api/worker/status', { signal }).then((data) => {
-        if (!Array.isArray(data.jobs) || typeof data.rosterSize !== 'number' || typeof data.enabledCount !== 'number') throw new Error('Unexpected service response.');
-        return data;
-      }),
-      dashboardJson<ActivityRow[]>('/api/ledger?limit=15', { signal }).then(array),
-      dashboardJson<ProjectSummary[]>('/api/projects', { signal }).then(array),
-    ]);
-    inFlight.current = false;
-    if (signal?.aborted) return;
-    const [worker, ledger, project] = result;
     const message = (reason: unknown) => typeof navigator !== 'undefined' && !navigator.onLine
       ? 'Offline. Reconnect and refresh.'
       : reason instanceof Error ? reason.message : 'Service unavailable. Try again.';
-    if (worker.status === 'fulfilled') { setStatus(worker.value); setWorkerUpdatedAt(Date.now()); setError(null); }
-    else setError(message(worker.reason));
-    if (ledger.status === 'fulfilled') { setActivity(ledger.value); setActivityError(null); }
-    else setActivityError(message(ledger.reason));
-    if (project.status === 'fulfilled') { setProjects(project.value); setProjectsError(null); }
-    else setProjectsError(message(project.reason));
-    setRefreshing(false);
-  }, []);
+    await Promise.all([
+      loadMonitorSection(() => dashboardJson<WorkerStatus>('/api/worker/status', { signal }).then((data) => {
+        if (!Array.isArray(data.jobs) || typeof data.rosterSize !== 'number' || typeof data.enabledCount !== 'number') throw new Error('Unexpected service response.');
+        return data;
+      }), signal, (value) => { setStatus(value); setWorkerUpdatedAt(Date.now()); setError(null); }, (reason) => setError(message(reason))),
+      loadMonitorSection(() => dashboardJson<ActivityRow[]>('/api/ledger?limit=15', { signal }).then(array),
+        signal, (value) => { setActivity(value); setActivityError(null); }, (reason) => setActivityError(message(reason))),
+      loadMonitorSection(() => readMonitorProjects<ProjectSummary>(queryClient, signal),
+        signal, (value) => { setProjects(value); setProjectsError(null); }, (reason) => setProjectsError(message(reason))),
+    ]);
+    if (inFlight.current === signal) {
+      inFlight.current = null;
+      if (!signal.aborted) setRefreshing(false);
+    }
+  }, [queryClient]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    const run = () => { if (!document.hidden) void load(controller.signal); };
-    const kick = setTimeout(run, 0);
-    const poll = setInterval(run, 30_000);
-    const tick = setInterval(() => setNow(Date.now()), 1000);
-    return () => { controller.abort(); clearTimeout(kick); clearInterval(poll); clearInterval(tick); };
-  }, [load]);
+    const session = startMonitorPolling(active, load, () => setNow(Date.now()));
+    polling.current = session;
+    return () => { session.stop(); polling.current = null; };
+  }, [active, load]);
 
   const rows = useMemo(() => {
     const jobs = status?.jobs ?? [];
@@ -245,7 +246,10 @@ export function DashboardMonitor({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => void load()}
+            onClick={() => {
+              void queryClient.invalidateQueries({ queryKey: DASHBOARD_KEYS.projects, refetchType: 'none' })
+                .then(() => polling.current?.refresh());
+            }}
             disabled={refreshing}
             className="workspace-button workspace-button-secondary"
           >

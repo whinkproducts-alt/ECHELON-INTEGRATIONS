@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  AVATAR_STATES, AVATAR_STATE_LABELS, MOUTH_SHAPES, MouthTracker, breathing, canTransition, classifyMouth, easeLook, transitionPath,
+  AVATAR_STATES, AVATAR_STATE_LABELS, MOUTH_SHAPES, MouthTracker, breathing, canTransition, classifyMouth, easeLook, transitionPath, portraitMouthPose,
 } from '@/components/avatar/avatar-engine';
 import { whinkAvatarAnimation } from '@/components/avatar/whink-avatar-animations';
 import { mambaAvatarAnimation } from '@/components/avatar/mamba-avatar-animations';
@@ -62,11 +62,64 @@ describe('mouth shapes', () => {
     }
     expect(changes).toBeLessThan(2000 / 70 + 2);
   });
+  it('never invents speaking movement without a live feed', () => {
+    const t = new MouthTracker();
+    for (let ms = 0; ms < 5000; ms += 16) expect(t.update(16, ms, true, null)).toBe('rest');
+    expect(t.loudness).toBe(0);
+  });
+  it('missing spectral data does not invent changing mouth shapes over time', () => {
+    const early = new MouthTracker(); const later = new MouthTracker();
+    for (let i = 0; i < 30; i++) {
+      expect(early.update(16, i * 16, true, { rms: 0.4 })).toBe(later.update(16, 9000 + i * 16, true, { rms: 0.4 }));
+    }
+  });
+  it('closes within 80 ms of silence, regardless of a held loud syllable', () => {
+    const t = new MouthTracker();
+    for (let ms = 0; ms < 200; ms += 16) t.update(16, ms, true, { rms: 1, centroid: 0.1 });
+    expect(t.loudness).toBeGreaterThan(0.8);
+    for (let ms = 0; ms < 80; ms += 16) t.update(16, ms, true, { rms: 0 });
+    expect(t.loudness).toBe(0);
+    expect(t.update(16, 300, true, { rms: 0 })).toBe('rest');
+  });
+  it('stops immediately on playback cancellation or a lost feed', () => {
+    for (const sample of [null, { rms: Number.NaN }]) {
+      const t = new MouthTracker();
+      t.update(100, 0, true, { rms: 1 });
+      expect(t.update(1, 100, true, sample)).toBe('rest');
+      expect(t.loudness).toBe(0);
+    }
+    const t = new MouthTracker(); t.update(100, 0, true, { rms: 1 });
+    expect(t.update(1, 100, false, { rms: 1 })).toBe('rest');
+    expect(t.loudness).toBe(0);
+  });
+  it('deforms original portrait lips within a restrained range and leaves silence untouched', () => {
+    for (const shape of MOUTH_SHAPES) for (const level of [0, 0.2, 0.7, 1, 200, Number.NaN]) {
+      const p = portraitMouthPose(level, shape);
+      expect(p.xScale).toBeGreaterThanOrEqual(0.975); expect(p.xScale).toBeLessThanOrEqual(1.018);
+      expect(p.yScale).toBeGreaterThanOrEqual(1); expect(p.yScale).toBeLessThanOrEqual(1.12);
+      expect(p.opacity).toBeGreaterThanOrEqual(0); expect(p.opacity).toBeLessThanOrEqual(1);
+    }
+    expect(portraitMouthPose(0, 'open').opacity).toBe(0);
+    expect(portraitMouthPose(1, 'rest').opacity).toBe(0);
+  });
   it('reads loudness and centroid from an analyser', () => {
     const feed = createAnalyserFeed({ frequencyBinCount: 256, getByteFrequencyData: (a) => a.fill(0, 0).fill(200, 0, 10) });
     const s = feed.read();
     expect(s.rms).toBeGreaterThan(0.1);
     expect(s.centroid).toBeLessThan(0.3);
+  });
+  it('uses waveform silence even when the spectrum retains smoothed energy', () => {
+    const feed = createAnalyserFeed({ frequencyBinCount: 256, getByteFrequencyData: a => a.fill(200), getByteTimeDomainData: a => a.fill(128) });
+    expect(feed.read().rms).toBe(0);
+  });
+  it('suppresses stale analyser samples while paused, ended or buffering', () => {
+    const playback = { paused: false, ended: false, readyState: 4 };
+    const feed = createAnalyserFeed({ frequencyBinCount: 256, getByteFrequencyData: a => a.fill(200), getByteTimeDomainData: a => a.fill(160) }, playback);
+    expect(feed.read().rms).toBeGreaterThan(0);
+    playback.paused = true; expect(feed.read().rms).toBe(0);
+    playback.paused = false; playback.ended = true; expect(feed.read().rms).toBe(0);
+    playback.ended = false; playback.readyState = 2; expect(feed.read().rms).toBe(0);
+    playback.readyState = 4; expect(feed.read().rms).toBeGreaterThan(0);
   });
 });
 

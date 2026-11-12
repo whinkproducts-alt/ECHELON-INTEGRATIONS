@@ -58,6 +58,9 @@ export const PROTECTED_REGISTRY: Readonly<Record<string, { category: ProtectedCa
   issues_write: { category: 'proprietary', reason: 'writes to an external issue tracker' },
   notes_write: { category: 'proprietary', reason: 'writes to an external notes service' },
   calendar_write: { category: 'proprietary', reason: 'writes to an external calendar' },
+  // Paid media generation also sends private prompts to an external provider.
+  media_quote: { category: 'proprietary', reason: 'sends exact media prompt to external provider for account pricing' },
+  media_generate: { category: 'money', reason: 'commits provider spend and sends prompt content outside the account' },
   // Money
   payments_write: { category: 'money', reason: 'creates or changes payments' },
   stripe_refund: { category: 'money', reason: 'refunds money' },

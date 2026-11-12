@@ -6,7 +6,8 @@ export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const config = await prisma.tenantConfig.upsert({
+  const existing = await prisma.tenantConfig.findUnique({ where: { tenantId: session.user.id } });
+  const config = existing ?? await prisma.tenantConfig.upsert({
     where: { tenantId: session.user.id },
     create: { tenantId: session.user.id },
     update: {},

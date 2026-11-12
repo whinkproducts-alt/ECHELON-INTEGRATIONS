@@ -1,6 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useDashboardDataClient } from '@/components/shell/dashboard-data-provider';
+import { DASHBOARD_KEYS } from '@/lib/dashboard-query-cache';
+import { dashboardJson } from '@/lib/dashboard-client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -13,11 +17,16 @@ import { getSubsidiaryList, projectReportHref } from '@/components/subsidiaries/
 
 export function ProjectDetail({ projectId }: { projectId: string }) {
   const router = useRouter();
-  const [project, setProject] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const client = useDashboardDataClient();
+  const projectKey = [...DASHBOARD_KEYS.projectDetails, projectId];
+  const { data: project, isPending: loading, error, refetch } = useQuery({
+    queryKey: projectKey,
+    queryFn: ({ signal }) => dashboardJson<any>(`/api/projects/${encodeURIComponent(projectId)}`, { signal }),
+  }, client);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [subError, setSubError] = useState<string | null>(null);
   const [subSaving, setSubSaving] = useState(false);
+  const [taskError, setTaskError] = useState<string | null>(null);
 
   const assignSubsidiary = async (value: string) => {
     setSubSaving(true);
@@ -29,7 +38,9 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         body: JSON.stringify({ subsidiary: value || null }),
       });
       if (!res.ok) throw new Error('failed');
-      setProject((prev: any) => ({ ...prev, subsidiary: value || null }));
+      client.setQueryData(projectKey, (prev: any) => ({ ...prev, subsidiary: value || null }));
+      void client.invalidateQueries({ queryKey: DASHBOARD_KEYS.projects });
+      void client.invalidateQueries({ queryKey: projectKey });
     } catch {
       setSubError('Could not update the subsidiary.');
     } finally {
@@ -37,34 +48,34 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     }
   };
 
-  useEffect(() => {
-    fetch(`/api/projects/${projectId}`)
-      .then(r => r.json())
-      .then(d => { setProject(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [projectId]);
-
   const addTask = async () => {
     if (!newTaskTitle.trim()) return;
-    await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, title: newTaskTitle }),
-    });
-    setNewTaskTitle('');
-    // Reload
-    const d = await fetch(`/api/projects/${projectId}`).then(r => r.json());
-    setProject(d);
+    setTaskError(null);
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, title: newTaskTitle }),
+      });
+      if (!response.ok) throw new Error('Task creation could not be confirmed.');
+      setNewTaskTitle('');
+      await Promise.all([
+        client.invalidateQueries({ queryKey: projectKey }),
+        client.invalidateQueries({ queryKey: DASHBOARD_KEYS.projects }),
+        client.invalidateQueries({ queryKey: DASHBOARD_KEYS.tasks }),
+      ]);
+    } catch { setTaskError('Task creation could not be confirmed. Refresh before trying again.'); }
   };
 
   if (loading) return <div className="p-6"><div className="h-40 bg-card animate-pulse rounded-lg" /></div>;
-  if (!project) return <div className="p-6 text-muted-foreground">Project not found.</div>;
+  if (!project) return <div className="p-6 text-muted-foreground" role="alert">{error?.message ?? 'Project not found.'} <button className="underline" onClick={() => void refetch()}>Retry</button></div>;
 
   const rawSub = project?.subsidiary;
   const subsidiaryId: string | null = typeof rawSub === 'string' ? rawSub : (rawSub?.id ?? null);
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {(error || taskError) && <p role="alert" className="text-sm text-destructive">{taskError ?? error?.message} <button onClick={() => void refetch()} className="underline">Refresh</button></p>}
       <button onClick={() => router.push('/dashboard/projects')} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Back to Projects
       </button>

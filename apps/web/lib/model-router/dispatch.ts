@@ -2,6 +2,7 @@
  * Production inference entry. Transport stays in model-router.ts; this file is what
  * callers must use so a missing account cannot select a server-funded call.
  */
+import { isLoopbackUrl } from '@/lib/local-only';
 import { chatOnce, embed, type StreamChatOptions } from '@/lib/model-router';
 import {
   classifyVoice,
@@ -97,14 +98,16 @@ export async function admittedEmbed(userId: string, text: string, attemptKey?: s
   );
 }
 
-export async function reserveVoice(input: { userId: string; channel: 'stt' | 'tts'; units: number }) {
-  const costClass = classifyVoice({ channel: input.channel });
+export async function reserveVoice(input: { userId: string; channel: 'stt' | 'tts'; units: number; localEndpoint?: string; provider?: string }) {
+  // Only server-configured loopback speech adapters may override legacy provider settings.
+  if (input.localEndpoint && !isLoopbackUrl(input.localEndpoint)) throw new Error('Speech endpoint must be loopback');
+  const costClass = input.localEndpoint ? 'local' : classifyVoice({ channel: input.channel });
   const price = voicePriceKnown();
   return reserveDispatch({
     userId: input.userId,
     purpose: input.channel === 'stt' ? 'voice_stt' : 'voice_tts',
     model: (input.channel === 'tts' ? process.env.TTS_MODEL : process.env.DEEPGRAM_MODEL) ?? input.channel,
-    provider: ((input.channel === 'stt' ? process.env.STT_PROVIDER : process.env.TTS_PROVIDER) ?? costClass).slice(0, 40),
+    provider: (input.provider ?? (input.channel === 'stt' ? process.env.STT_PROVIDER : process.env.TTS_PROVIDER) ?? costClass).slice(0, 40),
     maxTokens: 1,
     inputChars: 0,
     reservedTokens: Math.max(1, Math.min(input.units, 2_000_000_000)),
@@ -115,7 +118,7 @@ export async function reserveVoice(input: { userId: string; channel: 'stt' | 'tt
   });
 }
 
-export async function runAdmittedVoice<T>(input: { userId: string; channel: 'stt' | 'tts'; units: number }, run: () => Promise<T>): Promise<T> {
+export async function runAdmittedVoice<T>(input: { userId: string; channel: 'stt' | 'tts'; units: number; localEndpoint?: string; provider?: string }, run: () => Promise<T>): Promise<T> {
   const reserved = await reserveVoice(input);
   try {
     const value = await run();
