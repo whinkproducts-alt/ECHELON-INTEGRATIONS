@@ -1,6 +1,6 @@
 # Pending upgrade consolidation (2026-11-12)
 
-This candidate starts from ECHELON-INTEGRATIONS PR #12 (governed media, speech, navigation and Mac sandbox). It brings overlapping open dependency and CI PRs from ECHELON-CORP into the ECHELON-INTEGRATIONS test branch. The candidate was pushed as [Integrations PR #13](https://github.com/whinkproducts-alt/ECHELON-INTEGRATIONS/pull/13). ECHELON-CORP has not been changed by this consolidation.
+This delivery started from ECHELON-INTEGRATIONS PR #12 (governed media, speech, navigation and Mac sandbox). It brought overlapping open dependency and CI PRs from ECHELON-CORP into the ECHELON-INTEGRATIONS test branch. [Integrations PR #13](https://github.com/whinkproducts-alt/ECHELON-INTEGRATIONS/pull/13) passed CI, security and private speech runtime checks and merged into Integrations `main` at `857778f`. ECHELON-CORP has not been changed by this consolidation.
 
 ## Included in this branch
 
@@ -26,4 +26,4 @@ These PRs remain open at their original repositories. Their requested versions w
 - TypeScript and production build remain unverified because Prisma Client could not be generated. The OpenClaw Node 26 image build failed when this workspace ran out of disk space; the temporary pnpm cache was removed afterward.
 - `git diff --check` passed.
 
-Before merging PR #13 to Integrations main, require its CI and security checks to pass against a runner that can fetch official Prisma engines and has sufficient disk space. Then install the CI-built sandbox artifact on the M3 Mac and complete the live launch, speech, avatar, navigation and recovery checks. Do not promote to ECHELON-CORP until the Integrations sandbox passes acceptance.
+The PR #13 head passed CI (including Prisma generation, fresh database migration/seed, TypeScript, lint, tests, production build and browser E2E), security and private speech runtime checks. The CI-built `echelon-integrations-sandbox-mac` artifact is in its [successful Actions run](https://github.com/whinkproducts-alt/ECHELON-INTEGRATIONS/actions/runs/43323114884). Install the sandbox on the M3 Mac and complete live launch, speech, avatar, navigation and recovery acceptance. The cloud Linux session cannot start the Mac app. Do not promote to ECHELON-CORP until the Integrations sandbox passes acceptance.

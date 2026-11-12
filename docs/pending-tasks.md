@@ -2,9 +2,9 @@
 
 ## Current Integrations sandbox handoff (2026-11-12)
 
-The pending media/speech/navigation delivery and compatible dependency/CI upgrades are consolidated on the Integrations candidate branch. [Consolidation details](UPGRADE-CONSOLIDATION-2026-11-12.md) record exactly which PRs were included. This branch does not change ECHELON-CORP. The Integrations `main` branch is the test baseline, not a production promotion.
+The media/speech/navigation delivery and compatible dependency/CI upgrades merged into Integrations `main` through PR #13 at `857778f`. [Consolidation details](UPGRADE-CONSOLIDATION-2026-11-12.md) record exactly which PRs were included. ECHELON-CORP is unchanged. Integrations `main` is the test baseline, not a production promotion.
 
-Before calling the sandbox accepted: GitHub CI and security checks on the promoted head, Mac first launch and restart, Docker recovery, microphone input and audible output for Whisper/Kokoro and VoiceStudio, saved voice IDs, daily speech check, navigation/visual acceptance, and exact approval/spend behavior. The optional hosted Higgsfield generation test needs the owner's separate in-app approval and funded configuration. No Mac runtime or paid call is inferred from a package build. [Mac install and test instructions](product/ECHELON-INTEGRATIONS-SANDBOX.md) identify the package and launch steps.
+PR #13 CI, security and private speech runtime checks passed. Before calling the sandbox accepted: Mac first launch and restart, Docker recovery, microphone input and audible output for Whisper/Kokoro and VoiceStudio, saved voice IDs, daily speech check, navigation/visual acceptance, and exact approval/spend behavior. The optional hosted Higgsfield generation test needs the owner's separate in-app approval and funded configuration. No Mac runtime or paid call is inferred from a package build. [Mac install and test instructions](product/ECHELON-INTEGRATIONS-SANDBOX.md) identify the package and launch steps.
 
 Prisma CLI/Client 7 (Integrations #9/#11, Corp #37) and TypeScript 7 (Corp #40) are held for coordinated migrations. The Prisma engine download returned 403 in the cloud environment, and TypeScript 7 conflicts with the installed `@typescript-eslint` support range. Do not merge those version-only PRs into the sandbox baseline until code and verification catch up.
 
