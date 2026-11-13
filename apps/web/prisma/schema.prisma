@@ -1638,3 +1638,39 @@ model SpeechDailyCheck {
   @@index([userId, checkedAt])
   @@map("speech_daily_checks")
 }
+
+// ── ECHELON v3.3 Budget Envelope System ───────────────────────────────────────
+
+model BudgetEnvelope {
+  id           String   @id @default(cuid())
+  userId       String
+  envelopeKind String
+  periodStart  DateTime
+  limitMicros  BigInt
+  spentMicros  BigInt   @default(0)
+  state        String   @default("open")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  reservations BudgetReservation[]
+
+  @@unique([userId, envelopeKind, periodStart])
+  @@index([userId, periodStart])
+  @@map("budget_envelopes")
+}
+
+model BudgetReservation {
+  id              String    @id @default(cuid())
+  envelopeId      String
+  attemptKey      String
+  reservedMicros  BigInt
+  state           String    @default("pending")
+  createdAt       DateTime  @default(now())
+  settledAt       DateTime?
+
+  envelope BudgetEnvelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+
+  @@unique([envelopeId, attemptKey])
+  @@index([envelopeId, state])
+  @@map("budget_reservations")
+}
