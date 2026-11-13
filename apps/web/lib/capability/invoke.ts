@@ -34,6 +34,8 @@ import { providerFingerprint } from '@/lib/capability/providers';
 import { agentMayAct, resolveAgent } from '@/lib/capability/roster';
 import type { EgressDeps } from '@/lib/capability/egress';
 import { isLockedDown } from '@/lib/safety/lockdown';
+import { getOrOpenMonthlyExecEnvelope, reserveEnvelope, settleEnvelope, releaseReservation } from '@/lib/budget/envelope';
+import { EXEC_AGENT_IDS } from '@/lib/settings/org-authority';
 
 export class CapabilityError extends Error {
   constructor(readonly code: CapabilityErrorCode, message: string, readonly actionId?: string) {
@@ -227,6 +229,25 @@ export async function invokeCapability(p: InvokeParams, deps: InvokeDeps = {}, a
     throw e;
   }
 
+  // 6.5 Exec-tier monthly budget gate: blocks named exec agents once the $25/month envelope is exhausted.
+  let _execEnvelopeId: string | undefined;
+  let _execReservationId: string | undefined;
+  if (p.subject.type === 'AGENT' && EXEC_AGENT_IDS.has(p.subject.agentId.toUpperCase())) {
+    const envelope = await getOrOpenMonthlyExecEnvelope(p.userId, p.subject.agentId, now);
+    const reservation = await reserveEnvelope(envelope.id, receipt.id, 0n);
+    if (!reservation.ok) {
+      await closeReceipt(p.userId, receipt.id, {
+        status: 'FAILED',
+        outputSummary: `exec monthly budget exceeded: ${reservation.reason}`,
+        errorCode: 'AUTHZ_POLICY_DENIED',
+        latencyMs: Date.now() - started,
+      });
+      throw new CapabilityError('AUTHZ_POLICY_DENIED', `Exec monthly budget exceeded (${reservation.reason})`, receipt.id);
+    }
+    _execEnvelopeId = envelope.id;
+    _execReservationId = reservation.reservationId;
+  }
+
   // 7. Execute.
   let output: string;
   try {
@@ -238,6 +259,7 @@ export async function invokeCapability(p: InvokeParams, deps: InvokeDeps = {}, a
     const code: CapabilityErrorCode = e instanceof ProviderError ? (e.code === 'EXEC_TIMEOUT' ? 'EXEC_TIMEOUT' : e.code === 'EGRESS_DENIED' ? 'EGRESS_DENIED' : 'EXEC_FAILED') : 'EXEC_FAILED';
     const message = e instanceof ProviderError ? e.message : 'Provider call could not be made';
     await closeReceipt(p.userId, receipt.id, { status: 'FAILED', outputSummary: message, errorCode: code, latencyMs: Date.now() - started });
+    if (_execReservationId) await releaseReservation(_execReservationId).catch(() => { /* best-effort */ });
     throw new CapabilityError(code, message, receipt.id);
   }
   await closeReceipt(p.userId, receipt.id, {
@@ -245,6 +267,9 @@ export async function invokeCapability(p: InvokeParams, deps: InvokeDeps = {}, a
     outputSummary: JSON.stringify({ chars: output.length, sha256: createHash('sha256').update(output).digest('hex') }),
     latencyMs: Date.now() - started,
   });
+  if (_execEnvelopeId && _execReservationId) {
+    await settleEnvelope(_execEnvelopeId, _execReservationId, 0n).catch(() => { /* best-effort; actual spend tracked via usageEvent */ });
+  }
   return { status: 'EXECUTED', output, actionId: receipt.id, untrusted: true };
 }
 
