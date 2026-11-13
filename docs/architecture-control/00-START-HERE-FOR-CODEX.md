@@ -15,7 +15,7 @@
 4. Parallel **design-only** feasibility: off-device computer and cloud authoritative state for Mac-off continuity under no new costs. Do not deploy/purchase. Inventory OpenClaw capabilities; do not copy or connect unreviewed full-tools upstream.
 
 ## Invariants and guardrails
-- 326 agents/163 teams remain intact, 15 directorates audited vs 16 referenced remains a reconciliation item. No roster mutation.
+- 326 agents/163 teams remain intact. The Founder specified 16 directorates and identified AI Organization and Autonomous Operations as the additional leadership entry. Its staffing is still unassigned; do not invent agents or transfer teams.
 - Local-first and intelligent governed cloud escalation stay mandatory. Qwen vs Gemma remains **UNDECIDED until paired benchmarks**; preserve settings. Keep Ollama until separately approved replacement.
 - WHINK/MAMBA are peers overseeing the hierarchy, **not all tasks' compulsory execution nodes**. Marcus and Kill Team are Founder-only.
 - Approved mission-scoped execution does not authorize paid usage or release of sealed data. All external side effects require the correct standing or specific approval.

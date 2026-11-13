@@ -12,6 +12,7 @@
   ],
   "entrypoint_for_chat_attachment": "WHINK_PORTABLE_CHAT_BOOTSTRAP.md",
   "canonical_org_file": "organization/whink_group_leadership.json",
+  "directorate_count": 16,
   "canonical_governance_file": "governance/core_governance.yaml",
   "team_count": 163,
   "agent_count": 326,

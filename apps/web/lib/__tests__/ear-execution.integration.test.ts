@@ -239,7 +239,11 @@ describe.skipIf(!enabled)('M1 real database execution', () => {
   it('preserves roster counts/bytes and denies private, retired, suspended and unknown assignees', async () => {
     const kit = await getOrgKit();
     expect(kit.agents).toHaveLength(326); expect(kit.teams).toHaveLength(163);
-    expect(new Set(kit.agents.map((a) => a.directorate)).size).toBe(15);
+    const leadership = JSON.parse(readFileSync(path.join(kit.root, 'organization/whink_group_leadership.json'), 'utf8')) as { directorates: Array<{ name: string }> };
+    const directorateNames = new Set(leadership.directorates.map((d) => d.name));
+    expect(directorateNames.size).toBe(kit.manifest.directorate_count);
+    for (const agent of kit.agents) expect(directorateNames.has(agent.directorate)).toBe(true);
+    for (const team of kit.teams) expect(directorateNames.has(team.directorate)).toBe(true);
     const original = kit.agents[0];
     for (const state of ['suspended', 'retired'] as const) expect(() => admittedAgents(ear, [{ ...original, state }])).toThrow();
     for (const label of ['founder_sealed', 'founder_private', 'kill_team']) expect(() => admittedAgents(ear, [{ ...original, data_access: [label] }])).toThrow();

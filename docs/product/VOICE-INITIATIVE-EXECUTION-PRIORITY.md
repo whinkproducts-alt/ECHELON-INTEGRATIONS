@@ -2,6 +2,8 @@
 
 Owner request, 2026-11-12: speak naturally to WHINK, MAMBA or Marcus Vale about an initiative, and have the selected agent begin authorized work and report progress. The intended user flow is: **give an instruction → see it accepted → work begins → receive results**. This is the next build priority after the Integrations sandbox is usable for speech testing. It is an acceptance contract, not a claim that the flow already works.
 
+Founder decision, 2026-11-12 (America/Edmonton): the first end-to-end slice targets **WHINK**, creates a durable project and begins one safe internal task automatically. The owner may later select MAMBA or Marcus Vale; their special privacy and authority rules still apply. See [Founder decisions](FOUNDER-DECISIONS-2026-11-12.md).
+
 ## User experience
 
 1. From any relevant screen, select or say the recipient, then speak the initiative. Show live capture and transcription, and let the owner correct the text before submission when recognition is uncertain. Typed input remains available.

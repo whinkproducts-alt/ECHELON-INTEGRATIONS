@@ -2,7 +2,7 @@
 
 ## What this package now does
 This version contains an executable reference architecture for:
-- 15 directorates
+- 16 directorates (the newest directorate has no departments or assigned teams in this snapshot)
 - 126 departments
 - 163 teams
 - 326 dormant-by-default named AI agents
