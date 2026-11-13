@@ -38,7 +38,7 @@ The plan says to reuse `Tool`, `ConnectorInstall`, `Permission`, `Delegation`, `
 | Per-agent/team/mission grant | **New `CapabilityGrant`**. | `Permission` and `Delegation` are per user and per capability *name*; they cannot say "this agent may call this tool on this provider for this mission". |
 | Host (where an MCP server runs) | **New `Host`**. `AgentHeartbeat` (keyed by `workerId`, no host) is left alone. | Different concept; a host has its own token and liveness. |
 | SSE ticket table | **Not created.** | EventSource sends the session cookie, so the existing NextAuth login authenticates the stream. The first package's `EventTicket` was tied to a DB `sessions` table that JWT sign-ins never populate. |
-| Agent / Team tables | **Not created.** | The roster (326 agents, 163 teams, 15 directorates) stays in `packages/org-kit` and is read, never written (FDR-002/028). |
+| Agent / Team tables | **Not created.** | The roster (326 agents, 163 teams, 570 skills and 16 leadership directorates on the unmerged Integrations branch) stays in `packages/org-kit` and is read, never written (FDR-002/028). The new directorate has no assigned teams or agents. |
 
 The migration is additive only. `prisma migrate diff` also reports pre-existing drift unrelated to this work (memory_* indexes and `search_vec` columns created by raw SQL). Those statements are deliberately **not** in this migration.
 

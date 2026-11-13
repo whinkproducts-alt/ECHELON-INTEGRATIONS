@@ -2,6 +2,12 @@
 
 Newest first. Each entry: date, decision, alternatives, reason.
 
+## 2026-11-12  Founder roster correction (America/Edmonton)
+
+Decision: the organization has 16 directorates. The Founder identified **AI Organization and Autonomous Operations** as the additional directorate and supplied its director. Keep the existing leadership names and the 326 agents, 163 teams and 570 skills. The separate Innovation & Opportunity staff group is not this directorate.
+
+Implementation status: ECHELON-INTEGRATIONS branch `org/add-ai-autonomous-operations-directorate` adds the leadership entry to JSON/YAML and sets `directorate_count` to 16 in the manifest. It is not merged into Integrations or ECHELON-CORP. The new directorate has no assigned departments, teams or agents. Decide staffing from authoritative organization data before transferring identities or claiming operating capacity. Preserve older audit findings as dated evidence.
+
 ## 2026-10-25  Phase 3d assurance — security and compliance fixes
 
 ### D1 Security findings applied (H1–H5, M5, M7)

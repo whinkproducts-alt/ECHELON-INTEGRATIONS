@@ -2,6 +2,8 @@
 
 Updated **2026-11-04** (Founder timezone: America/Edmonton). Repository: [whinkproducts-alt/ECHELON-CORP](https://github.com/whinkproducts-alt/ECHELON-CORP). This is a documentation reconciliation, not a new full code/security audit or a completed personal launch.
 
+**Later update, 12 November 2026:** The Founder identified AI Organization and Autonomous Operations as the sixteenth directorate. Its leadership entry is on an unmerged ECHELON-INTEGRATIONS branch; ECHELON-CORP remains unchanged. The 4 November audit statements below retain their original snapshot meaning. Department, team and agent assignments for the new directorate remain open.
+
 ## 1. Read first; establish the revision
 
 - Inspected local and remote `main`: **`99f6d7eb3f58cff9d9aae8f59641137faf755a9c`**, clean at inspection. All code claims below refer to that immutable baseline. This documentation change will have a later commit; compare application tree IDs in the [evidence snapshot](audits/2026-11-04/evidence.json).
