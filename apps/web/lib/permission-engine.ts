@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger';
 import { recordAction, type LedgerStatus } from '@/lib/ledger';
 import { approvalContentHash, toolArgsHash } from '@/lib/canonical-json';
 import { classifyProtected, type ProtectedCategory } from '@/lib/protected-actions';
+import { canonicalJson } from '@/lib/canonical-json';
 
 export type PermissionClass = 'A' | 'B' | 'C';
 
@@ -222,6 +223,67 @@ export async function checkScheduledSend(
     return deny('Approved content hash mismatch');
   }
   return { allowed: true, method: 'human_approved' };
+}
+
+/**
+ * Check if an action has a valid Marcus-origin approval.
+ * Marcus tasks with sensitivity "standard" carry an approval that should be recognized
+ * without requiring a second human approval. For "financial" and "proprietary",
+ * the checkPermission flow already handles the protected action check.
+ */
+export async function checkMarcusApproval(
+  userId: string,
+  approvalId: string,
+  capability: string,
+  contentHash: string,
+  sensitivity: "standard" | "proprietary" | "financial"
+): Promise<PermissionCheckResult> {
+  const deny = (reason: string): PermissionCheckResult => ({ allowed: false, method: 'requires_confirmation', reason });
+  
+  if (!userId || !approvalId) return deny('Marcus approval required');
+  
+  // Look up the approval request created during intake
+  const row = await prisma.approvalRequest.findFirst({ where: { id: approvalId, userId } });
+  if (!row) return deny('Marcus approval not found');
+  if (row.executedAt) return deny('Marcus approval already consumed');
+  
+  // Verify content hash
+  let recomputed: string;
+  try {
+    recomputed = approvalContentHash({ kind: row.kind, tool: row.tool, params: row.params });
+  } catch {
+    return deny('Marcus approval content hash mismatch');
+  }
+  if (recomputed !== row.contentHash || contentHash !== row.contentHash) {
+    return deny('Marcus approval content hash mismatch');
+  }
+  
+  // For standard sensitivity, the Marcus approval is sufficient
+  if (sensitivity === 'standard') {
+    // Mark as executed
+    await prisma.approvalRequest.update({
+      where: { id: approvalId },
+      data: { status: 'EXECUTING', executedAt: new Date(), decidedAt: new Date() }
+    });
+    return { allowed: true, method: 'human_approved' };
+  }
+  
+  // For proprietary/financial, require second check - return blocked
+  return { 
+    allowed: false, 
+    method: 'requires_confirmation', 
+    reason: `Marcus task with ${sensitivity} sensitivity requires reconfirmation`,
+    protected: true,
+    category: sensitivity === 'financial' ? 'money' : 'proprietary'
+  };
+}
+
+/**
+ * Check if a Marcus approval_id has been replayed (single-use enforcement)
+ */
+export async function checkMarcusApprovalReplay(approvalId: string): Promise<boolean> {
+  const row = await prisma.approvalRequest.findFirst({ where: { id: approvalId } });
+  return row !== null && row.executedAt !== null;
 }
 
 // Log persona authority bypass attempts

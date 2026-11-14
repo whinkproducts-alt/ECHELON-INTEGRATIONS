@@ -70,6 +70,8 @@ model User {
   dailyBriefings          DailyBriefing[]
   sealedObjectives        SealedObjective[]
   sealedScopes            SealedScope[]
+  founderIdeas            FounderIdea[]
+  initiatives             Initiative[]
 
   @@map("users")
 }
@@ -742,6 +744,49 @@ model Note {
 
   @@index([userId, createdAt])
   @@map("notes")
+}
+
+// ── Founder Ideas (C05/C06) ──────────────────────────────────────
+// Durable Founder-owned idea workflow: capture, list, edit, archive, promote to initiative.
+
+model FounderIdea {
+  id            String   @id @default(cuid())
+  userId        String
+  title         String
+  body          String?
+  source        String   @default("founder") // founder | recommendation
+  archived      Boolean  @default(false)
+  privacyScope  String   @default("private") // private | shared
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, source, archived])
+  @@map("founder_ideas")
+}
+
+// ── Initiatives (C05/C06) ────────────────────────────────────────
+// Durable objective/execution tracking for WHINK, MAMBA, MARCUS, Kill Team, etc.
+
+model Initiative {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  objective   String
+  status      String   @default("queued") // queued | working | awaiting_approval | completed | failed | cancelled
+  recipient   String   // WHINK | MAMBA | MARCUS | TUNDE | PETER | PAUL | KILL_TEAM | BOARDROOM
+  progress    Int      @default(0)
+  result      Json?
+  sourceIdeaId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, recipient])
+  @@map("initiatives")
 }
 
 // ── Working Memory (persistent KV with TTL) ─────────────────────

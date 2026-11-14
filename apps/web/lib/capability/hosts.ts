@@ -14,6 +14,41 @@ import { CapabilityInputError } from '@/lib/capability/providers';
 
 export const MAX_HOST_JSON_BYTES = 4096;
 
+/** Marcus service identity (external intake agent). Uses a hashed bearer token from env. */
+export const MARCUS_SERVICE_NAME = 'marcus-vale';
+const MARCUS_TOKEN_ENV = 'MARCUS_BEARER_TOKEN';
+const MARCUS_TOKEN_HASH_ENV = 'MARCUS_BEARER_TOKEN_HASH';
+
+let _marcusTokenHash: string | null = null;
+function getMarcusTokenHash(): string {
+  if (_marcusTokenHash) return _marcusTokenHash;
+  const hash = process.env[MARCUS_TOKEN_HASH_ENV];
+  if (!hash) throw new Error('MARCUS_BEARER_TOKEN_HASH not configured');
+  _marcusTokenHash = hash;
+  return hash;
+}
+
+export function hashMarcusToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+export function verifyMarcusToken(token: string | null | undefined): boolean {
+  if (!token) return false;
+  try {
+    return timingSafeEqual(Buffer.from(hashMarcusToken(token), 'hex'), Buffer.from(getMarcusTokenHash(), 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+export function requireMarcusAuth(req: Request): { ok: true } | { ok: false; status: 401 | 403; error: string } {
+  const auth = req.headers.get('authorization');
+  if (!auth?.startsWith('Bearer ')) return { ok: false, status: 401, error: 'Missing bearer token' };
+  const token = auth.slice(7);
+  if (!verifyMarcusToken(token)) return { ok: false, status: 401, error: 'Invalid bearer token' };
+  return { ok: true };
+}
+
 export function newHostToken(): string {
   return `eh_${randomBytes(32).toString('base64url')}`;
 }

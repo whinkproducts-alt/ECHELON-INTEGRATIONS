@@ -3,7 +3,7 @@
  * Single source of truth for all persona metadata
  */
 
-export type PersonaType = 'WHINK' | 'MAMBA' | 'AMARA' | 'MATEO' | 'PRIYA' | 'SOREN' | 'MEI_LING' | 'MAYA';
+export type PersonaType = 'WHINK' | 'MAMBA' | 'AMARA' | 'MATEO' | 'PRIYA' | 'SOREN' | 'MEI_LING' | 'MAYA' | 'MARCUS';
 
 export interface PersonaConfig {
   id: PersonaType;
@@ -133,11 +133,24 @@ export const PERSONAS: Record<PersonaType, PersonaConfig> = {
     isBoardMember: false,
     reportsTo: 'WHINK',
   },
+  MARCUS: {
+    id: 'MARCUS',
+    name: 'MARCUS',
+    title: 'External Intake Agent',
+    shortTitle: 'Intake',
+    gradient: 'linear-gradient(135deg, #6B7280 0%, #4B5563 50%, #374151 100%)',
+    accent: '#6B7280',
+    avatarColor: '#6B7280',
+    description: 'Authorised external service for task intake from Marcus Vale. Relays approved goals to ECHELON directorates. Not a decision-maker.',
+    capabilities: ['Task Submission', 'Status Relay', 'Freeze Control'],
+    isBoardMember: false,
+    reportsTo: 'FOUNDER',
+  },
 };
 
 export const BOARD_MEMBERS: PersonaType[] = ['WHINK', 'MAMBA', 'AMARA'];
 export const INNOVATION_COMMITTEE: PersonaType[] = ['AMARA', 'MATEO', 'PRIYA', 'SOREN', 'MEI_LING'];
-export const ALL_PERSONAS: PersonaType[] = ['WHINK', 'MAMBA', 'AMARA', 'MATEO', 'PRIYA', 'SOREN', 'MEI_LING', 'MAYA'];
+export const ALL_PERSONAS: PersonaType[] = ['WHINK', 'MAMBA', 'AMARA', 'MATEO', 'PRIYA', 'SOREN', 'MEI_LING', 'MAYA', 'MARCUS'];
 
 export function getPersona(id: PersonaType): PersonaConfig {
   return PERSONAS[id];
