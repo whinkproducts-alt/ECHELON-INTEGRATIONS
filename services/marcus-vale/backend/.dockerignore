@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+venv
+venv39
+.venv-mv
+__pycache__
+.pytest_cache
+test.db
+tests
+debug_test.py

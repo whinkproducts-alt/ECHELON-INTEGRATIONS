@@ -2,6 +2,12 @@
 
 Newest first. Each entry: date, decision, alternatives, reason.
 
+## 2026-11-14  Marcus Vale lives in services/marcus-vale (branch marcus-vale-fixes)
+
+Decision: the Marcus Vale executive assistant (FastAPI backend, React PWA, Whisper and Kokoro voice) is kept in `services/marcus-vale/`. ECHELON stays optional for Marcus: an empty `ECHELON_API_KEY` runs Marcus standalone. Money and proprietary tasks need a second, separate approval from Victor through ECHELON's confirm step.
+Contract with ECHELON: tasks go to `/api/integrations/marcus/tasks`; the approval content hash is sha256 of the canonical JSON of title, goal and deadline. Golden vector: title "Pay vendor", goal "Wire $500 to Acme", deadline "2026-12-01T17:00:00+00:00" gives `e5d9d6062ff9c3f0a3954f85755f8dd362cf4b386b62d1ea62a46c54f4ddd442`. ECHELON must produce the same bytes. Not yet verified against the ECHELON route.
+Unverified: no run against real Postgres, Whisper model name, or a live ECHELON. 74 Marcus tests pass with mocks.
+
 ## 2026-10-25  Phase 3d assurance — security and compliance fixes
 
 ### D1 Security findings applied (H1–H5, M5, M7)
