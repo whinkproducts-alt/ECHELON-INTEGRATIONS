@@ -55,7 +55,7 @@ const ATTEMPT_KEY = /^[A-Za-z0-9:_-]{8,80}$/;
 const OPEN = ['reserved', 'held'] as const;
 
 /** UTC calendar month start, computed here so admission does not depend on budget module wiring. */
-function monthStart(now: Date): Date {
+export function monthStart(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 

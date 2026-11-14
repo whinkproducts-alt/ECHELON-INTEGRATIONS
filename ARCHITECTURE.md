@@ -12,6 +12,16 @@
 
 **Layer 5: Persistence** — Postgres + pgvector (memory), SQLite audit trail, org-kit state JSON.
 
+## Spend Control
+
+All paid model inference goes through `lib/model-router/admission.ts` (`reserveDispatch` / `settleDispatch`).
+- Row-level lock (`SELECT ... FOR UPDATE`) on the user row.
+- Counts settled spend + reserved + held across month boundaries.
+- Blocks unknown cost and unknown price.
+- Requires `WHINK_PAID_MODELS_ENABLED=true` and `WHINK_MONTHLY_SPEND_MICROS > 0`.
+- Conservative holds for uncertain outcomes.
+- Capability tools are FREE only by policy (`lib/capability/policy.ts` lines 211-212).
+
 ## Data Flow
 
 User gesture or request → HOLO/channel input → Approval framework (EAR) → Agent dispatch (org-kit) → Skill execution → Tool calls → Response → Channel output.

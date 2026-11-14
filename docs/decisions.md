@@ -2,6 +2,10 @@
 
 Newest first. Each entry: date, decision, alternatives, reason.
 
+## 2026-11-14  v3.3 spend control corrected
+
+The exec envelope in `invokeCapability` was unreachable and measured no spend; capability tools are FREE only by policy. The $25 cap is now `WHINK_MONTHLY_SPEND_MICROS` in the existing admission path and applies account-wide. The envelope tables and the unused authority lattice were removed. A per-persona sub-cap is not built.
+
 ## 2026-10-25  Phase 3d assurance — security and compliance fixes
 
 ### D1 Security findings applied (H1–H5, M5, M7)

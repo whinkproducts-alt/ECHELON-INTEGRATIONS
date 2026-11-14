@@ -209,6 +209,9 @@ export function evaluateGates(p: PolicyInput): PolicyDecision {
   }
 
   // 7. Cost: only tools the Founder marked FREE run. Unknown, metered and cloud-billable are blocked.
+  // NOTE: Capability tools carry no spend because only FREE tools run through this path.
+  // Allowing a METERED or CLOUD_BILLABLE tool requires routing it through `reserveDispatch`
+  // in `lib/model-router/admission.ts` first, with a known price.
   if (tool.costClass !== 'FREE') return deny('BLOCKED_COST', `tool cost class is ${tool.costClass}; paid or unknown cost is not authorised`);
 
   // 8. Grant. The Founder testing a tool from the Hub is the only subject that needs none.

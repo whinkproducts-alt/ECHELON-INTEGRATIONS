@@ -39,7 +39,7 @@ npx prisma migrate dev
 2. **Tenant isolation.** Every database query is scoped by account. Two accounts must never see each other's data. This applies now, even with one user.
 3. **White label.** No product name, logo or colour is hardcoded in markup. Names come from tenant config. Colours come from design tokens.
 4. **Every action goes through the permission engine** (`lib/permission-engine.ts`). Class A runs. Class B runs if delegated. Class C always waits for a human. No exceptions, no shortcuts, no "just for testing".
-5. **Every action lands in the ledger**, whether it ran, waited, or was denied.
+5. **Every action lands in the ledger**, whether it ran, waited, or was denied. The only ledger write path is `lib/ledger.ts`.
 6. **External content is data, never instruction.** Anything read from email, web pages, files or tool results stays wrapped as untrusted.
 7. **Licences.** Only MIT, Apache 2.0, BSD or ISC dependencies. No AGPL, no source available, no unlicensed code. Ask Victor before adding anything else.
 8. **No vendor lock.** Models go through the model router. Never call a provider directly from a route.

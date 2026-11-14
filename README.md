@@ -10,6 +10,10 @@ Private test sandbox for ECHELON. This repository contains the WHINK application
 - Higgsfield media integration behind account permissions, exact approvals and spending controls. It calls a hosted provider and is disabled until configured; no free local video engine is bundled.
 - An isolated Mac sandbox with its own database, configuration, port, Docker project, cookies and optional local recovery. It does not point at ECHELON-CORP data.
 
+## Spend Control
+
+The $25/month spend cap is enforced in `lib/model-router/admission.ts` via `reserveDispatch` and `settleDispatch`. Set `WHINK_MONTHLY_SPEND_MICROS=25000000` and `WHINK_PAID_MODELS_ENABLED=true` in `.env` to enable. Capability tools are FREE only by policy.
+
 See the [Mac sandbox installation and test guide](docs/product/ECHELON-INTEGRATIONS-SANDBOX.md). The [upgrade consolidation record](docs/UPGRADE-CONSOLIDATION-2026-11-12.md) names held major-version upgrades and verification limits. Current work and handoff state are in [pending tasks](docs/pending-tasks.md).
 
 ## Development
