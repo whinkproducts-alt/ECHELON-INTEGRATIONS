@@ -560,3 +560,9 @@ Approved in chat. Still open for discussion: R6 (Class C window), R10 (browser w
 - **R12** Docs-only, data-only and test-only changes may be checked by type check, lint and tests instead of a separate assurance agent. Code changes still need one.
 - **R13** A mission wakes the agents it needs and they return to dormant afterwards.
 - **R15** Amends non-negotiable 10 for model inference only: Victor sets a daily and monthly envelope once, approved against its exact figures. Routine inference runs inside it and stops at the cap. It never covers transfers, purchases, payouts or trades. **Figures not yet set.** Wording in `CLAUDE.md` is not changed until Victor confirms the figures.
+
+## 2026-11-15  R6, R10, R14 settled (Victor: follow recommendations)
+
+- **R6 dropped.** Class C keeps the 30 second window everywhere. Batch (R7) and template (R8) approvals cover high-volume work.
+- **R10 option C.** Browser writes are Class B on allow-listed domains and Class C elsewhere; any write on a login, payment or account-settings page stays Class C even on an allow-listed domain. Page content stays untrusted.
+- **R14 option B now.** Class B only for an allow-list of read-only commands Victor sets. Writes inside the sandbox become Class B (option C) once the sandbox (item 58) exists.

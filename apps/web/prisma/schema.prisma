@@ -13,6 +13,7 @@ datasource db {
 
 model User {
   killTeamMembers KillTeamMember[]
+  channelPairings ChannelPairing[]
   id            String    @id @default(cuid())
   name          String?
   email         String    @unique
@@ -1700,3 +1701,19 @@ model SpeechDailyCheck {
   @@map("speech_daily_checks")
 }
 
+
+// A sender may only get a reply on a messaging channel once the owner has paired them. Only a hash of the one-time code is kept.
+model ChannelPairing {
+  id        String    @id @default(cuid())
+  userId    String
+  channel   String
+  senderId  String
+  status    String    @default("PENDING") // PENDING | PAIRED | REVOKED
+  codeHash  String?
+  expiresAt DateTime?
+  pairedAt  DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, channel, senderId])
+  @@map("channel_pairings")
+}

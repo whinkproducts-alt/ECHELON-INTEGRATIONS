@@ -10,10 +10,10 @@ Method: every line counts once, unweighted (not effort). Done = 1, Built-not-acc
 | | Items | Credit |
 |---|---|---|
 | Done | 18 | 18 |
-| Built, not accepted | 8 | 4 |
+| Built, not accepted | 10 | 5 |
 | Built, connection unverified (Part 2) | 13 | 6.5 |
-| Open (Part 1: 29; Part 2: 40; Part 4: 10) | 79 | 0 |
-| **Total** | **118** | **28.5 → 24%** |
+| Open (Part 1: 29; Part 2: 40; Part 4: 8) | 77 | 0 |
+| **Total** | **118** | **29.5 → 25%** |
 
 Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except the exclusions listed in Part 2.
 
@@ -237,8 +237,8 @@ All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now h
 | # | Rule change | What to build | Status |
 |---|---|---|---|
 | 57 | R1 Local-only off for routine work | One enforced check replacing the 12 module checks; call-site audit; ledger every block | Open |
-| 58 | R2 Execution sandbox | Docker sandbox for command and browser tools; `sandbox explain` style inspector | Open |
-| 59 | R3 Sender pairing | Unknown sender gets no reply until paired; per channel | Open |
+| 58 | R2 Execution sandbox, R14 command allow-list | **Built 2026-11-15, not connected:** `lib/exec-policy.ts` (command class B or C from an owner allow-list, hardened `docker run` arguments, plain-language explain), 6 tests. **Still to do:** the command and browser tools must call it; the allow-list screen. No tool runs commands through it yet. | Built, not accepted |
+| 59 | R3 Sender pairing | **Built 2026-11-15, not connected:** `lib/pairing.ts`, table `channel_pairings` (migration `20261115010000`), one-time code hashed, 1 hour expiry, 5 pending per channel, revoke; 3 real-database tests pass. **Still to do:** every inbound channel adapter must call `requestPairing` (none exist yet), and an owner screen to approve a code. | Built, not accepted |
 | 60 | R5 Learned delegations | Offer after 5 identical approvals; 30 day expiry, daily cap, revocable; Class C excluded. A delegation can only tighten the action class, never loosen it (as in OpenClaw approvals) | Open |
 | 61 | R7 Batch approval | One card, N hash-locked request ids | Open |
 | 62 | R8 Template plus schedule approval | 30 day cap, non-protected public content, edit cancels | Open |
@@ -247,4 +247,5 @@ All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now h
 | 65 | R13 Mission activation | Wake agents per mission, return to dormant after | Open |
 | 66 | R15 Model-inference envelope | Daily and monthly figures set once; stops at cap; amend non-negotiable 10 wording. **Figures needed from Victor** | Open |
 
-**Still under discussion:** R6 (Class C approval window), R10 (browser write class), R14 (local command allow-list).
+**Settled:** R6 dropped (30 s stays); R10 option C (Class B on allow-listed domains, Class C on login, payment and settings pages); R14 option B now, option C after item 58.
+**Needs Victor:** R15 figures (daily and monthly model-inference caps).
