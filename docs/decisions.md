@@ -566,3 +566,7 @@ Approved in chat. Still open for discussion: R6 (Class C window), R10 (browser w
 - **R6 dropped.** Class C keeps the 30 second window everywhere. Batch (R7) and template (R8) approvals cover high-volume work.
 - **R10 option C.** Browser writes are Class B on allow-listed domains and Class C elsewhere; any write on a login, payment or account-settings page stays Class C even on an allow-listed domain. Page content stays untrusted.
 - **R14 option B now.** Class B only for an allow-list of read-only commands Victor sets. Writes inside the sandbox become Class B (option C) once the sandbox (item 58) exists.
+
+## 2026-11-15  R15 spend envelope set (Victor): CA$1 a day, CA$20 a month
+
+Amends non-negotiable 10 for model inference only (wording in `CLAUDE.md`). Starting figures: daily CA$1, monthly CA$20, currency CAD. Victor edits all three numbers (and the CAD per USD rate) in Settings, "Model spending limits". Switching on or raising needs approval of the exact figures (approval kind `spend_envelope`, Class C, 30 s); lowering or switching off applies at once. Admission (`lib/model-router/admission.ts`) enforces the monthly and the daily cap in USD micros and refuses with `DAILY_SPEND_LIMIT` or `SPEND_HARD_LIMIT`. The 1.37 CAD per USD rate is a placeholder I chose, not a looked-up rate; Victor sets the real one. The operator env cap `WHINK_MONTHLY_SPEND_MICROS`, when set, remains a ceiling.

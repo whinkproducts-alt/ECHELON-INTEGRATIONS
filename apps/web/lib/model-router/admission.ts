@@ -11,6 +11,7 @@
  */
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
+import { usdCaps } from '@/lib/spend-envelope';
 import { estimateCostMicros } from '@/lib/usage';
 import { isLocalOnlyMode } from '@/lib/local-only';
 import { paidAdmission } from '@/lib/model-router/priority';
@@ -48,6 +49,9 @@ export interface AdmissionDecisionInput {
   tokenHardPct: number;
   spendUsedMicros: number;
   spendReservedMicros: number;
+  /** R15 envelope: per-day cap in USD micros and spend so far today. Unset when no envelope is on. */
+  dailyCapMicros?: number | null;
+  dailyUsedMicros?: number;
   lockedDown: boolean;
   localOnly: boolean;
 }
@@ -133,6 +137,7 @@ export function decideAdmission(input: AdmissionDecisionInput): { ok: true } | {
     if (!input.priceKnown) return { ok: false, code: 'UNKNOWN_PRICE' };
     if (input.spendCapMicros == null || input.spendCapMicros <= 0) return { ok: false, code: 'SPEND_CAP_UNSET' };
     if (input.spendUsedMicros + input.spendReservedMicros + input.reservedMicros > input.spendCapMicros) return { ok: false, code: 'SPEND_HARD_LIMIT' };
+    if (input.dailyCapMicros != null && (input.dailyUsedMicros ?? 0) + input.spendReservedMicros + input.reservedMicros > input.dailyCapMicros) return { ok: false, code: 'DAILY_SPEND_LIMIT' };
   }
   if (input.tokenLimit != null && input.tokenUsed + input.tokenReserved + input.reservedTokens > Math.floor(input.tokenLimit * input.tokenHardPct / 100)) {
     return { ok: false, code: 'TOKEN_HARD_LIMIT' };
@@ -160,6 +165,7 @@ export function uncertaintyOf(e: unknown): string {
 }
 
 type AdmissionDb = {
+  spendEnvelope: { findUnique: (args: unknown) => Promise<{ enabled: boolean; dailyCadMicros: number; monthlyCadMicros: number; cadPerUsd: number } | null> };
   usageEvent: {
     aggregate: (args: unknown) => Promise<{ _sum: { tokensIn?: number | null; tokensOut?: number | null; costMicros?: number | null; reservedTokens?: number | null; reservedMicros?: number | null } }>;
     findFirst: (args: unknown) => Promise<{ id: string; state?: string } | null>;
@@ -257,12 +263,18 @@ export async function reserveDispatch(input: ReserveInput, deps: AdmissionDeps =
       const ceiling = Number.isFinite(hardCeiling) && hardCeiling > 0 ? hardCeiling : 100;
       const tokenHardPct = Math.min(pref?.budgetHardPct ?? ceiling, ceiling);
       const owed = await liability(input.userId, now, tx);
+      const caps = usdCaps(await tx.spendEnvelope.findUnique({ where: { userId: input.userId } }));
+      const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      const today = caps ? await tx.usageEvent.aggregate({ where: { userId: input.userId, createdAt: { gte: dayStart }, state: { notIn: [...OPEN] } }, _sum: { costMicros: true } }) : null;
+      const opCap = spendCapMicros(env);
       const decision = decideAdmission({
         userId: input.userId,
         costClass,
         priceKnown,
-        paidAdmitted: paidAdmission(env)(),
-        spendCapMicros: spendCapMicros(env),
+        paidAdmitted: paidAdmission(env)() || !!caps,
+        spendCapMicros: caps ? (opCap && opCap > 0 ? Math.min(opCap, caps.monthlyMicros) : caps.monthlyMicros) : opCap,
+        dailyCapMicros: caps?.dailyMicros ?? null,
+        dailyUsedMicros: today?._sum?.costMicros ?? 0,
         reservedTokens: tokens,
         reservedMicros,
         tokenUsed: owed.tokenUsed,

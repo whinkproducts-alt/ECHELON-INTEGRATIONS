@@ -38,7 +38,7 @@ vi.mock('@/lib/db', () => {
   const prismaMock: Row = {
     $queryRaw: async () => [{ id: 'mock-user' }],
     usageEvent: { create: async () => ({ id: 'hold-1' }), updateMany: async () => ({ count: 1 }), findFirst: async () => null, aggregate: async () => ({ _sum: {} }) },
-    userPreference: { findUnique: async () => null },
+    userPreference: { findUnique: async () => null }, spendEnvelope: { findUnique: async () => null },
     accountSafetyState: { findUnique: async () => null },
     skillSubmission: {
       create: async ({ data }: Row) => {

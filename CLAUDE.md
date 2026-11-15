@@ -45,6 +45,7 @@ npx prisma migrate dev
 8. **No vendor lock.** Models go through the model router. Never call a provider directly from a route.
 9. **Builders never grade their own work.** Code written by a builder agent is checked by a separate assurance agent.
 10. **Money and proprietary information always need Victor's approval.** No money transfer and no sharing of proprietary secrets or information happens without an approval from Victor, by request id. See "Protected actions" below. This rule outranks every other rule in this file.
+    **Amendment 2026-11-15 (R15):** model inference only may run without a per-call approval inside a spend envelope that Victor sets in Settings (daily and monthly caps in CAD, plus a CAD per USD rate; starting figures CA$1 a day and CA$20 a month). Switching the envelope on or raising it needs his approval of the exact figures by request id; lowering or switching it off applies at once. Every call is ledgered and the envelope stops at its caps. It never covers transfers, purchases, payouts, trades or any other money movement.
 
 ## Protected actions (strict rule, set by Victor 2026-10-26)
 Victor's instruction: there must be an approval from him for anything that has to do with money transfers or sharing of proprietary secrets and information.

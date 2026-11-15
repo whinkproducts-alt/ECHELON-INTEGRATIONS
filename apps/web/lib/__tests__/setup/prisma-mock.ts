@@ -76,6 +76,7 @@ class MockPrismaClient {
   $executeRaw = vi.fn().mockResolvedValue(0);
   usageEvent = createMockDelegate();
   userPreference = createMockDelegate();
+  spendEnvelope = createMockDelegate();
   accountSafetyState = createMockDelegate();
 
   constructor() {
@@ -84,6 +85,7 @@ class MockPrismaClient {
     this.usageEvent.updateMany = vi.fn().mockResolvedValue({ count: 1 });
     this.usageEvent.aggregate = vi.fn().mockResolvedValue({ _sum: {} });
     this.usageEvent.findFirst = vi.fn().mockResolvedValue(null);
+    this.spendEnvelope.findUnique = vi.fn().mockResolvedValue(null);
   }
 }
 

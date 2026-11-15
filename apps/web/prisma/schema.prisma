@@ -14,6 +14,7 @@ datasource db {
 model User {
   killTeamMembers KillTeamMember[]
   channelPairings ChannelPairing[]
+  spendEnvelope SpendEnvelope?
   id            String    @id @default(cuid())
   name          String?
   email         String    @unique
@@ -1716,4 +1717,17 @@ model ChannelPairing {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([userId, channel, senderId])
   @@map("channel_pairings")
+}
+
+// R15: model-inference spend envelope in CAD micros. Raising it or switching it on needs Victor's approval of the exact figures.
+model SpendEnvelope {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  enabled          Boolean  @default(false)
+  dailyCadMicros   Int      @default(1000000)
+  monthlyCadMicros Int      @default(20000000)
+  cadPerUsd        Float    @default(1.37)
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("spend_envelopes")
 }

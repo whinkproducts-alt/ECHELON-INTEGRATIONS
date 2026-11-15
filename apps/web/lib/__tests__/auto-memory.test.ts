@@ -18,7 +18,7 @@ const admitTx = {
     findFirst: async () => null,
     aggregate: async () => ({ _sum: {} }),
   },
-  userPreference: { findUnique: async () => null },
+  userPreference: { findUnique: async () => null }, spendEnvelope: { findUnique: async () => null },
 };
 const admit = { ...admitTx, $transaction: async (fn: (tx: unknown) => unknown) => fn(admitTx) };
 
@@ -52,7 +52,7 @@ function buildMocks(overrides: Record<string, Record<string, unknown>> = {}) {
       findFirst: vi.fn().mockResolvedValue(null),
       aggregate: vi.fn().mockResolvedValue({ _sum: {} }),
     },
-    userPreference: { findUnique: vi.fn().mockResolvedValue(null) },
+    userPreference: { findUnique: vi.fn().mockResolvedValue(null) }, spendEnvelope: { findUnique: async () => null },
     accountSafetyState: { findUnique: vi.fn().mockResolvedValue(null) },
   };
   (prisma as unknown as { $transaction: unknown }).$transaction = async (fn: (tx: unknown) => unknown) => fn(prisma);

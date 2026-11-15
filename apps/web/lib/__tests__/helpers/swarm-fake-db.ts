@@ -71,6 +71,7 @@ export function createSwarmFakeDb() {
     delegation: { findFirst: vi.fn(async () => null) },
     project: { findFirst: vi.fn(async () => null) },
     userPreference: { findUnique: vi.fn(async () => null) },
+    spendEnvelope: { findUnique: vi.fn(async () => null) },
     usageEvent: {
       aggregate: vi.fn(async () => ({ _sum: {} })),
       findFirst: vi.fn(async () => null),

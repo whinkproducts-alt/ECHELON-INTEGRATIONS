@@ -24,7 +24,7 @@ export const APPROVAL_TTL_MS = 30_000;
 export const EXECUTING_STUCK_MS = 2 * 60_000;
 const RESULT_CAP = 4000;
 
-export type ApprovalKind = 'tool_call' | 'ear' | 'autonomy_change' | 'scheduled_post';
+export type ApprovalKind = 'tool_call' | 'ear' | 'autonomy_change' | 'scheduled_post' | 'spend_envelope';
 export type Clock = () => Date;
 
 export interface ApprovalView {
@@ -477,6 +477,13 @@ export async function decide(
   try {
     if (row.kind === 'autonomy_change') {
       return await applyAutonomyChange(row, clock);
+    }
+    if (row.kind === 'spend_envelope') {
+      const perm = await checkApprovedAction(row.userId, row.id, 'spend_envelope', row.contentHash);
+      if (!perm.allowed) return finish(row, 'EXECUTING', 'FAILED', { success: false, error: perm.reason ?? 'Permission denied' }, clock);
+      const { applyApprovedEnvelope } = await import('@/lib/spend-envelope');
+      const ok = await applyApprovedEnvelope(row.userId, row.params, row.id);
+      return finish(row, 'EXECUTING', ok ? 'EXECUTED' : 'FAILED', ok ? { success: true } : { success: false, error: 'Invalid envelope; not applied' }, clock);
     }
     if (row.kind === 'scheduled_post') {
       // Stores the scheduled row after the permission engine allows it. Sending happens later, in the worker.

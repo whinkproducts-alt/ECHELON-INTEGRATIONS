@@ -74,7 +74,7 @@ function cursorWhere(c: Cursor | null) {
 
 export const APPROVAL_STATUSES = ['AWAITING_APPROVAL', 'APPROVED', 'DENIED', 'EXPIRED', 'EXECUTED', 'FAILED'] as const;
 export type ApprovalHistoryStatus = (typeof APPROVAL_STATUSES)[number];
-export const APPROVAL_KINDS = ['tool_call', 'ear', 'autonomy_change', 'scheduled_post'] as const;
+export const APPROVAL_KINDS = ['tool_call', 'ear', 'autonomy_change', 'scheduled_post', 'spend_envelope'] as const;
 
 export interface ApprovalHistoryFilter {
   status?: ApprovalHistoryStatus;

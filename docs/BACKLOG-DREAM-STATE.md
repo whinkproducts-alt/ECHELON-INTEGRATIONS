@@ -10,10 +10,10 @@ Method: every line counts once, unweighted (not effort). Done = 1, Built-not-acc
 | | Items | Credit |
 |---|---|---|
 | Done | 19 | 19 |
-| Built, not accepted | 10 | 5 |
+| Built, not accepted | 11 | 5.5 |
 | Built, connection unverified (Part 2) | 13 | 6.5 |
-| Open (Part 1: 29; Part 2: 40; Part 4: 11) | 80 | 0 |
-| **Total** | **122** | **30.5 → 25%** |
+| Open (Part 1: 29; Part 2: 40; Part 4: 10) | 79 | 0 |
+| **Total** | **122** | **31 → 25%** |
 
 Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except the exclusions listed in Part 2.
 
@@ -255,7 +255,7 @@ All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now h
 | 63 | R11 Licence rule | Amend non-negotiable 7 wording; compliance-checker checks each MPL or LGPL dependency | Open |
 | 64 | R12 Assurance gate for docs, data and test changes | Automated gate; amend non-negotiable 9 wording | Open |
 | 65 | R13 Mission activation | Wake agents per mission, return to dormant after | Open |
-| 66 | R15 Model-inference envelope | Daily and monthly figures set once; stops at cap; amend non-negotiable 10 wording. **Figures needed from Victor** | Open |
+| 66 | R15 Model-inference envelope | **Built 2026-11-15, not yet used in a real run:** table `spend_envelopes`, approval kind `spend_envelope`, daily and monthly CAD caps plus rate editable in Settings ("Model spending limits"), enforced in admission; `CLAUDE.md` rule 10 amended. Tests: 5 unit, 2 real-database. **Still to do:** set the real CAD per USD rate (placeholder 1.37), switch it on and approve once, then watch one real paid call stop at the cap. | Built, not accepted |
 
 | 67 | Wire pairing into every inbound channel adapter (WhatsApp, Telegram, Discord, Slack, Teams, Google Chat, IMAP) | Each adapter calls `requestPairing` before replying; test per adapter. Comes with each Part 2 messaging row. | Open |
 | 68 | Wire `exec-policy` into any command or browser tool | Class from `classifyCommand`, run under `sandboxDockerArgs`; no tool may spawn a command another way (add a call-site audit test like item 57). | Open |
@@ -263,4 +263,4 @@ All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now h
 | 70 | Switch-on gate for the loosened rules | R4, R5, R7, R8, R9 stay off by a flag until items 58, 59, 67 and 68 are connected, so the order of work is enforced in code, not only written. | Open |
 
 **Settled:** R6 dropped (30 s stays); R10 option C (Class B on allow-listed domains, Class C on login, payment and settings pages); R14 option B now, option C after item 58.
-**Needs Victor:** R15 figures (daily and monthly model-inference caps).
+**R15 figures set:** CA$1 a day, CA$20 a month.
