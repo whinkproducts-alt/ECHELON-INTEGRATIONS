@@ -192,7 +192,8 @@ export async function verifyLocalAnalysisModel(model: string, baseUrl: string): 
   if (!isLoopbackUrl(baseUrl) || /^(claude|gemini)/i.test(model) || /(^|[:/.-])cloud($|[:/.-])/i.test(model)) return false;
   try {
     const response = await fetch(`${baseUrl.replace(/\/v1\/?$/, '')}/api/show`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }),
+      // verbose: current Ollama omits the tensor list unless asked, which made every local model look remote.
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, verbose: true }),
       redirect: 'error', signal: AbortSignal.timeout(3000),
     });
     if (!response.ok) return false;

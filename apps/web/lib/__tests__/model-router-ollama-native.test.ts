@@ -163,6 +163,7 @@ describe('native Ollama transport', () => {
     expect(await verifyLocalAnalysisModel('local', 'http://localhost:11434/v1')).toBe(true);
     expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:11434/api/show');
     expect(fetchMock.mock.calls[0][1].redirect).toBe('error');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ model: 'local', verbose: true });
     fetchMock.mockResolvedValue(ok({ remote_host: 'cloud.example', model_info: { 'general.parameter_count': 1000 }, tensors: [] }));
     expect(await verifyLocalAnalysisModel('local', 'http://localhost:11434/v1')).toBe(false);
     fetchMock.mockResolvedValue(ok({}));
