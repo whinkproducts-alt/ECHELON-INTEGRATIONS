@@ -5,17 +5,17 @@ Built from `docs/pending-tasks.md`, `docs/handoffs/*` and this session's verifie
 
 ## Completion
 
-Method: every line counts once, unweighted (not effort). Done = 1, Built-not-accepted or built-not-connected = 0.5, Open = 0. Item 43 is merged into item 50, so it is not counted twice.
+Method: every line counts once, unweighted (not effort). Done = 1, Built-not-accepted or built-not-connected = 0.5, Open = 0. Item 43 is merged into item 50. Item 26 is done (Marcus commit e7f92d1, unpushed).
 
 | | Items | Credit |
 |---|---|---|
-| Done | 17 | 17 |
+| Done | 18 | 18 |
 | Built, not accepted | 7 | 3.5 |
-| Built, connection unverified (Part 2 checklist) | 13 | 6.5 |
-| Open (Part 1: 24 − 1 merged + 3 amendments; Part 2: 38) | 64 | 0 |
-| **Total** | **101** | **27 → 27%** |
+| Built, connection unverified (Part 2) | 13 | 6.5 |
+| Open (Part 1: 28; Part 2: 40) | 68 | 0 |
+| **Total** | **106** | **28 → 26%** |
 
-Dream state: **every row in both parts reads "built and connected"**, except the exclusions listed in Part 2.
+Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except the exclusions listed in Part 2.
 
 ## Features gained (all Done, on `main` at e14199f)
 
@@ -56,7 +56,7 @@ Dream state: **every row in both parts reads "built and connected"**, except the
 | # | Item | Waits on |
 |---|---|---|
 | **25** | **Warp opening screen before login** (see below) | engineering + **V** (decisions) |
-| 26 | Marcus sends `subsidiary` / `target_subsidiaries` (client allow-list, schema, model) | engineering, Marcus repo |
+| 26 | ~~Marcus sends `subsidiary` / `target_subsidiaries`~~ Done 2026-11-15 (Marcus e7f92d1, 75 tests pass, not run on real Postgres) | push, then restart Marcus so its database gets the new columns |
 | 27 | Security review of the `proxy.ts` exemption for Marcus routes | security-reviewer |
 | 28 | Auto-split requests over 5 domains | **V** (decide) |
 | 29 | Owner account and passkey (F01) | **V** |
@@ -117,12 +117,10 @@ Target for every row: **built and connected**. "Connected" means all of: the key
 
 **Excluded, not built:**
 - Honcho (leave it out; ECHELON memory covers it).
-- Qwen OAuth login reuse (leave it out).
-- Stealth browsers and CAPTCHA solving: Browserbase stealth, Camofox, Lightpanda, agent-browser (bypassing bot detection; also AGPL concern on Lightpanda, unchecked).
+- Stealth browsers and CAPTCHA solving: Browserbase stealth, Camofox, Lightpanda, agent-browser. Claude will not build tools that bypass CAPTCHAs or bot detection, whatever the rule. Alternatives: official APIs, or the browser pauses and asks you to solve it.
 - `SUDO_PASSWORD`: never. Use named-command sudo rules without a password if needed. Not yet confirmed with you.
-- WhatsApp through Baileys (unofficial): official Twilio route only.
 
-### Connection checklist (51 items)
+### Connection checklist (53 items)
 
 State today: **B** = built, connection unverified. **O** = open, to build or configure.
 
@@ -158,6 +156,8 @@ State today: **B** = built, connection unverified. **O** = open, to build or con
 | Search | Reddit (public feeds) | O | read-only |
 | Media | FAL.ai images | O | metered; prompts leave the machine, approval each time |
 | Browser | Local browser tool (decision 49) | O | |
+| Models | Qwen OAuth (you import the login once into encrypted settings) | O | decided 2026-11-15; ECHELON never reads the other tool's file |
+| Messaging | WhatsApp via unofficial bridge (Baileys-style) | O | needs "official APIs only" amended; ban risk on the number, use a dedicated one; licence check; Twilio stays the default |
 | Messaging | Email out (SMTP) | B | |
 | Messaging | SMS (Twilio) | B | |
 | Messaging | WhatsApp (Twilio) | B | |
@@ -180,7 +180,7 @@ State today: **B** = built, connection unverified. **O** = open, to build or con
 | Integrations | Hyperliquid | O | reads; orders only by approval request ID |
 | Safety | Global Approval window (decision 51) | O | |
 
-Legend note: the 13 "B" rows are the ones counted at 0.5 in the completion table; the other 38 are Open.
+Legend note: the 13 "B" rows are the ones counted at 0.5 in the completion table; the other 40 are Open.
 
 ### Order of work for Part 2
 
@@ -190,3 +190,11 @@ Legend note: the 13 "B" rows are the ones counted at 0.5 in the completion table
 4. Add the paid model providers by config, each off until its cap is set.
 5. Add gateway tools (search, Reddit, FAL, GitHub, Hyperliquid reads), then inbound channels, then speech providers.
 6. Browser, SSH and cloud sandboxes last, after a security review.
+
+## Part 3: the organisation (asked 2026-11-15)
+
+| # | Item | Today | Target |
+|---|---|---|---|
+| 52 | **KPIs per entity and promotion rules you set.** Registry agents carry a `kpis` list (checked non-empty by `agent-validator`) but nothing measures or scores it. No promotion or review system exists; "promote" in the code means idea → initiative only. | Open | You set KPIs and targets per entity (board, directorate head, subsidiary head, kill team member, agent). Scores come from the ledger and task results. A promotion or demotion is a proposal you approve. |
+| 53 | **Learning per entity.** Agents read and write lessons (`agent-memory.ts` in the chat orchestrator; swarm learnings per run). The self-improvement job learns at the WHINK/owner level only. | Built, partial | Every entity keeps its own lessons and debriefs from real work, and improves its own procedures. Changes outside low-risk procedural updates go to you as proposals. |
+| 54 | **Talk to every person individually in the Founders Office.** Chat exists for 9 personas (WHINK, MAMBA, Marcus, and 6 directorate-style personas). No individual chat for the rest of the 326-agent roster, subsidiary heads or kill team members. | Partial | One conversation per board member, directorate head, subsidiary head, kill team member, WHINK, MAMBA and Marcus. Each speaks as itself, with its own memory. A persona changes voice, never access. |
