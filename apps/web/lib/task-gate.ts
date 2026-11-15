@@ -41,42 +41,45 @@ export function isTaskDirective(message: string): boolean {
 // ── Skill extraction ──────────────────────────────────────────────────────────
 
 /**
- * Lightweight keyword → skill_id mapping.
- * The full skill registry has 570 entries; this covers the most common domains.
- * Router will surface capability_gaps for anything not matched.
+ * Lightweight keyword → skill_id mapping. Every id must exist in the workforce registry with an eligible agent,
+ * or the router reports a capability gap and the request is blocked; `task-gate.test.ts` checks this against the
+ * registry. Social media, SEO and events have no matching registry skill, so they are left out rather than guessed.
+ * A request that names several domains collects one skill per domain, so its team spans the departments that hold them.
  */
-const KEYWORD_SKILL_MAP: Array<{ keywords: RegExp; skill: string }> = [
+export const KEYWORD_SKILL_MAP: Array<{ keywords: RegExp; skill: string }> = [
   { keywords: /\b(product|roadmap|feature|backlog|sprint|mvp)\b/i, skill: "product_strategy" },
   { keywords: /\b(brand|rebrand|identity|logo|visual identity)\b/i, skill: "brand_strategy" },
   { keywords: /\b(market|marketing|demand|growth|acquisition|funnel|leads?)\b/i, skill: "demand_generation" },
-  { keywords: /\b(project|timeline|milestone|gantt|scope|workback)\b/i, skill: "project_decomposition" },
-  { keywords: /\b(code|coding|engineer|engineering|software|dev|api|backend|frontend|fullstack)\b/i, skill: "software_engineering" },
-  { keywords: /\b(data|analytics|metric|kpi|dashboard|bi|reporting)\b/i, skill: "data_analysis" },
-  { keywords: /\b(ai|machine learning|ml|model|llm|nlp|genai)\b/i, skill: "ai_ml_engineering" },
-  { keywords: /\b(design|ux|ui|user experience|figma|prototype|wireframe)\b/i, skill: "ux_ui_design" },
-  { keywords: /\b(content|copy|copywriting|blog|article|email|newsletter)\b/i, skill: "content_creation" },
-  { keywords: /\b(social|social media|instagram|twitter|linkedin|tiktok)\b/i, skill: "social_media_management" },
-  { keywords: /\b(seo|search engine|organic|keywords?|ranking)\b/i, skill: "seo_strategy" },
-  { keywords: /\b(sales|revenue|deal|pipeline|crm|close|quota)\b/i, skill: "sales_strategy" },
-  { keywords: /\b(finance|financial|budget|forecast|p&l|cash flow|model)\b/i, skill: "financial_modeling" },
-  { keywords: /\b(legal|contract|agreement|compliance|gdpr|terms|privacy)\b/i, skill: "legal_compliance" },
-  { keywords: /\b(hr|hire|hiring|recruit|talent|onboard|culture|people)\b/i, skill: "talent_acquisition" },
-  { keywords: /\b(ops|operations|process|workflow|sop|supply chain|vendor)\b/i, skill: "operations_management" },
+  { keywords: /\b(project|timeline|milestone|gantt|scope|workback)\b/i, skill: "program_management" },
+  { keywords: /\b(code|coding|engineer|engineering|software|dev|api|backend|frontend|fullstack)\b/i, skill: "platform_engineering" },
+  { keywords: /\b(data|analytics|metric|kpi|dashboard|bi|reporting)\b/i, skill: "product_analytics" },
+  { keywords: /\b(ai|machine learning|ml|model|llm|nlp|genai)\b/i, skill: "machine_learning" },
+  { keywords: /\b(design|ux|ui|user experience|figma|prototype|wireframe)\b/i, skill: "ux_strategy" },
+  { keywords: /\b(content|copy|copywriting|blog|article|email|newsletter)\b/i, skill: "content_strategy" },
+  { keywords: /\b(sales|revenue|deal|pipeline|crm|close|quota)\b/i, skill: "sales_enablement" },
+  { keywords: /\b(finance|financial|budget|forecast|p&l|cash flow|model)\b/i, skill: "budgeting" },
+  { keywords: /\b(legal|contract|agreement|compliance|gdpr|terms|privacy)\b/i, skill: "regulatory_compliance" },
+  { keywords: /\b(hr|hire|hiring|recruit|talent|onboard|culture|people)\b/i, skill: "recruiting" },
+  { keywords: /\b(ops|operations|process|workflow|sop|supply chain|vendor)\b/i, skill: "operational_coordination" },
   { keywords: /\b(customer|support|cx|service|retention|churn|nps)\b/i, skill: "customer_success" },
-  { keywords: /\b(security|cyber|penetration|vuln|compliance|iso|soc2)\b/i, skill: "cybersecurity" },
+  { keywords: /\b(security|cyber|penetration|vuln|iso|soc2)\b/i, skill: "vulnerability_management" },
   { keywords: /\b(infra|infrastructure|cloud|aws|gcp|azure|devops|k8s|docker)\b/i, skill: "cloud_infrastructure" },
-  { keywords: /\b(research|competitive|landscape|market research|intel)\b/i, skill: "market_research" },
-  { keywords: /\b(strategy|strategic|vision|direction|north star|goal)\b/i, skill: "strategic_planning" },
-  { keywords: /\b(partner|partnership|business development|biz dev|alliance)\b/i, skill: "business_development" },
-  { keywords: /\b(pr|public relations|press|media|journalist|pitch)\b/i, skill: "public_relations" },
-  { keywords: /\b(investor|fundraise|raise|seed|series|deck|pitch deck|vc)\b/i, skill: "investor_relations" },
-  { keywords: /\b(event|launch event|conference|webinar|demo day)\b/i, skill: "event_management" },
+  { keywords: /\b(research|competitive|landscape|market research|intel)\b/i, skill: "audience_intelligence" },
+  { keywords: /\b(strategy|strategic|vision|direction|north star|goal)\b/i, skill: "strategic_prioritization" },
+  { keywords: /\b(partner|partnership|business development|biz dev|alliance)\b/i, skill: "partner_enablement" },
+  { keywords: /\b(pr|public relations|press|media|journalist|pitch)\b/i, skill: "media_distribution" },
+  { keywords: /\b(investor|fundraise|raise|seed|series|deck|pitch deck|vc)\b/i, skill: "capital_management" },
 ];
+
+// shortcut: crude suffix strip so "recruiting", "budgets" and "forecasts" match their keywords; only words of 5+ letters,
+// and the original word is kept, so short keywords such as "ai" or "pr" never gain false matches. Replace with a real stemmer if it misfires.
+const withStems = (text: string) => text.replace(/[A-Za-z]{5,}/g, (w) => `${w} ${w.replace(/(ings?|ments?|ed|es|s)$/i, '')}`);
 
 export function extractRequiredSkills(message: string): string[] {
   const matched = new Set<string>();
+  const text = withStems(message);
   for (const { keywords, skill } of KEYWORD_SKILL_MAP) {
-    if (keywords.test(message)) matched.add(skill);
+    if (keywords.test(text)) matched.add(skill);
   }
   // Always include baseline skills for any real task
   if (matched.size > 0) {

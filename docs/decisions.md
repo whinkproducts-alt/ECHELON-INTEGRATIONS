@@ -538,3 +538,9 @@ The global Marcus freeze is stored as an `AgentJob` row (`marcus:__freeze__`) to
 ## 2026-11-15  Injection scan: qualified override phrasings
 
 `ignore (previous|all|above) instructions` did not match "ignore all previous instructions". Added a qualified pattern (a qualifier such as previous, prior, above or earlier is required) so ordinary sentences like "ignore the cooking instructions" are not caught.
+
+## 2026-11-15  Task gate skills must exist in the registry; cross-department and cross-subsidiary requests
+
+21 of the 27 skill names in `lib/task-gate.ts` did not exist in the workforce registry, so any request mentioning sales, legal, finance, security, strategy and similar domains got "capability gaps" and was blocked. They now use real skills (`cross-department.test.ts` fails if any mapped skill has no eligible agent). Social media, SEO and events have no matching registry skill and were left out rather than guessed. Keywords also match common word forms (recruiting, budgets, contracts) through a small suffix strip, and "compliance" no longer triggers a security specialist.
+
+A request spanning several domains collects one skill per domain, so its team spans the directorates holding them (up to the 5-agent cap, enforced at admission). Beyond 5 it is blocked as `too_many_departments`. A directorate named by Marcus steers the lead agent only; unmatched text is ignored because Marcus sends free text. The agents belong to the group, not to a subsidiary, so a subsidiary is a request label: Marcus tasks may carry an origin and up to four target subsidiaries, validated against `config/subsidiaries.json`, and the analysis objective is prefixed with their names from config (never from request text). Naming a subsidiary, including "Whink Trades & Investments", is not treated as a protected trade (tested).

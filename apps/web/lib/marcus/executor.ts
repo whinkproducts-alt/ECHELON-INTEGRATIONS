@@ -14,6 +14,8 @@ import { APPROVAL_TTL_MS } from '@/lib/approvals';
 import { budgetState } from '@/lib/budget';
 import { analysisRoute, cancelExecution, enqueueApprovedEar } from '@/lib/worker/ear-execution';
 import { MARCUS_NEVER_RUN } from '@/lib/marcus/freeze';
+import { matchDirectorate, subsidiaryContext } from '@/lib/marcus/routing';
+import { getOrgKit } from '@/lib/agent-loader';
 import type { ClaimedJob, JobOutcome } from '@/lib/worker/scheduler';
 
 const POLL_MS = 5_000;
@@ -41,7 +43,7 @@ async function finish(job: ClaimedJob, workerId: string, from: string, to: 'done
 
 async function admit(job: ClaimedJob, workerId: string, row: NonNullable<Job>): Promise<JobOutcome> {
   const userId = job.userId;
-  let content: { title: string; goal: string; deadline: string | null };
+  let content: { title: string; goal: string; deadline: string | null; directorate?: string | null; subsidiary?: string | null; targets?: string[] };
   try {
     content = JSON.parse(decryptKey(row.capabilityRequestEnc ?? ''));
     const hash = createHash('sha256').update(canonicalJson({ title: content.title, goal: content.goal, deadline: content.deadline })).digest('hex');
@@ -53,11 +55,18 @@ async function admit(job: ClaimedJob, workerId: string, row: NonNullable<Job>): 
   // Nothing is consumed until the model route and budget are known to allow the work, so a blocked task can be resumed.
   if (!analysisRoute() || (await budgetState(userId)).state === 'hard') return finish(job, workerId, 'received', 'blocked', 'model_or_budget_unavailable');
 
-  const objective = `${content.title}: ${content.goal}`.slice(0, 300);
-  const skills = extractRequiredSkills(objective);
-  const ear = buildAuthorizationRequest(objective, skills.length ? skills : FALLBACK_SKILLS, { maxAgents: 5 });
+  // Skills come from the request's own words; the subsidiary line and target directorate steer the team but add no skills.
+  const text = `${content.title}: ${content.goal}`;
+  const scope = { subsidiary: content.subsidiary ?? null, targets: content.targets ?? [] };
+  const objective = `${subsidiaryContext(scope)}${text}`.slice(0, 300);
+  const skills = extractRequiredSkills(text);
+  const directorate = matchDirectorate(content.directorate, [...new Set((await getOrgKit()).agents.map((a) => a.directorate))]);
+  const ear = buildAuthorizationRequest(objective, skills.length ? skills : FALLBACK_SKILLS, { maxAgents: 5, ...(directorate ? { targetDirectorate: directorate } : {}) });
   ear.execution_scope = 'internal_analysis';
-  if (!ear.lead_agent || ear.capability_gaps.length) return finish(job, workerId, 'received', 'blocked', 'no_specialist_available');
+  if (!ear.lead_agent || ear.capability_gaps.length) {
+    // A full team with skills left over means the request spans more domains than one analysis may use; split it.
+    return finish(job, workerId, 'received', 'blocked', ear.team_size >= 5 && ear.lead_agent ? 'too_many_departments' : 'no_specialist_available');
+  }
 
   // Single use: only one caller can flip the Marcus approval to EXECUTED.
   const used = await prisma.approvalRequest.updateMany({
@@ -92,7 +101,7 @@ async function admit(job: ClaimedJob, workerId: string, row: NonNullable<Job>): 
   if (moved.count !== 1) { await cancelExecution(userId, executionId); return 'SKIPPED'; } // frozen between admission and now
   await recordAction({
     userId, initiator: 'system', action: 'capability_marcus_task_started', permissionClass: 'C', status: 'VALIDATED',
-    correlationId: `marcus-task:${job.id}`, inputSummary: `execution=${executionId} earApproval=${earApprovalId} marcusApproval=${row.capabilityApprovalId}`,
+    correlationId: `marcus-task:${job.id}`, inputSummary: `execution=${executionId} earApproval=${earApprovalId} marcusApproval=${row.capabilityApprovalId} directorate=${directorate ?? '-'} subsidiary=${scope.subsidiary ?? '-'} targets=${scope.targets.join(',') || '-'}`,
   });
   return 'OK';
 }

@@ -184,6 +184,45 @@ describe.skipIf(!enabled)('marcus real database integration', () => {
       expect(await job(t.task_id)).toMatchObject({ lastStatus: 'in_progress', lastError: null });
     });
 
+    it('an inter-subsidiary request carries both subsidiaries and a directorate into the analysis', async () => {
+      const b = task({ subsidiary: 'consult', target_subsidiaries: ['trades', 'apps'], directorate: 'finance', title: 'Joint budget review', goal: 'Think through a shared budget for a joint client engagement' });
+      const t = await (await post(b)).json();
+      expect(t.status).toBe('received');
+      expect((await post(task({ subsidiary: 'nope' }))).status).toBe(400);
+      await tick(`marcus:${b.client_operation_id}`);
+      const started = await job(t.task_id);
+      expect(started.lastStatus).toBe('in_progress');
+      const ex = await prisma.agentExecution.findUniqueOrThrow({ where: { id: started.capabilityReceiptId! } });
+      const ear = (await prisma.approvalRequest.findUniqueOrThrow({ where: { id: ex.approvalId } })).params as { objective: string };
+      expect(ear.objective.startsWith('For Whink Consult, with Whink Trades & Investments, Whink Apps: ')).toBe(true);
+      const { getOrgKit } = await import('@/lib/agent-loader');
+      const lead = (await getOrgKit()).agents.find((a) => a.agent_id === ex.agentIds[0])!;
+      expect(lead.directorate).toBe('Finance & Accounting'); // "finance" steered the lead
+      const row = await prisma.action.findFirstOrThrow({ where: { userId: owner, correlationId: `marcus-task:${t.task_id}`, action: 'capability_marcus_task_started' } });
+      expect(row.inputSummary).toContain('directorate=Finance & Accounting subsidiary=consult targets=trades,apps');
+    });
+
+    it('an inter-departmental request gets one specialist per department and starts', async () => {
+      const b = task({ title: 'Launch plan', goal: 'Plan the product launch with a sales forecast, a legal and compliance review, a budget and recruiting a contractor' });
+      const t = await (await post(b)).json();
+      await tick(`marcus:${b.client_operation_id}`);
+      const started = await job(t.task_id);
+      expect(started, `ended ${started.lastStatus} (${started.lastError})`).toMatchObject({ lastStatus: 'in_progress' });
+      const ex = await prisma.agentExecution.findUniqueOrThrow({ where: { id: started.capabilityReceiptId! } });
+      const { getOrgKit } = await import('@/lib/agent-loader');
+      const agents = (await getOrgKit()).agents.filter((a) => ex.agentIds.includes(a.agent_id));
+      expect(agents.length).toBe(5);
+      expect(new Set(agents.map((a) => a.directorate)).size).toBeGreaterThanOrEqual(4);
+    });
+
+    it('a request spanning more departments than one analysis may use is blocked with a clear reason and its approval kept', async () => {
+      const b = task({ title: 'Everything review', goal: 'Plan the product launch with a sales forecast, a legal review, a budget, recruiting a contractor and a security review' });
+      const t = await (await post(b)).json();
+      await tick(`marcus:${b.client_operation_id}`);
+      expect(await job(t.task_id)).toMatchObject({ lastStatus: 'blocked', lastError: 'too_many_departments' });
+      expect((await prisma.approvalRequest.findUniqueOrThrow({ where: { id: b.approval.approval_id } })).status).toBe('APPROVED');
+    });
+
     it('with no local model the task is blocked without using its approval; resume then lets it run', async () => {
       vi.stubEnv('DEFAULT_MODEL', ''); vi.stubEnv('SWARM_MODEL', '');
       const b = task();

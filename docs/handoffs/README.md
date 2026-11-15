@@ -10,3 +10,4 @@ One file per build group, kept as the detailed record behind `docs/daily-syncs/2
 | `HANDOFF-GROUP-D.md` | Autonomy checks against the real repo, real-database results |
 | `HANDOFF-GROUP-E-F.md` | Hosts and UI, build repair |
 | `HANDOFF-MARCUS-EXECUTOR.md` | Executor design and its real-HTTP verification |
+| `HANDOFF-CROSS-DEPARTMENT.md` | Cross-department and cross-subsidiary requests, skill-name fix |

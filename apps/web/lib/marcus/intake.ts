@@ -7,6 +7,7 @@ import { recordAction } from '@/lib/ledger';
 import { encryptKey, isEncryptionConfigured } from '@/lib/key-encryption';
 import { isLockedDown } from '@/lib/safety/lockdown';
 import { isMarcusFrozen, resolveMarcusOwner, MARCUS_NEVER_RUN } from '@/lib/marcus/freeze';
+import { parseSubsidiaries } from '@/lib/marcus/routing';
 
 export interface MarcusTaskInput {
   client_operation_id: string;
@@ -17,6 +18,9 @@ export interface MarcusTaskInput {
   approval: { approval_id: string; approved_at: string; method: 'voice' | 'tap'; content_hash: string };
   sensitivity: 'standard' | 'proprietary' | 'financial';
   directorate: string | null;
+  /** Subsidiary the request comes from, and other subsidiaries it involves. Optional; ids are validated. */
+  subsidiary?: string | null;
+  target_subsidiaries?: string[] | null;
 }
 
 const RECONFIRM = new Set(['financial', 'proprietary']);
@@ -36,6 +40,9 @@ export async function intakeMarcusTask(req: Request) {
   if (body.deadline !== null && typeof body.deadline !== 'string') return bad('Invalid deadline');
   if (!['standard', 'proprietary', 'financial'].includes(body.sensitivity)) return bad('Invalid sensitivity value');
   if (!['voice', 'tap'].includes(body.approval.method)) return bad('Invalid approval method');
+  const scope = parseSubsidiaries(body.subsidiary, body.target_subsidiaries);
+  if (!scope.ok) return bad(scope.error);
+  if (body.directorate != null && (typeof body.directorate !== 'string' || body.directorate.length > 100)) return bad('Invalid directorate');
 
   const computed = createHash('sha256').update(canonicalJson({ title: body.title, goal: body.goal, deadline: body.deadline })).digest('hex');
   if (computed !== body.approval.content_hash) return bad('Approval content hash mismatch');
@@ -74,7 +81,7 @@ export async function intakeMarcusTask(req: Request) {
       });
       const job = await tx.agentJob.create({
         data: { jobKey, userId: owner.id, nextRunAt: reconfirm ? MARCUS_NEVER_RUN : new Date(), lastStatus: status, capabilityRequestHash: body.approval.content_hash,
-          capabilityRequestEnc: encryptKey(JSON.stringify({ title: body.title, goal: body.goal, deadline: body.deadline })), capabilityApprovalId: body.approval.approval_id },
+          capabilityRequestEnc: encryptKey(JSON.stringify({ title: body.title, goal: body.goal, deadline: body.deadline, directorate: body.directorate ?? null, subsidiary: scope.value.subsidiary, targets: scope.value.targets })), capabilityApprovalId: body.approval.approval_id },
       });
       await tx.sealedScope.create({ data: { userId: owner.id, kind: 'OBJECTIVE', refId: job.id } });
       await recordAction({

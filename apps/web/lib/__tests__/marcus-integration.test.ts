@@ -136,6 +136,23 @@ describe('Marcus intake', () => {
     expect((await post(body())).status).toBe(503);
   });
 
+  it('accepts origin and target subsidiaries and a directorate, storing them only inside the encrypted task text', async () => {
+    const res = await post(body({ subsidiary: 'consult', target_subsidiaries: ['trades', 'apps'], directorate: 'Finance' }));
+    expect(res.status).toBe(200);
+    const { decryptKey } = await import('@/lib/key-encryption');
+    const stored = JSON.parse(decryptKey(h.jobs[0].capabilityRequestEnc));
+    expect(stored).toMatchObject({ subsidiary: 'consult', targets: ['trades', 'apps'], directorate: 'Finance' });
+    expect(JSON.stringify(h.jobs[0])).not.toContain('Finance'); // nothing readable beside the ciphertext
+  });
+
+  it('rejects an unknown subsidiary or an unknown target, and stores nothing', async () => {
+    expect((await post(body({ subsidiary: 'nope' }))).status).toBe(400);
+    expect((await post(body({ target_subsidiaries: ['trades', 'bogus'] }))).status).toBe(400);
+    expect((await post(body({ directorate: 'x'.repeat(101) }))).status).toBe(400);
+    expect(h.jobs).toHaveLength(0);
+    expect(h.approvals).toHaveLength(0);
+  });
+
   it('503 and nothing stored when no encryption key is configured', async () => {
     const key = process.env.ENCRYPTION_KEY;
     delete process.env.ENCRYPTION_KEY;

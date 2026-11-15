@@ -10,7 +10,7 @@
 - Whether to amend non-negotiable 4 to allow any agent-tier approval (the 8-tier chain was not built; see decisions).
 - Whether an SSH tunnel counts as "local" for a second machine's Ollama.
 
-- Broad multi-domain tasks (for example marketing, sales, finance and legal in one request) get capability gaps from the router, so the Marcus executor reports them `blocked` (`no_specialist_available`) rather than running a partial team. Decide whether to split such tasks, run partial teams, or leave as is.
+- **Cross-department and cross-subsidiary requests (done 2026-11-15):** a request naming several domains now gets one specialist per department, up to 5. A request spanning more than 5 is blocked as `too_many_departments`; deciding whether to split such requests automatically is open. ECHELON accepts optional `subsidiary` and `target_subsidiaries` on Marcus tasks, but Marcus does not send them yet (its client allow-list and task model need the two fields).
 
 **Open, engineering:**
 - Run the executor on the owner's Mac with a real account (`ENCRYPTION_KEY`, `MARCUS_BEARER_TOKEN_HASH`, `WHINK_OWNER_EMAILS`, worker running) and look at the executive screens in a browser; neither has been done.

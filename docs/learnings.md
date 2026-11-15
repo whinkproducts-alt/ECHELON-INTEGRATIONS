@@ -210,3 +210,5 @@ Overlapping Dependabot PRs in the two repos can request different versions of th
 - **Tasks only know their own text.** Analysis runs with no tools, memory or web, so "summarise my roadmap" correctly gets a refusal. Marcus tasks must carry what to reason about unless context attachment is built.
 - **Repeat the real check:** `scripts/marcus-e2e.py` drives Marcus's own client against a running ECHELON.
 - **Measure before optimizing.** `next build` compiles in about 6 s and the full 2453-test suite runs in about 7 s, so build and test time are not worth tuning. The router already picks 1 to 2 agents per task even at the 5-agent cap, so lowering the cap for Marcus tasks would save no model tokens.
+- **Names in a mapping must be checked against the data.** The task gate's skill ids were written from memory and 21 of 27 did not exist, which silently blocked every multi-domain request. A test now checks each id against the registry.
+- **Registry skills are held by one pair of agents in one directorate**, so a cross-department request is naturally a multi-agent team (one skill per department). Only a handful of skills are shared across directorates.
