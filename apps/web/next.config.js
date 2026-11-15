@@ -55,8 +55,9 @@ const nextConfig = {
       config.externals = [
         ...prevArr,
         ({ request }, callback) => {
-          if (nodeBuiltins.includes(request)) {
-            return callback(null, `commonjs ${request}`);
+          // Any `node:` request (child_process, dns/promises, ...) must be external, or webpack throws UnhandledSchemeError.
+          if (typeof request === 'string' && (request.startsWith('node:') || nodeBuiltins.includes(request))) {
+            return callback(null, `commonjs ${request.replace(/^node:/, '')}`);
           }
           callback();
         },

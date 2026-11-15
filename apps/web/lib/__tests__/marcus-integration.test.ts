@@ -1,395 +1,182 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createHash } from 'node:crypto';
 import { canonicalJson } from '@/lib/canonical-json';
-import crypto from 'crypto';
 
-// Mock canonical-json module
-vi.mock('@/lib/canonical-json', () => {
-  const mockApprovalContentHash = vi.fn();
-  return {
-    canonicalJson: vi.fn((obj: any) => JSON.stringify(obj, Object.keys(obj).sort())),
-    approvalContentHash: mockApprovalContentHash,
-    __mockApprovalContentHash: mockApprovalContentHash,
-  };
-});
+// Real hashing, real auth, real owner lookup. Only the database and the ledger writer are faked.
+process.env.MARCUS_BEARER_TOKEN_HASH = createHash('sha256').update('tok').digest('hex');
+process.env.WHINK_OWNER_EMAILS = 'owner@example.com';
 
-const h = vi.hoisted(() => ({
-  jobs: [] as any[],
-  actions: [] as any[],
-  approvals: [] as any[],
-  sealedScopes: [] as any[],
-  findFirst: vi.fn(),
-  findMany: vi.fn(),
-  findUnique: vi.fn(),
-  create: vi.fn(),
-  createMany: vi.fn(),
-  update: vi.fn(),
-  updateMany: vi.fn(),
-  delete: vi.fn(),
-  deleteMany: vi.fn(),
-}));
+type Row = Record<string, any>;
+const h = vi.hoisted(() => ({ jobs: [] as Row[], approvals: [] as Row[], scopes: [] as Row[], ledger: [] as Row[], hasOwner: true, seq: 0 }));
 
-vi.mock('@/lib/db', async () => {
-  return {
-    prisma: {
-      agentJob: {
-        findFirst: (...args: any[]) => h.findFirst(...args),
-        findMany: (...args: any[]) => h.findMany(...args),
-        findUnique: (...args: any[]) => h.findUnique(...args),
-        create: (...args: any[]) => h.create(...args),
-        update: (...args: any[]) => h.update(...args),
-        updateMany: (...args: any[]) => h.updateMany(...args),
-        delete: (...args: any[]) => h.delete(...args),
+const dup = () => Object.assign(new Error('unique'), { code: 'P2002' });
+const inList = (v: unknown, c: any) => (c?.in ? c.in.includes(v) : c === v);
+
+vi.mock('@/lib/ledger', () => ({ recordAction: vi.fn(async (e: Row) => { h.ledger.push(e); return { id: `a${h.ledger.length}` }; }) }));
+vi.mock('@/lib/db', () => {
+  const p: Row = {
+    user: { findUnique: async () => (h.hasOwner ? { id: 'u1', email: 'owner@example.com' } : null) },
+    agentJob: {
+      findUnique: async ({ where }: Row) => h.jobs.find((j) => j.jobKey === where.jobKey_userId.jobKey && j.userId === where.jobKey_userId.userId) ?? null,
+      findFirst: async ({ where }: Row) => h.jobs.find((j) => j.id === where.id && j.jobKey.startsWith(where.jobKey.startsWith)) ?? null,
+      findMany: async ({ where }: Row) => h.jobs.filter((j) => j.userId === where.userId && j.jobKey.startsWith(where.jobKey.startsWith) && inList(j.lastStatus, where.lastStatus)),
+      create: async ({ data }: Row) => {
+        if (h.jobs.some((j) => j.jobKey === data.jobKey && j.userId === data.userId)) throw dup();
+        const row = { id: `job${++h.seq}`, createdAt: new Date(), ...data };
+        h.jobs.push(row);
+        return row;
       },
-      approvalRequest: {
-        findFirst: (...args: any[]) => h.findFirst(...args),
-        findMany: (...args: any[]) => h.findMany(...args),
-        create: (...args: any[]) => h.create(...args),
-        update: (...args: any[]) => h.update(...args),
+      upsert: async ({ where, create, update }: Row) => {
+        const k = where.jobKey_userId;
+        const found = h.jobs.find((j) => j.jobKey === k.jobKey && j.userId === k.userId);
+        if (found) { Object.assign(found, update); return found; }
+        const row = { id: `job${++h.seq}`, createdAt: new Date(), ...create };
+        h.jobs.push(row);
+        return row;
       },
-      action: {
-        findMany: (...args: any[]) => h.findMany(...args),
-        create: (...args: any[]) => h.create(...args),
-        createMany: (...args: any[]) => h.createMany(...args),
-      },
-      sealedScope: {
-        create: (...args: any[]) => h.create(...args),
+      updateMany: async ({ where, data }: Row) => {
+        const hit = h.jobs.filter((j) => where.id.in.includes(j.id) && j.userId === where.userId);
+        hit.forEach((j) => Object.assign(j, data));
+        return { count: hit.length };
       },
     },
+    approvalRequest: {
+      create: async ({ data }: Row) => {
+        if (h.approvals.some((a) => a.id === data.id)) throw dup();
+        const row = { executedAt: null, ...data };
+        h.approvals.push(row);
+        return row;
+      },
+      findFirst: async ({ where }: Row) => h.approvals.find((a) => a.id === where.id && (!where.userId || a.userId === where.userId)) ?? null,
+      updateMany: async ({ where, data }: Row) => {
+        const hit = h.approvals.filter((a) => a.id === where.id && a.userId === where.userId && a.executedAt === null);
+        hit.forEach((a) => Object.assign(a, data));
+        return { count: hit.length };
+      },
+    },
+    sealedScope: { create: async ({ data }: Row) => { h.scopes.push(data); return data; } },
   };
+  p.$transaction = async (fn: (tx: Row) => unknown) => fn(p);
+  return { prisma: p };
 });
 
-vi.mock('@/lib/capability/hosts', async () => {
-  return {
-    requireMarcusAuth: vi.fn((req: Request) => {
-      const auth = req.headers.get('authorization');
-      if (!auth?.startsWith('Bearer ')) return { ok: false, status: 401, error: 'Missing bearer token' };
-      const token = auth.slice(7);
-      if (token === 'valid-token') return { ok: true };
-      return { ok: false, status: 401, error: 'Invalid bearer token' };
-    }),
-    MARCUS_SERVICE_NAME: 'marcus-vale',
-    verifyMarcusToken: vi.fn((token: string) => token === 'valid-token'),
-    hashMarcusToken: vi.fn((token: string) => crypto.createHash('sha256').update(token).digest('hex')),
-  };
-});
+const { intakeMarcusTask } = await import('@/lib/marcus/intake');
+const { setMarcusFreeze } = await import('@/lib/marcus/freeze');
+const { checkMarcusApproval } = await import('@/lib/permission-engine');
+const { GET: eventsGet } = await import('@/app/api/integrations/marcus/events/route');
 
-vi.mock('@/lib/sealed-scope', () => {
-  return {
-    createSealedScope: vi.fn(),
-    registerSealedScope: vi.fn(),
-    isSealedScope: vi.fn(),
-  };
-});
-
-import { intakeMarcusTask } from '@/lib/marcus/intake';
-import { checkMarcusApproval, checkMarcusApprovalReplay } from '@/lib/permission-engine';
-import { approvalContentHash as mockApprovalContentHash } from '@/lib/canonical-json';
-import type { approvalContentHash } from '@/lib/canonical-json';
-
-// Get the mock function from the mocked module
-const __mockApprovalContentHash = mockApprovalContentHash as unknown as ReturnType<typeof vi.fn>;
-
-interface MarcusTaskBody {
-  client_operation_id: string;
-  title: string;
-  goal: string;
-  deadline: string | null;
-  requested_for: string;
-  approval: {
-    approval_id: string;
-    approved_at: string;
-    method: "voice" | "tap";
-    content_hash: string;
-  };
-  sensitivity: "standard" | "proprietary" | "financial";
-  directorate: string | null;
+function body(over: Row = {}) {
+  const b = { client_operation_id: 'op-1', title: 'Draft memo', goal: 'Summarise Q4', deadline: null, requested_for: 'victor', sensitivity: 'standard', directorate: null, ...over };
+  const content_hash = createHash('sha256').update(canonicalJson({ title: b.title, goal: b.goal, deadline: b.deadline })).digest('hex');
+  return { ...b, approval: { approval_id: over.approval_id ?? 'appr-1', approved_at: '2026-11-14T00:00:00Z', method: 'voice', content_hash, ...(over.approval ?? {}) } };
 }
+const post = (b: unknown, token = 'tok') =>
+  intakeMarcusTask(new Request('http://x/api/integrations/marcus/tasks', { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(b) }));
 
-const validBodyBase: MarcusTaskBody = {
-  client_operation_id: 'test-op-123',
-  title: 'Test Task',
-  goal: 'Test goal description',
-  deadline: '2026-12-01T00:00:00Z',
-  requested_for: 'victor',
-  approval: {
-    approval_id: 'approval-123',
-    approved_at: '2026-11-13T12:00:00Z',
-    method: 'voice',
-    content_hash: '',
-  },
-  sensitivity: 'standard',
-  directorate: null,
-};
+beforeEach(() => { h.jobs = []; h.approvals = []; h.scopes = []; h.ledger = []; h.hasOwner = true; h.seq = 0; });
 
-function computeHash(body: MarcusTaskBody) {
-  const contentForHash = { title: body.title, goal: body.goal, deadline: body.deadline };
-  const canonical = canonicalJson(contentForHash);
-  return crypto.createHash('sha256').update(canonical).digest('hex');
-}
-
-function makeReq(body: any, token = 'valid-token') {
-  return {
-    headers: new Map([['authorization', `Bearer ${token}`]]),
-    json: async () => body,
-  } as unknown as Request;
-}
-
-describe('Marcus Intake', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    __mockApprovalContentHash.mockReset();
-    h.jobs = [];
-    h.actions = [];
-    h.approvals = [];
-    h.sealedScopes = [];
+describe('Marcus intake', () => {
+  it('rejects a bad or missing token with 401 and writes nothing', async () => {
+    expect((await post(body(), 'wrong')).status).toBe(401);
+    expect(h.jobs).toHaveLength(0);
   });
 
-  it('accepts a valid Marcus bearer token', async () => {
-    const body = { ...validBodyBase, approval: { ...validBodyBase.approval, content_hash: computeHash(validBodyBase) } };
-    h.findFirst.mockResolvedValueOnce(null); // no existing task
-    h.findFirst.mockResolvedValueOnce(null); // no replayed approval
-    h.create.mockResolvedValueOnce({ id: 'task-1', createdAt: new Date(), lastStatus: 'received', userId: 'victor-igboekwe' });
-    h.create.mockResolvedValueOnce({}); // approvalRequest create
-    h.create.mockResolvedValueOnce({}); // action create
-    
-    const req = makeReq(body);
-    const res = await intakeMarcusTask(req);
+  it('standard task: stored as received, approval recorded under the Marcus id, sealed, ledgered', async () => {
+    const res = await post(body());
     expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.status).toBe('received');
-    expect(data.task_id).toBeDefined();
+    expect((await res.json()).status).toBe('received');
+    expect(h.approvals[0]).toMatchObject({ id: 'appr-1', status: 'APPROVED', permissionClass: 'A', userId: 'u1' });
+    expect(h.scopes).toHaveLength(1);
+    expect(h.ledger[0]).toMatchObject({ action: 'capability_marcus_task_received', userId: 'u1' });
+    expect(h.jobs[0].userId).toBe('u1');
   });
 
-  it('rejects invalid token with 401', async () => {
-    const body = { ...validBodyBase, approval: { ...validBodyBase.approval, content_hash: computeHash(validBodyBase) } };
-    const req = makeReq(body, 'invalid-token');
-    const res = await intakeMarcusTask(req);
-    expect(res.status).toBe(401);
+  it.each(['financial', 'proprietary'])('%s task waits for reconfirmation as Class C', async (sensitivity) => {
+    const res = await post(body({ sensitivity }));
+    expect((await res.json()).status).toBe('reconfirmation_required');
+    expect(h.approvals[0]).toMatchObject({ status: 'PENDING', permissionClass: 'C' });
+    expect(h.ledger[0]).toMatchObject({ status: 'AWAITING_APPROVAL', errorCode: 'RECONFIRMATION_REQUIRED' });
   });
 
-  it('rejects missing token with 401', async () => {
-    const body = { ...validBodyBase, approval: { ...validBodyBase.approval, content_hash: computeHash(validBodyBase) } };
-    const req = makeReq(body, '');
-    const res = await intakeMarcusTask(req);
-    expect(res.status).toBe(401);
+  it('rejects a content hash that does not match title+goal+deadline', async () => {
+    const b = body();
+    b.title = 'Changed after approval';
+    expect((await post(b)).status).toBe(400);
+    expect(h.jobs).toHaveLength(0);
   });
 
-  it('idempotent on duplicate client_operation_id', async () => {
-    const body = { ...validBodyBase, approval: { ...validBodyBase.approval, content_hash: computeHash(validBodyBase) } };
-    const existing = { id: 'task-existing', createdAt: new Date('2026-11-01'), lastStatus: 'received', userId: 'victor-igboekwe' };
-    h.findFirst.mockResolvedValueOnce(existing);
-    
-    const req = makeReq(body);
-    const res = await intakeMarcusTask(req);
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.task_id).toBe('task-existing');
+  it('same client_operation_id is idempotent: one task, same id back', async () => {
+    const a = await (await post(body())).json();
+    const b = await (await post(body())).json();
+    expect(b.task_id).toBe(a.task_id);
+    expect(h.jobs).toHaveLength(1);
   });
 
-  it('rejects replayed approval_id with 409', async () => {
-    const body = { ...validBodyBase, approval: { ...validBodyBase.approval, content_hash: computeHash(validBodyBase) } };
-    h.findFirst.mockResolvedValueOnce(null); // no existing task
-    h.findFirst.mockResolvedValueOnce({ id: 'approval-123' }); // replayed approval
-    
-    const req = makeReq(body);
-    const res = await intakeMarcusTask(req);
+  it('an approval_id reused for a different operation gets 409', async () => {
+    await post(body());
+    const res = await post(body({ client_operation_id: 'op-2', title: 'Other', approval_id: 'appr-1' }));
     expect(res.status).toBe(409);
+    expect(h.jobs).toHaveLength(1);
   });
 
-  it('pauses financial sensitivity and emits reconfirmation_required', async () => {
-    const financialBody = { ...validBodyBase, sensitivity: 'financial' as const };
-    financialBody.approval.content_hash = computeHash(financialBody);
-    
-    h.findFirst.mockResolvedValueOnce(null);
-    h.findFirst.mockResolvedValueOnce(null);
-    h.create.mockResolvedValueOnce({ id: 'task-fin', createdAt: new Date(), lastStatus: 'reconfirmation_required', userId: 'victor-igboekwe' });
-    h.create.mockResolvedValueOnce({}); // approvalRequest
-    h.create.mockResolvedValueOnce({}); // action
-    
-    const req = makeReq(financialBody);
-    const res = await intakeMarcusTask(req);
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.status).toBe('reconfirmation_required');
+  it('503 when no owner account is configured', async () => {
+    h.hasOwner = false;
+    expect((await post(body())).status).toBe(503);
   });
 
-  it('pauses proprietary sensitivity and emits reconfirmation_required', async () => {
-    const proprietaryBody = { ...validBodyBase, sensitivity: 'proprietary' as const };
-    proprietaryBody.approval.content_hash = computeHash(proprietaryBody);
-    
-    h.findFirst.mockResolvedValueOnce(null);
-    h.findFirst.mockResolvedValueOnce(null);
-    h.create.mockResolvedValueOnce({ id: 'task-prop', createdAt: new Date(), lastStatus: 'reconfirmation_required', userId: 'victor-igboekwe' });
-    h.create.mockResolvedValueOnce({}); // approvalRequest
-    h.create.mockResolvedValueOnce({}); // action
-    
-    const req = makeReq(proprietaryBody);
-    const res = await intakeMarcusTask(req);
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.status).toBe('reconfirmation_required');
-  });
-
-  it('standard sensitivity is accepted without second approval', async () => {
-    const body = { ...validBodyBase, approval: { ...validBodyBase.approval, content_hash: computeHash(validBodyBase) } };
-    h.findFirst.mockResolvedValueOnce(null);
-    h.findFirst.mockResolvedValueOnce(null);
-    h.create.mockResolvedValueOnce({ id: 'task-std', createdAt: new Date(), lastStatus: 'received', userId: 'victor-igboekwe' });
-    h.create.mockResolvedValueOnce({}); // approvalRequest
-    h.create.mockResolvedValueOnce({}); // action
-    
-    const req = makeReq(body);
-    const res = await intakeMarcusTask(req);
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.status).toBe('received');
+  it('rejects oversized or malformed fields', async () => {
+    expect((await post(body({ goal: 'x'.repeat(10_001) }))).status).toBe(400);
+    expect((await post(body({ sensitivity: 'secret' }))).status).toBe(400);
   });
 });
 
-describe('Marcus Approval Carry-Over', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    __mockApprovalContentHash.mockReset();
-    // Default mock to return matching hash (synchronous!)
-    __mockApprovalContentHash.mockReturnValue('computed-hash');
-  });
-
-  it('checkMarcusApproval accepts standard sensitivity', async () => {
-    h.findFirst.mockResolvedValueOnce({
-      id: 'approval-123',
-      userId: 'victor-igboekwe',
-      kind: 'tool_call',
-      tool: 'marcus_task_intake',
-      params: { client_operation_id: 'test-op-123' },
-      contentHash: 'computed-hash',
-      status: 'PENDING',
-      executedAt: null,
-      decidedAt: null,
-    });
-    h.update.mockResolvedValueOnce({});
-
-    const result = await checkMarcusApproval('victor-igboekwe', 'approval-123', 'marcus_task_intake', 'computed-hash', 'standard');
-    expect(result.allowed).toBe(true);
-    expect(result.method).toBe('human_approved');
-  });
-
-  it('checkMarcusApproval blocks financial sensitivity', async () => {
-    h.findFirst.mockResolvedValueOnce({
-      id: 'approval-123',
-      userId: 'victor-igboekwe',
-      kind: 'tool_call',
-      tool: 'marcus_task_intake',
-      params: { client_operation_id: 'test-op-123' },
-      contentHash: 'computed-hash',
-      status: 'PENDING',
-      executedAt: null,
-      decidedAt: null,
-    });
-
-    const result = await checkMarcusApproval('victor-igboekwe', 'approval-123', 'marcus_task_intake', 'computed-hash', 'financial');
-    expect(result.allowed).toBe(false);
-    expect(result.method).toBe('requires_confirmation');
-    expect(result.reason).toContain('reconfirmation');
-  });
-
-  it('checkMarcusApproval blocks proprietary sensitivity', async () => {
-    h.findFirst.mockResolvedValueOnce({
-      id: 'approval-123',
-      userId: 'victor-igboekwe',
-      kind: 'tool_call',
-      tool: 'marcus_task_intake',
-      params: { client_operation_id: 'test-op-123' },
-      contentHash: 'computed-hash',
-      status: 'PENDING',
-      executedAt: null,
-      decidedAt: null,
-    });
-
-    const result = await checkMarcusApproval('victor-igboekwe', 'approval-123', 'marcus_task_intake', 'computed-hash', 'proprietary');
-    expect(result.allowed).toBe(false);
-    expect(result.method).toBe('requires_confirmation');
-    expect(result.reason).toContain('reconfirmation');
-  });
-
-  it('checkMarcusApproval rejects replayed approval_id', async () => {
-    h.findFirst.mockResolvedValueOnce({
-      id: 'approval-123',
-      userId: 'victor-igboekwe',
-      executedAt: new Date(), // already consumed
-    });
-
-    const result = await checkMarcusApproval('victor-igboekwe', 'approval-123', 'marcus_task_intake', 'computed-hash', 'standard');
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe('Marcus approval already consumed');
-  });
-
-  it('checkMarcusApprovalReplay returns true for consumed approval', async () => {
-    h.findFirst.mockResolvedValueOnce({
-      id: 'approval-123',
-      executedAt: new Date(),
-    });
-    const replayed = await checkMarcusApprovalReplay('approval-123');
-    expect(replayed).toBe(true);
-  });
-
-  it('checkMarcusApprovalReplay returns false for unused approval', async () => {
-    h.findFirst.mockResolvedValueOnce({
-      id: 'approval-123',
-      executedAt: null,
-    });
-    const replayed = await checkMarcusApprovalReplay('approval-123');
-    expect(replayed).toBe(false);
-  });
-
-  it('checkMarcusApprovalReplay returns false for non-existent approval', async () => {
-    h.findFirst.mockResolvedValueOnce(null);
-    const replayed = await checkMarcusApprovalReplay('approval-123');
-    expect(replayed).toBe(false);
+describe('Marcus freeze', () => {
+  it('freeze pauses tasks and blocks intake with 503; unfreeze re-queues and reopens intake', async () => {
+    await post(body());
+    expect(await setMarcusFreeze('u1', true)).toEqual(['job1']);
+    expect(h.jobs.find((j) => j.id === 'job1')?.lastStatus).toBe('frozen');
+    expect((await post(body({ client_operation_id: 'op-2', approval_id: 'appr-2', title: 'B' }))).status).toBe(503);
+    expect(await setMarcusFreeze('u1', false)).toEqual(['job1']);
+    expect(h.jobs.find((j) => j.id === 'job1')?.lastStatus).toBe('received');
+    expect((await post(body({ client_operation_id: 'op-2', approval_id: 'appr-2', title: 'B' }))).status).toBe(200);
+    expect(h.ledger.map((l) => l.action)).toEqual(expect.arrayContaining(['capability_marcus_task_frozen', 'capability_marcus_task_unfrozen']));
   });
 });
 
-describe('Marcus Persona', () => {
-  it('MARCUS persona is registered in personas.ts', async () => {
+describe('Marcus approval carry-over', () => {
+  it('standard approval is consumed exactly once', async () => {
+    await post(body());
+    const row = h.approvals[0];
+    const first = await checkMarcusApproval('u1', 'appr-1', 'marcus_task_intake', row.contentHash, 'standard');
+    expect(first).toEqual({ allowed: true, method: 'human_approved' });
+    const second = await checkMarcusApproval('u1', 'appr-1', 'marcus_task_intake', row.contentHash, 'standard');
+    expect(second.allowed).toBe(false);
+  });
+
+  it('financial approval stays blocked and flagged as protected money', async () => {
+    await post(body({ sensitivity: 'financial' }));
+    const r = await checkMarcusApproval('u1', 'appr-1', 'marcus_task_intake', h.approvals[0].contentHash, 'financial');
+    expect(r).toMatchObject({ allowed: false, protected: true, category: 'money' });
+  });
+
+  it('a tampered hash is denied', async () => {
+    await post(body());
+    const r = await checkMarcusApproval('u1', 'appr-1', 'marcus_task_intake', 'deadbeef', 'standard');
+    expect(r.allowed).toBe(false);
+  });
+});
+
+describe('Marcus events', () => {
+  it('only serves events for marcus: jobs, not any ECHELON job id', async () => {
+    h.jobs.push({ id: 'ear-job', jobKey: 'ear:123', userId: 'u1', createdAt: new Date() });
+    const res = await eventsGet(new Request('http://x/api/integrations/marcus/events?task_id=ear-job', { headers: { authorization: 'Bearer tok' } }));
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('Marcus persona', () => {
+  it('is registered as a non-board intake agent', async () => {
     const { PERSONAS } = await import('@/lib/personas');
-    expect(PERSONAS.MARCUS).toBeDefined();
-    expect(PERSONAS.MARCUS.id).toBe('MARCUS');
-    expect(PERSONAS.MARCUS.title).toBe('External Intake Agent');
-    expect(PERSONAS.MARCUS.capabilities).toContain('Task Submission');
-    expect(PERSONAS.MARCUS.capabilities).toContain('Status Relay');
-    expect(PERSONAS.MARCUS.capabilities).toContain('Freeze Control');
-    expect(PERSONAS.MARCUS.isBoardMember).toBe(false);
-    expect(PERSONAS.MARCUS.reportsTo).toBe('FOUNDER');
-  });
-});
-
-describe('Marcus Host Credential', () => {
-  it('MARCUS_SERVICE_NAME is defined in hosts.ts', async () => {
-    const { MARCUS_SERVICE_NAME, requireMarcusAuth, verifyMarcusToken, hashMarcusToken } = await import('@/lib/capability/hosts');
-    expect(MARCUS_SERVICE_NAME).toBe('marcus-vale');
-    expect(typeof requireMarcusAuth).toBe('function');
-    expect(typeof verifyMarcusToken).toBe('function');
-    expect(typeof hashMarcusToken).toBe('function');
-  });
-});
-
-describe('Marcus Events Feed', () => {
-  it('route exists for /api/integrations/marcus/events', async () => {
-    const fs = await import('fs');
-    const path = '/Users/victorcheckingin/Developer/ECHELON-INTEGRATIONS/apps/web/app/api/integrations/marcus/events/route.ts';
-    expect(fs.existsSync(path)).toBe(true);
-  });
-});
-
-describe('Marcus Freeze/Unfreeze', () => {
-  it('freeze route exists', async () => {
-    const fs = await import('fs');
-    const path = '/Users/victorcheckingin/Developer/ECHELON-INTEGRATIONS/apps/web/app/api/integrations/marcus/freeze/route.ts';
-    expect(fs.existsSync(path)).toBe(true);
-  });
-
-  it('unfreeze route exists', async () => {
-    const fs = await import('fs');
-    const path = '/Users/victorcheckingin/Developer/ECHELON-INTEGRATIONS/apps/web/app/api/integrations/marcus/unfreeze/route.ts';
-    expect(fs.existsSync(path)).toBe(true);
+    expect(PERSONAS.MARCUS).toMatchObject({ id: 'MARCUS', isBoardMember: false });
   });
 });

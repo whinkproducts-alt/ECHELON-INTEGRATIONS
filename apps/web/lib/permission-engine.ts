@@ -260,11 +260,12 @@ export async function checkMarcusApproval(
   
   // For standard sensitivity, the Marcus approval is sufficient
   if (sensitivity === 'standard') {
-    // Mark as executed
-    await prisma.approvalRequest.update({
-      where: { id: approvalId },
+    // Atomic single-use: only one caller can flip executedAt from null.
+    const won = await prisma.approvalRequest.updateMany({
+      where: { id: approvalId, userId, executedAt: null },
       data: { status: 'EXECUTING', executedAt: new Date(), decidedAt: new Date() }
     });
+    if (won.count !== 1) return deny('Marcus approval already consumed');
     return { allowed: true, method: 'human_approved' };
   }
   

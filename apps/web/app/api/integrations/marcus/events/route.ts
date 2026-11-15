@@ -15,8 +15,8 @@ export async function GET(req: Request) {
   const cursor: Cursor | null = cursorParam ? decodeCursor(cursorParam) : null;
 
   // Find the task and its user
-  const task = await prisma.agentJob.findUnique({
-    where: { id: taskId },
+  const task = await prisma.agentJob.findFirst({
+    where: { id: taskId, jobKey: { startsWith: 'marcus:' } },
     select: { userId: true }
   });
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
