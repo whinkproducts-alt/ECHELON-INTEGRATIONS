@@ -12,8 +12,8 @@ Method: every line counts once, unweighted (not effort). Done = 1, Built-not-acc
 | Done | 18 | 18 |
 | Built, not accepted | 7 | 3.5 |
 | Built, connection unverified (Part 2) | 13 | 6.5 |
-| Open (Part 1: 29; Part 2: 40) | 69 | 0 |
-| **Total** | **107** | **28 → 26%** |
+| Open (Part 1: 30; Part 2: 40) | 70 | 0 |
+| **Total** | **108** | **28 → 26%** |
 
 Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except the exclusions listed in Part 2.
 
@@ -217,3 +217,14 @@ Legend note: the 13 "B" rows are the ones counted at 0.5 in the completion table
 **Tamper rule:** scoring code and scores are written by ECHELON only, from ledger rows. A scored agent cannot edit its own KPIs, targets or score.
 
 **Still to decide:** the targets and weights per role (you set them in a screen), the review period for non-subsidiary roles, and the thresholds that trigger a promotion proposal.
+| 56 | **Org structure with reporting lines**, draft in [ORG-STRUCTURE.md](ORG-STRUCTURE.md). Needs: board list, kill team list, subsidiary head names, whether the 141 named heads are real people, the Marketing data check, an agent-to-agent chain inside departments. | Open | One org table in the database seeded from the leadership and registry files. One manager per entity, no loops, chain depth checked. |
+
+### How the KPI, promotion and training system works (design)
+
+1. **Org table.** `OrgEntity`: id, kind (human, persona, agent), directorate, department, tier, manager id, status. Seeded from the two org files, never typed by hand. A check rejects loops and entities with no manager.
+2. **KPI definitions.** `Kpi`: role or entity, name, a **fixed measure code**, target, weight, period. Each measure code is one hard-coded ledger query, so nobody can define a KPI that reads anything else. Measures: task completion rate, rework rate, approval overrides, cost per task, viable ideas, revenue credit, training completion.
+3. **Scoring job.** A worker job writes `KpiScore` rows each period. Only this job writes scores. No entity can edit its own KPIs, targets or scores.
+4. **Promotion proposal.** When a score stays above a threshold for N periods, a proposal is created. It is hash-locked to its content and needs both managers' approval. If it changes access or permissions, it also needs you. It does not use the 30-second window, which belongs to Class C actions.
+5. **Reviews.** A scheduled job opens the twice-yearly subsidiary head review. WHINK and MAMBA each write their view; MAMBA's is stored as a hypothesis.
+6. **HR training.** A curriculum table, a scheduler job, completion records and a pass check per entity. Overdue mandatory training lowers the score and notifies you.
+7. **Prerequisites.** Agents must be activated first. Ideas need an author field. Contracts need a "sourced by" field and a link to the work that produced them.
