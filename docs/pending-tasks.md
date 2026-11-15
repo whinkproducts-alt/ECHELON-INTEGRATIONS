@@ -1,4 +1,20 @@
-# ECHELON pending work — updated 2026-11-12
+# ECHELON pending work — updated 2026-11-15
+
+## Update 2026-11-15 (Marcus executor, build repair)
+
+**Done:** Marcus tasks run end to end (verified over real HTTP with Marcus's own client, real worker, real Ollama; see [daily sync](daily-syncs/2026-11-15.md)); `main` builds, `tsc` 0 errors, lint 0 errors; worker roster restored; Marcus contract complete (GET, confirm, resume, SSE, lockdown); Ollama local-model check fixed; second-machine setup documented ([HARDWARE_SETUP](HARDWARE_SETUP.md)).
+
+**Open, Victor decides:**
+- Security-reviewer pass on the `proxy.ts` exemption for the Marcus bearer routes.
+- Whether Marcus tasks need attached context (documents, memory) or stay self-contained.
+- Whether to amend non-negotiable 4 to allow any agent-tier approval (the 8-tier chain was not built; see decisions).
+- Whether an SSH tunnel counts as "local" for a second machine's Ollama.
+
+**Open, engineering:**
+- Run the executor on the owner's Mac with a real account (`ENCRYPTION_KEY`, `MARCUS_BEARER_TOKEN_HASH`, `WHINK_OWNER_EMAILS`, worker running) and look at the executive screens in a browser; neither has been done.
+- One enforced local-only check across the 12 modules that enforce it, plus a call-site audit; live ordered model failover; a literal worker-kill chaos test.
+- Replace the Marcus freeze sentinel row with a table if it grows; a crash between consuming the approval and queueing the analysis ends the task `failed` (resubmit).
+- Windows: nothing has been run; backup and restore test still open (E08).
 
 ## Current Integrations sandbox handoff (2026-11-12)
 

@@ -1,3 +1,5 @@
+> **Status update 2026-11-15:** Superseded in part: Marcus tasks are now executed, and the Marcus-to-ECHELON flow has been verified over real HTTP and against a real Postgres. The foreign-key bug and the proxy exemption described later are fixed. See `HANDOFF-MARCUS-EXECUTOR.md` and `docs/daily-syncs/2026-11-15.md`.
+
 # Group A handoff — Marcus intake + dev-server unblock
 
 Branch at time of work: `feature/executive-experience` (not `feat/parallel-A-blockers`). Nothing committed or pushed.

@@ -81,7 +81,8 @@ export function FounderOffice({ userId, userEmail }: FounderOfficeProps) {
       setInitiatives(initiativesData);
       setSealedObjectives(sealedData);
       setLockdownState(lockdownData);
-    } catch (e) {
+      setError(null);
+    } catch {
       setError('Failed to load office data');
     } finally {
       setLoading(false);
@@ -248,6 +249,9 @@ export function FounderOffice({ userId, userEmail }: FounderOfficeProps) {
 
   return (
     <div className="executive-office space-y-6">
+      {error && (
+        <p role="alert" className="rounded border border-[hsl(var(--destructive)/0.4)] px-3 py-2 text-sm text-[hsl(var(--destructive))]">{error}</p>
+      )}
       {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

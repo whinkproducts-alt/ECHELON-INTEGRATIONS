@@ -1,3 +1,5 @@
+> **Status update 2026-11-15:** The listed open item "Marcus task executor" is done and verified over real HTTP with a real model. See `HANDOFF-MARCUS-EXECUTOR.md` and `docs/daily-syncs/2026-11-15.md`.
+
 # Group D handoff — autonomy: grants, local-only, dispatch
 
 Not pushed.

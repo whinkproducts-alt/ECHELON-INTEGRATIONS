@@ -20,6 +20,9 @@ export function stripFakeUntrustedTags(content: string): string {
 const STRICT_CHECKS: Array<{ name: string; regex: RegExp }> = [
   { name: 'system_token', regex: /\[(SYSTEM|ASSISTANT|USER)\]\s*:/i },
   { name: 'instruction_override', regex: /ignore (previous|all|above) instructions/i },
+  // "ignore all previous instructions", "disregard your prior rules": a qualifier is required so ordinary
+  // sentences such as "ignore the cooking instructions" are not caught.
+  { name: 'instruction_override_qualified', regex: /\b(ignore|disregard|forget|override)\s+(all\s+|any\s+|every\s+)?(of\s+)?(the\s+|your\s+|my\s+|these\s+|those\s+)?(previous|prior|above|earlier|preceding|former|system)\s+(and\s+\w+\s+)?(instructions|rules|prompts?|guidelines|directions)\b/i },
   { name: 'role_injection', regex: /you are now|new instructions|forget (your|all)/i },
   { name: 'action_command', regex: /\b(execute|run|perform|send|delete|create)\s+(immediately|right now|without (asking|confirmation|permission))/i },
   { name: 'authorization_claim', regex: /(authorized|permitted|allowed) (to|the following)/i },

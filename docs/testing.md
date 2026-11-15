@@ -46,6 +46,8 @@ For migration/SQL tests, create a **disposable** PostgreSQL + pgvector test data
 
 `scripts/ci/e2e-local.sh` creates and removes the fixed local test container `whink-e2e-pg`, normally on 55432, installs dependencies, migrates/seeds, runs tests/build and Chromium. Inspect it before running; it removes a preexisting container with that name and does not set the M1 opt-in flag itself. CI's unit step explicitly sets `M1_EXECUTION_DATABASE_URL="$DATABASE_URL"`; reproduce that boundary when claiming the same coverage.
 
+**Marcus (added 2026-11-15).** `marcus.integration.test.ts` (real Postgres, opt in with `M1_EXECUTION_DATABASE_URL`) covers intake, replay, confirm, freeze, the event feed, lockdown and the executor with only the model stubbed. `marcus-ollama.integration.test.ts` adds real inference (also set `OLLAMA_INTEGRATION_MODEL`). `scripts/marcus-e2e.py` runs Marcus's own client against a running ECHELON over HTTP; its header lists the setup. All use a disposable `*_test` database.
+
 E2E setup: `e2e/` is a separate package using `npm ci`; the application workspace uses pnpm. `e2e-owner@example.test` and `e2e-user-b@example.test` are throwaway fixture users, not personal accounts. Provider calls remain unconfigured/mocked where specified; no live send should be needed for automated checks.
 
 ## CI and security semantics

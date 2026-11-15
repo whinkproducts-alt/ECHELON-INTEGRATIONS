@@ -513,13 +513,11 @@ const EMBEDDING_DIM = parseInt(process.env.EMBEDDING_DIM ?? '768', 10);
 function validateEmbedding(raw: unknown): number[] | null {
   if (!Array.isArray(raw)) return null;
   if (raw.length !== EMBEDDING_DIM) {
-    // eslint-disable-next-line no-console
     console.warn(`[embed] dimension mismatch: got ${raw.length}, expected ${EMBEDDING_DIM}`);
     return null;
   }
   for (const v of raw) {
     if (!Number.isFinite(v)) {
-      // eslint-disable-next-line no-console
       console.warn('[embed] non-finite value in embedding vector');
       return null;
     }

@@ -198,3 +198,14 @@ Node24 Undici's synthetic multipart encoder can enqueue after readBodyCapped can
 # 2026-11-12 — Consolidation and sandbox handoff
 
 Overlapping Dependabot PRs in the two repos can request different versions of the same package; use the newer Integrations versions only after regenerating a single lockfile and checking affected code. react-resizable-panels v4 renamed the group and handle exports, requiring wrapper changes. Prisma engine download failures prevent generated-client suites and type checking; they do not prove a source regression. A local Linux build cannot certify Mac launch, Docker recovery, speech models or microphone behavior. Preserve those as explicit acceptance gates.
+
+# 2026-11-15 — Marcus executor and what real runs found
+
+- **A fake database hides foreign keys.** `Action.capabilityId` is a foreign key to `Tool.id`; putting a task id there passed every mocked test and would have failed every real Marcus call. Run the real-database suites (`M1_EXECUTION_DATABASE_URL` on a disposable `*_test` database, see `docs/testing.md`) for anything that writes the ledger.
+- **Mocked model checks hide integration bugs.** `verifyLocalAnalysisModel` needs `tensors` from Ollama's `/api/show`, which current Ollama returns only with `verbose: true`. Every local analysis was blocked on a real machine until it was run against a real model (`marcus-ollama.integration.test.ts`, opt in with `OLLAMA_INTEGRATION_MODEL`).
+- **A "FULL REPLACEMENT" commit can silently delete code.** `c4ab37b` replaced `lib/worker/roster.ts` with a stripped file and broke the worker and 24 tests. When a build is red, look for a commit that rewrote a whole file.
+- **Real-database suites share one database.** `claimDueJobs` leases every due job, so a test that calls it starves the others when files run in parallel. Lease only your own job (see `marcus.integration.test.ts`).
+- **A client component must not import server libraries.** `founder-office.tsx` imported five database-backed modules it never called; remove dead imports and talk to the API routes.
+- **Design documents describe intent, not the repo.** The code audit report reviewed a package that was never committed; most "must fix" items were already handled in the real code. Read the repo and run its tests before building from a brief.
+- **Tasks only know their own text.** Analysis runs with no tools, memory or web, so "summarise my roadmap" correctly gets a refusal. Marcus tasks must carry what to reason about unless context attachment is built.
+- **Repeat the real check:** `scripts/marcus-e2e.py` drives Marcus's own client against a running ECHELON.

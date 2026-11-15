@@ -510,3 +510,31 @@ Implementation is isolated from acceptance: model licenses, Prisma downloads, ac
 # 2026-11-12 — Integrations is the test baseline
 
 Promote reviewed sandbox changes to ECHELON-INTEGRATIONS `main` for Mac testing. Keep ECHELON-CORP separate until the owner accepts live behavior and a distinct promotion PR passes. Retain the two major upgrade holds in `docs/UPGRADE-CONSOLIDATION-2026-11-12.md`; merging version numbers without a working Prisma and TypeScript toolchain would break this baseline. The next build priority is spoken initiatives for WHINK, MAMBA and Founder-private Marcus Vale, with durable execution and existing exact approvals.
+
+## 2026-11-15  Marcus tasks run through the existing EAR executor
+
+A Marcus job drives a local, tool-free internal-analysis execution (`lib/marcus/executor.ts`, dispatched from `lib/worker/runner.ts`) and mirrors its state to the Marcus statuses. Victor's Marcus approval is consumed exactly once at admission by an atomic update. Reconfirmed financial and proprietary tasks run after their second approval as analysis only; any objective the protected-action classifier flags is refused at admission, and anything beyond analysis still goes through `checkPermission`. Task text is stored encrypted only until admission, then erased. Chosen over a second runner so leases, budget, cancellation and audit stay in one place.
+
+## 2026-11-15  Marcus bearer routes skip the login wall and CSRF
+
+`proxy.ts` lets exactly seven `/api/integrations/marcus/*` paths through (exact regex, no prefix match). Marcus's Python client sends no cookie and no `Origin`; the routes authenticate by bearer token and never read the session, so CSRF (which protects ambient cookies) does not apply. Needs a security-reviewer pass.
+
+## 2026-11-15  The 8-tier org approval chain is not built
+
+AI team leads, directors and a board approving Class C actions conflicts with non-negotiable 4 ("Class C always waits for a human") and the rule that no agent approves for Victor. The existing code was orphan files in repo-root `src/` (not compiled, not tested, importing `playwright`). To enable agent-tier approvals Victor must first amend those rules. Opt-in alternative shipped: `WHINK_TASK_GATE_ANALYSIS_AUTO=true` lets read-only directives with no side-effect word skip the approval request; default off.
+
+## 2026-11-15  Monthly spend report is in-app only
+
+`lib/notifications/deliver.ts` imported an email sender that is not exported. Exporting it would open an unapproved outbound path for ledger data. Email is reported `skipped`; the in-app notice still lands.
+
+## 2026-11-15  A second machine's Ollama is reached through an SSH tunnel
+
+Only exact loopback names count as local (`lib/local-only.ts`), so a LAN address is refused for every local analysis by design. `docs/HARDWARE_SETUP.md` documents a tunnel that keeps the endpoint on loopback and avoids exposing Ollama on the LAN. Whether a tunnel satisfies "local" is Victor's call.
+
+## 2026-11-15  Marcus freeze flag is a sentinel row (shortcut)
+
+The global Marcus freeze is stored as an `AgentJob` row (`marcus:__freeze__`) to avoid a migration. Replace with a real table if it grows.
+
+## 2026-11-15  Injection scan: qualified override phrasings
+
+`ignore (previous|all|above) instructions` did not match "ignore all previous instructions". Added a qualified pattern (a qualifier such as previous, prior, above or earlier is required) so ordinary sentences like "ignore the cooking instructions" are not caught.

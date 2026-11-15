@@ -30,10 +30,15 @@ Real Postgres (disposable container, removed afterwards; personal databases unto
 - Re-ran with the other real-database suites in parallel (ear, capability worker, capability gateway, dispatch admission): 103 passed, twice.
 - Unit: 2442 passed, 0 failed, 126 skipped (DB-gated). `tsc`: 12 errors, none in touched files. `eslint` clean.
 
-## Not verified / open
+## Verified later (2026-11-15)
 
-- **No real model.** The model call is stubbed. Run one task against your local Ollama (`DEFAULT_MODEL`/`SWARM_MODEL` set to an installed loopback model) to see real output.
-- **No Marcus-to-ECHELON run over HTTP**, and `pnpm build` not run.
-- **Injection guard**: the EAR path's output check (`scanForInjectionPatterns`) did not flag a plainly hostile reply in my probe, and the task was reported `done`. I did not change that guard. The result is returned marked untrusted and capped; Marcus must treat it as data, never as instructions.
-- Admission consumes the approval before the execution is queued. A crash in that window loses the task (it ends `failed`, resubmit). Chosen over the opposite order, which could run a task twice.
-- The worker must be running (`pnpm --filter app worker`) for any of this to execute.
+- **Real model and real HTTP, nothing mocked:** `scripts/marcus-e2e.py` drove Marcus's own client against a production build of ECHELON, the real worker and local Ollama (`wink-qwen3.5-9b-8k`), on a throwaway Postgres. Accepted, idempotent replay, admission in about 4 s, `done` in about 49 s with an untrusted result, second approval once (a repeat refused 409), freeze blocking intake (503), tampered hash refused (400), and Marcus's own SSE parser saw `received, in_progress, done` with no errors. Web and worker logs had no errors.
+- **Injection guard:** the gap found in the first version (a hostile reply reported `done`) was a pattern that missed "ignore all previous instructions". Fixed with a qualified pattern and tests that also check ordinary sentences are not flagged. The result is still returned marked untrusted and capped; Marcus must treat it as data.
+- **Build:** `next build` succeeds; `tsc` 0 errors; lint 0 errors.
+
+## Still open
+
+- Owner Mac with a real account, and the executive screens in a browser: not done.
+- Admission consumes the approval before the execution is queued. A crash in that window ends the task `failed` (resubmit). Chosen over the opposite order, which could run a task twice.
+- A task only reasons over its own text (no tools, memory or web), so "summarise my roadmap" correctly gets a refusal. Context attachment is a decision for Victor.
+- The worker must be running for tasks to execute.
