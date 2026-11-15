@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { requireMarcusAuth } from '@/lib/capability/hosts';
 import { canonicalJson, approvalContentHash } from '@/lib/canonical-json';
 import { recordAction } from '@/lib/ledger';
+import { isLockedDown } from '@/lib/safety/lockdown';
 import { isMarcusFrozen, resolveMarcusOwner, MARCUS_NEVER_RUN } from '@/lib/marcus/freeze';
 
 export interface MarcusTaskInput {
@@ -40,6 +41,7 @@ export async function intakeMarcusTask(req: Request) {
 
   const owner = await resolveMarcusOwner();
   if (!owner) return bad('Owner account is not configured (WHINK_OWNER_EMAILS)', 503);
+  if (await isLockedDown(owner.id)) return bad('Lockdown is active', 503);
   if (await isMarcusFrozen(owner.id)) return bad('Marcus tasks are frozen', 503);
 
   const jobKey = `marcus:${body.client_operation_id}`;

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createHash } from 'node:crypto';
 import { canonicalJson } from '@/lib/canonical-json';
+import { lockdownTestState } from './setup/lockdown-mock';
 
 // Real hashing, real auth, real owner lookup. Only the database and the ledger writer are faked.
 process.env.MARCUS_BEARER_TOKEN_HASH = createHash('sha256').update('tok').digest('hex');
@@ -12,7 +13,7 @@ const h = vi.hoisted(() => ({ jobs: [] as Row[], approvals: [] as Row[], scopes:
 const dup = () => Object.assign(new Error('unique'), { code: 'P2002' });
 const inList = (v: unknown, c: any) => (c?.in ? c.in.includes(v) : c === v);
 
-vi.mock('@/lib/ledger', () => ({ recordAction: vi.fn(async (e: Row) => { h.ledger.push(e); return { id: `a${h.ledger.length}` }; }) }));
+vi.mock('@/lib/ledger', () => ({ recordAction: vi.fn(async (e: Row) => { h.ledger.push({ ...e, id: `a${String(h.ledger.length + 1).padStart(3, '0')}`, createdAt: new Date(1_800_000_000_000 + h.ledger.length * 1000) }); return { id: 'x' }; }) }));
 vi.mock('@/lib/db', () => {
   const p: Row = {
     user: { findUnique: async () => (h.hasOwner ? { id: 'u1', email: 'owner@example.com' } : null) },
@@ -35,7 +36,7 @@ vi.mock('@/lib/db', () => {
         return row;
       },
       updateMany: async ({ where, data }: Row) => {
-        const hit = h.jobs.filter((j) => where.id.in.includes(j.id) && j.userId === where.userId);
+        const hit = h.jobs.filter((j) => (where.id.in ? where.id.in.includes(j.id) : where.id === j.id) && j.userId === where.userId && (where.lastStatus === undefined || inList(j.lastStatus, where.lastStatus)));
         hit.forEach((j) => Object.assign(j, data));
         return { count: hit.length };
       },
@@ -49,12 +50,19 @@ vi.mock('@/lib/db', () => {
       },
       findFirst: async ({ where }: Row) => h.approvals.find((a) => a.id === where.id && (!where.userId || a.userId === where.userId)) ?? null,
       updateMany: async ({ where, data }: Row) => {
-        const hit = h.approvals.filter((a) => a.id === where.id && a.userId === where.userId && a.executedAt === null);
+        const hit = h.approvals.filter((a) => a.id === where.id && a.userId === where.userId && (where.executedAt === undefined || a.executedAt === where.executedAt) && (where.status === undefined || a.status === where.status));
         hit.forEach((a) => Object.assign(a, data));
         return { count: hit.length };
       },
     },
     sealedScope: { create: async ({ data }: Row) => { h.scopes.push(data); return data; } },
+    action: {
+      findMany: async ({ where, take }: Row) => {
+        const after = where.AND?.[0]?.OR?.[0]?.createdAt?.gt as Date | undefined;
+        return h.ledger.filter((l) => l.userId === where.userId && where.action.in.includes(l.action) && (!after || l.createdAt > after)).slice(0, take);
+      },
+      findFirst: async ({ where }: Row) => [...h.ledger].reverse().find((l) => l.userId === where.userId && where.action.in.includes(l.action)) ?? null,
+    },
   };
   p.$transaction = async (fn: (tx: Row) => unknown) => fn(p);
   return { prisma: p };
@@ -64,6 +72,9 @@ const { intakeMarcusTask } = await import('@/lib/marcus/intake');
 const { setMarcusFreeze } = await import('@/lib/marcus/freeze');
 const { checkMarcusApproval } = await import('@/lib/permission-engine');
 const { GET: eventsGet } = await import('@/app/api/integrations/marcus/events/route');
+const { marcusEventsAfter } = await import('@/lib/marcus/feed');
+const { encodeCursor } = await import('@/lib/capability/events');
+const { confirmMarcusTask, resumeMarcusTask, getMarcusTask } = await import('@/lib/marcus/tasks');
 
 function body(over: Row = {}) {
   const b = { client_operation_id: 'op-1', title: 'Draft memo', goal: 'Summarise Q4', deadline: null, requested_for: 'victor', sensitivity: 'standard', directorate: null, ...over };
@@ -124,6 +135,12 @@ describe('Marcus intake', () => {
     expect((await post(body())).status).toBe(503);
   });
 
+  it('503 while the account is in lockdown', async () => {
+    lockdownTestState.locked = true;
+    expect((await post(body())).status).toBe(503);
+    expect(h.jobs).toHaveLength(0);
+  });
+
   it('rejects oversized or malformed fields', async () => {
     expect((await post(body({ goal: 'x'.repeat(10_001) }))).status).toBe(400);
     expect((await post(body({ sensitivity: 'secret' }))).status).toBe(400);
@@ -166,11 +183,79 @@ describe('Marcus approval carry-over', () => {
   });
 });
 
-describe('Marcus events', () => {
-  it('only serves events for marcus: jobs, not any ECHELON job id', async () => {
-    h.jobs.push({ id: 'ear-job', jobKey: 'ear:123', userId: 'u1', createdAt: new Date() });
-    const res = await eventsGet(new Request('http://x/api/integrations/marcus/events?task_id=ear-job', { headers: { authorization: 'Bearer tok' } }));
-    expect(res.status).toBe(404);
+describe('Marcus task endpoints', () => {
+  const second = (b: Row, id = 'appr-2', hash = b.approval.content_hash) => ({ approval_id: id, approved_at: '2026-11-14T00:01:00Z', method: 'voice', content_hash: hash });
+
+  it('GET returns the task Marcus created and 404 for anything else', async () => {
+    const t = await (await post(body())).json();
+    expect(await getMarcusTask('u1', t.task_id)).toMatchObject({ status: 200, body: { task_id: t.task_id, client_operation_id: 'op-1', status: 'received' } });
+    h.jobs.push({ id: 'ear-job', jobKey: 'ear:1', userId: 'u1', createdAt: new Date() });
+    expect((await getMarcusTask('u1', 'ear-job')).status).toBe(404);
+  });
+
+  it('confirm moves a financial task to received, closes the pending card, and cannot be replayed', async () => {
+    const b = body({ sensitivity: 'financial' });
+    const t = await (await post(b)).json();
+    const ok = await confirmMarcusTask('u1', t.task_id, second(b));
+    expect(ok).toMatchObject({ status: 200, body: { status: 'received' } });
+    expect(h.approvals.find((a) => a.id === 'appr-1')?.status).toBe('APPROVED');
+    expect(h.approvals.find((a) => a.id === 'appr-2')).toMatchObject({ status: 'APPROVED', permissionClass: 'C' });
+    expect(h.ledger.at(-1)).toMatchObject({ action: 'capability_marcus_task_reconfirmed' });
+    expect((await confirmMarcusTask('u1', t.task_id, second(b, 'appr-3'))).status).toBe(409);
+  });
+
+  it('confirm refuses the first approval again, a wrong hash, a standard task, and unknown tasks', async () => {
+    const b = body({ sensitivity: 'proprietary' });
+    const t = await (await post(b)).json();
+    expect((await confirmMarcusTask('u1', t.task_id, second(b, 'appr-1'))).status).toBe(400);
+    expect((await confirmMarcusTask('u1', t.task_id, second(b, 'appr-2', 'f'.repeat(64)))).status).toBe(400);
+    expect((await confirmMarcusTask('u1', t.task_id, { approval_id: 'x' })).status).toBe(400);
+    expect((await confirmMarcusTask('u1', 'nope', second(b))).status).toBe(404);
+    const std = body({ client_operation_id: 'op-9', approval_id: 'appr-9' });
+    const s = await (await post(std)).json();
+    expect((await confirmMarcusTask('u1', s.task_id, second(std, 'appr-10'))).status).toBe(409);
+  });
+
+  it('a replayed second approval id gets 409 and leaves the task waiting', async () => {
+    const b = body({ sensitivity: 'financial' });
+    const t = await (await post(b)).json();
+    expect((await confirmMarcusTask('u1', t.task_id, second(b, 'appr-1'))).status).toBe(400);
+    expect(h.jobs.find((j) => j.id === t.task_id)?.lastStatus).toBe('reconfirmation_required');
+  });
+
+  it('resume only works on a blocked or paused task', async () => {
+    const t = await (await post(body())).json();
+    expect((await resumeMarcusTask('u1', t.task_id)).status).toBe(409);
+    h.jobs.find((j) => j.id === t.task_id)!.lastStatus = 'blocked';
+    expect(await resumeMarcusTask('u1', t.task_id)).toMatchObject({ status: 200, body: { status: 'received' } });
+  });
+});
+
+describe('Marcus event feed', () => {
+  it('emits {task_id, status} for each change, in order, and resumes after a cursor', async () => {
+    const a = await (await post(body())).json();
+    const f = await (await post(body({ client_operation_id: 'op-2', approval_id: 'appr-2', title: 'Pay', sensitivity: 'financial' }))).json();
+    await setMarcusFreeze('u1', true);
+    const all = await marcusEventsAfter('u1', null);
+    expect(all.map((e) => (e.data as Row).status)).toEqual(['received', 'reconfirmation_required', 'frozen', 'frozen']);
+    expect((all[0].data as Row).task_id).toBe(a.task_id);
+    expect((all[1].data as Row).task_id).toBe(f.task_id);
+    const { decodeCursor } = await import('@/lib/capability/events');
+    const after = await marcusEventsAfter('u1', decodeCursor(all[1].id));
+    expect(after.map((e) => (e.data as Row).status)).toEqual(['frozen', 'frozen']);
+  });
+
+  it('SSE route needs the bearer and streams id/event/data frames Marcus can parse', async () => {
+    expect((await eventsGet(new Request('http://x/api/integrations/marcus/events'))).status).toBe(401);
+    await post(body());
+    const ac = new AbortController();
+    const res = await eventsGet(new Request(`http://x/api/integrations/marcus/events?cursor=${encodeCursor({ createdAt: 1, id: 'a' })}`, { headers: { authorization: 'Bearer tok' }, signal: ac.signal }));
+    expect(res.headers.get('content-type')).toBe('text/event-stream');
+    const reader = res.body!.getReader();
+    let text = '';
+    while (!text.includes('data:')) text += new TextDecoder().decode((await reader.read()).value);
+    ac.abort();
+    expect(text).toMatch(/id: \S+\nevent: task_received\ndata: \{"task_id":"job1","status":"received"/);
   });
 });
 

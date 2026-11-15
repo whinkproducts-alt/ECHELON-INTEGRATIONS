@@ -24,6 +24,8 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
   return res;
 });
 
+const MARCUS_ROUTE = /^\/api\/integrations\/marcus\/(tasks(\/[A-Za-z0-9]{1,64}(\/(confirm|resume))?)?|events|freeze|unfreeze)$/;
+
 async function handle(req: NextRequest & { auth: any }, nonce: string, csp: string): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
   // Next reads the nonce from the request's CSP header and stamps it on its own scripts.
@@ -33,6 +35,10 @@ async function handle(req: NextRequest & { auth: any }, nonce: string, csp: stri
     requestHeaders.set('Content-Security-Policy', csp);
     return NextResponse.next({ request: { headers: requestHeaders } });
   };
+
+  // Marcus service routes authenticate by bearer token inside the route and never read the session cookie,
+  // so neither the login wall nor CSRF (which protects ambient cookies) applies. Exact allowlist, no prefix match.
+  if (MARCUS_ROUTE.test(pathname)) return passThrough();
 
   // M1: CSRF guard for state-changing /api calls, before any other work.
   const csrf = checkCsrf({

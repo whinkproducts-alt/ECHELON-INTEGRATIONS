@@ -33,6 +33,24 @@ describe('proxy public paths', () => {
     }
   });
 
+  it('Marcus bearer routes skip the login wall and CSRF, and nothing near them does', async () => {
+    const bare = (path: string, method: string) => {
+      const r: any = new NextRequest(`http://localhost${path}`, { method }); // no Origin, no Sec-Fetch-Site, like a Python client
+      r.auth = null;
+      return (proxy as any)(r) as Promise<Response>;
+    };
+    for (const [path, method] of [['/api/integrations/marcus/tasks', 'POST'], ['/api/integrations/marcus/tasks/abc123', 'GET'], ['/api/integrations/marcus/tasks/abc123/confirm', 'POST'], ['/api/integrations/marcus/tasks/abc123/resume', 'POST'], ['/api/integrations/marcus/events', 'GET'], ['/api/integrations/marcus/freeze', 'POST'], ['/api/integrations/marcus/unfreeze', 'POST']]) {
+      const res = await bare(path, method);
+      expect(res.status, `${method} ${path}`).toBe(200);
+      expect(res.headers.get('location')).toBeNull();
+    }
+    for (const path of ['/api/integrations/marcus', '/api/integrations/marcus/other', '/api/integrations/marcus/tasks/a/b/c', '/api/integrations/marcus/tasks/..%2Fgrants', '/api/integrations/providers']) {
+      const res = await bare(path, 'GET');
+      expect(res.status, path).toBe(307);
+    }
+    expect((await bare('/api/integrations/providers', 'POST')).status).toBe(403);
+  });
+
   it('signed-in visitor to / passes through', async () => {
     expect((await run('/', true)).headers.get('location')).toBeNull();
   });
