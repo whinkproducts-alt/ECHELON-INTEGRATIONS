@@ -4,7 +4,7 @@
     "name": "Office of the CEO & Executive Operations Core",
     "directorate": "Executive Office & Corporate Strategy",
     "department": "Office of the CEO & Executive Operations",
-    "department_head": "Whitney Brown",
+    "department_head": "Marcus Vale",
     "mission": "Primary execution and advisory team for Office of the CEO & Executive Operations.",
     "core_skills": [
       "executive_briefing",
@@ -46,7 +46,7 @@
     "name": "Corporate Development & Strategic Investments Core",
     "directorate": "Executive Office & Corporate Strategy",
     "department": "Corporate Development & Strategic Investments",
-    "department_head": "Tosin (Suki) Suara",
+    "department_head": "Tosin Suara",
     "mission": "Primary execution and advisory team for Corporate Development & Strategic Investments.",
     "core_skills": [
       "deal_screening",
@@ -751,7 +751,7 @@
     "name": "Enterprise Sales Core",
     "directorate": "Sales & Revenue",
     "department": "Enterprise Sales",
-    "department_head": "Ijie Alpha",
+    "department_head": "Adebowale Osei",
     "mission": "Primary execution and advisory team for Enterprise Sales.",
     "core_skills": [
       "enterprise_sales_strategy",
@@ -1213,7 +1213,7 @@
     "name": "Technical Documentation & Engineering Knowledge Core",
     "directorate": "Engineering & Technology",
     "department": "Technical Documentation & Engineering Knowledge",
-    "department_head": "Leila Haddad",
+    "department_head": "Priscilla Oduya",
     "mission": "Primary execution and advisory team for Technical Documentation & Engineering Knowledge.",
     "core_skills": [
       "technical_writing",
@@ -1294,7 +1294,7 @@
     "name": "Machine Learning & Model Development Core",
     "directorate": "Data & Artificial Intelligence",
     "department": "Machine Learning & Model Development",
-    "department_head": "Dr. Priyanka Rao",
+    "department_head": "Dr Priyanka Rao",
     "mission": "Primary execution and advisory team for Machine Learning & Model Development.",
     "core_skills": [
       "machine_learning",
@@ -1374,7 +1374,7 @@
     "name": "Data Science & Decision Intelligence Core",
     "directorate": "Data & Artificial Intelligence",
     "department": "Data Science & Decision Intelligence",
-    "department_head": "Dr. Sofia Petrovic",
+    "department_head": "Dr Sofia Petrovic",
     "mission": "Primary execution and advisory team for Data Science & Decision Intelligence.",
     "core_skills": [
       "statistical_modeling",
@@ -1475,7 +1475,7 @@
     "name": "Applied Research Core",
     "directorate": "Research & Development",
     "department": "Applied Research",
-    "department_head": "Dr. Tendai Muchengeti",
+    "department_head": "Dr Tendai Muchengeti",
     "mission": "Primary execution and advisory team for Applied Research.",
     "core_skills": [
       "applied_research",
@@ -1533,7 +1533,7 @@
     "name": "AI & Autonomous Systems Research Core",
     "directorate": "Research & Development",
     "department": "AI & Autonomous Systems Research",
-    "department_head": "Dr. Samira Qureshi",
+    "department_head": "Dr Kolade Adewumi",
     "mission": "Primary execution and advisory team for AI & Autonomous Systems Research.",
     "core_skills": [
       "autonomous_agents_research",
@@ -1552,7 +1552,7 @@
     "name": "Human–Computer Interaction & Future Interfaces Core",
     "directorate": "Research & Development",
     "department": "Human–Computer Interaction & Future Interfaces",
-    "department_head": "Freja Lindholm",
+    "department_head": "Zara Osei-Bonsu",
     "mission": "Primary execution and advisory team for Human–Computer Interaction & Future Interfaces.",
     "core_skills": [
       "hci_research",
@@ -1572,7 +1572,7 @@
     "name": "Advanced Computing & Systems Research Core",
     "directorate": "Research & Development",
     "department": "Advanced Computing & Systems Research",
-    "department_head": "Dr. Kwame Asante",
+    "department_head": "Dr Kwame Asante",
     "mission": "Primary execution and advisory team for Advanced Computing & Systems Research.",
     "core_skills": [
       "distributed_systems_research",
@@ -1591,7 +1591,7 @@
     "name": "Research Partnerships & Academic Collaboration Core",
     "directorate": "Research & Development",
     "department": "Research Partnerships & Academic Collaboration",
-    "department_head": "Claire Dubois",
+    "department_head": "Beatriz Cavalcanti",
     "mission": "Primary execution and advisory team for Research Partnerships & Academic Collaboration.",
     "core_skills": [
       "research_partnerships",
@@ -1629,7 +1629,7 @@
     "name": "Intellectual Property Discovery & Invention Management Core",
     "directorate": "Research & Development",
     "department": "Intellectual Property Discovery & Invention Management",
-    "department_head": "Noura Al-Mansouri",
+    "department_head": "Roksana Wiśniewska",
     "mission": "Primary execution and advisory team for Intellectual Property Discovery & Invention Management.",
     "core_skills": [
       "invention_capture",
@@ -1648,7 +1648,7 @@
     "name": "Research Intelligence & Scientific Foresight Core",
     "directorate": "Research & Development",
     "department": "Research Intelligence & Scientific Foresight",
-    "department_head": "Dr. Ji-won Seo",
+    "department_head": "Adaeze Okonkwo",
     "mission": "Primary execution and advisory team for Research Intelligence & Scientific Foresight.",
     "core_skills": [
       "literature_review",
@@ -1686,7 +1686,7 @@
     "name": "End-User Computing & Workplace Technology Core",
     "directorate": "Information Technology",
     "department": "End-User Computing & Workplace Technology",
-    "department_head": "Yuki Tanaka",
+    "department_head": "Daisuke Yamamoto",
     "mission": "Primary execution and advisory team for End-User Computing & Workplace Technology.",
     "core_skills": [
       "endpoint_management",
@@ -1840,7 +1840,7 @@
     "name": "IT Architecture & Technology Standards Core",
     "directorate": "Information Technology",
     "department": "IT Architecture & Technology Standards",
-    "department_head": "Dr. Elise van der Meer",
+    "department_head": "Dr Elise van der Meer",
     "mission": "Primary execution and advisory team for IT Architecture & Technology Standards.",
     "core_skills": [
       "it_architecture",
@@ -1859,7 +1859,7 @@
     "name": "Security Operations & Incident Response Core",
     "directorate": "Cybersecurity & Resilience",
     "department": "Security Operations & Incident Response",
-    "department_head": "Marcus Lund",
+    "department_head": "Wanjiru Kamau",
     "mission": "Primary execution and advisory team for Security Operations & Incident Response.",
     "core_skills": [
       "soc_operations",
@@ -1898,7 +1898,7 @@
     "name": "Identity Security & Privileged Access Core",
     "directorate": "Cybersecurity & Resilience",
     "department": "Identity Security & Privileged Access",
-    "department_head": "Camille Tremblay",
+    "department_head": "Abosede Fashola",
     "mission": "Primary execution and advisory team for Identity Security & Privileged Access.",
     "core_skills": [
       "iam_security",
@@ -1975,7 +1975,7 @@
     "name": "Security Architecture Core",
     "directorate": "Cybersecurity & Resilience",
     "department": "Security Architecture",
-    "department_head": "Dr. Miriam Kessler",
+    "department_head": "Dr Miriam Kessler",
     "mission": "Primary execution and advisory team for Security Architecture.",
     "core_skills": [
       "security_architecture",
@@ -2013,7 +2013,7 @@
     "name": "Data Security & Information Protection Core",
     "directorate": "Cybersecurity & Resilience",
     "department": "Data Security & Information Protection",
-    "department_head": "Noor Al-Khatib",
+    "department_head": "Funmilayo Okoye",
     "mission": "Primary execution and advisory team for Data Security & Information Protection.",
     "core_skills": [
       "data_security",
@@ -2189,7 +2189,7 @@
     "name": "Billing, Accounts Receivable & Accounts Payable Core",
     "directorate": "Finance & Accounting",
     "department": "Billing, Accounts Receivable & Accounts Payable",
-    "department_head": "Camila Ferreira",
+    "department_head": "Mariana Figueiredo",
     "mission": "Primary execution and advisory team for Billing, Accounts Receivable & Accounts Payable.",
     "core_skills": [
       "billing",
@@ -2286,7 +2286,7 @@
     "name": "Intellectual Property & Technology Legal Core",
     "directorate": "Legal, Risk & Governance",
     "department": "Intellectual Property & Technology Legal",
-    "department_head": "Dr. Lucía Herrera",
+    "department_head": "Dr Lucía Herrera",
     "mission": "Primary execution and advisory team for Intellectual Property & Technology Legal.",
     "core_skills": [
       "ip_law",
@@ -2306,7 +2306,7 @@
     "name": "Employment Legal Core",
     "directorate": "Legal, Risk & Governance",
     "department": "Employment Legal",
-    "department_head": "Daniel Cho",
+    "department_head": "Rasheed Olawale",
     "mission": "Primary execution and advisory team for Employment Legal.",
     "core_skills": [
       "employment_law",
@@ -2325,7 +2325,7 @@
     "name": "Privacy & Data Protection Core",
     "directorate": "Legal, Risk & Governance",
     "department": "Privacy & Data Protection",
-    "department_head": "Amélie Laurent",
+    "department_head": "Yewande Oyelaran",
     "mission": "Primary execution and advisory team for Privacy & Data Protection.",
     "core_skills": [
       "privacy_law",
@@ -2573,7 +2573,7 @@
     "name": "People Analytics Core",
     "directorate": "People & Culture",
     "department": "People Analytics",
-    "department_head": "Elena Popescu",
+    "department_head": "Adaora Nwosu",
     "mission": "Primary execution and advisory team for People Analytics.",
     "core_skills": [
       "people_analytics",
@@ -2592,7 +2592,7 @@
     "name": "AI Workforce & Organizational Intelligence Core",
     "directorate": "People & Culture",
     "department": "AI Workforce & Organizational Intelligence",
-    "department_head": "Dr. Maya Kilonzo",
+    "department_head": "Dr Maya Kilonzo",
     "mission": "Primary execution and advisory team for AI Workforce & Organizational Intelligence.",
     "core_skills": [
       "agent_workforce_registry",
@@ -2726,7 +2726,7 @@
     "name": "Quality Management Core",
     "directorate": "Operations & Procurement",
     "department": "Quality Management",
-    "department_head": "Dr. Eva Horváth",
+    "department_head": "Dr Eva Horváth",
     "mission": "Primary execution and advisory team for Quality Management.",
     "core_skills": [
       "quality_management",
@@ -2802,7 +2802,7 @@
     "name": "Professional Services Core",
     "directorate": "Customer Organization",
     "department": "Professional Services",
-    "department_head": "Aiko Fujimoto",
+    "department_head": "Oluwakemi Abiodun",
     "mission": "Primary execution and advisory team for Professional Services.",
     "core_skills": [
       "consulting_delivery",
@@ -2935,7 +2935,7 @@
     "name": "Technology Audit Core",
     "directorate": "Internal Audit & Assurance",
     "department": "Technology Audit",
-    "department_head": "Dr. Marcus Chen",
+    "department_head": "Dr Marcus Chen",
     "mission": "Primary execution and advisory team for Technology Audit.",
     "core_skills": [
       "technology_audit",
@@ -2954,7 +2954,7 @@
     "name": "Cybersecurity Assurance Core",
     "directorate": "Internal Audit & Assurance",
     "department": "Cybersecurity Assurance",
-    "department_head": "Leila Haddad-Sayegh",
+    "department_head": "Taiwo Adegboyega",
     "mission": "Primary execution and advisory team for Cybersecurity Assurance.",
     "core_skills": [
       "cyber_assurance",
@@ -3029,13 +3029,118 @@
     "name": "AI Systems & Agent Governance Audit Core",
     "directorate": "Internal Audit & Assurance",
     "department": "AI Systems & Agent Governance Audit",
-    "department_head": "Dr. Kojo Mensima",
+    "department_head": "Dr Kojo Mensima",
     "mission": "Primary execution and advisory team for AI Systems & Agent Governance Audit.",
     "core_skills": [
       "ai_audit",
       "agent_governance_audit",
       "model_risk_assurance",
       "ai_control_testing",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "ai_organization_autonomous_operations.autonomous_agent_deployment_lifecycle.autonomous_agent_deployment_lifecycle_core",
+    "name": "Autonomous Agent Deployment & Lifecycle Core",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "Autonomous Agent Deployment & Lifecycle",
+    "department_head": "Chidera Okafor",
+    "mission": "Primary execution and advisory team for Autonomous Agent Deployment & Lifecycle.",
+    "core_skills": [
+      "agent_lifecycle",
+      "deployment_coordination",
+      "agent_registry",
+      "agent_autonomy",
+      "agent_workforce_registry",
+      "agent_capability_mapping",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "ai_organization_autonomous_operations.ai_workforce_orchestration_dispatch.ai_workforce_orchestration_dispatch_core",
+    "name": "AI Workforce Orchestration & Dispatch Core",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "AI Workforce Orchestration & Dispatch",
+    "department_head": "Zuberi Okonjo",
+    "mission": "Primary execution and advisory team for AI Workforce Orchestration & Dispatch.",
+    "core_skills": [
+      "multi_agent_orchestration",
+      "delegation_design",
+      "agent_capability_mapping",
+      "agent_utilization",
+      "escalation_management",
+      "agent_registry",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "ai_organization_autonomous_operations.agent_performance_continuous_learning.agent_performance_continuous_learning_core",
+    "name": "Agent Performance & Continuous Learning Core",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "Agent Performance & Continuous Learning",
+    "department_head": "Ngozi Udeh",
+    "mission": "Primary execution and advisory team for Agent Performance & Continuous Learning.",
+    "core_skills": [
+      "agent_observability",
+      "performance_analysis",
+      "model_evaluation",
+      "drift_monitoring",
+      "learning_design",
+      "agent_utilization",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "ai_organization_autonomous_operations.human_ai_collaboration_oversight.human_ai_collaboration_oversight_core",
+    "name": "Human-AI Collaboration & Oversight Core",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "Human-AI Collaboration & Oversight",
+    "department_head": "Obinna Chukwu",
+    "mission": "Primary execution and advisory team for Human-AI Collaboration & Oversight.",
+    "core_skills": [
+      "human_ai_interaction",
+      "agent_governance",
+      "escalation_management",
+      "decision_tracking",
+      "compliance_monitoring",
+      "agent_autonomy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "ai_organization_autonomous_operations.autonomous_operations_governance_safety.autonomous_operations_governance_safety_core",
+    "name": "Autonomous Operations Governance & Safety Core",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "Autonomous Operations Governance & Safety",
+    "department_head": "Dr Oluwaseun Adebayo",
+    "mission": "Primary execution and advisory team for Autonomous Operations Governance & Safety.",
+    "core_skills": [
+      "agent_governance_audit",
+      "agent_governance",
+      "incident_management",
+      "compliance_monitoring",
+      "ai_auditability",
+      "agent_autonomy",
       "web_research",
       "source_verification",
       "quality_review"

@@ -239,7 +239,7 @@ describe.skipIf(!enabled)('M1 real database execution', () => {
   it('preserves roster counts/bytes and denies private, retired, suspended and unknown assignees', async () => {
     const kit = await getOrgKit();
     expect(kit.agents).toHaveLength(326); expect(kit.teams).toHaveLength(163);
-    expect(new Set(kit.agents.map((a) => a.directorate)).size).toBe(15);
+    expect(new Set(kit.agents.map((a) => a.directorate)).size).toBe(16);
     const original = kit.agents[0];
     for (const state of ['suspended', 'retired'] as const) expect(() => admittedAgents(ear, [{ ...original, state }])).toThrow();
     for (const label of ['founder_sealed', 'founder_private', 'kill_team']) expect(() => admittedAgents(ear, [{ ...original, data_access: [label] }])).toThrow();

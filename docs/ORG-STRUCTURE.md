@@ -75,4 +75,4 @@ Source: `docs/product/Whink-Group-Roster.html`, supplied by Victor. **Where it d
 
 ### Org-kit files updated to the roster (same day)
 `whink_group_leadership.json` and `.yaml` now hold 16 directorates, 132 departments, department heads and team leads, the board of 8, the 5 subsidiary heads and the 5-member kill team. 60 agents now report to the roster's department head, and the 2 agents (1 team) in HR Business Partnering moved from People & Culture to Executive Office. Existing department names were kept where the roster only abbreviates them, so agent ids and routing are unchanged.
-**Not done:** D16 and the new D01 department "People Operations & HR Strategy" have no agents (registry stays at 326; the roster says about 338). Nobody can be routed work there until agents are written for them.
+**Added (same day):** 10 agents and 5 teams for D16, so the registry now holds 336 agents and 168 teams. Principal Specialists use the roster's team-lead names; the five Analyst & Reviewer names are placeholders I chose, not from the roster. **Still missing:** agents for the new D01 department "People Operations & HR Strategy" (2 more would reach the roster's ~338).

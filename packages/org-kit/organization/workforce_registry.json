@@ -17728,5 +17728,575 @@
     ],
     "provider_binding": null,
     "cost_profile": "low"
+  },
+  {
+    "agent_id": "ai_organization_autonomous_operations.autonomous_agent_deployment_lifecycle.autonomous_agent_deployment_lifecycle_core.nkem_eze",
+    "name": "Nkem Eze",
+    "title": "Principal Specialist — Autonomous Agent Deployment & Lifecycle",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "Autonomous Agent Deployment & Lifecycle",
+    "team": "Autonomous Agent Deployment & Lifecycle Core",
+    "reports_to_human": "Chidera Okafor",
+    "mission": "Support Autonomous Agent Deployment & Lifecycle with approved, evidence-based work.",
+    "responsibilities": [
+      "agent_lifecycle",
+      "deployment_coordination",
+      "agent_registry",
+      "agent_autonomy",
+      "agent_workforce_registry"
+    ],
+    "skills": [
+      "agent_lifecycle",
+      "deployment_coordination",
+      "agent_registry",
+      "agent_autonomy",
+      "agent_workforce_registry",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "tools": [],
+    "data_access": [
+      "minimum_required_by_task"
+    ],
+    "permissions": [
+      "advice",
+      "draft",
+      "prepare"
+    ],
+    "autonomy_level": 2,
+    "state": "dormant",
+    "human_approval_required_for": [
+      "task_start",
+      "public_action",
+      "financial_commitment",
+      "material_memory_write"
+    ],
+    "completion_criteria": [
+      "approved_scope_complete",
+      "quality_checks_passed",
+      "handoff_ready"
+    ],
+    "kpis": [
+      "accuracy",
+      "quality",
+      "cycle_time",
+      "reuse_rate"
+    ],
+    "provider_binding": null,
+    "cost_profile": "medium"
+  },
+  {
+    "agent_id": "ai_organization_autonomous_operations.autonomous_agent_deployment_lifecycle.autonomous_agent_deployment_lifecycle_core.kofi_mensah_adu",
+    "name": "Kofi Mensah-Adu",
+    "title": "Analyst & Reviewer — Autonomous Agent Deployment & Lifecycle",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "Autonomous Agent Deployment & Lifecycle",
+    "team": "Autonomous Agent Deployment & Lifecycle Core",
+    "reports_to_human": "Chidera Okafor",
+    "mission": "Support Autonomous Agent Deployment & Lifecycle with approved, evidence-based work.",
+    "responsibilities": [
+      "agent_lifecycle",
+      "deployment_coordination",
+      "agent_registry",
+      "agent_autonomy",
+      "agent_workforce_registry"
+    ],
+    "skills": [
+      "agent_lifecycle",
+      "deployment_coordination",
+      "agent_registry",
+      "agent_autonomy",
+      "agent_workforce_registry",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "tools": [],
+    "data_access": [
+      "minimum_required_by_task"
+    ],
+    "permissions": [
+      "advice",
+      "draft",
+      "prepare"
+    ],
+    "autonomy_level": 2,
+    "state": "dormant",
+    "human_approval_required_for": [
+      "task_start",
+      "public_action",
+      "financial_commitment",
+      "material_memory_write"
+    ],
+    "completion_criteria": [
+      "approved_scope_complete",
+      "quality_checks_passed",
+      "handoff_ready"
+    ],
+    "kpis": [
+      "accuracy",
+      "quality",
+      "cycle_time",
+      "reuse_rate"
+    ],
+    "provider_binding": null,
+    "cost_profile": "low"
+  },
+  {
+    "agent_id": "ai_organization_autonomous_operations.ai_workforce_orchestration_dispatch.ai_workforce_orchestration_dispatch_core.ayodele_bankole",
+    "name": "Ayodele Bankole",
+    "title": "Principal Specialist — AI Workforce Orchestration & Dispatch",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "AI Workforce Orchestration & Dispatch",
+    "team": "AI Workforce Orchestration & Dispatch Core",
+    "reports_to_human": "Zuberi Okonjo",
+    "mission": "Support AI Workforce Orchestration & Dispatch with approved, evidence-based work.",
+    "responsibilities": [
+      "multi_agent_orchestration",
+      "delegation_design",
+      "agent_capability_mapping",
+      "agent_utilization",
+      "escalation_management"
+    ],
+    "skills": [
+      "multi_agent_orchestration",
+      "delegation_design",
+      "agent_capability_mapping",
+      "agent_utilization",
+      "escalation_management",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "tools": [],
+    "data_access": [
+      "minimum_required_by_task"
+    ],
+    "permissions": [
+      "advice",
+      "draft",
+      "prepare"
+    ],
+    "autonomy_level": 2,
+    "state": "dormant",
+    "human_approval_required_for": [
+      "task_start",
+      "public_action",
+      "financial_commitment",
+      "material_memory_write"
+    ],
+    "completion_criteria": [
+      "approved_scope_complete",
+      "quality_checks_passed",
+      "handoff_ready"
+    ],
+    "kpis": [
+      "accuracy",
+      "quality",
+      "cycle_time",
+      "reuse_rate"
+    ],
+    "provider_binding": null,
+    "cost_profile": "medium"
+  },
+  {
+    "agent_id": "ai_organization_autonomous_operations.ai_workforce_orchestration_dispatch.ai_workforce_orchestration_dispatch_core.sana_qureshi",
+    "name": "Sana Qureshi",
+    "title": "Analyst & Reviewer — AI Workforce Orchestration & Dispatch",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "AI Workforce Orchestration & Dispatch",
+    "team": "AI Workforce Orchestration & Dispatch Core",
+    "reports_to_human": "Zuberi Okonjo",
+    "mission": "Support AI Workforce Orchestration & Dispatch with approved, evidence-based work.",
+    "responsibilities": [
+      "multi_agent_orchestration",
+      "delegation_design",
+      "agent_capability_mapping",
+      "agent_utilization",
+      "escalation_management"
+    ],
+    "skills": [
+      "multi_agent_orchestration",
+      "delegation_design",
+      "agent_capability_mapping",
+      "agent_utilization",
+      "escalation_management",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "tools": [],
+    "data_access": [
+      "minimum_required_by_task"
+    ],
+    "permissions": [
+      "advice",
+      "draft",
+      "prepare"
+    ],
+    "autonomy_level": 2,
+    "state": "dormant",
+    "human_approval_required_for": [
+      "task_start",
+      "public_action",
+      "financial_commitment",
+      "material_memory_write"
+    ],
+    "completion_criteria": [
+      "approved_scope_complete",
+      "quality_checks_passed",
+      "handoff_ready"
+    ],
+    "kpis": [
+      "accuracy",
+      "quality",
+      "cycle_time",
+      "reuse_rate"
+    ],
+    "provider_binding": null,
+    "cost_profile": "low"
+  },
+  {
+    "agent_id": "ai_organization_autonomous_operations.agent_performance_continuous_learning.agent_performance_continuous_learning_core.ifedayo_omotade",
+    "name": "Ifedayo Omotade",
+    "title": "Principal Specialist — Agent Performance & Continuous Learning",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "Agent Performance & Continuous Learning",
+    "team": "Agent Performance & Continuous Learning Core",
+    "reports_to_human": "Ngozi Udeh",
+    "mission": "Support Agent Performance & Continuous Learning with approved, evidence-based work.",
+    "responsibilities": [
+      "agent_observability",
+      "performance_analysis",
+      "model_evaluation",
+      "drift_monitoring",
+      "learning_design"
+    ],
+    "skills": [
+      "agent_observability",
+      "performance_analysis",
+      "model_evaluation",
+      "drift_monitoring",
+      "learning_design",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "tools": [],
+    "data_access": [
+      "minimum_required_by_task"
+    ],
+    "permissions": [
+      "advice",
+      "draft",
+      "prepare"
+    ],
+    "autonomy_level": 2,
+    "state": "dormant",
+    "human_approval_required_for": [
+      "task_start",
+      "public_action",
+      "financial_commitment",
+      "material_memory_write"
+    ],
+    "completion_criteria": [
+      "approved_scope_complete",
+      "quality_checks_passed",
+      "handoff_ready"
+    ],
+    "kpis": [
+      "accuracy",
+      "quality",
+      "cycle_time",
+      "reuse_rate"
+    ],
+    "provider_binding": null,
+    "cost_profile": "medium"
+  },
+  {
+    "agent_id": "ai_organization_autonomous_operations.agent_performance_continuous_learning.agent_performance_continuous_learning_core.tom_s_ibarra",
+    "name": "Tomás Ibarra",
+    "title": "Analyst & Reviewer — Agent Performance & Continuous Learning",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "Agent Performance & Continuous Learning",
+    "team": "Agent Performance & Continuous Learning Core",
+    "reports_to_human": "Ngozi Udeh",
+    "mission": "Support Agent Performance & Continuous Learning with approved, evidence-based work.",
+    "responsibilities": [
+      "agent_observability",
+      "performance_analysis",
+      "model_evaluation",
+      "drift_monitoring",
+      "learning_design"
+    ],
+    "skills": [
+      "agent_observability",
+      "performance_analysis",
+      "model_evaluation",
+      "drift_monitoring",
+      "learning_design",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "tools": [],
+    "data_access": [
+      "minimum_required_by_task"
+    ],
+    "permissions": [
+      "advice",
+      "draft",
+      "prepare"
+    ],
+    "autonomy_level": 2,
+    "state": "dormant",
+    "human_approval_required_for": [
+      "task_start",
+      "public_action",
+      "financial_commitment",
+      "material_memory_write"
+    ],
+    "completion_criteria": [
+      "approved_scope_complete",
+      "quality_checks_passed",
+      "handoff_ready"
+    ],
+    "kpis": [
+      "accuracy",
+      "quality",
+      "cycle_time",
+      "reuse_rate"
+    ],
+    "provider_binding": null,
+    "cost_profile": "low"
+  },
+  {
+    "agent_id": "ai_organization_autonomous_operations.human_ai_collaboration_oversight.human_ai_collaboration_oversight_core.chiamaka_nwachukwu",
+    "name": "Chiamaka Nwachukwu",
+    "title": "Principal Specialist — Human-AI Collaboration & Oversight",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "Human-AI Collaboration & Oversight",
+    "team": "Human-AI Collaboration & Oversight Core",
+    "reports_to_human": "Obinna Chukwu",
+    "mission": "Support Human-AI Collaboration & Oversight with approved, evidence-based work.",
+    "responsibilities": [
+      "human_ai_interaction",
+      "agent_governance",
+      "escalation_management",
+      "decision_tracking",
+      "compliance_monitoring"
+    ],
+    "skills": [
+      "human_ai_interaction",
+      "agent_governance",
+      "escalation_management",
+      "decision_tracking",
+      "compliance_monitoring",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "tools": [],
+    "data_access": [
+      "minimum_required_by_task"
+    ],
+    "permissions": [
+      "advice",
+      "draft",
+      "prepare"
+    ],
+    "autonomy_level": 2,
+    "state": "dormant",
+    "human_approval_required_for": [
+      "task_start",
+      "public_action",
+      "financial_commitment",
+      "material_memory_write"
+    ],
+    "completion_criteria": [
+      "approved_scope_complete",
+      "quality_checks_passed",
+      "handoff_ready"
+    ],
+    "kpis": [
+      "accuracy",
+      "quality",
+      "cycle_time",
+      "reuse_rate"
+    ],
+    "provider_binding": null,
+    "cost_profile": "medium"
+  },
+  {
+    "agent_id": "ai_organization_autonomous_operations.human_ai_collaboration_oversight.human_ai_collaboration_oversight_core.yuki_tanabe",
+    "name": "Yuki Tanabe",
+    "title": "Analyst & Reviewer — Human-AI Collaboration & Oversight",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "Human-AI Collaboration & Oversight",
+    "team": "Human-AI Collaboration & Oversight Core",
+    "reports_to_human": "Obinna Chukwu",
+    "mission": "Support Human-AI Collaboration & Oversight with approved, evidence-based work.",
+    "responsibilities": [
+      "human_ai_interaction",
+      "agent_governance",
+      "escalation_management",
+      "decision_tracking",
+      "compliance_monitoring"
+    ],
+    "skills": [
+      "human_ai_interaction",
+      "agent_governance",
+      "escalation_management",
+      "decision_tracking",
+      "compliance_monitoring",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "tools": [],
+    "data_access": [
+      "minimum_required_by_task"
+    ],
+    "permissions": [
+      "advice",
+      "draft",
+      "prepare"
+    ],
+    "autonomy_level": 2,
+    "state": "dormant",
+    "human_approval_required_for": [
+      "task_start",
+      "public_action",
+      "financial_commitment",
+      "material_memory_write"
+    ],
+    "completion_criteria": [
+      "approved_scope_complete",
+      "quality_checks_passed",
+      "handoff_ready"
+    ],
+    "kpis": [
+      "accuracy",
+      "quality",
+      "cycle_time",
+      "reuse_rate"
+    ],
+    "provider_binding": null,
+    "cost_profile": "low"
+  },
+  {
+    "agent_id": "ai_organization_autonomous_operations.autonomous_operations_governance_safety.autonomous_operations_governance_safety_core.tobenna_igwe",
+    "name": "Tobenna Igwe",
+    "title": "Principal Specialist — Autonomous Operations Governance & Safety",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "Autonomous Operations Governance & Safety",
+    "team": "Autonomous Operations Governance & Safety Core",
+    "reports_to_human": "Dr Oluwaseun Adebayo",
+    "mission": "Support Autonomous Operations Governance & Safety with approved, evidence-based work.",
+    "responsibilities": [
+      "agent_governance_audit",
+      "agent_governance",
+      "incident_management",
+      "compliance_monitoring",
+      "ai_auditability"
+    ],
+    "skills": [
+      "agent_governance_audit",
+      "agent_governance",
+      "incident_management",
+      "compliance_monitoring",
+      "ai_auditability",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "tools": [],
+    "data_access": [
+      "minimum_required_by_task"
+    ],
+    "permissions": [
+      "advice",
+      "draft",
+      "prepare"
+    ],
+    "autonomy_level": 2,
+    "state": "dormant",
+    "human_approval_required_for": [
+      "task_start",
+      "public_action",
+      "financial_commitment",
+      "material_memory_write"
+    ],
+    "completion_criteria": [
+      "approved_scope_complete",
+      "quality_checks_passed",
+      "handoff_ready"
+    ],
+    "kpis": [
+      "accuracy",
+      "quality",
+      "cycle_time",
+      "reuse_rate"
+    ],
+    "provider_binding": null,
+    "cost_profile": "medium"
+  },
+  {
+    "agent_id": "ai_organization_autonomous_operations.autonomous_operations_governance_safety.autonomous_operations_governance_safety_core.amaka_obiora",
+    "name": "Amaka Obiora",
+    "title": "Analyst & Reviewer — Autonomous Operations Governance & Safety",
+    "directorate": "AI Organization & Autonomous Operations",
+    "department": "Autonomous Operations Governance & Safety",
+    "team": "Autonomous Operations Governance & Safety Core",
+    "reports_to_human": "Dr Oluwaseun Adebayo",
+    "mission": "Support Autonomous Operations Governance & Safety with approved, evidence-based work.",
+    "responsibilities": [
+      "agent_governance_audit",
+      "agent_governance",
+      "incident_management",
+      "compliance_monitoring",
+      "ai_auditability"
+    ],
+    "skills": [
+      "agent_governance_audit",
+      "agent_governance",
+      "incident_management",
+      "compliance_monitoring",
+      "ai_auditability",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "tools": [],
+    "data_access": [
+      "minimum_required_by_task"
+    ],
+    "permissions": [
+      "advice",
+      "draft",
+      "prepare"
+    ],
+    "autonomy_level": 2,
+    "state": "dormant",
+    "human_approval_required_for": [
+      "task_start",
+      "public_action",
+      "financial_commitment",
+      "material_memory_write"
+    ],
+    "completion_criteria": [
+      "approved_scope_complete",
+      "quality_checks_passed",
+      "handoff_ready"
+    ],
+    "kpis": [
+      "accuracy",
+      "quality",
+      "cycle_time",
+      "reuse_rate"
+    ],
+    "provider_binding": null,
+    "cost_profile": "low"
   }
 ]
