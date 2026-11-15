@@ -25,7 +25,7 @@ export async function isMarcusFrozen(userId: string): Promise<boolean> {
 export async function setMarcusFreeze(userId: string, on: boolean): Promise<string[]> {
   const from = on ? FREEZABLE : ['frozen'];
   const to = on ? 'frozen' : 'received';
-  const correlationId = `marcus:${on ? 'freeze' : 'unfreeze'}:${Date.now()}`;
+  const batch = `${on ? 'freeze' : 'unfreeze'}:${Date.now()}`;
   return prisma.$transaction(async (tx) => {
     await tx.agentJob.upsert({
       where: { jobKey_userId: { jobKey: FREEZE_KEY, userId } },
@@ -41,7 +41,7 @@ export async function setMarcusFreeze(userId: string, on: boolean): Promise<stri
     for (const id of ids) {
       await recordAction({
         userId, initiator: 'system', action: `capability_marcus_task_${on ? 'frozen' : 'unfrozen'}`,
-        permissionClass: 'A', status: 'EXECUTED', capabilityId: id, correlationId,
+        permissionClass: 'A', status: 'EXECUTED', correlationId: `marcus-task:${id}`, inputSummary: `batch=${batch}`,
       }, tx);
     }
     return ids;

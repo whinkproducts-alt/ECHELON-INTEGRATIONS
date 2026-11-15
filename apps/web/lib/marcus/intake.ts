@@ -75,7 +75,7 @@ export async function intakeMarcusTask(req: Request) {
       await recordAction({
         userId: owner.id, initiator: 'system', action: 'capability_marcus_task_received', permissionClass: reconfirm ? 'C' : 'A',
         status: reconfirm ? 'AWAITING_APPROVAL' : 'VALIDATED', errorCode: reconfirm ? 'RECONFIRMATION_REQUIRED' : null,
-        capabilityId: job.id, inputSummary: `title=${body.title} sensitivity=${body.sensitivity}`, correlationId,
+        inputSummary: `title=${body.title} sensitivity=${body.sensitivity}`, correlationId: `marcus-task:${job.id}`,
       }, tx);
       return job;
     });

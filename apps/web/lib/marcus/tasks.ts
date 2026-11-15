@@ -52,7 +52,7 @@ export async function confirmMarcusTask(userId: string, id: string, approval: un
       if (job.capabilityApprovalId) {
         await tx.approvalRequest.updateMany({ where: { id: job.capabilityApprovalId, userId, status: 'PENDING' }, data: { status: 'APPROVED', decidedAt: new Date() } });
       }
-      await recordAction({ userId, initiator: 'system', action: 'capability_marcus_task_reconfirmed', permissionClass: 'C', status: 'VALIDATED', capabilityId: id, correlationId: job.jobKey }, tx);
+      await recordAction({ userId, initiator: 'system', action: 'capability_marcus_task_reconfirmed', permissionClass: 'C', status: 'VALIDATED', correlationId: `marcus-task:${id}` }, tx);
     });
   } catch (e) {
     const code = (e as { code?: string })?.code;
@@ -69,6 +69,6 @@ export async function resumeMarcusTask(userId: string, id: string): Promise<Task
   if (!job) return fail(404, 'Task not found');
   const won = await prisma.agentJob.updateMany({ where: { id, userId, lastStatus: { in: ['blocked', 'paused'] } }, data: { lastStatus: 'received' } });
   if (won.count !== 1) return fail(409, 'Task is not waiting for an answer');
-  await recordAction({ userId, initiator: 'system', action: 'capability_marcus_task_resumed', permissionClass: 'A', status: 'EXECUTED', capabilityId: id, correlationId: job.jobKey });
+  await recordAction({ userId, initiator: 'system', action: 'capability_marcus_task_resumed', permissionClass: 'A', status: 'EXECUTED', correlationId: `marcus-task:${id}` });
   return { status: 200, body: { ...view(job), status: 'received' } };
 }

@@ -3,6 +3,7 @@ import { encodeCursor, type Cursor } from '@/lib/capability/events';
 import type { SseEvent } from '@/lib/events/sse';
 
 const PREFIX = 'capability_marcus_';
+const TASK_REF = 'marcus-task:';
 
 /** The status Marcus maps through its own task_status table. Null = not a task status change. */
 export function marcusStatusFor(action: string, errorCode: string | null): string | null {
@@ -33,13 +34,15 @@ export async function marcusEventsAfter(userId: string, cursor: Cursor | null, l
     where: where(userId, cursor),
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     take: Math.min(Math.max(limit, 1), 1000),
-    select: { id: true, action: true, errorCode: true, createdAt: true, capabilityId: true },
+    select: { id: true, action: true, errorCode: true, createdAt: true, correlationId: true },
   });
   const out: SseEvent[] = [];
   for (const r of rows) {
     const status = marcusStatusFor(r.action, r.errorCode);
-    if (!status || !r.capabilityId) continue;
-    out.push({ id: encodeCursor({ createdAt: r.createdAt.getTime(), id: r.id }), type: r.action.slice(PREFIX.length), data: { task_id: r.capabilityId, status, at: r.createdAt.toISOString() } });
+    // The ledger's capabilityId is a Tool foreign key, so the task id travels in correlationId.
+    const taskId = r.correlationId?.startsWith(TASK_REF) ? r.correlationId.slice(TASK_REF.length) : null;
+    if (!status || !taskId) continue;
+    out.push({ id: encodeCursor({ createdAt: r.createdAt.getTime(), id: r.id }), type: r.action.slice(PREFIX.length), data: { task_id: taskId, status, at: r.createdAt.toISOString() } });
   }
   return out;
 }
