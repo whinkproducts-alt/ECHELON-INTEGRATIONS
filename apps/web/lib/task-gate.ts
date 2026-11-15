@@ -86,6 +86,19 @@ export function extractRequiredSkills(message: string): string[] {
   return [...matched];
 }
 
+// ── Opt-in: let read-only directives skip the approval request ───────────────
+
+const READ_ONLY_OPENER = /^(research|analy[sz]e|audit|review|report|compile|collect|find|plan|prepare|draft|write)\b/i;
+// shortcut: keyword list, evadable by phrasing; a missed word only means a harmless request is
+// still intercepted, and an evaded one still meets checkPermission on every tool call. Revisit if it misfires.
+const SIDE_EFFECT = /\b(send|e-?mail|post|publish|tweet|dm|text|call|share|upload|forward|pay|payment|transfer|wire|buy|purchase|subscribe|invoice|refund|invest|deploy|delete|remove|drop|hire|recruit|onboard|close|negotiate|sign|launch|ship|execute|run|book|schedule|order)\b/i;
+
+/** Founder opt-in (WHINK_TASK_GATE_ANALYSIS_AUTO=true). Default off: every directive is intercepted as before. */
+export function isReadOnlyDirective(message: string): boolean {
+  const m = message.trim();
+  return READ_ONLY_OPENER.test(m) && !SIDE_EFFECT.test(m);
+}
+
 // ── Gate entry point ──────────────────────────────────────────────────────────
 
 export interface TaskGateResult {
@@ -105,6 +118,7 @@ export function runTaskGate(
   persona: string = "WHINK"
 ): TaskGateOutcome {
   if (!isTaskDirective(message)) return { intercepted: false };
+  if (process.env.WHINK_TASK_GATE_ANALYSIS_AUTO === 'true' && isReadOnlyDirective(message)) return { intercepted: false };
 
   const requiredSkills = extractRequiredSkills(message);
   if (requiredSkills.length === 0) return { intercepted: false };
