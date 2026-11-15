@@ -64,8 +64,8 @@ describe.skipIf(!enabled)('Capability Gateway: real database, real MCP server', 
     owner = (await prisma.user.create({ data: { email: `cap-owner-${stamp}@example.test` } })).id;
     other = (await prisma.user.create({ data: { email: `cap-other-${stamp}@example.test` } })).id;
     const kit = await getOrgKit();
-    expect(kit.agents.length).toBe(326); // the canonical roster is read, never written
-    expect(kit.teams.length).toBe(163);
+    expect(kit.agents.length).toBe(338); // the canonical roster is read, never written
+    expect(kit.teams.length).toBe(169);
     agentA = kit.agents[0].agent_id;
     agentB = kit.agents.find((a) => a.agent_id.split('.').slice(0, -1).join('.') !== agentA.split('.').slice(0, -1).join('.'))!.agent_id;
     dormantAgentTeamMate = kit.agents.find((a) => a.agent_id !== agentA && a.agent_id.startsWith(agentA.split('.').slice(0, -1).join('.') + '.'))?.agent_id ?? agentB;

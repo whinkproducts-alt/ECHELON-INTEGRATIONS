@@ -5,15 +5,15 @@ Built from `docs/pending-tasks.md`, `docs/handoffs/*` and this session's verifie
 
 ## Completion
 
-Method: every line counts once, unweighted (not effort). Done = 1, Built-not-accepted or built-not-connected = 0.5, Open = 0. Item 43 is merged into item 50. Item 26 is done (Marcus commit e7f92d1, unpushed).
+Method: every line counts once, unweighted (not effort). Done = 1, Built-not-accepted or built-not-connected = 0.5, Open = 0. Item 43 is merged into item 50. Item 26 is done (Marcus commit e7f92d1, pushed). Item 56 moved from Open to Built-not-accepted on 2026-11-15 (roster loaded into org-kit; database org table still to build).
 
 | | Items | Credit |
 |---|---|---|
 | Done | 18 | 18 |
-| Built, not accepted | 7 | 3.5 |
+| Built, not accepted | 8 | 4 |
 | Built, connection unverified (Part 2) | 13 | 6.5 |
-| Open (Part 1: 30; Part 2: 40) | 70 | 0 |
-| **Total** | **108** | **28 → 26%** |
+| Open (Part 1: 29; Part 2: 40) | 69 | 0 |
+| **Total** | **108** | **28.5 → 26%** |
 
 Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except the exclusions listed in Part 2.
 
@@ -217,7 +217,7 @@ Legend note: the 13 "B" rows are the ones counted at 0.5 in the completion table
 **Tamper rule:** scoring code and scores are written by ECHELON only, from ledger rows. A scored agent cannot edit its own KPIs, targets or score.
 
 **Still to decide:** the targets and weights per role (you set them in a screen), the review period for non-subsidiary roles, and the thresholds that trigger a promotion proposal.
-| 56 | **Org structure with reporting lines**, draft in [ORG-STRUCTURE.md](ORG-STRUCTURE.md). Needs: board list, kill team list, subsidiary head names, whether the 141 named heads are real people, the Marketing data check, an agent-to-agent chain inside departments. | Open | One org table in the database seeded from the leadership and registry files. One manager per entity, no loops, chain depth checked. |
+| 56 | **Org structure with reporting lines**, in [ORG-STRUCTURE.md](ORG-STRUCTURE.md). **Done 2026-11-15:** the locked roster is loaded into org-kit (16 directorates, 132 departments, board of 8, 5 subsidiary heads, 5-member kill team); the registry holds 338 agents and 169 teams including all of D16 and People Operations & HR Strategy; you approved the 6 placeholder Analyst & Reviewer names; Marcus Vale's line is set (WHINK sets KPIs, you appraise and decide promotion and pay); AI and human follow the same chain. Real-database tests now pass with the new counts. **Still open:** whether the heads are real people (you said it makes no difference to the chain); an agent-to-agent chain inside departments. | Built, not accepted | One org table in the database seeded from the leadership and registry files. One manager per entity, no loops, chain depth checked. |
 
 ### How the KPI, promotion and training system works (design)
 

@@ -238,7 +238,7 @@ describe.skipIf(!enabled)('M1 real database execution', () => {
 
   it('preserves roster counts/bytes and denies private, retired, suspended and unknown assignees', async () => {
     const kit = await getOrgKit();
-    expect(kit.agents).toHaveLength(326); expect(kit.teams).toHaveLength(163);
+    expect(kit.agents).toHaveLength(338); expect(kit.teams).toHaveLength(169);
     expect(new Set(kit.agents.map((a) => a.directorate)).size).toBe(16);
     const original = kit.agents[0];
     for (const state of ['suspended', 'retired'] as const) expect(() => admittedAgents(ear, [{ ...original, state }])).toThrow();
@@ -255,6 +255,6 @@ describe.skipIf(!enabled)('M1 real database execution', () => {
   });
 });
 const ROSTER_HASHES: Record<string, string> = {
-  'organization/workforce_registry.json': '41ffcb3933b680784df003fe81e98b1f1b5bccec78e5d79c72141661052df3f8',
-  'organization/team_registry.json': '5613dc63caf7531fbcdaa38094ad6af1ccdee5790d86bd3f4e455f2c8188d95d',
+  'organization/workforce_registry.json': '91fec5cbe36872a70c0b984b89abfeba1baf6fccc1a8f022ce08e641d4cfe448',
+  'organization/team_registry.json': 'b93d9640b5d4e96c89ca9ccc7cea5ef37917d9fd5ca572213d13bd9358184db3',
 };
