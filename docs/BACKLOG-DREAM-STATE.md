@@ -184,6 +184,7 @@ Legend note: the 13 "B" rows are the ones counted at 0.5 in the completion table
 
 ### Order of work for Part 2
 
+0. **First (decided 2026-11-15, safeguards before loosening):** build the execution sandbox (item 58) and sender pairing (item 59), and add OpenClaw's rule that approvals can only tighten policy, never loosen it, to learned delegations (item 60). The loosened rules in Part 4 are not switched on until these exist.
 1. Amend D9 and the local-only rule in `CLAUDE.md` and `decisions.md` (you approve the wording).
 2. Build Global Approval, with its tests, before any browser or remote-execution tool, so those tools use the same approval path.
 3. Prove the 13 built rows are connected: run one real call each and ledger it.
@@ -238,7 +239,7 @@ All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now h
 | 57 | R1 Local-only off for routine work | One enforced check replacing the 12 module checks; call-site audit; ledger every block | Open |
 | 58 | R2 Execution sandbox | Docker sandbox for command and browser tools; `sandbox explain` style inspector | Open |
 | 59 | R3 Sender pairing | Unknown sender gets no reply until paired; per channel | Open |
-| 60 | R5 Learned delegations | Offer after 5 identical approvals; 30 day expiry, daily cap, revocable; Class C excluded | Open |
+| 60 | R5 Learned delegations | Offer after 5 identical approvals; 30 day expiry, daily cap, revocable; Class C excluded. A delegation can only tighten the action class, never loosen it (as in OpenClaw approvals) | Open |
 | 61 | R7 Batch approval | One card, N hash-locked request ids | Open |
 | 62 | R8 Template plus schedule approval | 30 day cap, non-protected public content, edit cancels | Open |
 | 63 | R11 Licence rule | Amend non-negotiable 7 wording; compliance-checker checks each MPL or LGPL dependency | Open |
