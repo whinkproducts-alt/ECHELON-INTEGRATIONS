@@ -5,16 +5,17 @@ Built from `docs/pending-tasks.md`, `docs/handoffs/*` and this session's verifie
 
 ## Completion
 
-Method: every line below counts once, unweighted (not effort). Done = 1, Built-not-accepted = 0.5, Open = 0.
+Method: every line counts once, unweighted (not effort). Done = 1, Built-not-accepted or built-not-connected = 0.5, Open = 0. Item 43 is merged into item 50, so it is not counted twice.
 
 | | Items | Credit |
 |---|---|---|
 | Done | 17 | 17 |
 | Built, not accepted | 7 | 3.5 |
-| Open | 24 | 0 |
-| **Total** | **48** | **20.5 → 43%** (35% if only "Done" counts) |
+| Built, connection unverified (Part 2 checklist) | 13 | 6.5 |
+| Open (Part 1: 24 − 1 merged + 3 amendments; Part 2: 38) | 64 | 0 |
+| **Total** | **101** | **27 → 27%** |
 
-Engineering-only open items: 15. Open items that wait on Victor: 9 (marked **V**).
+Dream state: **every row in both parts reads "built and connected"**, except the exclusions listed in Part 2.
 
 ## Features gained (all Done, on `main` at e14199f)
 
@@ -72,7 +73,7 @@ Engineering-only open items: 15. Open items that wait on Victor: 9 (marked **V**
 | 40 | 131 dependency alerts; Prisma 7 and TypeScript 7 held; PRs #14, #11, #9, #15 | engineering |
 | 41 | 132 skipped tests are not acceptance | engineering |
 | 42 | Do Marcus tasks need attached documents or memory? | **V** (decide) |
-| 43 | Does an SSH tunnel count as "local" for a second machine's Ollama? | **V** (decide) |
+| 43 | ~~SSH tunnel counts as local?~~ Decided 2026-11-15: own SSH hosts count as local. Merged into item 50. | done in 50 |
 | 44 | Amend non-negotiable 4 to allow agent-tier approvals | **V** (decide) |
 | 45 | Freeze sentinel row → table; crash between consuming approval and queueing ends `failed` | engineering |
 | 46 | Worker-kill chaos test | engineering |
@@ -99,3 +100,93 @@ Engineering-only open items: 15. Open items that wait on Victor: 9 (marked **V**
 5. No test exists. Add one: `/` renders for a visitor, click goes to `/login`, a signed-in user skips it.
 
 **Open decisions (V):** show the opening every visit or once per session; add a visible "skip" hint; sound or silent (the file has none).
+
+## Part 2: connect everything (decided 2026-11-15)
+
+Target for every row: **built and connected**. "Connected" means all of: the key or login is in ECHELON's encrypted settings (never in git), a health check passes, one real call is ledgered, and for paid services a price and cap are set. Paid services stay switched off until you set the cap. Inbound content is untrusted data. Every write or send follows the permission classes.
+
+### Decisions and the rules they touch
+
+| # | Decision | Rule touched | Needed |
+|---|---|---|---|
+| 49 | **Browser:** allow a local, non-stealth, permissively licensed browser tool. Class C approval for any write. Page content untrusted. | Group D rule D9 (no automation libraries) | Amend D9 in `CLAUDE.md` and `decisions.md`. Licence check on the chosen tool. |
+| 50 | **Remote execution:** own SSH machines count as local; cloud sandboxes (Modal, Daytona, Vercel) allowed with approval for each run. | Local-only enforcement (12 modules); Protected actions (data leaving the machine) | Amend the local-only rule. Cloud runs are Class C, and the approval card names what leaves. Cloud sandboxes also need a hard timeout and a cost cap. |
+| 51 | **Global Approval, routine only:** a timed window you open and set. It lifts Class B, browser and in-cap tool approvals. Money, proprietary sharing, lockdown and spend caps stay protected. | Non-negotiable 4 (no shortcuts): it is a timed delegation, so no rule change. Rule 10 is untouched. | Build it (see below). |
+
+**Global Approval requirements:** only you can open it, from a signed-in session with a passkey check. No agent or tool can open or extend it. It has a start, a fixed end and an instant cancel. It reverts on its own, including after a restart. Every action inside it is ledgered with the window id. Lockdown ends it at once. Its tests must prove money and sharing still need approval inside the window.
+
+**Excluded, not built:**
+- Honcho (leave it out; ECHELON memory covers it).
+- Qwen OAuth login reuse (leave it out).
+- Stealth browsers and CAPTCHA solving: Browserbase stealth, Camofox, Lightpanda, agent-browser (bypassing bot detection; also AGPL concern on Lightpanda, unchecked).
+- `SUDO_PASSWORD`: never. Use named-command sudo rules without a password if needed. Not yet confirmed with you.
+- WhatsApp through Baileys (unofficial): official Twilio route only.
+
+### Connection checklist (51 items)
+
+State today: **B** = built, connection unverified. **O** = open, to build or configure.
+
+| Group | Item | Today | Notes |
+|---|---|---|---|
+| Models | Ollama (local) | B | default local path |
+| Models | Anthropic | B | |
+| Models | OpenAI-compatible | B | covers any compatible endpoint |
+| Models | Gemini | B | |
+| Models | NVIDIA NIM | B | trial adapter; metered stays blocked until priced |
+| Models | OmniRoute | B | adapter exists |
+| Models | Hermes | B | adapter exists |
+| Models | OpenRouter | O | config + price + cap |
+| Models | Fireworks | O | same |
+| Models | Novita | O | same |
+| Models | DeepInfra | O | same |
+| Models | Hugging Face | O | same |
+| Models | Kimi / Moonshot | O | same |
+| Models | z.ai / GLM | O | same |
+| Models | MiniMax | O | same |
+| Models | Nebius | O | same |
+| Models | Upstage | O | same |
+| Models | Ramp Router | O | same |
+| Models | Tencent TokenHub / TokenPlan | O | same |
+| Models | OpenCode Zen | O | same |
+| Models | OpenCode Go | O | same |
+| Models | Arcee | O | same |
+| Models | Xiaomi MiMo | O | same |
+| Models | Ollama Cloud | O | not local: never for founder-private data |
+| Search | Exa | O | gateway provider; metered |
+| Search | Parallel | O | same |
+| Search | Firecrawl | O | same |
+| Search | Reddit (public feeds) | O | read-only |
+| Media | FAL.ai images | O | metered; prompts leave the machine, approval each time |
+| Browser | Local browser tool (decision 49) | O | |
+| Messaging | Email out (SMTP) | B | |
+| Messaging | SMS (Twilio) | B | |
+| Messaging | WhatsApp (Twilio) | B | |
+| Messaging | Telegram | B | |
+| Messaging | Email in (IMAP) | O | owner allowlist |
+| Messaging | Discord | O | owner allowlist |
+| Messaging | Slack | O | owner allowlist |
+| Messaging | Microsoft Teams | O | owner allowlist |
+| Messaging | Google Chat | O | owner allowlist |
+| Voice | Local Whisper | B | |
+| Voice | Local Kokoro | B | |
+| Voice | Groq speech | O | audio leaves the machine; approval |
+| Voice | OpenAI speech | O | same |
+| Voice | ElevenLabs | O | same |
+| Execution | Local and Docker command backend | O | needs approval path first |
+| Execution | SSH to own machines (decision 50) | O | |
+| Execution | Cloud sandboxes (decision 50) | O | approval per run |
+| Integrations | GitHub skills token | O | read-only, fine-grained |
+| Integrations | Context compression | O | `context-budget.ts` exists; compare with Hermes behaviour |
+| Integrations | Hyperliquid | O | reads; orders only by approval request ID |
+| Safety | Global Approval window (decision 51) | O | |
+
+Legend note: the 13 "B" rows are the ones counted at 0.5 in the completion table; the other 38 are Open.
+
+### Order of work for Part 2
+
+1. Amend D9 and the local-only rule in `CLAUDE.md` and `decisions.md` (you approve the wording).
+2. Build Global Approval, with its tests, before any browser or remote-execution tool, so those tools use the same approval path.
+3. Prove the 13 built rows are connected: run one real call each and ledger it.
+4. Add the paid model providers by config, each off until its cap is set.
+5. Add gateway tools (search, Reddit, FAL, GitHub, Hyperliquid reads), then inbound channels, then speech providers.
+6. Browser, SSH and cloud sandboxes last, after a security review.
