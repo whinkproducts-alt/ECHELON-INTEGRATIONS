@@ -1,0 +1,409 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>WHINK Group Roster</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg:#070B12;--bg2:#0D1420;--bg3:#131C2E;
+  --card:#1A2540;--card2:#1E2D4A;--border:#263355;
+  --fg:#E8EDF5;--fg2:#8B9BB8;--fg3:#5A6A88;
+  --gold:#CC944B;--gold2:#E8B06A;--blue:#38B6FF;
+  --teal:#2DD4BF;--red:#FF4D6D;--purple:#A78BFA;--green:#34D399;
+  --radius:10px;--radius-sm:6px;
+  color-scheme:dark;
+}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --bg:#F0F4FA;--bg2:#E4EAF5;--bg3:#D8E2F0;
+  --card:#FFF;--card2:#F5F8FF;--border:#C8D4E8;
+  --fg:#0D1420;--fg2:#3A4A68;--fg3:#6A7A98;
+  --gold:#B07828;--gold2:#C88A3A;--blue:#1A8FD4;
+  --teal:#0A9B87;--red:#D4003A;--purple:#7C5FD4;--green:#0A9B6A;
+  color-scheme:light;
+}}
+:root[data-theme="light"]{--bg:#F0F4FA;--bg2:#E4EAF5;--bg3:#D8E2F0;--card:#FFF;--card2:#F5F8FF;--border:#C8D4E8;--fg:#0D1420;--fg2:#3A4A68;--fg3:#6A7A98;--gold:#B07828;--gold2:#C88A3A;--blue:#1A8FD4;--teal:#0A9B87;--red:#D4003A;--purple:#7C5FD4;--green:#0A9B6A;color-scheme:light;}
+:root[data-theme="dark"]{--bg:#070B12;--bg2:#0D1420;--bg3:#131C2E;--card:#1A2540;--card2:#1E2D4A;--border:#263355;--fg:#E8EDF5;--fg2:#8B9BB8;--fg3:#5A6A88;--gold:#CC944B;--gold2:#E8B06A;--blue:#38B6FF;--teal:#2DD4BF;--red:#FF4D6D;--purple:#A78BFA;--green:#34D399;color-scheme:dark;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--fg);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.5;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0;}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:101;background:var(--bg);}
+.hdr{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;}
+.hdr h1{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;letter-spacing:.04em;color:var(--gold);}
+.hdr h1 span{color:var(--fg2);font-weight:400;font-size:13px;margin-left:8px;letter-spacing:0;}
+.ctrl{display:flex;gap:8px;align-items:center;flex-shrink:0;}
+.btn{background:var(--card);border:1px solid var(--border);color:var(--fg2);font-size:12px;font-family:'Inter',sans-serif;padding:5px 10px;border-radius:var(--radius-sm);cursor:pointer;transition:background .15s,color .15s;}
+.btn:hover{background:var(--card2);color:var(--fg);}
+.search-wrap{position:relative;}
+.search-wrap input{background:var(--card);border:1px solid var(--border);color:var(--fg);font-family:'Inter',sans-serif;font-size:13px;padding:6px 10px 6px 28px;border-radius:var(--radius-sm);width:180px;outline:none;transition:border-color .15s;}
+.search-wrap input:focus{border-color:var(--blue);}
+.search-wrap input::placeholder{color:var(--fg3);}
+.si{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--fg3);font-size:13px;pointer-events:none;}
+.stats{display:flex;flex-wrap:wrap;gap:16px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.stat{display:flex;align-items:center;gap:6px;}
+.sv{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;}
+.sl{color:var(--fg2);}
+.gold{color:var(--gold);}
+.blue{color:var(--blue);}
+.teal{color:var(--teal);}
+.red{color:var(--red);}
+.grn{color:var(--green);}
+.wrap{padding-block:20px;}
+section{margin-bottom:28px;}
+.sec-hd{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:12px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;}
+.card .name{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;color:var(--fg);}
+.card .role{font-size:11px;color:var(--fg2);margin-top:2px;}
+.card .tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;margin-top:5px;}
+.t-board{background:rgba(56,182,255,.12);color:var(--blue);}
+.t-ai{background:rgba(167,139,250,.12);color:var(--purple);}
+.t-sub{background:rgba(45,212,191,.12);color:var(--teal);}
+.t-kill{background:rgba(255,77,109,.12);color:var(--red);}
+.t-dir{background:rgba(56,182,255,.1);color:var(--blue);}
+.t-dept{background:var(--bg3);color:var(--fg2);}
+.t-team{background:rgba(52,211,153,.1);color:var(--green);}
+.dir-block{margin-bottom:20px;}
+.dir-hd{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;color:var(--blue);padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}
+.dir-hd .toggle{font-size:11px;color:var(--fg3);transition:transform .2s;}
+.dir-hd.open .toggle{transform:rotate(90deg);}
+.dir-body{display:none;}
+.dir-body.open{display:block;}
+.dept-row{display:flex;align-items:flex-start;gap:8px;padding:5px 8px;border-left:2px solid var(--border);margin-left:8px;margin-bottom:4px;border-radius:0 var(--radius-sm) var(--radius-sm) 0;}
+.dept-row:hover{background:var(--card2);}
+.dept-name{font-weight:600;font-size:12px;color:var(--fg);min-width:0;flex:1;}
+.dept-head{font-size:11px;color:var(--fg2);}
+.team-lead{font-size:11px;color:var(--fg3);margin-top:1px;}
+.hidden{display:none!important;}
+.match .name,.match .dept-name{color:var(--gold)!important;}
+@media(max-width:600px){.hdr h1 span{display:none;}.search-wrap input{width:120px;}.grid{grid-template-columns:1fr;}}
+</style>
+
+<header class="hdr">
+  <h1>W.H.I.N.K <span>Group Personnel Roster · Locked 2026-11-15</span></h1>
+  <div class="ctrl">
+    <div class="search-wrap"><span class="si">⌕</span><input type="search" id="search" placeholder="Search…" autocomplete="off"></div>
+    <button class="btn" id="expandAll">Expand All</button>
+    <button class="btn" id="collapseAll">Collapse All</button>
+    <button class="btn" id="themeToggle">☀︎</button>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat"><span class="sv gold">1</span><span class="sl">Founder</span></div>
+  <div class="stat"><span class="sv blue">8</span><span class="sl">Board</span></div>
+  <div class="stat"><span class="sv teal">5</span><span class="sl">Subsidiaries</span></div>
+  <div class="stat"><span class="sv red">5</span><span class="sl">Kill Team</span></div>
+  <div class="stat"><span class="sv blue">16</span><span class="sl">Directorates</span></div>
+  <div class="stat"><span class="sv grn">~131</span><span class="sl">Departments</span></div>
+  <div class="stat"><span class="sv grn">~169</span><span class="sl">Teams</span></div>
+  <div class="stat"><span class="sv gold">~338</span><span class="sl">Agents</span></div>
+</div>
+
+<div class="wrap" id="main">
+
+<section>
+  <div class="sec-hd">Board of 8</div>
+  <div class="grid" id="board"></div>
+</section>
+
+<section>
+  <div class="sec-hd">AI Chiefs</div>
+  <div class="grid" id="ai"></div>
+</section>
+
+<section>
+  <div class="sec-hd">5 Subsidiaries</div>
+  <div class="grid" id="subs"></div>
+</section>
+
+<section>
+  <div class="sec-hd">Kill Team — ECHELON</div>
+  <div class="grid" id="kill"></div>
+</section>
+
+<section>
+  <div class="sec-hd">16 Directorates — Full Roster</div>
+  <div id="dirs"></div>
+</section>
+
+</div>
+
+<script>
+const BOARD = [
+  {name:'Victor Igboekwe',role:'Founder & Chairman',tag:'board'},
+  {name:'Anthony Igboekwe',role:'Board Member · MD Whink Apps',tag:'board'},
+  {name:'Juliet Igboekwe',role:'Board Member · MD Whink Trades & Investments',tag:'board'},
+  {name:'Dr Tinaye Lydia Muzenyi',role:'Board Member · MD Whink Frontliners · Exec Dir D01',tag:'board'},
+  {name:'Genevieve Igboekwe',role:'Chief Legal Counsel · Board Member · Director D11',tag:'board'},
+  {name:'Marcus Vale',role:'Chief Exec Assistant · Board Member · D01 Dept Head',tag:'board'},
+];
+const AI = [
+  {name:'WHINK',role:'Chief of Staff · AI Board Member',tag:'ai'},
+  {name:'MAMBA',role:'Chief Exec Operating Officer / Consigliere · AI Board Member',tag:'ai'},
+];
+const SUBS = [
+  {name:'Victor Igboekwe',role:'MD — Whink Consult',tag:'sub'},
+  {name:'Anthony Igboekwe',role:'MD — Whink Apps',tag:'sub'},
+  {name:'Juliet Igboekwe',role:'MD — Whink Trades & Investments',tag:'sub'},
+  {name:'Dr Tinaye Lydia Muzenyi',role:'MD — Whink Frontliners',tag:'sub'},
+  {name:'Whitney Brown',role:'MD — Whink Real Estate',tag:'sub'},
+];
+const KILL = [
+  {name:'PETER (Peter)',role:'Principal Reverse Engineer',tag:'kill'},
+  {name:'PAUL (Paul)',role:'Principal Reconstruction Engineer',tag:'kill'},
+  {name:'MICAH (Micah)',role:'Principal Product Auditor',tag:'kill'},
+  {name:'NANDI (Nandi)',role:'Growth, Marketing & Revenue Strategist',tag:'kill'},
+  {name:'SCOUT (Michael Carrick)',role:'Master Researcher & Opportunity Scout',tag:'kill'},
+];
+
+const DIRS = [
+  {id:'d01',title:'D01 Executive Office & Corporate Strategy',director:'Dr Tinaye Lydia Muzenyi',depts:[
+    {name:'Office of CEO & Executive Operations',head:'Marcus Vale',lead:'Aarav Kapoor'},
+    {name:'People Operations & HR Strategy',head:'Nneka Eze',lead:'Adaora Mbanefo'},
+    {name:'HR Business Partnering & People Operations',head:'Nneka Eze',lead:'Ebele Onyeka'},
+    {name:'Corporate Strategy & Strategic Planning',head:'Chux Onwusah',lead:'Lucía Navarro'},
+    {name:'Corporate Development & Strategic Investments',head:'Tosin Suara',lead:'Nadia Rahman'},
+    {name:'Enterprise Transformation & Strategic Programs',head:'Nimat Omobolanle',lead:'Soo-jin Park'},
+    {name:'Enterprise BI & Performance',head:'Jideofor Nnaji',lead:'Leila Haddad'},
+    {name:'Strategic Portfolio & PMO',head:'Pat Johnson',lead:'Aya Nakamura'},
+  ]},
+  {id:'d02',title:'D02 WHINK Group Marketing Intelligence',director:'Tai Tamminga',depts:[
+    {name:'Brand, Media & Audience Intelligence',head:'Sonia Bantu',lead:'23 teams: ATLAS, CHORUS, CUT, ECHO, FLUX, FORGE, HALO, LIVEWIRE, MAGNET, MIRROR, MOSAIC, NOVA, ORACLE, PRISM, PULSE, QUANTA, RHODES, SHIELD, SIGNAL, SONIC, TITAN, VANTA, VERITY'},
+    {name:'Commercial & Growth Marketing Intelligence',head:'David Eniolade',lead:'16 teams: ADVOCATE, AUTHORITY, COMPASS, CONDUCTOR, CONVERT, DEMAND, ENABLE, FIELD, LEDGER, LIFECYCLE, MUSE, NEXUS, PROPEL, REVOPS, SENTINEL, VECTOR'},
+  ]},
+  {id:'d03',title:'D03 Sales & Revenue',director:'Ijie Alpha',depts:[
+    {name:'Enterprise Sales',head:'Adebowale Osei',lead:'Adewale Bakare'},
+    {name:'SMB & Mid-Market Sales',head:'Muyiwa Agoro',lead:'Noor Al-Khatib'},
+    {name:'Sales Development & Pipeline Generation',head:'Mosope Talabi',lead:'Mpho Ndlovu'},
+    {name:'Solutions & Technical Sales',head:'Matthew Okonunfua',lead:'Yusuf Karim'},
+    {name:'Channel & Partner Sales',head:'Oluwaseun Lambo',lead:'Lena Schmidt'},
+    {name:'Account Management & Expansion',head:'Sam Patel',lead:'Ana Petrescu'},
+    {name:'Revenue Operations & Sales Intelligence',head:'Sylvester Anyanwu',lead:'Imani Carter'},
+  ]},
+  {id:'d04',title:'D04 Product',director:'Atika Emmanuel',depts:[
+    {name:'Product Strategy & Portfolio',head:'Dee Jay Khaled',lead:'Leandro Souza'},
+    {name:'Product Management',head:'Kamsiyochukwu Igboekwe',lead:'Osei Agyeman'},
+    {name:'Product Operations',head:'Kiki Palmer',lead:'Hassan Bashir'},
+    {name:'Product Research & Customer Discovery',head:'Denzel Washington',lead:'Kelechi Umeh'},
+    {name:'Product Analytics & Intelligence',head:'Kaisochukwu Nnaji',lead:'Victor Liu'},
+    {name:'User Experience & Service Design',head:'Inaas Abdul',lead:'Fiona MacLeod'},
+    {name:'Release & Product Lifecycle Management',head:'Abiodun Iseniyi',lead:'Seyi Adeyemi'},
+  ]},
+  {id:'d05',title:'D05 Engineering & Technology',director:'Luke Mellors',depts:[
+    {name:'Software Engineering',head:'Sofoluwe Coker',lead:'Hye-jin Seo'},
+    {name:'Mobile & Client Platforms',head:'Ernest Abhulimehn',lead:'Daniel Cho'},
+    {name:'Platform Engineering & Core Infrastructure',head:'Tinashe Muzenyi',lead:'Felix Weber'},
+    {name:'Architecture & Technical Strategy',head:'Sophia Mercurri',lead:'Rami Aziz'},
+    {name:'API/Integrations & Developer Ecosystem',head:'Omolara Suara',lead:'Olu Afolayan'},
+    {name:'DevOps/SRE & Cloud Engineering',head:'Raven May Mei',lead:'Joon Kang'},
+    {name:'Quality Engineering & Test Automation',head:'Terhemba Ahile',lead:'Sebastian Keller'},
+    {name:'Release Engineering & Configuration Management',head:'Rebecca Johnson',lead:'Chiamaka Nnaji'},
+    {name:'Engineering Productivity & Developer Experience',head:'Étienne Moreau',lead:'Reina Matsuda'},
+    {name:'Technical Documentation & Engineering Knowledge',head:'Priscilla Oduya',lead:'Adjoa Quartey'},
+  ]},
+  {id:'d06',title:'D06 Data & Artificial Intelligence',director:'Dr Amara Okafor',depts:[
+    {name:'AI Engineering & Applied Intelligence',head:'Lukas Schneider',lead:'Neha Desai'},
+    {name:'Agent Architecture & AI Workforce Systems',head:'Hanae Nakamura',lead:'Nora Jensen'},
+    {name:'Skill Engineering & Tool Orchestration',head:'Mateo Fernández',lead:'Esteban Cruz'},
+    {name:'Machine Learning & Model Development',head:'Dr Priyanka Rao',lead:'Ivan Dimitrov'},
+    {name:'Model Evaluation, Reliability & Intelligence Quality',head:'Elias Haddad',lead:'Tatsuya Kobayashi'},
+    {name:'Model Routing & AI Infrastructure',head:'Ingrid Bergström',lead:'Femi Balogun'},
+    {name:'Data Engineering & Data Platforms',head:'Kwesi Boateng',lead:'Kwesi Appiah'},
+    {name:'Data Science & Decision Intelligence',head:'Dr Sofia Petrovic',lead:'Rahul Iyer'},
+    {name:'Knowledge Systems & Enterprise Memory',head:'Leila Ben Youssef',lead:'Jorge Almeida'},
+    {name:'AI Governance Technology & Responsible AI',head:'Amina El-Sayed',lead:'Maksim Volkov'},
+    {name:'AI FinOps & Usage Intelligence',head:'Gabriel Costa',lead:'Enzo Marchetti'},
+    {name:'AI Platform Operations & Observability',head:'Min-jun Park',lead:'Chinedu Okafor'},
+  ]},
+  {id:'d07',title:'D07 Research & Development',director:'Dr Elena Varga',depts:[
+    {name:'Applied Research',head:'Dr Tendai Muchengeti',lead:'Hasan Demir'},
+    {name:'Emerging Technologies & Future Systems',head:'Kenji Mori',lead:'Bianca Santos'},
+    {name:'Experimental Engineering & Prototyping',head:'Andrés Valdés',lead:'Linh Tran'},
+    {name:'AI & Autonomous Systems Research',head:'Dr Kolade Adewumi',lead:'Mariam Said'},
+    {name:'Human-Computer Interaction & Future Interfaces',head:'Zara Osei-Bonsu',lead:'Amina Yusuf'},
+    {name:'Advanced Computing & Systems Research',head:'Dr Kwame Asante',lead:'Camila Ferreira'},
+    {name:'Research Partnerships & Academic Collaboration',head:'Beatriz Cavalcanti',lead:'Ade Mabaso'},
+    {name:'Innovation Incubation & Technology Transfer',head:'Rafael Mendes',lead:'Nabil Rahman'},
+    {name:'IP Discovery & Invention Management',head:'Roksana Wiśniewska',lead:'Lorenzo Greco'},
+    {name:'Research Intelligence & Scientific Foresight',head:'Adaeze Okonkwo',lead:'Chiamaka Ofoegbu'},
+  ]},
+  {id:'d08',title:'D08 Information Technology',director:'Alejandro Ruiz',depts:[
+    {name:'Enterprise Applications & Business Systems',head:'Grace Kimani',lead:'Chidinma Ezeh'},
+    {name:'End-User Computing & Workplace Technology',head:'Daisuke Yamamoto',lead:'Emeka Chukwuemeka'},
+    {name:"IT Service Management & Service Desk",head:"Michael O'Connor",lead:'Gustavo Herrera'},
+    {name:'Cloud & Infrastructure Operations',head:'Ananya Deshmukh',lead:'Ifeoma Nwosu'},
+    {name:'Network & Connectivity Services',head:'Chinedu Eze',lead:'Kemi Adeyemi'},
+    {name:'Identity & Access Administration',head:'Katarina Novak',lead:'Mamadou Coulibaly'},
+    {name:'Collaboration & Productivity Platforms',head:'Farah Rahman',lead:'Olusegun Bello'},
+    {name:'IT Asset & Configuration Management',head:'João Ferreira',lead:'Qian Liu'},
+    {name:'Enterprise Systems Administration',head:'Thabo Mokoena',lead:'Sade Adeleke'},
+    {name:'IT Architecture & Technology Standards',head:'Dr Elise van der Meer',lead:'Uchenna Okeke'},
+  ]},
+  {id:'d09',title:'D09 Cybersecurity & Resilience',director:'Marcus Lund',depts:[
+    {name:'Security Operations & Incident Response',head:'Wanjiru Kamau',lead:'Kagiso Mokoena'},
+    {name:'Threat Intelligence & Threat Hunting',head:'Olumide Adekunle',lead:'Yetunde Adeyinka'},
+    {name:'Identity Security & Privileged Access',head:'Abosede Fashola',lead:'Abena Asante'},
+    {name:'Security Engineering',head:'Arjun Mehra',lead:'Chiamaka Obi'},
+    {name:'Cloud & Infrastructure Security',head:'Sofia Dimitrova',lead:'Eshe Wangari'},
+    {name:'Application & Product Security',head:'Diego Morales',lead:'Gbolahan Adesanya'},
+    {name:'Security Architecture',head:'Dr Miriam Kessler',lead:'Ikenna Eze'},
+    {name:'Vulnerability & Exposure Management',head:'Bongani Dlamini',lead:'Kehinde Adewale'},
+    {name:'Data Security & Information Protection',head:'Funmilayo Okoye',lead:'Musa Conteh'},
+    {name:'Third-Party & Supply Chain Security',head:'Haruka Watanabe',lead:'Obi Okwu'},
+    {name:'Cyber Risk & Security Governance',head:'Gabriela Torres',lead:'Rashida Hassan'},
+    {name:'Business Continuity & Cyber Resilience',head:'Henrik Sørensen',lead:'Titilayo Bakare'},
+  ]},
+  {id:'d10',title:'D10 Finance & Accounting',director:'Charles Soludo',depts:[
+    {name:'Accounting & Close',head:'Helena Costa',lead:'Vera Okafor'},
+    {name:'Financial Reporting & Consolidation',head:'Kwabena Mensah',lead:'Xochitl Reyes'},
+    {name:'FP&A / Budgeting & Forecasting',head:'Priya Raman',lead:'Zanele Dube'},
+    {name:'Treasury & Capital Management',head:'Mikhail Petrov',lead:'Bintou Kouyaté'},
+    {name:'Tax',head:'Aisha Bello',lead:'Dele Adekunle'},
+    {name:'Billing / AR & AP',head:'Mariana Figueiredo',lead:'Folake Akinbode'},
+    {name:'Payroll Finance',head:'Thandiwe Ncube',lead:'Halima Jallow'},
+    {name:'Financial Controls & Management Accounting',head:'Giulia Romano',lead:'Jumoke Adegoke'},
+  ]},
+  {id:'d11',title:'D11 Legal, Risk & Governance',director:'Genevieve Igboekwe',depts:[
+    {name:'Corporate & Commercial Legal',head:'Marcus Feldman',lead:'Laide Ogundimu'},
+    {name:'Contracts & Transactions',head:'Zainab Bakare',lead:'Nifemi Alade'},
+    {name:'Intellectual Property & Technology Legal',head:'Dr Lucía Herrera',lead:'Pelumi Alabi'},
+    {name:'Employment Legal',head:'Rasheed Olawale',lead:'Seun Adeola'},
+    {name:'Privacy & Data Protection',head:'Yewande Oyelaran',lead:'Ufuoma Oghenekaro'},
+    {name:'Enterprise Risk Management',head:'Sipho Dlamini',lead:'Wunmi Olatunji'},
+    {name:'Governance & Board Affairs',head:'Ingrid Madsen',lead:'Yemi Akinwande'},
+    {name:'Regulatory Compliance & Ethics',head:'Farida El-Masri',lead:'Abiola Ogunbayo'},
+    {name:'Records & Information Governance',head:'Tomasz Kowalski',lead:'Chinwe Eze'},
+  ]},
+  {id:'d12',title:'D12 People & Culture',director:'Nneka Eze',depts:[
+    {name:'Talent Acquisition',head:'Sofia Lindström',lead:'Gbenga Adekunle'},
+    {name:'Onboarding & Employee Experience',head:'Javier Morales',lead:'Imaobong Etim'},
+    {name:'Employee Relations',head:'Amina Yusuf',lead:'Kola Adebisi'},
+    {name:'Total Rewards / Comp & Benefits',head:'Claire Beaumont',lead:'Morenike Adeyemi'},
+    {name:'Performance & Talent Management',head:'Kofi Agyeman',lead:'Odunola Okonkwo'},
+    {name:'Learning & Development',head:'Hana Suzuki',lead:'Rolake Okonkwo'},
+    {name:'Organizational Design & Workforce Planning',head:'Rajiv Menon',lead:'Titi Akinbode'},
+    {name:'People Analytics',head:'Adaora Nwosu',lead:'Voke Oghenerukewe'},
+    {name:'AI Workforce & Organizational Intelligence',head:'Dr Maya Kilonzo',lead:'Yetunde Adeola'},
+  ]},
+  {id:'d13',title:'D13 Operations & Procurement',director:'Bruno Fernades',depts:[
+    {name:'Corporate Operations',head:'Nadia Petrescu',lead:'Amina Garba'},
+    {name:'Business Process & Continuous Improvement',head:'Samuel Adekunle',lead:'Chinelo Obi'},
+    {name:'Procurement & Strategic Sourcing',head:'Linh Nguyen',lead:'Efua Mensah'},
+    {name:'Vendor & Supplier Management',head:'Matteo Ricci',lead:'Gbeke Michaels'},
+    {name:'Facilities & Workplace',head:'Chloe Martin',lead:'Isioma Nwosu'},
+    {name:'Real Estate & Physical Infrastructure',head:'Ahmed Al-Hassan',lead:'Kike Oladele'},
+    {name:'Quality Management',head:'Dr Eva Horváth',lead:'Maryam Abubakar'},
+    {name:'Operational Performance & Service Excellence',head:'Bongiwe Khumalo',lead:'Olamide Baddo'},
+  ]},
+  {id:'d14',title:'D14 Customer Organization',director:'Zaleena BeeHarry',depts:[
+    {name:'Customer Success',head:'Sofia Mendes',lead:'Remi Adesanya'},
+    {name:'Customer Onboarding & Implementation',head:'Caleb Nwosu',lead:'Temi Otedola'},
+    {name:'Professional Services',head:'Oluwakemi Abiodun',lead:'Vero Okafor'},
+    {name:'Technical Account Management',head:'Lars Petersen',lead:'Xena Osei'},
+    {name:'Customer Support & Service Desk',head:'Naomi Chen',lead:'Zubaidah Haruna'},
+    {name:'Customer Education & Adoption',head:'Fatima Zahra',lead:'Bukola Saraki-Jr'},
+    {name:'Renewals & Expansion',head:'Diego Fernandes',lead:'Demola Adesanya'},
+    {name:'Customer Health & Escalation Management',head:'Grace Owusu',lead:'Feyi Fela'},
+  ]},
+  {id:'d15',title:'D15 Internal Audit & Assurance',director:'Francis Lampard',depts:[
+    {name:'Financial Audit & Assurance',head:'Helena Novak',lead:'Hauwa Ribadu'},
+    {name:'Technology Audit',head:'Dr Marcus Chen',lead:'Jide Kosoko-Jr'},
+    {name:'Cybersecurity Assurance',head:'Taiwo Adegboyega',lead:'Lanre Olusola'},
+    {name:'Operational Audit',head:'Tawanda Moyo',lead:'Nonso Anozie'},
+    {name:'Compliance & Governance Audit',head:'Ingrid Solberg',lead:'Pemi Onyekwere'},
+    {name:'Controls Assurance',head:'Priya Kapoor',lead:'Sola Allyson'},
+    {name:'AI Systems & Agent Governance Audit',head:'Dr Kojo Mensima',lead:'Ugo Chukwu'},
+  ]},
+  {id:'d16',title:'D16 AI Organization & Autonomous Operations',director:'Chukwuemezue VJ Igboekwe',depts:[
+    {name:'Autonomous Agent Deployment & Lifecycle',head:'Chidera Okafor',lead:'Nkem Eze'},
+    {name:'AI Workforce Orchestration & Dispatch',head:'Zuberi Okonjo',lead:'Ayodele Bankole'},
+    {name:'Agent Performance & Continuous Learning',head:'Ngozi Udeh',lead:'Ifedayo Omotade'},
+    {name:'Human-AI Collaboration & Oversight',head:'Obinna Chukwu',lead:'Chiamaka Nwachukwu'},
+    {name:'Autonomous Operations Governance & Safety',head:'Dr Oluwaseun Adebayo',lead:'Tobenna Igwe'},
+  ]},
+];
+
+function card(p,tagClass){
+  const d=document.createElement('div');
+  d.className='card';
+  d.dataset.search=(p.name+' '+(p.role||'')).toLowerCase();
+  d.innerHTML=`<div class="name">${p.name}</div><div class="role">${p.role}</div><span class="tag t-${tagClass}">${tagClass.toUpperCase()}</span>`;
+  return d;
+}
+
+function populate(id,arr,tagClass){
+  const c=document.getElementById(id);
+  arr.forEach(p=>c.appendChild(card(p,tagClass)));
+}
+populate('board',BOARD,'board');
+populate('ai',AI,'ai');
+populate('subs',SUBS,'sub');
+populate('kill',KILL,'kill');
+
+const dirsEl=document.getElementById('dirs');
+DIRS.forEach(d=>{
+  const blk=document.createElement('div');
+  blk.className='dir-block';
+  blk.dataset.search=(d.title+' '+d.director).toLowerCase();
+
+  const hd=document.createElement('div');
+  hd.className='dir-hd';
+  hd.innerHTML=`<span>${d.title} <span style="color:var(--fg2);font-weight:400">· ${d.director}</span></span><span class="toggle">▶</span>`;
+  blk.appendChild(hd);
+
+  const body=document.createElement('div');
+  body.className='dir-body';
+  d.depts.forEach(dep=>{
+    const row=document.createElement('div');
+    row.className='dept-row';
+    row.dataset.search=(dep.name+' '+dep.head+' '+dep.lead).toLowerCase();
+    row.innerHTML=`<div><div class="dept-name">${dep.name}</div><div class="dept-head">Head: ${dep.head}</div><div class="team-lead">Lead: ${dep.lead}</div></div>`;
+    body.appendChild(row);
+  });
+  blk.appendChild(body);
+
+  hd.addEventListener('click',()=>{
+    const open=body.classList.toggle('open');
+    hd.classList.toggle('open',open);
+  });
+
+  dirsEl.appendChild(blk);
+});
+
+document.getElementById('expandAll').addEventListener('click',()=>{
+  document.querySelectorAll('.dir-body').forEach(el=>el.classList.add('open'));
+  document.querySelectorAll('.dir-hd').forEach(el=>el.classList.add('open'));
+});
+document.getElementById('collapseAll').addEventListener('click',()=>{
+  document.querySelectorAll('.dir-body').forEach(el=>el.classList.remove('open'));
+  document.querySelectorAll('.dir-hd').forEach(el=>el.classList.remove('open'));
+});
+
+let dark=true;
+document.getElementById('themeToggle').addEventListener('click',()=>{
+  dark=!dark;
+  document.documentElement.dataset.theme=dark?'dark':'light';
+  document.getElementById('themeToggle').textContent=dark?'☀︎':'☾';
+});
+
+const search=document.getElementById('search');
+search.addEventListener('input',()=>{
+  const q=search.value.trim().toLowerCase();
+  document.querySelectorAll('.card,[data-search]').forEach(el=>{
+    if(!q){el.classList.remove('hidden','match');return;}
+    const hit=(el.dataset.search||'').includes(q);
+    el.classList.toggle('hidden',!hit);
+    el.classList.toggle('match',hit);
+    if(hit&&el.classList.contains('dept-row')){
+      el.closest('.dir-body')?.classList.add('open');
+      el.closest('.dir-body')?.previousElementSibling?.classList.add('open');
+    }
+  });
+  document.querySelectorAll('.dir-block').forEach(blk=>{
+    if(!q){blk.classList.remove('hidden');return;}
+    const anyVisible=[...blk.querySelectorAll('[data-search]')].some(el=>!el.classList.contains('hidden'));
+    const selfHit=(blk.dataset.search||'').includes(q);
+    blk.classList.toggle('hidden',!anyVisible&&!selfHit);
+  });
+});
+</script>
+
+</body></html>
