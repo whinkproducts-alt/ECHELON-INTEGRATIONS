@@ -8,6 +8,10 @@ Coverage: current conversation; accessible historical project summaries from Oct
 
 Repository snapshot: ECHELON-INTEGRATIONS `main` at `11b70896b2dedf72f55c751034dad770896dc61a`, checked immediately before this document was prepared. ECHELON-CORP was inspected earlier in this conversation at `bcdd0caa18201cf1c0e09adc71aef7855365f495`. Recheck live source before changes.
 
+## November 14 consolidation addendum
+
+This is a dated context file; its earlier snapshot findings must be distinguished from later local work. The reviewed consolidation adds the sixteenth, unstaffed AI Organization and Autonomous Operations directorate without changing existing agents/teams. Newer local executive routes, ideas/initiatives and a separate Marcus prototype exist, but their completion/privacy claims were not accepted. They remain outside the application baseline pending compilation, migration, service-contract, worker and privacy repairs. See [consolidation evidence](LOCAL-CONSOLIDATION-2026-11-14.md) and the latest daily sync. Current exact protected-action approvals remain authoritative; the historical planning branch's daily-SMS exception is unverified and inactive.
+
 ## 1. Evidence vocabulary and limits
 
 - **Founder intent:** a desired outcome or explicit decision; not an implementation claim.

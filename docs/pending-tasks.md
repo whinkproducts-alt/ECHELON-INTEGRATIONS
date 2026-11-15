@@ -1,4 +1,17 @@
-# ECHELON pending work — updated 2026-11-12
+# ECHELON pending work — updated 2026-11-14
+
+## November 14 consolidation status
+
+This consolidation includes the sixteen-directorate metadata update, restores the complete standing-worker roster API broken by the earlier budget branch, documents/tests the existing account-level spend cap, and keeps the new notification helper in-app only. It does not enable paid inference, external notifications, Marcus handoff or the executive experience.
+
+The new directorate is **AI Organization and Autonomous Operations**; existing director names, 326 agents and 163 teams are preserved. It has no staffing yet. The historical D8 daily-SMS exception is an unverified proposal, not permission to bypass exact approvals.
+
+Held work: `feature/executive-experience` at `cc87d02` (compile errors, missing migrations, private-thread and mission contract gaps), local `fix/v3.3-spend-control` at `6e85524` (only safe config/test portions integrated; destructive table retirement and report rewrite held), and `marcus-vale-fixes` at `83b85ed` (standalone prototype, incompatible cross-service contract and incomplete acceptance). No local private configuration or standalone runtime is copied into the application.
+
+Monthly budget reporting is **not scheduled**: the existing worker supports interval schedules, not the added cron expression. The legacy envelope tables/modules remain; no destructive migration is included. Account model-spend admission and holds remain the active budget boundary. Setting a cap does not enable paid inference. No owner settings were changed.
+
+Promotion to ECHELON-CORP and actual Mac speech, private memory, mission execution and recovery acceptance remain separate gates.
+
 
 ## Current Integrations sandbox handoff (2026-11-12)
 
@@ -32,7 +45,7 @@ Current execution architecture: [C00–C14 completion plan](product/ECHELON-END-
 | E04 / R07 | Independently audit and finish lockdown across in-flight jobs/model/tool/delivery and browser mic/camera/audio; fail closed on DB failure. | Real safety module + DB tests, mid-task activation, no new network/capture after cutoff, local review intact. Document unavoidable already-sent effects. |
 | E05 / R06 | Finish iMessage bridge selection/integration and real two-way phone/audio; identify any required inbound message/reply paths and correlate receipts. Retain SMTP/Twilio/Telegram delivery adapters. | Per-channel configured/unconfigured, approval/denial, unknown outcome and authorized send/receive tests. Scripted Twilio call is not conversational voice. |
 | E06 / R02,R03 | Real mission and restricted GitHub App-to-provider-to-gateway-to-worker acceptance; verify report bounds/injection and revocation. Retention/cleanup for interrupted encrypted inputs/results. | Exact target commit, job and gateway receipt, no writes/other-repo access, pending/failed/incomplete checks stay truthful. |
-| E07 / R08,R09 | Accept Board Room daily motion/voice and avatar mouth/blink on the Mac; finish HOLO task/agent lifecycle and reconcile 15/16 directorates without inventing roles. | Source-accurate daily/replay/mute/skip behavior, actual audio vs synthetic cadence labelled, reduced motion, real lifecycle events; Founder roster decision if unresolved. |
+| E07 / R08,R09 | Accept Board Room daily motion/voice and avatar mouth/blink on the Mac; finish HOLO task/agent lifecycle and define staffing for the Founder-specified AI Organization and Autonomous Operations directorate without inventing roles. | Source-accurate daily/replay/mute/skip behavior, actual audio vs synthetic cadence labelled, reduced motion, real lifecycle events; leadership addition reviewed before merge, staffing decision recorded. |
 | E08 / R01,R10 | Desktop ECHELON.app/icon, runtime readiness/start/reuse/stop, safe errors and logs, backup + tested restore. The existing plist is an example, not installed. | Double-click launch twice and after restart, port/dependency failures handled, no secret logs, no automatic reset/spend/download; data and owner session survive; restore verified. |
 | E09 / R05 | Approved Mac-independent runtime, secret/bootstrap/heartbeats, budgets, monitoring, backups and recovery. Mac-on is the first milestone, not removal of Mac-off scope. | Authorized host and worker serve/finish a job with Mac powered off; prove blocked stale host and recovery, costs/privacy recorded. |
 

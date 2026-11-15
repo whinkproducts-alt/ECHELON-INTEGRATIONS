@@ -38,7 +38,7 @@ Long-term project memory. Read this with `CLAUDE.md`, `docs/decisions.md` and th
 - Executive directors as published on the site: Consult, Victor Igboekwe; Apps, Anthony Igboekwe; Trades & Investments, Juliet Igboekwe; Frontliners, Dr Tinaye Lydia Muzenyi; Real Estate, Whitney Brown (she is not on the board list).
 - Board (from the site's leadership data): Victor Igboekwe, Founder & Executive Director, Whink Consult; Anthony Igboekwe; Juliet Igboekwe; Dr Tinaye Lydia Muzenyi, Executive Director & Head of People Operations; Genevieve Igboekwe, Chief Legal Counsel (Victor calls her Barrister Genevieve); Marcus Vale, Chief Executive Assistant, Office of the Founder. WHINK (Chief of Staff / Managing Director) and MAMBA (Chief Executive Operating Officer / Consigliere) are AI board members.
 - Staff email standard: `firstname.lastname@whinkgroup.com`. Board emails other than Victor's and Marcus's were generated from this rule; the mailboxes are unverified.
-- Innovation & Opportunity Directorate (AI personas with human names, report to Victor): Amara Okafor, Mateo Restrepo, Priya Raghunathan, Soren O'Connell, Mei-Ling Tan. The 326-agent, 15-directorate roster lives in `packages/org-kit` and every agent is dormant.
+- Innovation & Opportunity Directorate (AI personas with human names, report to Victor): Amara Okafor, Mateo Restrepo, Priya Raghunathan, Soren O'Connell, Mei-Ling Tan. It is a separate staff group, not the Founder-specified AI Organization and Autonomous Operations directorate. The org-kit has 326 dormant agents; its sixteenth leadership entry is on an unmerged Integrations branch, with staffing still undefined.
 - Websites (given by Victor): Group https://whink-group.onrender.com, Pro Assist https://wpma.onrender.com, Whink Predict https://whinkpredict.onrender.com. WHINK Apps and Whink Ultimate URLs are not supplied. The Group site is a single-page app with its data in `leadership.js`, `app.js` and `upgrade.js`.
 
 ## 3. Brand and assets
@@ -198,3 +198,8 @@ Node24 Undici's synthetic multipart encoder can enqueue after readBodyCapped can
 # 2026-11-12 — Consolidation and sandbox handoff
 
 Overlapping Dependabot PRs in the two repos can request different versions of the same package; use the newer Integrations versions only after regenerating a single lockfile and checking affected code. react-resizable-panels v4 renamed the group and handle exports, requiring wrapper changes. Prisma engine download failures prevent generated-client suites and type checking; they do not prove a source regression. A local Linux build cannot certify Mac launch, Docker recovery, speech models or microphone behavior. Preserve those as explicit acceptance gates.
+
+
+## 2026-11-14 — Consolidation verification
+
+A replacement roster containing only job/schedule fields broke existing worker/API consumers. Preserve complete schemas and exported helpers when adding jobs. The worker accepts bounded interval schedules, not cron expressions. A standalone Marcus service and an ECHELON component bearing a private label do not establish a working/private mission bridge. Review request/event contracts and real worker consumption before promotion. Do not export a low-level email adapter to solve a build error: notifications need exact protected-action approval.

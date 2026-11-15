@@ -2,6 +2,12 @@
 
 Newest first. Each entry: date, decision, alternatives, reason.
 
+## 2026-11-12  Founder roster correction (America/Edmonton)
+
+Decision: the organization has 16 directorates. The Founder identified **AI Organization and Autonomous Operations** as the additional directorate and supplied its director. Keep the existing leadership names and the 326 agents, 163 teams and 570 skills. The separate Innovation & Opportunity staff group is not this directorate.
+
+Implementation status: ECHELON-INTEGRATIONS branch `org/add-ai-autonomous-operations-directorate` adds the leadership entry to JSON/YAML and sets `directorate_count` to 16 in the manifest. It is not merged into Integrations or ECHELON-CORP. The new directorate has no assigned departments, teams or agents. Decide staffing from authoritative organization data before transferring identities or claiming operating capacity. Preserve older audit findings as dated evidence.
+
 ## 2026-10-25  Phase 3d assurance — security and compliance fixes
 
 ### D1 Security findings applied (H1–H5, M5, M7)
@@ -506,3 +512,8 @@ Implementation is isolated from acceptance: model licenses, Prisma downloads, ac
 # 2026-11-12 — Integrations is the test baseline
 
 Promote reviewed sandbox changes to ECHELON-INTEGRATIONS `main` for Mac testing. Keep ECHELON-CORP separate until the owner accepts live behavior and a distinct promotion PR passes. Retain the two major upgrade holds in `docs/UPGRADE-CONSOLIDATION-2026-11-12.md`; merging version numbers without a working Prisma and TypeScript toolchain would break this baseline. The next build priority is spoken initiatives for WHINK, MAMBA and Founder-private Marcus Vale, with durable execution and existing exact approvals.
+
+
+## 2026-11-14 — Merge ready slices; preserve incomplete builds
+
+The Founder authorized merging only ready local work, cleanup of redundant branches and current notes. Include the reviewed organisation metadata and compatibility repairs; preserve unfinished executive/Marcus/spend-retirement work on their branches. Restore the standing-worker API rather than drop existing jobs. Unregistered tier lookup defaults to the lowest tier because no Agent Prisma model exists. The notification helper remains in-app only; external sends still require the existing exact approval path. D8 is an unverified planning proposal and does not override protected-action policy. Do not retire envelope tables or activate unsupported monthly scheduling in this consolidation.

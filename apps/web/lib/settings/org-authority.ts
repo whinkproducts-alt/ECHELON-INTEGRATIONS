@@ -8,7 +8,6 @@
  *           → exec → board → founder
  */
 
-import { prisma } from '@/lib/db';
 
 // ── Tier definitions ──────────────────────────────────────────────────────────
 
@@ -93,7 +92,7 @@ export type InvokeSubject =
 /**
  * Resolves the authority tier for a subject.
  * - OWNER always resolves to 'founder'.
- * - AGENT checks static exec list first (no DB), then falls back to DB lookup.
+ * - AGENT checks the static exec list; all other subjects retain the lowest tier.
  * - Result is cached for TIER_CACHE_TTL_MS.
  */
 export async function mapSubjectToTier(
@@ -113,21 +112,9 @@ export async function mapSubjectToTier(
     return 'exec';
   }
 
-  // DB lookup for dynamically-registered agents
-  const agent = await prisma.agent
-    .findFirst({
-      where: { id: agentId, userId },
-      select: { tier: true },
-    })
-    .catch(() => null);
-
-  const tier: Tier = isValidTier(agent?.tier) ? (agent!.tier as Tier) : 'agent';
-  setCache(cacheKey, tier);
-  return tier;
-}
-
-function isValidTier(value: unknown): value is Tier {
-  return typeof value === 'string' && TIERS.includes(value as Tier);
+  // There is no Agent database model. Unregistered authority must fail closed.
+  setCache(cacheKey, 'agent');
+  return 'agent';
 }
 
 // ── Gate enforcement ──────────────────────────────────────────────────────────

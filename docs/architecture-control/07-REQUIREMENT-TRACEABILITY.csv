@@ -26,5 +26,5 @@ FDR-023,One organization across local and remote,01 §3;02 SC-03,"M3,M4",One can
 "FDR-025","Founder-only Marcus Vale and private Kill Team","01 §2;02 SC-10;03 §8","M2,M4","Cross-role negative access tests; private tasks and memory denied to other personas"
 "FDR-026","Mission-scoped agent activation and temporary cover","02 SC-09;03 §8;04 Authorized first ticket","M1,M4","Authorized substitute takeover, manager notification, audit, deny elevation"
 "FDR-027","Mac-off 24/7 now, examine spare computer and zero-new-cost memory","01 §4;03 §4;04 M3","M3,M8","Full Mac-off execution and sync test, cost/privacy evidence"
-"FDR-028","Preserve 326/163; reconcile 15 audited vs 16 planned","01 §8;02 SC-09;06 FDR-028","M0,M4","Registry hashes/counts unchanged; trace design discrepancy"
+"FDR-028","Preserve 326 agents/163 teams; include the Founder-specified sixteenth directorate","01 §8;02 SC-09;06 FDR-028","M0,M4","Leadership and manifest show 16 on unmerged Integrations branch; workforce/team hashes remain unchanged; staffing remains open"
 "FDR-029","Versioned decisions and anti-drift enforcement","03 §3;05 §5;04 J5","M0,M8","CI blocks untraced governed changes; Founder approval records"

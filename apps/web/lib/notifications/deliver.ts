@@ -1,16 +1,15 @@
 /**
  * notifications/deliver.ts
- * In-app + email notification delivery for ECHELON.
+ * In-app notification delivery for ECHELON.
  *
  * In-app:  prisma.recommendation  (dedupeKey for idempotency)
- * Email:   deliverEmail() from lib/comms/delivery.ts
+ * External delivery remains on the existing exact-approval path.
  *
  * NOTE: prisma.notification does NOT exist in schema.prisma.
  *       All in-app delivery goes through prisma.recommendation.
  */
 
 import { prisma } from '@/lib/db';
-import { deliverEmail } from '@/lib/comms/delivery';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -87,34 +86,16 @@ export async function resolveEmailAddress(userId: string): Promise<string | null
 // ── Combined delivery ─────────────────────────────────────────────────────────
 
 /**
- * Delivers both in-app (recommendation) and email notification.
+ * Delivers an in-app recommendation. Email is deliberately skipped pending exact approval.
  * Idempotent via dedupeKey.
  */
 export async function notify(params: NotifyParams): Promise<NotifyResult> {
   const inApp = await deliverInApp(params);
 
-  let emailResult: NotifyResult['email'] = 'skipped';
+  const emailResult: NotifyResult['email'] = 'skipped';
 
-  if (params.emailSubject !== undefined) {
-    const address = await resolveEmailAddress(params.userId);
-
-    if (!address) {
-      emailResult = 'no_address';
-    } else {
-      try {
-        const result = await deliverEmail({
-          to: address,
-          subject: params.emailSubject,
-          body: params.body,
-          channel: 'EMAIL',
-          userId: params.userId,
-        });
-        emailResult = result.ok ? 'sent' : 'error';
-      } catch {
-        emailResult = 'error';
-      }
-    }
-  }
+  // Email is a protected external action. Keep this helper in-app only;
+  // sending requires the existing exact approval and delivery path.
 
   return { inApp, email: emailResult };
 }

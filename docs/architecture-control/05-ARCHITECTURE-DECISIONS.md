@@ -1,6 +1,8 @@
 # WHINK Ultimate | Architecture Decisions / ADR Governance
 **v0.3 post-Founder approval of six corrections** · Historical facts, current Founder requirements and proposed future choices deliberately separated.
 
+**Current branch update (12 November 2026, America/Edmonton):** The Founder identified AI Organization and Autonomous Operations as the sixteenth directorate. Integrations branch `org/add-ai-autonomous-operations-directorate` adds its leadership entry and manifest count without modifying the 326 agents or 163 teams. It is unmerged and unstaffed. Earlier audit observations below describe their dated snapshots.
+
 ## 1. What the audits actually found (AUDIT-OBSERVED; not current live verification)
 - Earliest imported design includes WHINK, ADA V2, OpenClaw actions, AnythingLLM and a swappable model router; **not** proof that upstream OpenClaw was supposed to own all 326 agents.
 - 2026-10-03 recorded choice used WHINK-owned MCP aggregator in `services/openclaw` for transport/availability. The installed upstream OpenClaw v2026.10.8 is distinct, and the audit did **not** find a configured bridge.
@@ -8,7 +10,7 @@
 - Upstream installation was bound loopback and token authenticated, but configured `tools: full`, no explicit sandbox configuration, and a default local model not present in observed Ollama inventory. Its safe execution and successful WHINK integration are **unverified**.
 - EAR approval currently says 'TEAM DISPATCHED' without actually handing a job to an executor. Analytical swarm assigns agents but they have no tools. HOLO visual activity uses fixtures. Business operations may be independent of this path.
 - Local file settings selected Gemma. Independent comparative evaluation was incomplete: Qwen had four scored trials with strict 0/4 full compliance and partial successes, Gemma inference not run; disk exhaustion stopped tests. No reliable comparative winner.
-- Historic `ARCHITECTURE.md` incorrectly implies 16 directorates, Tauri, Python/SQLite; audited code shows **15 directorates**, Next.js, Prisma/Postgres. Older notes are evidence, not binding current-state descriptions.
+- At the dated audit, historic `ARCHITECTURE.md` described 16 directorates before the inspected org-kit leadership data did; it also described Tauri and Python/SQLite while the inspected app used Next.js and Prisma/Postgres. The Founder later identified the additional directorate and the Integrations branch now adds its leadership entry. Older notes remain evidence of their inspected revision, not binding current-state descriptions.
 - Cloud spending is not universally gated; direct content analyst, detached jobs and uncommitted coding runner may not share execution contracts. The existing late-approval council is deterministic policy, not five independent AI judgements.
 **Sources:** see `evidence/FORENSIC-ARCHITECTURE-AUDIT.md` and `evidence/INDEPENDENT-LOCAL-MODEL-EVALUATION.md`. These snapshots inspected local source/selected metadata; did not test full app end-to-end.
 

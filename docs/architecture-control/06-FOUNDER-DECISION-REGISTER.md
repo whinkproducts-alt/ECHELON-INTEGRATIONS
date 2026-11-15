@@ -53,5 +53,11 @@
 
 ## Explicitly NOT decided
 Hosting vendor/plan/location, its cost or suitability, selected remote model, reliable no-cost cloud capacity, exact cloud memory database and encryption implementation, whether to vendor/port OpenClaw source code or adapt its API, final model benchmark winner, gesture implementation, production release authorization, any purchases. Codex must investigate and report options, not guess Founder approval.
+
+## Founder update — 12 November 2026 (America/Edmonton)
+
+The [dated planning record](../product/FOUNDER-DECISIONS-2026-11-12.md) describes the next-build targets: WHINK-first spoken initiative, automatic safe internal execution, local then verified free cloud then approved paid inference, Canada-preferred central memory, local-video evaluation priority. The off-device host choice is deferred. The intended organization has **16 directorates**; the Founder supplied **AI Organization and Autonomous Operations** as the missing canonical directorate. Existing director names remain unchanged. The dated historical audit entries above describe their inspected snapshot and are not a current product target. The proposed daily briefing exception is unverified and is not enabled; protected messages retain exact approval.
+
+Implementation checkpoint: the leadership JSON/YAML and manifest update is pushed only to ECHELON-INTEGRATIONS branch `org/add-ai-autonomous-operations-directorate`. It has not been merged. Departments, teams and agents for the new directorate are unassigned; their existing records remain unchanged.
 ## Authorization record — 30 October 2026
 Founder explicitly responded **Approved** to the six recommendations and then instructed: **Send to Codex to start implementing**. This authorizes the scoped non-destructive M0/M1 engineering workflow on a separate branch, not paid/cloud deployment, production release, permanent roster mutations or protected side effects. FDR-001..023 remain controlling except where refined by FDR-024..029. The signed model default remains undecided pending paired benchmarking.
