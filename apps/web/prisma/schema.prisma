@@ -12,6 +12,7 @@ datasource db {
 // ── Auth.js tables ──────────────────────────────────────────────
 
 model User {
+  killTeamMembers KillTeamMember[]
   id            String    @id @default(cuid())
   name          String?
   email         String    @unique
@@ -1663,6 +1664,21 @@ model SpeechPreference {
   updatedAt         DateTime @updatedAt
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@map("speech_preferences")
+}
+
+// Founder-managed Kill Team roster. Rows only describe a specialist (name, role, brief); they grant no permission.
+model KillTeamMember {
+  id        String   @id @default(cuid())
+  userId    String
+  slug      String
+  name      String
+  role      String
+  handoff   String   @default("")
+  brief     String   @default("")
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, slug])
+  @@map("kill_team_members")
 }
 
 model SpeechDailyCheck {

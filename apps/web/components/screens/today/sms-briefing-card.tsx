@@ -3,7 +3,7 @@
 // for an approval request, and the existing ApprovalCard (amber, 30 s countdown, protected badge) is where the
 // owner approves it by request id. If the server later reports not_configured or failed, the card says so.
 import * as React from 'react';
-import { MessageSquareText } from 'lucide-react';
+import { Download, Mail, MessageSquareText } from 'lucide-react';
 import { ApprovalCard } from '@/app/dashboard/conversation/_components/approval-card';
 import {
   approvalReducer, initialCardState, normalizeApproval, postDecision,
@@ -13,6 +13,7 @@ import { HoloBadge, HoloButton, HoloPanel } from '@/components/ui/holo';
 
 const E164 = /^\+[1-9]\d{6,14}$/;
 
+type Channel = 'sms' | 'email';
 type Phase = 'idle' | 'working' | 'need_number' | 'ready' | 'error';
 
 function DecisionCard({ approval }: { approval: ApprovalView }) {
@@ -40,14 +41,17 @@ export function SmsBriefingCard() {
   const [preview, setPreview] = React.useState('');
   const [message, setMessage] = React.useState<string | null>(null);
   const [number, setNumber] = React.useState('');
+  const [channel, setChannel] = React.useState<Channel>('sms');
 
-  const request = React.useCallback(async () => {
+  const request = React.useCallback(async (ch: Channel = 'sms') => {
+    setChannel(ch);
     setPhase('working');
     setMessage(null);
     try {
-      const res = await fetch('/api/briefing/sms', { method: 'POST' });
+      const res = await fetch(`/api/briefing/${ch}`, { method: 'POST' });
       const data = (await res.json().catch(() => ({}))) as { approval?: unknown; preview?: unknown; error?: unknown };
       if (res.status === 400 && data.error === 'no_sms_number') { setPhase('need_number'); return; }
+      if (res.status === 400 && data.error === 'no_email') { setMessage('Your account has no email address on file. Nothing was sent.'); setPhase('error'); return; }
       if (res.status === 429) { setMessage('Too many requests. Wait a minute and try again.'); setPhase('error'); return; }
       const a = normalizeApproval(data.approval);
       if (!res.ok || !a) { setMessage('The briefing could not be prepared. Nothing was sent.'); setPhase('error'); return; }
@@ -73,7 +77,7 @@ export function SmsBriefingCard() {
         body: JSON.stringify({ channel: 'SMS', enabled: true, address }),
       });
       if (!res.ok) { setMessage('The number could not be saved.'); setPhase('need_number'); return; }
-      await request();
+      await request('sms');
     } catch {
       setMessage('The number could not be saved.');
       setPhase('need_number');
@@ -85,12 +89,16 @@ export function SmsBriefingCard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <h3 className="flex items-center gap-2 font-display text-base text-foreground">
-            <MessageSquareText className="h-4 w-4" aria-hidden />Send today&apos;s briefing to my phone by SMS
+            <MessageSquareText className="h-4 w-4" aria-hidden />Send today&apos;s briefing
           </h3>
-          <p className="text-xs text-muted-foreground">Goes to your own number. Nothing is sent until you approve the exact text below.</p>
+          <p className="text-xs text-muted-foreground">By SMS to your number or email to your account address. Nothing is sent until you approve the exact text. Download keeps it on this device.</p>
         </div>
         {phase !== 'ready' && phase !== 'need_number' && (
-          <HoloButton onClick={request} loading={phase === 'working'}>Send briefing</HoloButton>
+          <div className="flex flex-wrap gap-2">
+            <HoloButton onClick={() => void request('sms')} loading={phase === 'working' && channel === 'sms'}><MessageSquareText className="mr-1 h-4 w-4" aria-hidden />SMS</HoloButton>
+            <HoloButton onClick={() => void request('email')} loading={phase === 'working' && channel === 'email'}><Mail className="mr-1 h-4 w-4" aria-hidden />Email</HoloButton>
+            <a href="/api/briefing/download" download className="inline-flex items-center rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"><Download className="mr-1 h-4 w-4" aria-hidden />Download</a>
+          </div>
         )}
       </div>
 

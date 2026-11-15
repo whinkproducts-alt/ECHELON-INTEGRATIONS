@@ -1,7 +1,8 @@
 'use client';
 import { useCallback,useEffect,useState } from 'react';
 import type { SpeechMode,SpeechResult,SpeechService } from '@/lib/speech-policy';
-import { KOKORO_VOICES,stableVoice } from '@/lib/speech-policy';
+import { KOKORO_CHOICES,KOKORO_VOICES,stableVoice } from '@/lib/speech-policy';
+import { PERSONAS } from '@/lib/personas';
 interface Config {
  enabled:boolean;accountId:string;mode:SpeechMode;timezone:string|null;timezoneConfirmed:boolean;selectedService?:string|null;
  voiceAssignments:Record<string,Record<string,string>>;
@@ -9,7 +10,11 @@ interface Config {
  lastCheck:{ checkedAt:string|null;status:string;reason:string|null;results:SpeechResult[]|null }|null;
 }
 const names:Record<SpeechMode,string>={ auto:'Auto','whisper-kokoro':'Whisper + Kokoro',voicestudio:'VoiceStudio',legacy:'Previous provider' };
+const BOARD=Object.values(PERSONAS).filter(p=>p.isBoardMember&&p.id!=='WHINK'&&p.id!=='MAMBA'&&p.id!=='MARCUS');
 export function SpeechServicePanel() {
+ const [killTeam,setKillTeam]=useState<Array<{slug:string;name:string}>>([]);
+ useEffect(()=> { fetch('/api/kill-team/members').then(r=>r.ok?r.json():null).then(d=>{ if(d?.members) setKillTeam(d.members); }).catch(()=>{}); },[]);
+ const [previewing,setPreviewing]=useState(false);
  const [config,setConfig]=useState<Config|null>(null);const [error,setError]=useState<string|null>(null);const [busy,setBusy]=useState(false);
  const [speaker,setSpeaker]=useState('whink');const [service,setService]=useState<SpeechService>('whisper-kokoro');const [voiceDraft,setVoiceDraft]=useState<{key:string;value:string}|null>(null);
  const load=useCallback(async()=> { const response=await fetch('/api/voice/config');const data=await response.json();if(!response.ok) throw new Error(data.error??'Speech settings unavailable.');setConfig(data);setVoiceDraft(null); },[]);
@@ -22,9 +27,9 @@ export function SpeechServicePanel() {
  if(!config) return <p role="status" className="text-sm text-muted-foreground">{error??'Loading speech services…'}</p>;
  if(!config.enabled) return <p className="text-sm text-muted-foreground">Selectable speech services are disabled in this installation. Your previous speech provider is unchanged.</p>;
  const results=config.lastCheck?.results??[];
- const voices=service==='whisper-kokoro'?KOKORO_VOICES:results.find(result=>result.service==='voicestudio')?.voices??[];
+ const voices=service==='whisper-kokoro'?KOKORO_CHOICES:results.find(result=>result.service==='voicestudio')?.voices??[];
  const key=service+':'+speaker;const savedVoice=config.voiceAssignments?.[service]?.[speaker];
- const voice=voiceDraft?.key===key?voiceDraft.value:savedVoice??(voices.length?stableVoice(speaker,voices):'');
+ const voice=voiceDraft?.key===key?voiceDraft.value:savedVoice??(voices.length?stableVoice(speaker,service==='whisper-kokoro'?KOKORO_VOICES:voices):'');
  return <div className="space-y-4">
   <p className="text-xs text-muted-foreground">Local setup account ID: <code className="select-all">{config.accountId}</code></p>
   <p className="text-sm text-muted-foreground">Choose listening and speech together. Changes apply on the next turn. Text stays available if speech fails.</p>
@@ -48,14 +53,20 @@ export function SpeechServicePanel() {
   <p className="text-xs text-muted-foreground">Checks use two short bundled synthetic samples per service, never your microphone or files. Warm score = STT + playable TTS milliseconds. Auto keeps yesterday’s healthy pair when within 20%.</p>
   {config.lastCheck?.reason&&<p className="text-xs text-muted-foreground">{config.lastCheck.reason}</p>}
   <fieldset disabled={busy} className="space-y-2 border-t border-border pt-3">
-   <legend className="text-sm font-medium">Stable agent voices</legend>
+   <legend className="text-sm font-medium">Voices for each person</legend>
    <div className="flex flex-wrap gap-2">
-    <label className="text-xs">Agent ID<input aria-label="Agent ID" value={speaker} onChange={event=>setSpeaker(event.target.value.toLowerCase())} maxLength={100} className="mt-1 block rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground" placeholder="whink, mamba, or agent ID"/></label>
+    <label className="text-xs">Who<select aria-label="Who to give a voice" value={speaker} onChange={event=>setSpeaker(event.target.value)} className="mt-1 block rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground">
+     <optgroup label="Core"><option value="whink">Whink</option><option value="mamba">Mamba</option><option value="marcus">Marcus Vale</option></optgroup>
+     {killTeam.length>0&&<optgroup label="Kill Team">{killTeam.map(m=><option key={m.slug} value={m.slug}>{m.name}</option>)}</optgroup>}
+     <optgroup label="Board">{BOARD.map(p=><option key={p.id} value={p.id.toLowerCase()}>{p.name[0]+p.name.slice(1).toLowerCase()}</option>)}</optgroup>
+     <optgroup label="Everyone else"><option value="agents">All other AI agents (shared voice)</option></optgroup>
+    </select></label>
     <label className="text-xs">Service<select aria-label="Voice service" value={service} onChange={event=>setService(event.target.value as SpeechService)} className="mt-1 block rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"><option value="whisper-kokoro">Whisper + Kokoro</option><option value="voicestudio">VoiceStudio</option></select></label>
     <label className="text-xs">Voice<select aria-label="Agent voice" value={voice} onChange={event=>setVoiceDraft({key,value:event.target.value})} className="mt-1 block rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground">{voice&&!voices.includes(voice)&&<option value={voice}>{voice} (saved voice unavailable)</option>}{voices.map(id=><option key={id} value={id}>{id}</option>)}</select></label>
    </div>
    {savedVoice&&!voices.includes(savedVoice)&&<p role="status" className="text-xs text-muted-foreground">Saved voice {savedVoice} is unavailable. Speech uses the service default until you choose an available voice.</p>}
-   <button type="button" disabled={!voices.includes(voice)||!speaker} onClick={()=>void save({ speakerId:speaker,service,voice })} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Save agent voice</button>
+   <button type="button" disabled={!voices.includes(voice)||!speaker} onClick={()=>void save({ speakerId:speaker,service,voice })} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Save voice</button>
+   <button type="button" disabled={busy||previewing||!voices.includes(voice)||service!=='whisper-kokoro'} onClick={async()=> { setPreviewing(true);setError(null); try { const res=await fetch('/api/voice/tts',{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify({ text:'Good morning. Here is how I sound, and what is on your plate today.',speakerId:speaker,voice }) });if(!res.ok) throw new Error('Preview unavailable. Check the local speech service.');const url=URL.createObjectURL(await res.blob());const audio=new Audio(url);audio.onended=()=>URL.revokeObjectURL(url);await audio.play(); } catch(e) { setError(e instanceof Error?e.message:'Preview unavailable.'); } finally { setPreviewing(false); } }} className="ml-2 rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">{previewing?'Playing…':'Play sample'}</button>
    <p className="text-xs text-muted-foreground">The primary and strategist personas have stable distinct Kokoro defaults. Other agents receive a stable mapping. VoiceStudio needs actual voice profiles for distinct voices; its OpenAI voice aliases all use the same engine default.</p>
   </fieldset>
   {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}

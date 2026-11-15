@@ -2,6 +2,7 @@
 // Today: the chief-of-staff briefing. Every figure comes from a real endpoint; if one is unavailable the card says so.
 // Greeting and date are computed on the client after mount, so server HTML is deterministic.
 import * as React from 'react';
+import Link from 'next/link';
 import { CalendarX, ExternalLink, Newspaper, Sparkles, ShieldAlert } from 'lucide-react';
 import { HoloBadge, HoloEmpty, HoloHeading, HoloMeter, HoloPanel, HoloStat } from '@/components/ui/holo';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
@@ -74,9 +75,12 @@ export function TodayScreen() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
+        <Link href="/dashboard/approvals" aria-label="Open approvals" className="block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-opacity hover:opacity-90">
         {pendingCount === null
           ? <HoloPanel tone="neutral"><p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-muted-foreground">Approvals pending</p><p className="mt-2 font-mono text-lg text-muted-foreground">not reported</p></HoloPanel>
           : <HoloStat label="Approvals pending" value={pendingCount} tone={pendingCount > 0 ? 'amber' : 'accent'} suffix={pendingCount > 0 ? ' awaiting' : ''} />}
+        </Link>
+        <Link href="/dashboard/security" aria-label="Open security events" className="block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-opacity hover:opacity-90">
         {secCount === null
           ? <HoloPanel tone="neutral"><p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-muted-foreground">Security events</p><p className="mt-2 font-mono text-lg text-muted-foreground">{ledger.state === 'loading' || security.state === 'loading' ? 'loading' : 'not reported'}</p></HoloPanel>
           : (
@@ -87,6 +91,8 @@ export function TodayScreen() {
               <p className="mt-1 text-xs text-muted-foreground">{fromStatus ? 'In the last 24 hours' : 'In the latest 200 ledger entries'}</p>
             </HoloPanel>
           )}
+        </Link>
+        <Link href="/dashboard/usage" aria-label="Open token usage" className="block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-opacity hover:opacity-90">
         <HoloPanel tone={bState === 'soft' || bState === 'hard' ? 'amber' : 'accent'}>
           {budget && bState ? (
             limit === null
@@ -96,6 +102,7 @@ export function TodayScreen() {
             <><p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-muted-foreground">Monthly token budget</p><p className="mt-2 font-mono text-lg text-muted-foreground">{usage.state === 'loading' ? 'loading' : 'not reported'}</p></>
           )}
         </HoloPanel>
+        </Link>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">

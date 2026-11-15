@@ -88,12 +88,12 @@ export function RecommendationsColumn() {
                   <HoloBadge tone={sev.tone}>{sev.label}</HoloBadge>
                   <span className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-muted-foreground">{r.source}</span>
                 </div>
-                <h3 className="font-display text-base text-foreground">{r.title}</h3>
+                <h3 className="font-display text-base text-foreground"><Link href={r.link ?? '/dashboard/conversation'} className="hover:text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">{r.title}</Link></h3>
                 {r.body && <p className="whitespace-pre-line text-sm text-muted-foreground">{r.body}</p>}
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                   {r.link
                     ? <Link href={r.link} className="inline-flex items-center gap-1 text-sm text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">Open<ArrowRight className="h-3.5 w-3.5" aria-hidden /></Link>
-                    : <span />}
+                    : <Link href="/dashboard/conversation" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">Discuss<ArrowRight className="h-3.5 w-3.5" aria-hidden /></Link>}
                   <HoloButton size="sm" variant="ghost" magnetic={false} loading={busy === r.id} onClick={() => void dismiss(r.id)} aria-label={`Dismiss: ${r.title}`}>Dismiss</HoloButton>
                 </div>
               </HoloPanel>

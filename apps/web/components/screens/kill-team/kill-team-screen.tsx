@@ -1,24 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, ArrowRight, CheckCircle2, LockKeyhole, Radar, Send, ShieldCheck } from 'lucide-react';
-
-type Specialist = {
-  id: string;
-  name: string;
-  role: string;
-  handoff: string;
-  accent: string;
-};
-
-const SPECIALISTS: Specialist[] = [
-  { id: 'PETER', name: 'Peter', role: 'Forensics & reverse engineering', handoff: 'Verified evidence and capability map', accent: 'border-sky-500/30' },
-  { id: 'PAUL', name: 'Paul', role: 'Clean-room reconstruction', handoff: 'Production implementation and tests', accent: 'border-violet-500/30' },
-  { id: 'MICAH', name: 'Micah', role: 'Product audit & strategy', handoff: 'User value, risk, and product decisions', accent: 'border-amber-500/30' },
-  { id: 'NANDI', name: 'Nandi', role: 'Growth, marketing & revenue', handoff: 'Distribution and monetisation opportunities', accent: 'border-emerald-500/30' },
-  { id: 'SCOUT', name: 'Michael Carrick', role: 'Market research & opportunity scouting', handoff: 'Sources, signals, and opportunity leads', accent: 'border-rose-500/30' },
-  { id: 'REGISTRATION', name: 'Website Registration', role: 'Founder-only free-account setup planning', handoff: 'Signup checklist and account status; no password handling', accent: 'border-cyan-500/30' },
-];
+import { KillTeamRoster } from './kill-team-roster';
+import { AlertTriangle, CheckCircle2, LockKeyhole, Radar, Send, ShieldCheck } from 'lucide-react';
 
 export function KillTeamScreen({ founder }: { founder: boolean }) {
   const [objective, setObjective] = useState('');
@@ -57,12 +41,7 @@ export function KillTeamScreen({ founder }: { founder: boolean }) {
         </div>
       </section>
 
-      <section aria-labelledby="specialists-heading">
-        <div className="mb-3 flex items-center justify-between"><h2 id="specialists-heading" className="text-sm font-semibold text-foreground">Specialists</h2><span className="font-mono text-xs text-muted-foreground">{SPECIALISTS.length} active roles</span></div>
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {SPECIALISTS.map((specialist) => <article key={specialist.id} className={`rounded-xl border bg-card p-4 ${specialist.accent}`}><div className="flex items-start justify-between gap-3"><div><h3 className="font-display font-semibold text-foreground">{specialist.name}</h3><p className="mt-1 text-xs text-muted-foreground">{specialist.role}</p></div><span className="rounded bg-secondary px-2 py-1 font-mono text-[0.625rem] text-muted-foreground">{specialist.id}</span></div><div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground"><ArrowRight className="h-3.5 w-3.5 text-primary" /> {specialist.handoff}</div></article>)}
-        </div>
-      </section>
+      <KillTeamRoster founder={founder} />
 
       <section aria-labelledby="guardrails-heading" className="grid gap-3 md:grid-cols-2">
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4"><h2 id="guardrails-heading" className="flex items-center gap-2 text-sm font-semibold text-foreground"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Allowed without another approval</h2><p className="mt-2 text-xs leading-5 text-muted-foreground">Research, analysis, evidence gathering, planning, drafts, code proposals, and testable implementation work within existing access boundaries.</p></div>

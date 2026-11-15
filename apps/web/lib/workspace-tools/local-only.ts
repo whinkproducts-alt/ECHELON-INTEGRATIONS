@@ -22,7 +22,7 @@ export const LOCAL_ONLY_DENIED: ReadonlySet<string> = new Set([
   'media_generate', 'media_quote', 'media_status',
   'web_search', 'web_fetch',
   'document_search', 'document_upload', 'document_delete',
-  'contact_message', 'contact_call', 'sms_briefing_send',
+  'contact_message', 'contact_call', 'sms_briefing_send', 'email_briefing_send',
   'change_request_submit', 'social_schedule_post',
   'calendar_create',
 ]);

@@ -3,6 +3,7 @@ import { isLocalOnlyMode, localOnlyBlocksUrl, redirectOpt, SPEECH_UNAVAILABLE } 
 import { ledgerLocalOnlyBlock } from '@/lib/local-only-guard';
 import { isLockedDown, ledgerLockdownBlock, LOCKDOWN_MESSAGE } from '@/lib/safety/lockdown';
 import { NextRequest, NextResponse } from 'next/server';
+import { KOKORO_CHOICES } from '@/lib/speech-policy';
 import { auth } from '@/auth';
 import { DispatchBlockedError, runAdmittedVoice } from '@/lib/model-router/dispatch';
 
@@ -53,7 +54,10 @@ export async function POST(req: NextRequest) {
     const selected = await selectedSpeech(req, session.user.id);
     if (selected === null) return NextResponse.json({ error: 'No local speech pair is available. Text remains available.' }, { status: 503 });
     if (selected) {
-      const { voice, notice } = await voiceForSpeaker(session.user.id, selected.service, body.speakerId);
+      const picked = await voiceForSpeaker(session.user.id, selected.service, body.speakerId);
+      // A preview may name any listed Kokoro voice; nothing else is accepted from the body.
+      const voice = selected.service === 'whisper-kokoro' && typeof body.voice === 'string' && KOKORO_CHOICES.includes(body.voice) ? body.voice : picked.voice;
+      const notice = picked.notice;
       const audio = await synthesizeSpeech(session.user.id, selected, text, voice, req.signal);
       return new NextResponse(Uint8Array.from(audio).buffer, { headers: { 'Content-Type': 'audio/wav', 'Content-Length': String(audio.byteLength), 'Cache-Control': 'no-store', 'X-Speech-Service': selected.service, ...(notice ? { 'X-Speech-Notice': notice } : {}) } });
     }

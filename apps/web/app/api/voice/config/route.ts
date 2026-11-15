@@ -7,7 +7,7 @@ import { checkPermission } from '@/lib/permission-engine';
 import { recordAction } from '@/lib/ledger';
 import { dailySpeech, speechContext, speechSelectionEnabled, speechTarget } from '@/lib/speech-services';
 import { isRosterSpeaker } from '@/lib/speech-roster';
-import { canonicalSpeaker, KOKORO_VOICES, SPEECH_MODES, type SpeechMode, type SpeechResult, type SpeechService } from '@/lib/speech-policy';
+import { canonicalSpeaker, KOKORO_CHOICES, SPEECH_MODES, type SpeechMode, type SpeechResult, type SpeechService } from '@/lib/speech-policy';
 
 export async function GET() {
   const session=await auth();
@@ -46,10 +46,10 @@ export async function POST(req:NextRequest) {
   if (body.voice!==undefined) {
     if (body.service==='voicestudio'&&!speechTarget('voicestudio',userId)) return NextResponse.json({ error:'VoiceStudio is not configured for this account' },{ status:403 });
     if (!['whisper-kokoro','voicestudio'].includes(body.service as string) || typeof body.voice!=='string' || typeof body.speakerId!=='string' || canonicalSpeaker(body.speakerId)!==body.speakerId) return NextResponse.json({ error:'Invalid voice assignment' },{ status:400 });
-    if (!await isRosterSpeaker(body.speakerId)) return NextResponse.json({ error:'Choose a canonical agent ID from your app roster.' },{ status:400 });
+    if (!await isRosterSpeaker(body.speakerId,userId)) return NextResponse.json({ error:'Choose a canonical agent ID from your app roster.' },{ status:400 });
     const latest=await prisma.speechDailyCheck.findFirst({ where:{ userId,status:'COMPLETED' },orderBy:{ checkedAt:'desc' } });
     const results=Array.isArray(latest?.results)?latest.results as unknown as SpeechResult[]:[];
-    const allowed=body.service==='whisper-kokoro'?KOKORO_VOICES:results.find(result=>result.service==='voicestudio')?.voices??[];
+    const allowed=body.service==='whisper-kokoro'?KOKORO_CHOICES:results.find(result=>result.service==='voicestudio')?.voices??[];
     if (!allowed.includes(body.voice)) return NextResponse.json({ error:'Choose a discovered voice profile. Run a service check first.' },{ status:400 });
     const assignments=(context.pref?.voiceAssignments??{}) as Record<string,Record<string,string>>;
     if (Object.keys(assignments[body.service as string]??{}).length>=100 && !assignments[body.service as string]?.[body.speakerId]) return NextResponse.json({ error:'Voice assignment limit reached' },{ status:400 });

@@ -3,6 +3,10 @@ export type SpeechService = 'whisper-kokoro' | 'voicestudio';
 export type SpeechMode = SpeechService | 'auto' | 'legacy';
 export const SPEECH_MODES: SpeechMode[] = ['auto', 'whisper-kokoro', 'voicestudio', 'legacy'];
 export const KOKORO_VOICES = ['af_heart', 'af_bella', 'af_sky', 'af_nova', 'am_adam', 'am_michael'];
+/** Voices a user may pick for Kokoro (all exist in the local catalog). Defaults still hash over KOKORO_VOICES only. */
+export const KOKORO_CHOICES = [...KOKORO_VOICES, 'af_nicole', 'af_sarah', 'af_jessica', 'af_alloy', 'af_aoede', 'af_kore', 'af_river', 'am_echo', 'am_eric', 'am_liam', 'am_onyx', 'am_puck', 'am_fenrir', 'bf_alice', 'bf_emma', 'bf_lily', 'bm_daniel', 'bm_fable', 'bm_george', 'bm_lewis'];
+/** Speaker key for the one voice every AI agent without its own assignment shares. */
+export const SHARED_AGENT_SPEAKER = 'agents';
 export const FIXTURE_TEXT = 'The local speech service is ready for a clear voice test';
 export interface SpeechResult {
   service: SpeechService; configured: boolean; reachable: boolean; modelReady: boolean; healthy: boolean;

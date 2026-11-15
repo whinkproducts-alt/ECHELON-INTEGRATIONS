@@ -41,6 +41,7 @@ export const PROTECTED_REGISTRY: Readonly<Record<string, { category: ProtectedCa
   // Outbound messages and calls
   contact_message: { category: 'proprietary', reason: 'sends a message to a person outside the account' },
   contact_call: { category: 'proprietary', reason: 'places a call to a person outside the account' },
+  email_briefing_send: { category: 'proprietary', reason: 'sends account data to an email address through an SMTP provider' },
   sms_briefing_send: { category: 'proprietary', reason: 'sends account data to a phone through an SMS provider' },
   // Social and gateway writes (openclaw__<platform>__post, reply, send_dm, follow, publish_*) are caught by the
   // keyword rules below, so no gateway tool name is hardcoded here.

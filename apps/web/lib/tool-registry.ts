@@ -618,6 +618,13 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
     return { success: r.success, data: r.data, error: r.error, source: 'sms', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
   },
 
+  // Same gate as sms_briefing_send: Class C, protected, hash-locked, runs only from an approved request.
+  email_briefing_send: async (userId: string, params: any) => {
+    const { runApprovedEmailBriefing } = await import('@/lib/briefing/email');
+    const r = await runApprovedEmailBriefing(userId, params);
+    return { success: r.success, data: r.data, error: r.error, source: 'email', timestamp: new Date().toISOString(), toolVersion: '1.0.0' };
+  },
+
   contact_call: async (userId: string, params: any) => {
     const ts = () => new Date().toISOString();
     const contact = typeof params?.contactId === 'string'
@@ -673,6 +680,7 @@ const TOOL_RISK_MAP: Record<string, PermissionClass> = Object.assign(Object.crea
   contact_message: 'C',
   contact_call: 'C',
   sms_briefing_send: 'C',
+  email_briefing_send: 'C',
   change_request_submit: 'C',
   memory_write: 'A',
   memory_read: 'A',
@@ -1427,7 +1435,7 @@ export async function executeApprovedTool(userId: string, approval: ApprovedTool
       confirmationMethod: 'user_confirmed',
       status: 'SUBMITTED',
       // The SMS briefing text and the full number stay out of the ledger; the approval row holds them.
-      inputSummary: approval.tool.startsWith('media_') ? 'Media request (exact content in approval)' : approval.tool === 'sms_briefing_send' ? 'sms briefing (content in the approval request)' : approval.tool === 'contact_message' || approval.tool === 'contact_call' ? `${approval.tool} (recipient and content are in the approval request)` : safeJson(callParams),
+      inputSummary: approval.tool.startsWith('media_') ? 'Media request (exact content in approval)' : approval.tool === 'sms_briefing_send' || approval.tool === 'email_briefing_send' ? 'sms briefing (content in the approval request)' : approval.tool === 'contact_message' || approval.tool === 'contact_call' ? `${approval.tool} (recipient and content are in the approval request)` : safeJson(callParams),
       validationResult: JSON.stringify({ approvalId: approval.id }),
       latencyMs: 0,
     });

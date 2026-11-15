@@ -7,7 +7,7 @@ import { prisma } from '@/lib/db';
 import { recordAction } from '@/lib/ledger';
 import { checkPermission } from '@/lib/permission-engine';
 import { isLockedDown } from '@/lib/safety/lockdown';
-import { canonicalSpeaker, chooseHealthy, FIXTURE_TEXT, KOKORO_VOICES, scheduledSpeechDay, stableVoice, transcriptAccepts, validTimezone, validatePcmWav, type SpeechMode, type SpeechResult, type SpeechService } from './speech-policy';
+import { canonicalSpeaker, chooseHealthy, FIXTURE_TEXT, KOKORO_CHOICES, KOKORO_VOICES, SHARED_AGENT_SPEAKER, scheduledSpeechDay, stableVoice, transcriptAccepts, validTimezone, validatePcmWav, type SpeechMode, type SpeechResult, type SpeechService } from './speech-policy';
 export type { SpeechMode, SpeechResult, SpeechService } from './speech-policy';
 export interface SpeechTarget { service: SpeechService; baseUrl: string; token: string; sttPath: string; ttsPath: string }
 const SERVICES: SpeechService[] = ['whisper-kokoro', 'voicestudio'];
@@ -180,9 +180,11 @@ export async function voiceForSpeaker(userId: string,service: SpeechService,spea
   const serviceMap = map[service] && typeof map[service]==='object' ? map[service] as Record<string,unknown> : {};
   const latest=await prisma.speechDailyCheck.findFirst({ where:{ userId,status:'COMPLETED' },orderBy:{ checkedAt:'desc' } });
   const results=Array.isArray(latest?.results) ? latest.results as unknown as SpeechResult[] : [];
-  const catalog = service==='whisper-kokoro' ? KOKORO_VOICES : results.find(result=>result.service===service)?.voices ?? [];
-  const assigned=serviceMap[id];
+  const catalog = service==='whisper-kokoro' ? KOKORO_CHOICES : results.find(result=>result.service===service)?.voices ?? [];
+  // Whink, Mamba and Marcus use their own pick or default. Every other speaker falls back to the shared agent voice.
+  const named=id==='whink'||id==='mamba'||id==='marcus';
+  const assigned=serviceMap[id] ?? (named ? undefined : serviceMap[SHARED_AGENT_SPEAKER]);
   if (typeof assigned==='string' && catalog.includes(assigned)) return {voice:assigned,notice:null};
   // VoiceStudio aliases all resolve to one default; never pretend they are distinct agent voices.
-  return {voice:catalog.length ? stableVoice(id,catalog) : 'alloy',notice:typeof assigned==='string'?'stored_voice_unavailable':service==='voicestudio'&&!catalog.length?'distinct_voice_profiles_unavailable':null};
+  return {voice:catalog.length ? stableVoice(id,service==='whisper-kokoro'?KOKORO_VOICES:catalog) : 'alloy',notice:typeof assigned==='string'?'stored_voice_unavailable':service==='voicestudio'&&!catalog.length?'distinct_voice_profiles_unavailable':null};
 }
