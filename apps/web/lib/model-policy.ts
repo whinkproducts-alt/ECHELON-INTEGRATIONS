@@ -8,6 +8,8 @@
  * WHINK_ALLOWED_MODELS (comma separated) replaces the built-in list. The built-in list is the set the
  * model picker in the chat screen offers, plus DEFAULT_MODEL and WHINK_LOCAL_MODEL when they are set.
  */
+import { isOmniRouteModel, omniRouteConfigured } from '@/lib/model-router/omniroute';
+
 export const DEFAULT_SELECTABLE_MODELS: readonly string[] = [
   'claude-haiku-4-5-20251001',
   'claude-sonnet-4-5',
@@ -42,6 +44,8 @@ export function byokProviderFor(model: string): 'anthropic' | 'openai' | null {
 
 export function isModelAllowed(model: string, opts: { hasOwnKey: boolean; env?: EnvMap }): boolean {
   if (!isModelNameShape(model)) return false;
+  // OmniRoute models are listed live by the gateway, so they are allowed whenever it is configured. Cost admission still applies.
+  if (isOmniRouteModel(model)) return omniRouteConfigured(opts.env ?? process.env);
   if (opts.hasOwnKey) return true;
   return allowedModelSet(opts.env).has(model);
 }

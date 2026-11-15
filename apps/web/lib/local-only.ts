@@ -39,6 +39,7 @@ export function localOnlyViolation(model: string, opts: { apiKey?: string; baseU
   if (!isLocalOnlyMode(env)) return null;
   const lower = (model ?? '').trim().toLowerCase();
   if (lower.startsWith('claude') || lower.startsWith('gemini')) return `model ${lower.slice(0, 40)} is a cloud model`;
+  if (lower.startsWith('omniroute/')) return 'OmniRoute forwards off the machine';
   if (opts.apiKey) return 'a per-user API key may not be used';
   const targets = opts.baseUrl ? [opts.baseUrl] : [env.OPENAI_COMPATIBLE_BASE_URL || DEFAULT_OPENAI_BASE];
   if (!opts.baseUrl && env.OLLAMA_URL) targets.push(env.OLLAMA_URL);

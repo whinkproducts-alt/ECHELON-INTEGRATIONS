@@ -11,7 +11,7 @@ import { officialAssets } from '@/lib/brand/official-assets';
 import { dashboardJson, DashboardRequestError, readConversationEvents, isConversationPersona, type ConversationPersona } from '@/lib/dashboard-client';
 import {
   Send, Plus, MessageSquare, Zap, ChevronDown,
-  FolderKanban, Mic, MicOff, Volume2, VolumeX, Cpu, SlidersHorizontal, PanelLeft, HelpCircle
+  FolderKanban, Mic, Volume2, VolumeX, Cpu, SlidersHorizontal, PanelLeft, HelpCircle
 } from 'lucide-react';
 import { HoloDrawer } from '@/components/ui/holo';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
@@ -73,6 +73,19 @@ function findLastIndexOf<T>(items: readonly T[], predicate: (item: T) => boolean
   return -1;
 }
 
+/** Plain-language reasons for refusals the server reports with a code; null falls back to the generic message. */
+function stopMessage(stop: { error: string; code: string | null } | null): string | null {
+  if (!stop) return null;
+  switch (stop.code) {
+    case 'TOKEN_HARD_LIMIT': return 'Monthly token budget reached. Local model tokens count too. Raise WHINK_MONTHLY_TOKEN_BUDGET (or set it to 0 for unlimited) and restart, or wait for the monthly reset.';
+    case 'SPEND_HARD_LIMIT': return 'Monthly spend limit reached. Nothing was sent to a paid model.';
+    case 'PAID_NOT_ADMITTED': return 'This model is paid and paid models are switched off (WHINK_PAID_MODELS_ENABLED).';
+    case 'LOCAL_ONLY': return 'Local-Only mode is on, so this non-local model was refused. Choose a local model.';
+    case 'LOCKDOWN': return 'Lockdown is active. Release it to chat.';
+    default: return stop.code ? `${stop.error} (${stop.code}).` : `${stop.error}.`;
+  }
+}
+
 export function ConversationSurface({ initialPrompt = '', presentation = 'standard' }: { initialPrompt?: string; presentation?: 'standard' | 'presence' | 'obsidian' } = {}) {
   const persona = useDashboardPersona();
   const {input,setInput,activeConvId,setActiveConvId,selectedProject,setSelectedProject} = useConversationWorkspace();
@@ -108,7 +121,19 @@ export function ConversationSurface({ initialPrompt = '', presentation = 'standa
   const [streamMambaMode, setStreamMambaMode] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [handsFree, setHandsFree] = useState(false);
+  const [handsFreeTick, setHandsFreeTick] = useState(0);
+  const handsFreeRef = useRef(false);
+  const listeningCycle = useRef(false);
   const [selectedModel, setSelectedModel] = useState('');
+  const [omniModels, setOmniModels] = useState<string[]>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    dashboardJson<{ models?: unknown }>('/api/models/omniroute', { signal: controller.signal })
+      .then(d => { if (!controller.signal.aborted && Array.isArray(d.models)) setOmniModels(d.models.filter((m): m is string => typeof m === 'string')); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
   useEffect(() => {
     const initial = setTimeout(() => {
       setOptionsOpen(readOptionsFlag());
@@ -127,7 +152,7 @@ export function ConversationSurface({ initialPrompt = '', presentation = 'standa
   const streamCitationsRef = useRef<CitationChipProps[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { startListening, stopListening, speak, isListening, isSpeaking, supported, lipSyncAmplitude, voiceNotice } = useVoice({ speakerId: activePersona ?? 'WHINK' });
+  const { stopListening, listen, stopSpeaking, primeAudio, speak, isListening, isSpeaking, supported, lipSyncAmplitude, voiceNotice } = useVoice({ speakerId: activePersona ?? 'WHINK' });
 
   // Approvals: cards live in the stream; state per id via a pure reducer.
   const [approvals, setApprovals] = useState<ApprovalView[]>([]);
@@ -255,6 +280,7 @@ export function ConversationSurface({ initialPrompt = '', presentation = 'standa
     let mambaMode = activeMambaMode;
     let completed = false;
     let approvalArrived = false;
+    let streamStop: { error: string; code: string | null } | null = null;
     let attempted = false;
     let rejected = false;
     const tempId = `temp-${Date.now()}`;
@@ -342,6 +368,9 @@ export function ConversationSurface({ initialPrompt = '', presentation = 'standa
                   setStreamCitations([...streamCitationsRef.current]);
                 }
 
+              } else if (data.type === 'error') {
+                const e = data as { error?: unknown; code?: unknown };
+                streamStop = { error: typeof e.error === 'string' ? e.error : 'Model error', code: typeof e.code === 'string' ? e.code : null };
               } else if (data.type === 'done') {
                 completed = true;
                 persona = isSelectablePersona(data.persona) ? data.persona : persona;
@@ -353,7 +382,11 @@ export function ConversationSurface({ initialPrompt = '', presentation = 'standa
       const capturedCitations = [...streamCitationsRef.current];
       if (fullText) setMessages(previous => [...previous,{id:`reply-${Date.now()}`,role:'assistant',content:fullText,persona:replyPersona,mambaMode,functionalMode:null,createdAt:new Date().toISOString(),citations:capturedCitations}]);
       setStreamText(''); setStreamCitations([]); streamCitationsRef.current = [];
-      if (voiceMode && fullText && !approvalArrived && !hasPendingApproval()) void speak(fullText, replyPersona).catch(() => {});
+      if ((voiceMode || handsFreeRef.current) && fullText && !approvalArrived && !hasPendingApproval()) {
+        // Hands-free waits for the reply to finish so the microphone never hears the speaker.
+        const spoken = speak(fullText, replyPersona).catch(() => {});
+        if (handsFreeRef.current) await spoken; else void spoken;
+      }
     } catch (error) {
       if (!attempted || rejected) {
         setInput(text); setMessages(previous => previous.filter(message => message.id !== tempId));
@@ -361,13 +394,45 @@ export function ConversationSurface({ initialPrompt = '', presentation = 'standa
       } else {
         const partialCitations = [...streamCitationsRef.current];
         if (fullText) setMessages(previous => [...previous,{id:`partial-${Date.now()}`,role:'assistant',content:fullText,persona:replyPersona,mambaMode,functionalMode:null,createdAt:new Date().toISOString(),citations:partialCitations}]);
-        setRequestError('Delivery or response completion could not be confirmed. Check conversation history before sending again.');
+        setRequestError(stopMessage(streamStop) ?? 'Delivery or response completion could not be confirmed. Check conversation history before sending again.');
       }
       setStreamText(''); setStreamCitations([]); streamCitationsRef.current = []; pushNeuralEvent('error','Conversation request did not complete.');
     } finally {
       sendLock.current = false; setStreaming(false); await persona.refresh();
     }
   }, [input, activePersona, activeMambaMode, switchingPersona, historyLoading, historyError, activeConvId, selectedProject, selectedModel, voiceMode, speak, pushNeuralEvent, addApproval, speakApproval, hasPendingApproval, persona, setActiveConvId, setInput]);
+
+  // Hands-free conversation: listen until the speaker stops, send, speak the reply, listen again.
+  // Pending approvals keep their own manual controls, so the loop pauses while one is open.
+  useEffect(() => {
+    if (!handsFree || streaming || isSpeaking || isListening || listeningCycle.current) return;
+    if (!activePersona || switchingPersona || historyLoading || historyError || hasPendingApproval()) return;
+    listeningCycle.current = true;
+    void (async () => {
+      let heard = '';
+      try { heard = (await listen()).trim(); } finally { listeningCycle.current = false; }
+      if (!handsFreeRef.current) return;
+      if (!heard) { handsFreeRef.current = false; setHandsFree(false); return; } // nothing was said: end the session
+      await sendMessage(heard);
+      setHandsFreeTick(n => n + 1);
+    })();
+  }, [handsFree, handsFreeTick, streaming, isSpeaking, isListening, activePersona, switchingPersona, historyLoading, historyError, approvals, listen, sendMessage, hasPendingApproval]);
+  // A pending approval resolving changes no dependency above, so re-check once a second while hands-free is on.
+  useEffect(() => {
+    if (!handsFree) return;
+    const id = setInterval(() => setHandsFreeTick(n => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [handsFree]);
+  useEffect(() => () => { handsFreeRef.current = false; }, []);
+
+  const onMicClick = useCallback(() => {
+    if (isSpeaking) { stopSpeaking(); return; } // barge in: cut the reply off, then listen
+    if (handsFreeRef.current) {
+      if (isListening) { void stopListening(); return; } // done talking: send now
+      handsFreeRef.current = false; setHandsFree(false); stopSpeaking(); return; // end hands-free
+    }
+    primeAudio(); handsFreeRef.current = true; setHandsFree(true);
+  }, [isSpeaking, isListening, stopListening, stopSpeaking, primeAudio]);
 
   // Slash command menu: open while typing a command token, or from the Commands button.
   const typedMenu = isSlashMenuOpen(input) && dismissedFor !== input;
@@ -516,6 +581,11 @@ export function ConversationSurface({ initialPrompt = '', presentation = 'standa
             <div className="flex-1" />
 
             {/* Mic state — always visible when live */}
+            {handsFree && (
+              <span className="flex items-center gap-1 text-xs font-mono" style={{ color: 'hsl(var(--whink-accent))' }}>
+                Hands-free
+              </span>
+            )}
             {isListening && (
               <span
                 className="flex items-center gap-1 text-xs font-mono animate-pulse"
@@ -600,6 +670,7 @@ export function ConversationSurface({ initialPrompt = '', presentation = 'standa
 
               {/* Model picker */}
               <ModelPicker
+                extra={omniModels}
                 selected={selectedModel}
                 onChange={(m) => {
                   setSelectedModel(m);
@@ -778,22 +849,18 @@ export function ConversationSurface({ initialPrompt = '', presentation = 'standa
                 {supported.stt && (
                   <button
                     type="button"
-                    onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); startListening(); }}
-                    onPointerUp={async () => { const text = await stopListening(); if(text.trim()) setInput(text.trim()); }}
-                    onPointerCancel={() => { void stopListening(); }}
-                    onKeyDown={event => { if((event.key === ' ' || event.key === 'Enter') && !event.repeat) { event.preventDefault(); startListening(); } }}
-                    onKeyUp={async event => { if(event.key === ' ' || event.key === 'Enter') { event.preventDefault(); const text = await stopListening(); if(text.trim()) setInput(text.trim()); } }}
-                    onBlur={() => { void stopListening(); }}
-                    title={isListening ? 'Listening… release to stop' : 'Hold to speak'}
-                    aria-label={isListening ? 'Listening. Release to stop' : 'Hold to speak'}
-                    disabled={streaming || switchingPersona || !activePersona || historyLoading || !!historyError}
+                    onClick={onMicClick}
+                    title={handsFree ? (isSpeaking ? 'Tap to interrupt' : isListening ? 'Tap to send now' : 'Tap to end hands-free') : 'Tap to talk hands-free'}
+                    aria-label={handsFree ? 'Hands-free conversation on' : 'Start hands-free conversation'}
+                    aria-pressed={handsFree}
+                    disabled={switchingPersona || !activePersona || historyLoading || !!historyError}
                     className={`px-3 md:px-4 py-3 rounded-lg border transition-colors disabled:opacity-30 ${
-                      isListening
-                        ? 'bg-[hsl(var(--whink-accent)/0.15)] border-[hsl(var(--whink-accent))] text-[hsl(var(--whink-accent))] animate-pulse'
+                      handsFree
+                        ? `bg-[hsl(var(--whink-accent)/0.15)] border-[hsl(var(--whink-accent))] text-[hsl(var(--whink-accent))]${isListening ? ' animate-pulse' : ''}`
                         : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    {isListening ? <MicOff className="h-4 w-4" aria-hidden /> : <Mic className="h-4 w-4" aria-hidden />}
+                    <Mic className="h-4 w-4" aria-hidden />
                   </button>
                 )}
                 <button
@@ -836,10 +903,11 @@ const MODEL_OPTIONS = [
   { value: 'llama3.1:8b', label: 'Llama 3.1 8B', hint: 'Local' },
 ];
 
-function ModelPicker({ selected, onChange, disabled }: { selected:string; onChange:(model:string)=>void; disabled:boolean }) {
+function ModelPicker({ selected, onChange, disabled, extra = [] }: { selected:string; onChange:(model:string)=>void; disabled:boolean; extra?:string[] }) {
   return <label className="inline-flex min-w-0 items-center gap-2 text-xs text-muted-foreground"><Cpu size={14} aria-hidden /><span>Model preference</span><select aria-label="Model preference" disabled={disabled} value={selected} onChange={event => onChange(event.target.value)} className="min-h-9 max-w-40 rounded-md border border-border bg-background px-2 text-xs text-foreground">
-    {!MODEL_OPTIONS.some(option => option.value === selected) && <option value={selected}>{selected}</option>}
+    {!MODEL_OPTIONS.some(option => option.value === selected) && !extra.includes(selected) && <option value={selected}>{selected}</option>}
     {MODEL_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+    {extra.length > 0 && <optgroup label="OmniRoute">{extra.map(id => <option key={id} value={id}>{id.replace(/^omniroute\//, '')}</option>)}</optgroup>}
   </select></label>;
 }
 

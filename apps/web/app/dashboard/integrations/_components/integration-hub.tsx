@@ -295,6 +295,10 @@ function ProvidersSection({ providers, hosts, busy, act, onReview }: { providers
         <label>Extra destinations it may contact (comma separated; its own host is added)<input className="mt-1 w-full border border-border bg-background rounded px-2 py-1" value={f.allow} onChange={(e) => setF({ ...f, allow: e.target.value })} placeholder="api.example.com:443" /></label>
         <label>Highest data class it may receive<select className="mt-1 w-full border border-border bg-background rounded px-1 py-1" value={f.maxDataClass} onChange={(e) => setF({ ...f, maxDataClass: e.target.value })}>{['public', 'organization', 'confidential'].map((d) => <option key={d}>{d}</option>)}</select></label>
         <label>Runs on host (optional)<select className="mt-1 w-full border border-border bg-background rounded px-1 py-1" value={f.hostId} onChange={(e) => setF({ ...f, hostId: e.target.value })}><option value="">none (always reachable)</option>{hosts.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}</select></label>
+        <div className="sm:col-span-2 text-xs text-muted-foreground">
+          <button type="button" className="rounded border border-border bg-background px-2 py-1 mr-2" onClick={() => setF({ ...f, connectorId: 'composio', endpoint: 'https://connect.composio.dev/mcp' })}>Use Composio</button>
+          Composio Connect gives access to 1000+ apps through one connection. Paste your Composio API key (from its dashboard, AI Clients setup) below. Its tools stay Class C and unpriced until you review them.
+        </div>
         <div className="sm:col-span-2"><button disabled={busy !== ''} className="rounded border border-border bg-background px-3 py-1 disabled:opacity-50">Register provider</button></div>
       </form>
     </section>

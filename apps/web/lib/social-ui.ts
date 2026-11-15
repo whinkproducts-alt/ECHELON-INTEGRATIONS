@@ -184,6 +184,11 @@ export function interpretConnectResponse(
       ? (body as { error: string }).error
       : null;
   if (status === 503 && (errCode === 'platform_not_configured' || errCode === 'encryption_not_configured')) {
+    const raw = body && typeof body === 'object' ? (body as { missing?: unknown }).missing : undefined;
+    const missing = Array.isArray(raw) ? raw.filter((n): n is string => typeof n === 'string' && /^[A-Z0-9_]{1,64}$/.test(n)).slice(0, 5) : [];
+    if (errCode === 'platform_not_configured' && missing.length) {
+      return { ok: false, message: `Not set up yet. Add ${missing.join(', ')} to the server settings (.env), then restart.` };
+    }
     return { ok: false, message: ERROR_TEXT[errCode] };
   }
   if (status < 200 || status >= 300) {

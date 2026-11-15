@@ -29,7 +29,8 @@ export type DispatchPurpose =
   | 'chat' | 'tool_round' | 'embed' | 'voice_stt' | 'voice_tts'
   | 'worker' | 'skill' | 'swarm' | 'memory' | 'refinement' | 'other';
 
-export type CostClass = 'local' | 'metered' | 'trial' | 'unknown';
+/** free: remote but the operator states it costs nothing (OmniRoute with WHINK_OMNIROUTE_COST=free). Still refused in lockdown and Local-Only. */
+export type CostClass = 'local' | 'metered' | 'trial' | 'unknown' | 'free';
 
 export interface AdmissionDecisionInput {
   userId: string;
@@ -81,6 +82,7 @@ export function classifyCost(input: { model: string; baseUrl?: string; env?: Nod
   const lower = model.toLowerCase();
   const env = input.env ?? process.env;
   if (!model) return 'unknown';
+  if (lower.startsWith('omniroute/')) return env.WHINK_OMNIROUTE_COST === 'free' ? 'free' : 'unknown';
   if (lower.startsWith('nvidia/') || lower.includes('nemotron')) return 'trial';
   if (/^(claude|gemini|gpt-|o1|o3|o4)/.test(lower)) return 'metered';
   const base = input.baseUrl ?? env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1';

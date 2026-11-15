@@ -30,6 +30,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pla
     }
     throw e;
   }
-  if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.status });
+  if (!res.ok) return NextResponse.json({ error: res.error, ...(res.missing?.length ? { missing: res.missing } : {}) }, { status: res.status });
   return NextResponse.json({ authorizeUrl: res.authorizeUrl });
 }

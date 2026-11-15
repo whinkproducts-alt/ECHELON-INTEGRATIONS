@@ -6,11 +6,18 @@ import { acquireMicrophone } from './microphone-capture';
 import { beginSpeech,endSpeech } from './speech-activity';
 import { isClientLockedDown,onClientLockdown,trackMedia } from '@/lib/safety/client-lockdown';
 import { createAnalyserFeed,type AudioFeed } from '@/components/avatar/avatar-audio-feed';
+import { createVad } from '@/lib/voice-vad';
 
 declare global { interface Window { SpeechRecognition:SpeechRecognitionConstructor; webkitSpeechRecognition:SpeechRecognitionConstructor } }
 export interface VoiceSupport { stt:boolean;tts:boolean;serverStt:boolean }
 export interface UseVoiceReturn {
-  startListening:()=>void;stopListening:()=>Promise<string>;speak:(text:string,speakerId?:string)=>Promise<void>;
+  startListening:()=>void;stopListening:()=>Promise<string>;
+  /** Hands-free: listen until the speaker stops, resolving with the transcript ('' when nothing was said). */
+  listen:()=>Promise<string>;
+  /** Cut the current reply off (barge-in). */
+  stopSpeaking:()=>void;
+  /** Call from a tap so the browser lets later captures run without a gesture. */
+  primeAudio:()=>void;speak:(text:string,speakerId?:string)=>Promise<void>;
   isListening:boolean;isSpeaking:boolean;transcript:string;supported:VoiceSupport;lipSyncAmplitude:number;audioFeed:AudioFeed|null;voiceNotice?:string|null;
 }
 const LOCAL_ONLY_CLIENT=process.env.NEXT_PUBLIC_WHINK_LOCAL_ONLY==='true';
@@ -29,6 +36,7 @@ export function useVoice(options:{ speakerId?:string }={}):UseVoiceReturn {
   const audioUrl=useRef<string|null>(null);const context=useRef<AudioContext|null>(null);const animation=useRef<number|null>(null);
   const captureTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const speaker=useRef(options.speakerId??'whink');
+  const autoStop=useRef(false);const vadContext=useRef<AudioContext|null>(null);
   useEffect(()=> { speaker.current=options.speakerId??'whink'; },[options.speakerId]);
 
   const finishCapture=useCallback((text:string,version=captureEpoch.current)=> { if(version===captureEpoch.current) capturedText.current=text;if(pendingCapture.current?.version===version) pendingCapture.current.complete(text); },[]);
@@ -59,7 +67,7 @@ export function useVoice(options:{ speakerId?:string }={}):UseVoiceReturn {
   useEffect(()=> {
     mounted.current=true;
     const timer=setTimeout(()=>setSupported({ stt:typeof MediaRecorder!=='undefined'||(!LOCAL_ONLY_CLIENT&&!!(window.SpeechRecognition??window.webkitSpeechRecognition)),tts:true,serverStt:true }),0);
-    return ()=> { mounted.current=false;clearTimeout(timer);cancelCapture();stopPlayback(); };
+    return ()=> { mounted.current=false;clearTimeout(timer);cancelCapture();stopPlayback();void vadContext.current?.close().catch(()=>{});vadContext.current=null; };
   },[cancelCapture,stopPlayback]);
   useEffect(()=>onClientLockdown(locked=> { if (locked) { cancelCapture();stopPlayback(); } }),[cancelCapture,stopPlayback]);
 
@@ -75,6 +83,7 @@ export function useVoice(options:{ speakerId?:string }={}):UseVoiceReturn {
   const startListening=useCallback(()=> {
     if (intent.current||isListening||isClientLockedDown()) return;
     pendingCapture.current?.complete('');if(captureTimer.current) clearTimeout(captureTimer.current);captureTimer.current=null;recorder.current=null;intent.current=true;const version=++captureEpoch.current;pendingCapture.current=new CaptureTurn(version);capturedText.current='';turn.current=null;
+    const auto=autoStop.current;autoStop.current=false;
     captureAbort.current?.abort();const controller=new AbortController();captureAbort.current=controller;
     setVoiceNotice('Checking speech service…');
     const active=()=>mounted.current&&intent.current&&version===captureEpoch.current&&!controller.signal.aborted&&!isClientLockedDown();
@@ -83,19 +92,22 @@ export function useVoice(options:{ speakerId?:string }={}):UseVoiceReturn {
       const BrowserRecognition=selected.mode==='legacy'&&!selected.serverStt&&!LOCAL_ONLY_CLIENT?(window.SpeechRecognition??window.webkitSpeechRecognition):null;
       if (BrowserRecognition) {
         const recognizer=new BrowserRecognition();recognition.current=recognizer;recognizer.continuous=true;recognizer.interimResults=true;recognizer.lang='en-US';
+        let silenceTimer:ReturnType<typeof setTimeout>|null=null;
+        const armSilence=(ms:number)=> { if(silenceTimer) clearTimeout(silenceTimer);silenceTimer=setTimeout(()=> { try { recognizer.stop(); } catch { /* already stopped */ } },ms); };
         recognizer.onresult=event=> {
           if (!mounted.current||version!==captureEpoch.current||isClientLockedDown()) return;
           let interim='';for (let i=event.resultIndex;i<event.results.length;i++) { if (event.results[i].isFinal) capturedText.current+=event.results[i][0].transcript;else interim+=event.results[i][0].transcript; }
           setTranscript(capturedText.current+interim);
+          if(auto) armSilence(1500);
         };
-        const complete=()=> { if(version!==captureEpoch.current) return;intent.current=false;if (mounted.current) setIsListening(false);finishCapture(capturedText.current,version); };
-        recognizer.onend=complete;recognizer.onerror=complete;recognizer.start();setIsListening(true);setSupported(previous=>({...previous,serverStt:false}));return;
+        const complete=()=> { if(silenceTimer) clearTimeout(silenceTimer);if(version!==captureEpoch.current) return;intent.current=false;if (mounted.current) setIsListening(false);finishCapture(capturedText.current,version); };
+        recognizer.onend=complete;recognizer.onerror=complete;recognizer.start();setIsListening(true);if(auto) armSilence(9000);setSupported(previous=>({...previous,serverStt:false}));return;
       }
       const stream=await acquireMicrophone(()=>navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true,noiseSuppression:true } }),active);
       if (!stream) return;trackMedia(stream);
       const mime=recorderMime();let recording:MediaRecorder;
       try { recording=new MediaRecorder(stream,mime?{ mimeType:mime }:undefined); } catch(error) { stream.getTracks().forEach(track=>track.stop());throw error; }
-      const chunks:Blob[]=[];let size=0;recorder.current=recording;
+      const chunks:Blob[]=[];let size=0;recorder.current=recording;let silent=false;
       recording.ondataavailable=event=> { size+=event.data.size;if (size<=10*1024*1024&&event.data.size) chunks.push(event.data);else if (recording.state!=='inactive') recording.stop(); };
       recording.onstop=()=> {
         stream.getTracks().forEach(track=>track.stop());
@@ -105,6 +117,7 @@ export function useVoice(options:{ speakerId?:string }={}):UseVoiceReturn {
         void (async()=> {
           let text='';
           try {
+            if (silent) return; // hands-free heard nothing: do not send silence to speech recognition
             const wav=await recordingWav(new Blob(chunks,{ type:recording.mimeType }));
             if (!mounted.current||version!==captureEpoch.current||controller.signal.aborted||isClientLockedDown()) return;
             const form=new FormData();form.append('audio',wav,'audio.wav');
@@ -120,6 +133,23 @@ export function useVoice(options:{ speakerId?:string }={}):UseVoiceReturn {
         })();
       };
       recording.start(1000);setIsListening(true);setSupported(previous=>({...previous,serverStt:true}));
+      if (auto) {
+        const Ctx=window.AudioContext??(window as unknown as { webkitAudioContext?:typeof AudioContext }).webkitAudioContext;
+        const ctx=vadContext.current&&vadContext.current.state!=='closed'?vadContext.current:Ctx?new Ctx():null;
+        if (ctx) {
+          void ctx.resume().catch(()=>{});
+          const analyser=ctx.createAnalyser();analyser.fftSize=1024;const source=ctx.createMediaStreamSource(stream);source.connect(analyser);
+          const samples=new Uint8Array(analyser.fftSize);const verdictFor=createVad(Date.now());
+          const release=()=> { clearInterval(watch);try { source.disconnect(); } catch { /* already gone */ } if(ctx!==vadContext.current) void ctx.close().catch(()=>{}); };
+          const watch=setInterval(()=> {
+            if (recording.state==='inactive'||version!==captureEpoch.current) { release();return; }
+            analyser.getByteTimeDomainData(samples);let sum=0;for (const sample of samples) { const v=(sample-128)/128;sum+=v*v; }
+            const verdict=verdictFor(Math.sqrt(sum/samples.length),Date.now());
+            if (verdict==='unreadable') release(); // leave ending the turn to the user
+            else if (verdict==='end'||verdict==='no-speech') { silent=verdict==='no-speech';release();try { recording.stop(); } catch { /* already stopped */ } }
+          },100);
+        }
+      }
       captureTimer.current=setTimeout(()=> { if(recording.state!=='inactive') recording.stop(); },60000);
     })().catch(error=> {
       if (version===captureEpoch.current) { intent.current=false;finishCapture('');if(mounted.current&&!controller.signal.aborted) setVoiceNotice(error instanceof Error?error.message:'Microphone unavailable.'); }
@@ -140,6 +170,19 @@ export function useVoice(options:{ speakerId?:string }={}):UseVoiceReturn {
     captureEpoch.current++;captureAbort.current?.abort();pendingCapture.current?.complete('');
     return Promise.resolve(capturedText.current);
   },[finishCapture]);
+
+  const listen=useCallback(():Promise<string>=> {
+    if (intent.current||isClientLockedDown()) return Promise.resolve('');
+    autoStop.current=true;startListening();
+    return pendingCapture.current?.promise??Promise.resolve('');
+  },[startListening]);
+  const primeAudio=useCallback(()=> {
+    if (typeof window==='undefined') return;
+    const Ctx=window.AudioContext??(window as unknown as { webkitAudioContext?:typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    if (!vadContext.current||vadContext.current.state==='closed') vadContext.current=new Ctx();
+    void vadContext.current.resume().catch(()=>{});
+  },[]);
 
   const speak=useCallback(async(text:string,explicitSpeaker?:string):Promise<void>=> {
     if (!text.trim()||isClientLockedDown()) return;
@@ -180,5 +223,5 @@ export function useVoice(options:{ speakerId?:string }={}):UseVoiceReturn {
       endSpeech();
     }
   },[fetchTurn,stopMotion,stopPlayback]);
-  return { startListening,stopListening,speak,isListening,isSpeaking,transcript,supported,lipSyncAmplitude,audioFeed,voiceNotice };
+  return { startListening,stopListening,listen,stopSpeaking:stopPlayback,primeAudio,speak,isListening,isSpeaking,transcript,supported,lipSyncAmplitude,audioFeed,voiceNotice };
 }

@@ -508,7 +508,7 @@ export async function POST(
                 } else if (parsed.type === 'security') {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'security', event: parsed.event, tool: parsed.tool, patterns: parsed.patterns })}\n\n`));
                 } else if (parsed.type === 'error') {
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: parsed.error ?? 'LLM error' })}\n\n`));
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: parsed.error ?? 'LLM error', ...(typeof parsed.code === 'string' ? { code: parsed.code } : {}) })}\n\n`));
                 }
               } catch {
                 // skip unparseable lines

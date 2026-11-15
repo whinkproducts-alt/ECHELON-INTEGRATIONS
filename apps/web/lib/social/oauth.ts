@@ -43,9 +43,15 @@ export function hashState(state: string): string {
   return createHash('sha256').update(state).digest('hex');
 }
 
+/** The environment variable names a platform still needs before Connect can start. Names only. */
+export function missingSetup(platform: SocialPlatform, env: Record<string, string | undefined> = process.env): string[] {
+  const cfg = PLATFORM_CONFIG[platform];
+  return [cfg.clientIdEnv, cfg.clientSecretEnv, 'SOCIAL_OAUTH_REDIRECT_BASE'].filter((name) => !env[name]?.trim());
+}
+
 export type StartResult =
   | { ok: true; authorizeUrl: string }
-  | { ok: false; status: 400 | 503; error: 'platform_not_configured' | 'redirect_not_allowed' | 'encryption_not_configured' | 'consent_required' };
+  | { ok: false; status: 400 | 503; error: 'platform_not_configured' | 'redirect_not_allowed' | 'encryption_not_configured' | 'consent_required'; /** Names (never values) of the settings still empty. */ missing?: string[] };
 
 export async function startConnect(userId: string, platform: SocialPlatform, consent?: { granted: boolean; textVersion: string }): Promise<StartResult> {
   if (!userId) throw new Error('social: userId is required');
@@ -53,7 +59,7 @@ export async function startConnect(userId: string, platform: SocialPlatform, con
   if (!isEncryptionConfigured()) return { ok: false, status: 503, error: 'encryption_not_configured' };
   const creds = clientCredentials(platform);
   const redirectUri = buildRedirectUri(platform);
-  if (!creds || !redirectUri) return { ok: false, status: 503, error: 'platform_not_configured' };
+  if (!creds || !redirectUri) return { ok: false, status: 503, error: 'platform_not_configured', missing: missingSetup(platform) };
   if (!isRedirectAllowed(redirectUri)) return { ok: false, status: 400, error: 'redirect_not_allowed' };
 
   const cfg = PLATFORM_CONFIG[platform];

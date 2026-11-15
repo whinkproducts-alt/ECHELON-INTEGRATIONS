@@ -4,6 +4,7 @@
  * based on the model string. Never import a provider SDK from a route; use this instead.
  */
 
+import { isOmniRouteModel, resolveOmniRoute } from '@/lib/model-router/omniroute';
 import { assertLocalOnly, isLocalOnlyMode, isLoopbackUrl, redirectOpt } from '@/lib/local-only';
 import { localDefaultModel } from '@/lib/model-router/registry';
 import { redactForLog } from '@/lib/redact-log';
@@ -265,20 +266,22 @@ async function chatOnceOpenAICompatible(
   explicitBaseUrl?: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const baseUrl = (explicitBaseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
-  const apiKey = explicitBaseUrl || isLocalOnlyMode() ? 'ollama' : (userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
+  const omni = resolveOmniRoute(model);
+  const baseUrl = omni?.baseUrl ?? (explicitBaseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
+  const apiKey = omni?.apiKey ?? (explicitBaseUrl || isLocalOnlyMode() ? 'ollama' : (userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama'));
   const response = await fetch(`${baseUrl}/chat/completions`, {
     signal,
     method: 'POST',
     ...redirectOpt(baseUrl),
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model,
+      model: omni?.model ?? model,
       messages,
       stream: false,
       max_tokens: maxTokens,
       temperature,
-      ...(localReasoningEffort(baseUrl) ? { reasoning_effort: localReasoningEffort(baseUrl), think: false } : {}),
+      // Ollama-only options: a gateway that forwards to other providers may reject them.
+      ...(!omni && localReasoningEffort(baseUrl) ? { reasoning_effort: localReasoningEffort(baseUrl), think: false } : {}),
     }),
   });
   if (!response.ok) {
@@ -535,8 +538,9 @@ async function streamOpenAICompatible(
   userApiKey?: string,
   explicitBaseUrl?: string,
 ): Promise<ReadableStream<Uint8Array>> {
-  const baseUrl = (explicitBaseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
-  const apiKey = explicitBaseUrl || isLocalOnlyMode() ? 'ollama' : (userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
+  const omni = resolveOmniRoute(model);
+  const baseUrl = omni?.baseUrl ?? (explicitBaseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
+  const apiKey = omni?.apiKey ?? (explicitBaseUrl || isLocalOnlyMode() ? 'ollama' : (userApiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama'));
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
@@ -546,12 +550,12 @@ async function streamOpenAICompatible(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model,
+      model: omni?.model ?? model,
       messages,
       stream: true,
       max_tokens: maxTokens,
       temperature,
-      ...(localReasoningEffort(baseUrl) ? { reasoning_effort: localReasoningEffort(baseUrl), think: false } : {}),
+      ...(!omni && localReasoningEffort(baseUrl) ? { reasoning_effort: localReasoningEffort(baseUrl), think: false } : {}),
     }),
   });
 
@@ -680,7 +684,7 @@ export function nativeOllamaUrl(): string | null {
  */
 export function isNativeOllamaModel(model: string, baseUrl?: string): boolean {
   const lower = model.toLowerCase();
-  if (lower.startsWith('claude') || lower.startsWith('gemini')) return false;
+  if (lower.startsWith('claude') || lower.startsWith('gemini') || isOmniRouteModel(lower)) return false;
   const raw = process.env.WHINK_OLLAMA_NATIVE_MODELS ?? 'gemma';
   const prefixes = raw.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean);
   if (!prefixes.some((p) => lower.startsWith(p))) return false;
@@ -742,6 +746,6 @@ export function ollamaProbeUrl(): string {
  * OpenAI-style path local.
  */
 export function isCloudModel(model: string): boolean {
-  if (model.startsWith('claude') || model.startsWith('gemini')) return true;
+  if (model.startsWith('claude') || model.startsWith('gemini') || isOmniRouteModel(model)) return true;
   return !isLocalUrl(openAiCompatibleBase());
 }

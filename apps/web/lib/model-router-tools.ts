@@ -12,6 +12,7 @@
  * (OPENAI_COMPATIBLE_BASE_URL, default local Ollama).
  */
 
+import { resolveOmniRoute } from '@/lib/model-router/omniroute';
 import { logger } from '@/lib/logger';
 import { localReasoningEffort, isNativeOllamaModel, nativeOllamaUrl, nativeTimeoutMs } from '@/lib/model-router';
 import { assertLocalOnly, isLocalOnlyMode, redirectOpt } from '@/lib/local-only';
@@ -261,8 +262,9 @@ function parseArgs(raw: unknown): Record<string, unknown> {
 }
 
 async function openAICompatibleWithTools(opts: ChatWithToolsOptions): Promise<ChatWithToolsResult> {
-  const baseUrl = (opts.baseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
-  const apiKey = opts.baseUrl || isLocalOnlyMode() ? 'ollama' : (opts.apiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama');
+  const omni = resolveOmniRoute(opts.model);
+  const baseUrl = omni?.baseUrl ?? (opts.baseUrl ?? process.env.OPENAI_COMPATIBLE_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, '');
+  const apiKey = omni?.apiKey ?? (opts.baseUrl || isLocalOnlyMode() ? 'ollama' : (opts.apiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY ?? 'ollama'));
 
   const messages = opts.messages.map((m) => {
     if (m.role === 'assistant') {
@@ -286,12 +288,12 @@ async function openAICompatibleWithTools(opts: ChatWithToolsOptions): Promise<Ch
   });
 
   const body: Record<string, unknown> = {
-    model: opts.model,
+    model: omni?.model ?? opts.model,
     messages,
     stream: false,
     max_tokens: opts.maxTokens ?? 4000,
   };
-  const reasoningEffort = localReasoningEffort(baseUrl);
+  const reasoningEffort = omni ? undefined : localReasoningEffort(baseUrl);
   if (reasoningEffort) {
     body.reasoning_effort = reasoningEffort;
     body.think = false;

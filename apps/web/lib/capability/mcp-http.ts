@@ -34,11 +34,22 @@ const MAX_LIST_RESPONSE_BYTES = 256 * 1024;
 const MAX_CALL_RESPONSE_BYTES = 1024 * 1024;
 const TOOL_NAME_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 
+/**
+ * Composio Connect authenticates with its own header, not a bearer token (docs.composio.dev/docs/composio-connect:
+ * "API key sent in the x-consumer-api-key header"). Every other provider gets a standard bearer token.
+ */
+export function credentialHeaders(endpoint: string, credential: string | null | undefined): Record<string, string> {
+  if (!credential) return {};
+  let host = '';
+  try { host = new URL(endpoint).hostname.toLowerCase(); } catch { /* an invalid endpoint never reaches a call */ }
+  return host === 'connect.composio.dev' ? { 'x-consumer-api-key': credential } : { Authorization: `Bearer ${credential}` };
+}
+
 function connFor(conn: ProviderConn, deps: EgressDeps, maxResponseBytes: number): ExternalMcpConn {
   return {
     endpoint: conn.endpoint,
     fetch: createAllowlistedFetch({ allowlist: conn.egressAllowlist, maxResponseBytes }, deps),
-    headers: conn.credential ? { Authorization: `Bearer ${conn.credential}` } : {},
+    headers: credentialHeaders(conn.endpoint, conn.credential),
   };
 }
 
