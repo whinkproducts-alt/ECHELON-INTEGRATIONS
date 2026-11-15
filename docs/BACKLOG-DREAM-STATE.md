@@ -12,8 +12,8 @@ Method: every line counts once, unweighted (not effort). Done = 1, Built-not-acc
 | Done | 18 | 18 |
 | Built, not accepted | 8 | 4 |
 | Built, connection unverified (Part 2) | 13 | 6.5 |
-| Open (Part 1: 29; Part 2: 40) | 69 | 0 |
-| **Total** | **108** | **28.5 → 26%** |
+| Open (Part 1: 29; Part 2: 40; Part 4: 10) | 79 | 0 |
+| **Total** | **118** | **28.5 → 24%** |
 
 Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except the exclusions listed in Part 2.
 
@@ -228,3 +228,22 @@ Legend note: the 13 "B" rows are the ones counted at 0.5 in the completion table
 5. **Reviews.** A scheduled job opens the twice-yearly subsidiary head review. WHINK and MAMBA each write their view; MAMBA's is stored as a hypothesis.
 6. **HR training.** A curriculum table, a scheduler job, completion records and a pass check per entity. Overdue mandatory training lowers the score and notifies you.
 7. **Prerequisites.** Agents must be activated first. Ideas need an author field. Contracts need a "sourced by" field and a link to the work that produced them.
+
+## Part 4: approved rule changes (decided 2026-11-15, see `docs/decisions.md`)
+
+All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now have an approved design.
+
+| # | Rule change | What to build | Status |
+|---|---|---|---|
+| 57 | R1 Local-only off for routine work | One enforced check replacing the 12 module checks; call-site audit; ledger every block | Open |
+| 58 | R2 Execution sandbox | Docker sandbox for command and browser tools; `sandbox explain` style inspector | Open |
+| 59 | R3 Sender pairing | Unknown sender gets no reply until paired; per channel | Open |
+| 60 | R5 Learned delegations | Offer after 5 identical approvals; 30 day expiry, daily cap, revocable; Class C excluded | Open |
+| 61 | R7 Batch approval | One card, N hash-locked request ids | Open |
+| 62 | R8 Template plus schedule approval | 30 day cap, non-protected public content, edit cancels | Open |
+| 63 | R11 Licence rule | Amend non-negotiable 7 wording; compliance-checker checks each MPL or LGPL dependency | Open |
+| 64 | R12 Assurance gate for docs, data and test changes | Automated gate; amend non-negotiable 9 wording | Open |
+| 65 | R13 Mission activation | Wake agents per mission, return to dormant after | Open |
+| 66 | R15 Model-inference envelope | Daily and monthly figures set once; stops at cap; amend non-negotiable 10 wording. **Figures needed from Victor** | Open |
+
+**Still under discussion:** R6 (Class C approval window), R10 (browser write class), R14 (local command allow-list).

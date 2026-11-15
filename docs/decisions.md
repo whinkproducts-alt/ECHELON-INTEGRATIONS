@@ -544,3 +544,19 @@ The global Marcus freeze is stored as an `AgentJob` row (`marcus:__freeze__`) to
 21 of the 27 skill names in `lib/task-gate.ts` did not exist in the workforce registry, so any request mentioning sales, legal, finance, security, strategy and similar domains got "capability gaps" and was blocked. They now use real skills (`cross-department.test.ts` fails if any mapped skill has no eligible agent). Social media, SEO and events have no matching registry skill and were left out rather than guessed. Keywords also match common word forms (recruiting, budgets, contracts) through a small suffix strip, and "compliance" no longer triggers a security specialist.
 
 A request spanning several domains collects one skill per domain, so its team spans the directorates holding them (up to the 5-agent cap, enforced at admission). Beyond 5 it is blocked as `too_many_departments`. A directorate named by Marcus steers the lead agent only; unmatched text is ignored because Marcus sends free text. The agents belong to the group, not to a subsidiary, so a subsidiary is a request label: Marcus tasks may carry an origin and up to four target subsidiaries, validated against `config/subsidiaries.json`, and the analysis objective is prefixed with their names from config (never from request text). Naming a subsidiary, including "Whink Trades & Investments", is not treated as a protected trade (tested).
+
+## 2026-11-15  Rule loosening approved by Victor (R1 to R5, R7 to R9, R11 to R13, R15)
+
+Approved in chat. Still open for discussion: R6 (Class C window), R10 (browser write class), R14 (local command allow-list). Each approval below is a decision, not yet built; the backlog (Part 4) tracks the build.
+
+- **R1** Local-only is off for routine work. One enforced check replaces the 12 scattered ones. Money and proprietary-information gating (non-negotiable 10) is unchanged.
+- **R2** Add an execution sandbox for command and browser tools. **R3** Add sender pairing before any messaging channel replies.
+- **R4** An agent tier may approve Class B actions for its own team inside delegations Victor sets. Class C and protected actions always need Victor.
+- **R5** Learned delegations: after 5 identical approvals Victor is offered a delegation (30 day expiry, daily cap, revocable). Class C is not eligible.
+- **R7** Batch approval: one card, each item its own hash-locked request id.
+- **R8** Template plus schedule approval, up to 30 days, non-protected public content only.
+- **R9** Global Approval is routine only, maximum 24 hours, shown on screen, reverts automatically, never covers money, proprietary data, or the founder-private and kill-team scopes.
+- **R11** MPL-2.0 and LGPL allowed when unmodified and not bundled. AGPL, SSPL and source-available still need Victor.
+- **R12** Docs-only, data-only and test-only changes may be checked by type check, lint and tests instead of a separate assurance agent. Code changes still need one.
+- **R13** A mission wakes the agents it needs and they return to dormant afterwards.
+- **R15** Amends non-negotiable 10 for model inference only: Victor sets a daily and monthly envelope once, approved against its exact figures. Routine inference runs inside it and stops at the cap. It never covers transfers, purchases, payouts or trades. **Figures not yet set.** Wording in `CLAUDE.md` is not changed until Victor confirms the figures.
