@@ -68,3 +68,11 @@ Source: `docs/product/Whink-Group-Roster.html`, supplied by Victor. **Where it d
 ### Still open
 - Are directors and department heads real people or personas? The roster lists human-style names throughout.
 - Several people hold two roles (Victor and the MDs are also board; Genevieve is board and D11 director). Promotion approval needs a rule for who signs when manager and manager's manager are the same person.
+
+### Decisions (Victor, 2026-11-15)
+- **AI or human makes no difference to the chain.** The same two-level approval applies to a person and to an AI persona. Consequence: an approval is recorded against a named role, and only that named person (or their persona) can give it.
+- **Marcus Vale:** WHINK sets his KPIs. Victor does his appraisal and alone decides his promotion and any pay rise. This is a single-approver exception to the two-level rule.
+
+### Org-kit files updated to the roster (same day)
+`whink_group_leadership.json` and `.yaml` now hold 16 directorates, 132 departments, department heads and team leads, the board of 8, the 5 subsidiary heads and the 5-member kill team. 60 agents now report to the roster's department head, and the 2 agents (1 team) in HR Business Partnering moved from People & Culture to Executive Office. Existing department names were kept where the roster only abbreviates them, so agent ids and routing are unchanged.
+**Not done:** D16 and the new D01 department "People Operations & HR Strategy" have no agents (registry stays at 326; the roster says about 338). Nobody can be routed work there until agents are written for them.

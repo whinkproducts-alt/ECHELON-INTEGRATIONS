@@ -1,3 +1,4 @@
+---
 group: WHINK GROUP
 founder:
   name: Victor Igboekwe
@@ -5,12 +6,12 @@ founder:
   pronunciation: K-C
 executive_personas:
 - name: WHINK
-  role: CEO
-  level: peer executive persona
+  role: Chief of Staff
+  level: peer executive persona, AI board member
   primary_interface: true
 - name: MAMBA
-  role: Consigliere
-  level: peer executive persona
+  role: Chief Executive Operating Officer / Consigliere
+  level: peer executive persona, AI board member
   primary_interface: false
 product:
   name: W.H.I.N.K ULTIMATE
@@ -18,29 +19,55 @@ product:
   parent_company: WHINK GROUP
 directorates:
 - name: Executive Office & Corporate Strategy
-  director: Dr. Tinaye Muzenyi-Igboekwe
+  director: Dr Tinaye Lydia Muzenyi
   departments:
-    Office of the CEO & Executive Operations: Whitney Brown
+    Office of the CEO & Executive Operations: Marcus Vale
+    People Operations & HR Strategy: Nneka Eze
+    HR Business Partnering & People Operations: Nneka Eze
     Corporate Strategy & Strategic Planning: Chux Onwusah
-    Corporate Development & Strategic Investments: Tosin (Suki) Suara
+    Corporate Development & Strategic Investments: Tosin Suara
     Enterprise Transformation & Strategic Programs: Nimat Omobolanle
     Enterprise Business Intelligence & Performance: Jideofor Nnaji
     Strategic Portfolio & PMO: Pat Johnson
+  department_leads:
+    Office of the CEO & Executive Operations: Aarav Kapoor
+    People Operations & HR Strategy: Adaora Mbanefo
+    HR Business Partnering & People Operations: Ebele Onyeka
+    Corporate Strategy & Strategic Planning: Lucía Navarro
+    Corporate Development & Strategic Investments: Nadia Rahman
+    Enterprise Transformation & Strategic Programs: Soo-jin Park
+    Enterprise Business Intelligence & Performance: Leila Haddad
+    Strategic Portfolio & PMO: Aya Nakamura
 - name: WHINK Group Marketing Intelligence
   director: Tai Tamminga
   departments:
     Brand, Media & Audience Intelligence: Sonia Bantu
     Commercial & Growth Marketing Intelligence: David Eniolade
+  department_leads:
+    Brand, Media & Audience Intelligence: '23 teams: ATLAS, CHORUS, CUT, ECHO, FLUX,
+      FORGE, HALO, LIVEWIRE, MAGNET, MIRROR, MOSAIC, NOVA, ORACLE, PRISM, PULSE, QUANTA,
+      RHODES, SHIELD, SIGNAL, SONIC, TITAN, VANTA, VERITY'
+    Commercial & Growth Marketing Intelligence: '16 teams: ADVOCATE, AUTHORITY, COMPASS,
+      CONDUCTOR, CONVERT, DEMAND, ENABLE, FIELD, LEDGER, LIFECYCLE, MUSE, NEXUS, PROPEL,
+      REVOPS, SENTINEL, VECTOR'
 - name: Sales & Revenue
-  director: Juliet Uchechukwu Igboekwe (JP)
+  director: Ijie Alpha
   departments:
-    Enterprise Sales: Ijie Alpha
+    Enterprise Sales: Adebowale Osei
     SMB & Mid-Market Sales: Muyiwa Agoro
     Sales Development & Pipeline Generation: Mosope Talabi
     Solutions & Technical Sales: Matthew Okonunfua
     Channel & Partner Sales: Oluwaseun Lambo
     Account Management & Expansion: Sam Patel
     Revenue Operations & Sales Intelligence: Sylvester Anyanwu
+  department_leads:
+    Enterprise Sales: Adewale Bakare
+    SMB & Mid-Market Sales: Noor Al-Khatib
+    Sales Development & Pipeline Generation: Mpho Ndlovu
+    Solutions & Technical Sales: Yusuf Karim
+    Channel & Partner Sales: Lena Schmidt
+    Account Management & Expansion: Ana Petrescu
+    Revenue Operations & Sales Intelligence: Imani Carter
 - name: Product
   director: Atika Emmanuel
   departments:
@@ -51,6 +78,14 @@ directorates:
     Product Analytics & Intelligence: Kaisochukwu Nnaji
     User Experience & Service Design: Inaas Abdul
     Release & Product Lifecycle Management: Abiodun Iseniyi
+  department_leads:
+    Product Strategy & Portfolio: Leandro Souza
+    Product Management: Osei Agyeman
+    Product Operations: Hassan Bashir
+    Product Research & Customer Discovery: Kelechi Umeh
+    Product Analytics & Intelligence: Victor Liu
+    User Experience & Service Design: Fiona MacLeod
+    Release & Product Lifecycle Management: Seyi Adeyemi
 - name: Engineering & Technology
   director: Luke Mellors
   departments:
@@ -63,40 +98,75 @@ directorates:
     Quality Engineering & Test Automation: Terhemba Ahile
     Release Engineering & Configuration Management: Rebecca Johnson
     Engineering Productivity & Developer Experience: Étienne Moreau
-    Technical Documentation & Engineering Knowledge: Leila Haddad
+    Technical Documentation & Engineering Knowledge: Priscilla Oduya
+  department_leads:
+    Software Engineering: Hye-jin Seo
+    Mobile & Client Platforms: Daniel Cho
+    Platform Engineering & Core Infrastructure: Felix Weber
+    Architecture & Technical Strategy: Rami Aziz
+    API, Integrations & Developer Ecosystem: Olu Afolayan
+    DevOps, SRE & Cloud Engineering: Joon Kang
+    Quality Engineering & Test Automation: Sebastian Keller
+    Release Engineering & Configuration Management: Chiamaka Nnaji
+    Engineering Productivity & Developer Experience: Reina Matsuda
+    Technical Documentation & Engineering Knowledge: Adjoa Quartey
 - name: Data & Artificial Intelligence
-  director: Dr. Amara Okafor
+  director: Dr Amara Okafor
   departments:
     AI Engineering & Applied Intelligence: Lukas Schneider
     Agent Architecture & AI Workforce Systems: Hanae Nakamura
     Skill Engineering & Tool Orchestration: Mateo Fernández
-    Machine Learning & Model Development: Dr. Priyanka Rao
+    Machine Learning & Model Development: Dr Priyanka Rao
     Model Evaluation, Reliability & Intelligence Quality: Elias Haddad
     Model Routing & AI Infrastructure: Ingrid Bergström
     Data Engineering & Data Platforms: Kwesi Boateng
-    Data Science & Decision Intelligence: Dr. Sofia Petrovic
+    Data Science & Decision Intelligence: Dr Sofia Petrovic
     Knowledge Systems & Enterprise Memory: Leila Ben Youssef
     AI Governance Technology & Responsible AI Systems: Amina El-Sayed
     AI FinOps & Usage Intelligence: Gabriel Costa
     AI Platform Operations & Observability: Min-jun Park
+  department_leads:
+    AI Engineering & Applied Intelligence: Neha Desai
+    Agent Architecture & AI Workforce Systems: Nora Jensen
+    Skill Engineering & Tool Orchestration: Esteban Cruz
+    Machine Learning & Model Development: Ivan Dimitrov
+    Model Evaluation, Reliability & Intelligence Quality: Tatsuya Kobayashi
+    Model Routing & AI Infrastructure: Femi Balogun
+    Data Engineering & Data Platforms: Kwesi Appiah
+    Data Science & Decision Intelligence: Rahul Iyer
+    Knowledge Systems & Enterprise Memory: Jorge Almeida
+    AI Governance Technology & Responsible AI Systems: Maksim Volkov
+    AI FinOps & Usage Intelligence: Enzo Marchetti
+    AI Platform Operations & Observability: Chinedu Okafor
 - name: Research & Development
-  director: Dr. Elena Varga
+  director: Dr Elena Varga
   departments:
-    Applied Research: Dr. Tendai Muchengeti
+    Applied Research: Dr Tendai Muchengeti
     Emerging Technologies & Future Systems: Kenji Mori
     Experimental Engineering & Prototyping: Andrés Valdés
-    AI & Autonomous Systems Research: Dr. Samira Qureshi
-    Human–Computer Interaction & Future Interfaces: Freja Lindholm
-    Advanced Computing & Systems Research: Dr. Kwame Asante
-    Research Partnerships & Academic Collaboration: Claire Dubois
+    AI & Autonomous Systems Research: Dr Kolade Adewumi
+    Human–Computer Interaction & Future Interfaces: Zara Osei-Bonsu
+    Advanced Computing & Systems Research: Dr Kwame Asante
+    Research Partnerships & Academic Collaboration: Beatriz Cavalcanti
     Innovation Incubation & Technology Transfer: Rafael Mendes
-    Intellectual Property Discovery & Invention Management: Noura Al-Mansouri
-    Research Intelligence & Scientific Foresight: Dr. Ji-won Seo
+    Intellectual Property Discovery & Invention Management: Roksana Wiśniewska
+    Research Intelligence & Scientific Foresight: Adaeze Okonkwo
+  department_leads:
+    Applied Research: Hasan Demir
+    Emerging Technologies & Future Systems: Bianca Santos
+    Experimental Engineering & Prototyping: Linh Tran
+    AI & Autonomous Systems Research: Mariam Said
+    Human–Computer Interaction & Future Interfaces: Amina Yusuf
+    Advanced Computing & Systems Research: Camila Ferreira
+    Research Partnerships & Academic Collaboration: Ade Mabaso
+    Innovation Incubation & Technology Transfer: Nabil Rahman
+    Intellectual Property Discovery & Invention Management: Lorenzo Greco
+    Research Intelligence & Scientific Foresight: Chiamaka Ofoegbu
 - name: Information Technology
   director: Alejandro Ruiz
   departments:
     Enterprise Applications & Business Systems: Grace Kimani
-    End-User Computing & Workplace Technology: Yuki Tanaka
+    End-User Computing & Workplace Technology: Daisuke Yamamoto
     IT Service Management & Service Desk: Michael O'Connor
     Cloud & Infrastructure Operations: Ananya Deshmukh
     Network & Connectivity Services: Chinedu Eze
@@ -104,22 +174,46 @@ directorates:
     Collaboration & Productivity Platforms: Farah Rahman
     IT Asset & Configuration Management: João Ferreira
     Enterprise Systems Administration: Thabo Mokoena
-    IT Architecture & Technology Standards: Dr. Elise van der Meer
+    IT Architecture & Technology Standards: Dr Elise van der Meer
+  department_leads:
+    Enterprise Applications & Business Systems: Chidinma Ezeh
+    End-User Computing & Workplace Technology: Emeka Chukwuemeka
+    IT Service Management & Service Desk: Gustavo Herrera
+    Cloud & Infrastructure Operations: Ifeoma Nwosu
+    Network & Connectivity Services: Kemi Adeyemi
+    Identity & Access Administration: Mamadou Coulibaly
+    Collaboration & Productivity Platforms: Olusegun Bello
+    IT Asset & Configuration Management: Qian Liu
+    Enterprise Systems Administration: Sade Adeleke
+    IT Architecture & Technology Standards: Uchenna Okeke
 - name: Cybersecurity & Resilience
-  director: Anthony C Igboekwe
+  director: Marcus Lund
   departments:
-    Security Operations & Incident Response: Marcus Lund
+    Security Operations & Incident Response: Wanjiru Kamau
     Threat Intelligence & Threat Hunting: Olumide Adekunle
-    Identity Security & Privileged Access: Camille Tremblay
+    Identity Security & Privileged Access: Abosede Fashola
     Security Engineering: Arjun Mehra
     Cloud & Infrastructure Security: Sofia Dimitrova
     Application & Product Security: Diego Morales
-    Security Architecture: Dr. Miriam Kessler
+    Security Architecture: Dr Miriam Kessler
     Vulnerability & Exposure Management: Bongani Dlamini
-    Data Security & Information Protection: Noor Al-Khatib
+    Data Security & Information Protection: Funmilayo Okoye
     Third-Party & Supply Chain Security: Haruka Watanabe
     Cyber Risk & Security Governance: Gabriela Torres
     Business Continuity, Disaster Recovery & Cyber Resilience: Henrik Sørensen
+  department_leads:
+    Security Operations & Incident Response: Kagiso Mokoena
+    Threat Intelligence & Threat Hunting: Yetunde Adeyinka
+    Identity Security & Privileged Access: Abena Asante
+    Security Engineering: Chiamaka Obi
+    Cloud & Infrastructure Security: Eshe Wangari
+    Application & Product Security: Gbolahan Adesanya
+    Security Architecture: Ikenna Eze
+    Vulnerability & Exposure Management: Kehinde Adewale
+    Data Security & Information Protection: Musa Conteh
+    Third-Party & Supply Chain Security: Obi Okwu
+    Cyber Risk & Security Governance: Rashida Hassan
+    Business Continuity, Disaster Recovery & Cyber Resilience: Titilayo Bakare
 - name: Finance & Accounting
   director: Charles Soludo
   departments:
@@ -128,25 +222,43 @@ directorates:
     FP&A, Budgeting & Forecasting: Priya Raman
     Treasury & Capital Management: Mikhail Petrov
     Tax: Aisha Bello
-    Billing, Accounts Receivable & Accounts Payable: Camila Ferreira
+    Billing, Accounts Receivable & Accounts Payable: Mariana Figueiredo
     Payroll Finance: Thandiwe Ncube
     Financial Controls & Management Accounting: Giulia Romano
+  department_leads:
+    Accounting & Close: Vera Okafor
+    Financial Reporting & Consolidation: Xochitl Reyes
+    FP&A, Budgeting & Forecasting: Zanele Dube
+    Treasury & Capital Management: Bintou Kouyaté
+    Tax: Dele Adekunle
+    Billing, Accounts Receivable & Accounts Payable: Folake Akinbode
+    Payroll Finance: Halima Jallow
+    Financial Controls & Management Accounting: Jumoke Adegoke
 - name: Legal, Risk & Governance
   director: Genevieve Igboekwe
   departments:
     Corporate & Commercial Legal: Marcus Feldman
     Contracts & Transactions: Zainab Bakare
-    Intellectual Property & Technology Legal: Dr. Lucía Herrera
-    Employment Legal: Daniel Cho
-    Privacy & Data Protection: Amélie Laurent
+    Intellectual Property & Technology Legal: Dr Lucía Herrera
+    Employment Legal: Rasheed Olawale
+    Privacy & Data Protection: Yewande Oyelaran
     Enterprise Risk Management: Sipho Dlamini
     Governance & Board Affairs: Ingrid Madsen
     Regulatory Compliance & Ethics: Farida El-Masri
     Records & Information Governance: Tomasz Kowalski
+  department_leads:
+    Corporate & Commercial Legal: Laide Ogundimu
+    Contracts & Transactions: Nifemi Alade
+    Intellectual Property & Technology Legal: Pelumi Alabi
+    Employment Legal: Seun Adeola
+    Privacy & Data Protection: Ufuoma Oghenekaro
+    Enterprise Risk Management: Wunmi Olatunji
+    Governance & Board Affairs: Yemi Akinwande
+    Regulatory Compliance & Ethics: Abiola Ogunbayo
+    Records & Information Governance: Chinwe Eze
 - name: People & Culture
-  director: Victoria Ngozi Igboekwe
+  director: Nneka Eze
   departments:
-    HR Business Partnering & People Operations: Nneka Eze
     Talent Acquisition: Sofia Lindström
     Onboarding & Employee Experience: Javier Morales
     Employee Relations: Amina Yusuf
@@ -154,8 +266,18 @@ directorates:
     Performance & Talent Management: Kofi Agyeman
     Learning & Development: Hana Suzuki
     Organizational Design & Workforce Planning: Rajiv Menon
-    People Analytics: Elena Popescu
-    AI Workforce & Organizational Intelligence: Dr. Maya Kilonzo
+    People Analytics: Adaora Nwosu
+    AI Workforce & Organizational Intelligence: Dr Maya Kilonzo
+  department_leads:
+    Talent Acquisition: Gbenga Adekunle
+    Onboarding & Employee Experience: Imaobong Etim
+    Employee Relations: Kola Adebisi
+    Total Rewards, Compensation & Benefits: Morenike Adeyemi
+    Performance & Talent Management: Odunola Okonkwo
+    Learning & Development: Rolake Okonkwo
+    Organizational Design & Workforce Planning: Titi Akinbode
+    People Analytics: Voke Oghenerukewe
+    AI Workforce & Organizational Intelligence: Yetunde Adeola
 - name: Operations & Procurement
   director: Bruno Fernades
   departments:
@@ -165,26 +287,116 @@ directorates:
     Vendor & Supplier Management: Matteo Ricci
     Facilities & Workplace: Chloe Martin
     Real Estate & Physical Infrastructure: Ahmed Al-Hassan
-    Quality Management: Dr. Eva Horváth
+    Quality Management: Dr Eva Horváth
     Operational Performance & Service Excellence: Bongiwe Khumalo
+  department_leads:
+    Corporate Operations: Amina Garba
+    Business Process & Continuous Improvement: Chinelo Obi
+    Procurement & Strategic Sourcing: Efua Mensah
+    Vendor & Supplier Management: Gbeke Michaels
+    Facilities & Workplace: Isioma Nwosu
+    Real Estate & Physical Infrastructure: Kike Oladele
+    Quality Management: Maryam Abubakar
+    Operational Performance & Service Excellence: Olamide Baddo
 - name: Customer Organization
   director: Zaleena BeeHarry
   departments:
     Customer Success: Sofia Mendes
     Customer Onboarding & Implementation: Caleb Nwosu
-    Professional Services: Aiko Fujimoto
+    Professional Services: Oluwakemi Abiodun
     Technical Account Management: Lars Petersen
     Customer Support & Service Desk: Naomi Chen
     Customer Education & Adoption: Fatima Zahra
     Renewals & Expansion: Diego Fernandes
     Customer Health & Escalation Management: Grace Owusu
+  department_leads:
+    Customer Success: Remi Adesanya
+    Customer Onboarding & Implementation: Temi Otedola
+    Professional Services: Vero Okafor
+    Technical Account Management: Xena Osei
+    Customer Support & Service Desk: Zubaidah Haruna
+    Customer Education & Adoption: Bukola Saraki-Jr
+    Renewals & Expansion: Demola Adesanya
+    Customer Health & Escalation Management: Feyi Fela
 - name: Internal Audit & Assurance
   director: Francis Lampard
   departments:
     Financial Audit & Assurance: Helena Novak
-    Technology Audit: Dr. Marcus Chen
-    Cybersecurity Assurance: Leila Haddad-Sayegh
+    Technology Audit: Dr Marcus Chen
+    Cybersecurity Assurance: Taiwo Adegboyega
     Operational Audit: Tawanda Moyo
     Compliance & Governance Audit: Ingrid Solberg
     Controls Assurance: Priya Kapoor
-    AI Systems & Agent Governance Audit: Dr. Kojo Mensima
+    AI Systems & Agent Governance Audit: Dr Kojo Mensima
+  department_leads:
+    Financial Audit & Assurance: Hauwa Ribadu
+    Technology Audit: Jide Kosoko-Jr
+    Cybersecurity Assurance: Lanre Olusola
+    Operational Audit: Nonso Anozie
+    Compliance & Governance Audit: Pemi Onyekwere
+    Controls Assurance: Sola Allyson
+    AI Systems & Agent Governance Audit: Ugo Chukwu
+- name: AI Organization & Autonomous Operations
+  director: Chukwuemezue VJ Igboekwe
+  departments:
+    Autonomous Agent Deployment & Lifecycle: Chidera Okafor
+    AI Workforce Orchestration & Dispatch: Zuberi Okonjo
+    Agent Performance & Continuous Learning: Ngozi Udeh
+    Human-AI Collaboration & Oversight: Obinna Chukwu
+    Autonomous Operations Governance & Safety: Dr Oluwaseun Adebayo
+  department_leads:
+    Autonomous Agent Deployment & Lifecycle: Nkem Eze
+    AI Workforce Orchestration & Dispatch: Ayodele Bankole
+    Agent Performance & Continuous Learning: Ifedayo Omotade
+    Human-AI Collaboration & Oversight: Chiamaka Nwachukwu
+    Autonomous Operations Governance & Safety: Tobenna Igwe
+board:
+- name: Victor Igboekwe
+  role: Founder & Chairman
+- name: Anthony Igboekwe
+  role: Board Member, MD Whink Apps
+- name: Juliet Igboekwe
+  role: Board Member, MD Whink Trades & Investments
+- name: Dr Tinaye Lydia Muzenyi
+  role: Board Member, MD Whink Frontliners, Executive Director D01
+- name: Genevieve Igboekwe
+  role: Chief Legal Counsel, Board Member, Director D11
+- name: Marcus Vale
+  role: Chief Executive Assistant, Board Member, D01 department head
+- name: WHINK
+  role: Chief of Staff, AI board member
+- name: MAMBA
+  role: Chief Executive Operating Officer / Consigliere, AI board member
+subsidiary_heads:
+- subsidiary: consult
+  name: Victor Igboekwe
+  role: MD Whink Consult
+- subsidiary: apps
+  name: Anthony Igboekwe
+  role: MD Whink Apps
+- subsidiary: trades
+  name: Juliet Igboekwe
+  role: MD Whink Trades & Investments
+- subsidiary: frontliners
+  name: Dr Tinaye Lydia Muzenyi
+  role: MD Whink Frontliners
+- subsidiary: real-estate
+  name: Whitney Brown
+  role: MD Whink Real Estate
+kill_team:
+- codename: PETER
+  name: Peter
+  role: Principal Reverse Engineer
+- codename: PAUL
+  name: Paul
+  role: Principal Reconstruction Engineer
+- codename: MICAH
+  name: Micah
+  role: Principal Product Auditor
+- codename: NANDI
+  name: Nandi
+  role: Growth, Marketing & Revenue Strategist
+- codename: SCOUT
+  name: Michael Carrick
+  role: Master Researcher & Opportunity Scout
+roster_source: WHINK Group Roster, locked 2026-11-15
