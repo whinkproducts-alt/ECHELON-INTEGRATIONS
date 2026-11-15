@@ -13,9 +13,20 @@ async function load(userId: string, id: string) {
 const view = (j: { id: string; jobKey: string; lastStatus: string | null; createdAt: Date }) =>
   ({ task_id: j.id, client_operation_id: j.jobKey.slice(MARCUS_JOB_PREFIX.length), status: j.lastStatus ?? 'received', created_at: j.createdAt.toISOString() });
 
+/** What the analysis produced, only once the task is done. Model output is untrusted text. */
+async function resultOf(j: { lastStatus: string | null; capabilityReceiptId: string | null; userId: string }) {
+  if (j.lastStatus !== 'done' || !j.capabilityReceiptId) return undefined;
+  const ex = await prisma.agentExecution.findFirst({ where: { id: j.capabilityReceiptId, userId: j.userId }, select: { output: true } });
+  const agents = (ex?.output as { agents?: Array<{ agentId?: unknown; result?: unknown }> } | null)?.agents;
+  if (!Array.isArray(agents)) return undefined;
+  return { untrusted: true, outputs: agents.slice(0, 5).map((a) => ({ agent_id: String(a.agentId), text: String(a.result).slice(0, 4000) })) };
+}
+
 export async function getMarcusTask(userId: string, id: string): Promise<TaskResult> {
   const job = await load(userId, id);
-  return job ? { status: 200, body: view(job) } : fail(404, 'Task not found');
+  if (!job) return fail(404, 'Task not found');
+  const result = await resultOf(job);
+  return { status: 200, body: result ? { ...view(job), result } : view(job) };
 }
 
 /**
@@ -37,7 +48,7 @@ export async function confirmMarcusTask(userId: string, id: string, approval: un
 
   try {
     await prisma.$transaction(async (tx) => {
-      const won = await tx.agentJob.updateMany({ where: { id, userId, lastStatus: 'reconfirmation_required' }, data: { lastStatus: 'received' } });
+      const won = await tx.agentJob.updateMany({ where: { id, userId, lastStatus: 'reconfirmation_required' }, data: { lastStatus: 'received', nextRunAt: new Date() } });
       if (won.count !== 1) throw Object.assign(new Error('raced'), { code: 'RACED' });
       const params = { task_id: id, content_hash: contentHash };
       await tx.approvalRequest.create({
@@ -63,11 +74,11 @@ export async function confirmMarcusTask(userId: string, id: string, approval: un
   return { status: 200, body: { ...view(job), status: 'received' } };
 }
 
-/** Marcus answers a blocked or paused task. The note is not stored: nothing reads it until a worker handler exists. */
+/** Marcus answers a blocked or paused task. Only a task whose analysis never started can resume; its approval is otherwise used. The note is not stored. */
 export async function resumeMarcusTask(userId: string, id: string): Promise<TaskResult> {
   const job = await load(userId, id);
   if (!job) return fail(404, 'Task not found');
-  const won = await prisma.agentJob.updateMany({ where: { id, userId, lastStatus: { in: ['blocked', 'paused'] } }, data: { lastStatus: 'received' } });
+  const won = await prisma.agentJob.updateMany({ where: { id, userId, capabilityReceiptId: null, lastStatus: { in: ['blocked', 'paused'] } }, data: { lastStatus: 'received', nextRunAt: new Date() } });
   if (won.count !== 1) return fail(409, 'Task is not waiting for an answer');
   await recordAction({ userId, initiator: 'system', action: 'capability_marcus_task_resumed', permissionClass: 'A', status: 'EXECUTED', correlationId: `marcus-task:${id}` });
   return { status: 200, body: { ...view(job), status: 'received' } };

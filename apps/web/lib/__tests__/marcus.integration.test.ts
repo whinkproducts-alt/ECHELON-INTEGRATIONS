@@ -1,12 +1,16 @@
 /** Real Postgres: the Marcus intake, confirm, freeze, feed and single-use approval, with no database fake. Opt in with M1_EXECUTION_DATABASE_URL=$DATABASE_URL (a disposable *test* database). */
 import { randomUUID, createHash } from 'node:crypto';
-import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.unmock('@prisma/client');
 vi.unmock('@/lib/safety/lockdown');
+const model = vi.hoisted(() => ({ call: vi.fn(), admission: vi.fn() }));
+vi.mock('@/lib/model-router', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/model-router')>(), chatOnce: model.call, verifyLocalAnalysisModel: model.admission,
+}));
 import { prisma } from '@/lib/db';
 import { canonicalJson } from '@/lib/canonical-json';
 import { setLockdown } from '@/lib/safety/lockdown';
-import { claimDueJobs } from '@/lib/worker/scheduler';
+import { runClaimedJob } from '@/lib/worker/runner';
 
 const enabled = !!process.env.M1_EXECUTION_DATABASE_URL;
 const TOKEN = `tok-${randomUUID()}`;
@@ -30,6 +34,7 @@ describe.skipIf(!enabled)('marcus real database integration', () => {
     const email = `marcus-owner-${randomUUID()}@example.test`;
     owner = (await prisma.user.create({ data: { email } })).id;
     vi.stubEnv('WHINK_OWNER_EMAILS', email);
+    vi.stubEnv('ENCRYPTION_KEY', 'ab'.repeat(32));
     vi.stubEnv('MARCUS_BEARER_TOKEN_HASH', createHash('sha256').update(TOKEN).digest('hex'));
     ({ intakeMarcusTask: intake } = await import('@/lib/marcus/intake'));
     freeze = await import('@/lib/marcus/freeze');
@@ -39,7 +44,7 @@ describe.skipIf(!enabled)('marcus real database integration', () => {
   });
   afterAll(async () => { vi.unstubAllEnvs(); await prisma.$disconnect(); });
 
-  it('stores a standard task with its approval, sealed scope and ledger row, and the worker never claims it', async () => {
+  it('stores a standard task with its approval, sealed scope and ledger row', async () => {
     const b = body();
     const res = await post(b);
     expect(res.status).toBe(200);
@@ -48,8 +53,6 @@ describe.skipIf(!enabled)('marcus real database integration', () => {
     expect(await prisma.approvalRequest.findUniqueOrThrow({ where: { id: b.approval.approval_id } })).toMatchObject({ userId: owner, status: 'APPROVED', permissionClass: 'A' });
     expect(await prisma.sealedScope.findFirst({ where: { kind: 'OBJECTIVE', refId: out.task_id, userId: owner } })).not.toBeNull();
     expect(await prisma.action.findFirst({ where: { userId: owner, correlationId: `marcus-task:${out.task_id}`, action: 'capability_marcus_task_received' } })).not.toBeNull();
-    const claimed = await claimDueJobs(`marcus-it-${randomUUID()}`, 1000);
-    expect(claimed.map((j) => j.id)).not.toContain(out.task_id);
   });
 
   it('a replayed approval id gets 409 from the real unique violation and leaves no second task', async () => {
@@ -113,5 +116,131 @@ describe.skipIf(!enabled)('marcus real database integration', () => {
     expect((await post(body())).status).toBe(503);
     expect((await setLockdown(owner, false)).ok).toBe(true);
     expect((await post(body())).status).toBe(200);
+  });
+
+  describe('executor', () => {
+    const worker = `marcus-exec-${randomUUID()}`;
+    const reply = JSON.stringify({ result: 'Internal draft: verify the evidence before acting externally.', learnings: [], confidence: 0.6 });
+    const task = (over: Record<string, unknown> = {}) => body({ title: 'Summarise the product roadmap', goal: 'Summarise Q4 product roadmap risks and milestones', ...over });
+    const job = (taskId: string) => prisma.agentJob.findUniqueOrThrow({ where: { id: taskId } });
+    /**
+     * Lease only this job and run it through the worker's own dispatch. claimDueJobs would lease every due job in the
+     * shared test database, starving the other real-database suites that run alongside this one.
+     */
+    async function tick(jobKey: string) {
+      const row = await prisma.agentJob.findFirst({ where: { userId: owner, jobKey } });
+      if (!row) return null;
+      const leaseUntil = new Date(Date.now() + 600_000);
+      await prisma.agentJob.update({ where: { id: row.id }, data: { leaseOwner: worker, leaseUntil } });
+      return runClaimedJob({ id: row.id, jobKey, userId: owner, consecutiveFailures: row.consecutiveFailures, runs: row.runs, leaseUntil }, worker);
+    }
+    /** Parked = far-future nextRunAt, which is what keeps the claim query from ever returning the job. */
+    const parked = async (id: string) => (await job(id)).nextRunAt.getTime() > Date.now() + 365 * 24 * 3600_000;
+    const makeDue = (id: string) => prisma.agentJob.update({ where: { id }, data: { nextRunAt: new Date() } });
+    beforeEach(() => {
+      vi.stubEnv('DEFAULT_MODEL', 'existing-local-model');
+      vi.stubEnv('SWARM_MODEL', 'existing-local-model');
+      vi.stubEnv('OPENAI_COMPATIBLE_BASE_URL', 'http://127.0.0.1:11434/v1');
+      model.call.mockReset().mockResolvedValue(reply);
+      model.admission.mockReset().mockResolvedValue(true);
+    });
+
+    it('a Marcus task runs end to end: admitted, analysed by the EAR worker, reported done with its result, approval used once', async () => {
+      const b = task();
+      const t = await (await post(b)).json();
+      const jobKey = `marcus:${b.client_operation_id}`;
+
+      expect(await tick(jobKey)).toBe('OK');
+      const started = await job(t.task_id);
+      expect(started).toMatchObject({ lastStatus: 'in_progress', capabilityRequestEnc: null });
+      expect(started.capabilityReceiptId).toBeTruthy();
+      expect((await prisma.approvalRequest.findUniqueOrThrow({ where: { id: b.approval.approval_id } })).status).toBe('EXECUTED');
+      expect(await prisma.sealedScope.findFirst({ where: { kind: 'EXECUTION', refId: started.capabilityReceiptId!, userId: owner } })).not.toBeNull();
+      expect((await prisma.agentExecution.findUniqueOrThrow({ where: { id: started.capabilityReceiptId! } })).status).toBe('QUEUED');
+
+      expect(await tick(`ear:${started.capabilityReceiptId}`)).toBe('OK'); // the existing EAR worker does the analysis
+      expect((await prisma.agentExecution.findUniqueOrThrow({ where: { id: started.capabilityReceiptId! } })).status).toBe('SUCCEEDED');
+
+      await makeDue(t.task_id);
+      expect(await tick(jobKey)).toBe('OK');
+      expect((await job(t.task_id)).lastStatus).toBe('done');
+      const got = await tasks.getMarcusTask(owner, t.task_id);
+      expect(got.body.status).toBe('done');
+      expect(got.body.result).toMatchObject({ untrusted: true });
+      expect(JSON.stringify(got.body.result)).toContain('verify the evidence');
+
+      const statuses = (await feed.marcusEventsAfter(owner, null, 1000)).filter((e) => (e.data as { task_id: string }).task_id === t.task_id).map((e) => (e.data as { status: string }).status);
+      expect(statuses).toEqual(['received', 'in_progress', 'done']);
+      expect(await parked(t.task_id)).toBe(true); // finished: never claimed again
+      await makeDue(t.task_id);
+      expect(await tick(jobKey)).toBe('SKIPPED'); // even if forced, it does nothing and parks again
+      expect(await parked(t.task_id)).toBe(true);
+    });
+
+    it('a task that names none of the router keywords still finds a team through the fallback skill', async () => {
+      const b = task({ title: 'Tidy my week', goal: 'Think through what I should focus on this week' });
+      const t = await (await post(b)).json();
+      await tick(`marcus:${b.client_operation_id}`);
+      expect(await job(t.task_id)).toMatchObject({ lastStatus: 'in_progress', lastError: null });
+    });
+
+    it('with no local model the task is blocked without using its approval; resume then lets it run', async () => {
+      vi.stubEnv('DEFAULT_MODEL', ''); vi.stubEnv('SWARM_MODEL', '');
+      const b = task();
+      const t = await (await post(b)).json();
+      const jobKey = `marcus:${b.client_operation_id}`;
+      await tick(jobKey);
+      expect(await job(t.task_id)).toMatchObject({ lastStatus: 'blocked', lastError: 'model_or_budget_unavailable' });
+      expect((await prisma.approvalRequest.findUniqueOrThrow({ where: { id: b.approval.approval_id } })).status).toBe('APPROVED');
+
+      vi.stubEnv('DEFAULT_MODEL', 'existing-local-model'); vi.stubEnv('SWARM_MODEL', 'existing-local-model');
+      expect((await tasks.resumeMarcusTask(owner, t.task_id)).status).toBe(200);
+      await tick(jobKey);
+      expect((await job(t.task_id)).lastStatus).toBe('in_progress');
+    });
+
+    it('a financial task runs only after its second approval', async () => {
+      const b = task({ sensitivity: 'financial' });
+      const t = await (await post(b)).json();
+      const jobKey = `marcus:${b.client_operation_id}`;
+      expect(await parked(t.task_id)).toBe(true); // waiting for the second approval: not claimable
+      const second = { approval_id: `appr-${randomUUID()}`, approved_at: '2026-11-14T00:01:00Z', method: 'voice', content_hash: b.approval.content_hash };
+      expect((await tasks.confirmMarcusTask(owner, t.task_id, second)).status).toBe(200);
+      expect(await tick(jobKey)).toBe('OK');
+      expect((await job(t.task_id)).lastStatus).toBe('in_progress');
+    });
+
+    it('freezing a running task cancels its analysis; unfreezing marks it cancelled instead of re-running a used approval', async () => {
+      const b = task();
+      const t = await (await post(b)).json();
+      const jobKey = `marcus:${b.client_operation_id}`;
+      await tick(jobKey);
+      const executionId = (await job(t.task_id)).capabilityReceiptId!;
+      expect(await freeze.setMarcusFreeze(owner, true)).toContain(t.task_id);
+      expect((await prisma.agentExecution.findUniqueOrThrow({ where: { id: executionId } })).status).toBe('CANCELLED');
+      expect((await job(t.task_id)).lastStatus).toBe('frozen');
+      expect(await parked(t.task_id)).toBe(true); // frozen jobs are not claimable
+      await freeze.setMarcusFreeze(owner, false);
+      expect((await job(t.task_id)).lastStatus).toBe('cancelled');
+    });
+
+    it('a frozen task that never started is re-queued on unfreeze and then runs', async () => {
+      const b = task();
+      const t = await (await post(b)).json();
+      await freeze.setMarcusFreeze(owner, true);
+      await freeze.setMarcusFreeze(owner, false);
+      expect((await job(t.task_id)).lastStatus).toBe('received');
+      expect(await tick(`marcus:${b.client_operation_id}`)).toBe('OK');
+      expect((await job(t.task_id)).lastStatus).toBe('in_progress');
+    });
+
+    it('content altered after approval is refused before anything is consumed', async () => {
+      const b = task();
+      const t = await (await post(b)).json();
+      await prisma.agentJob.update({ where: { id: t.task_id }, data: { capabilityRequestHash: 'f'.repeat(64) } });
+      await tick(`marcus:${b.client_operation_id}`);
+      expect(await job(t.task_id)).toMatchObject({ lastStatus: 'failed', lastError: 'content_changed' });
+      expect((await prisma.approvalRequest.findUniqueOrThrow({ where: { id: b.approval.approval_id } })).status).toBe('APPROVED');
+    });
   });
 });

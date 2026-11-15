@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { requireMarcusAuth } from '@/lib/capability/hosts';
 import { canonicalJson, approvalContentHash } from '@/lib/canonical-json';
 import { recordAction } from '@/lib/ledger';
+import { encryptKey, isEncryptionConfigured } from '@/lib/key-encryption';
 import { isLockedDown } from '@/lib/safety/lockdown';
 import { isMarcusFrozen, resolveMarcusOwner, MARCUS_NEVER_RUN } from '@/lib/marcus/freeze';
 
@@ -44,6 +45,9 @@ export async function intakeMarcusTask(req: Request) {
   if (await isLockedDown(owner.id)) return bad('Lockdown is active', 503);
   if (await isMarcusFrozen(owner.id)) return bad('Marcus tasks are frozen', 503);
 
+  // The task text is kept encrypted only until the executor admits it, then erased; without a key it cannot be stored.
+  if (!isEncryptionConfigured()) return bad('Encryption is not configured (ENCRYPTION_KEY)', 503);
+
   const jobKey = `marcus:${body.client_operation_id}`;
   const existing = await prisma.agentJob.findUnique({ where: { jobKey_userId: { jobKey, userId: owner.id } } });
   if (existing) {
@@ -69,7 +73,8 @@ export async function intakeMarcusTask(req: Request) {
         },
       });
       const job = await tx.agentJob.create({
-        data: { jobKey, userId: owner.id, nextRunAt: MARCUS_NEVER_RUN, lastStatus: status, capabilityRequestHash: body.approval.content_hash, capabilityApprovalId: body.approval.approval_id },
+        data: { jobKey, userId: owner.id, nextRunAt: reconfirm ? MARCUS_NEVER_RUN : new Date(), lastStatus: status, capabilityRequestHash: body.approval.content_hash,
+          capabilityRequestEnc: encryptKey(JSON.stringify({ title: body.title, goal: body.goal, deadline: body.deadline })), capabilityApprovalId: body.approval.approval_id },
       });
       await tx.sealedScope.create({ data: { userId: owner.id, kind: 'OBJECTIVE', refId: job.id } });
       await recordAction({

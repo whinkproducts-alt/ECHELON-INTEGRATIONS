@@ -64,6 +64,10 @@ export async function runClaimedJob(job: ClaimedJob, workerId: string, now = new
     const { runCapabilityJob } = await import('@/lib/worker/capability-execution');
     return runCapabilityJob(job, workerId, now);
   }
+  if (job.jobKey.startsWith('marcus:')) {
+    const { runMarcusJob } = await import('@/lib/marcus/executor');
+    return runMarcusJob(job, workerId, now);
+  }
   if (job.jobKey.startsWith('ear:')) {
     const { runEarJob } = await import('@/lib/worker/ear-execution');
     return runEarJob(job, workerId, now);

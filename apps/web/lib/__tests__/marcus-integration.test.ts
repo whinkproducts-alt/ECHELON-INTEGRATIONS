@@ -6,6 +6,7 @@ import { lockdownTestState } from './setup/lockdown-mock';
 // Real hashing, real auth, real owner lookup. Only the database and the ledger writer are faked.
 process.env.MARCUS_BEARER_TOKEN_HASH = createHash('sha256').update('tok').digest('hex');
 process.env.WHINK_OWNER_EMAILS = 'owner@example.com';
+process.env.ENCRYPTION_KEY = 'ab'.repeat(32);
 
 type Row = Record<string, any>;
 const h = vi.hoisted(() => ({ jobs: [] as Row[], approvals: [] as Row[], scopes: [] as Row[], ledger: [] as Row[], hasOwner: true, seq: 0 }));
@@ -133,6 +134,18 @@ describe('Marcus intake', () => {
   it('503 when no owner account is configured', async () => {
     h.hasOwner = false;
     expect((await post(body())).status).toBe(503);
+  });
+
+  it('503 and nothing stored when no encryption key is configured', async () => {
+    const key = process.env.ENCRYPTION_KEY;
+    delete process.env.ENCRYPTION_KEY;
+    try {
+      expect((await post(body())).status).toBe(503);
+      expect(h.jobs).toHaveLength(0);
+      expect(h.approvals).toHaveLength(0);
+    } finally {
+      process.env.ENCRYPTION_KEY = key;
+    }
   });
 
   it('503 while the account is in lockdown', async () => {

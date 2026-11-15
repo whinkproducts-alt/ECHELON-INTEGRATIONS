@@ -13,12 +13,17 @@ export function marcusStatusFor(action: string, errorCode: string | null): strin
     case `${PREFIX}task_unfrozen`:
     case `${PREFIX}task_reconfirmed`:
     case `${PREFIX}task_resumed`: return 'received';
+    case `${PREFIX}task_started`: return 'in_progress';
+    case `${PREFIX}task_done`: return 'done';
+    case `${PREFIX}task_failed`: return 'failed';
+    case `${PREFIX}task_blocked`: return 'blocked';
+    case `${PREFIX}task_cancelled`: return 'cancelled';
     default: return null;
   }
 }
 
 // Query only these so no row is ever skipped (a skipped row would not advance the cursor).
-const ACTIONS = ['task_received', 'task_frozen', 'task_unfrozen', 'task_reconfirmed', 'task_resumed'].map((a) => `${PREFIX}${a}`);
+const ACTIONS = ['task_received', 'task_frozen', 'task_unfrozen', 'task_reconfirmed', 'task_resumed', 'task_started', 'task_done', 'task_failed', 'task_blocked', 'task_cancelled'].map((a) => `${PREFIX}${a}`);
 
 const where = (userId: string, cursor: Cursor | null) => ({
   userId,
