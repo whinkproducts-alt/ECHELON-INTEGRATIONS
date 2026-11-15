@@ -21,7 +21,7 @@ Promotion to ECHELON-CORP and actual Mac speech, private memory, mission executi
 - Independent read-only assurance reviewed the source slice; its required correction was to mark the unverified daily-SMS policy override as proposed. Applied.
 - Local dependencies were installed in an isolated checkout; disk exhaustion blocked copying the optional Linux Prisma engine. Only this task's temporary dependency install was removed. Existing checkouts/settings were preserved.
 - Local checking uses the generated candidate Prisma types with a temporary path mapping because shared installed dependency types otherwise resolve to the source checkout's different schema. CI must generate its own normal client and run the complete migration/build/test/browser checks before merge.
-- Focused regression tests: 6 files / 55 tests passed. ESLint: zero errors, six existing warnings. Full local tests and final CI are pending. No live paid requests, external sends, database migrations against personal data, deployment or ECHELON-CORP changes are part of this task.
+- Focused regression tests: 6 files / 55 tests passed. ESLint: zero errors, six existing warnings. Full local suite: 179 files passed, 5 skipped; 2,416 tests passed, 112 skipped. Final CI must still validate normal client generation, typecheck, migrations, build and browser flows. No live paid requests, external sends, database migrations against personal data, deployment or ECHELON-CORP changes are part of this task.
 
 ## Redundant branch candidates (ancestry verified against base main)
 
