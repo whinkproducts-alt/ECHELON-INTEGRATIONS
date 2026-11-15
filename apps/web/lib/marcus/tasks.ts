@@ -26,7 +26,9 @@ export async function getMarcusTask(userId: string, id: string): Promise<TaskRes
   const job = await load(userId, id);
   if (!job) return fail(404, 'Task not found');
   const result = await resultOf(job);
-  return { status: 200, body: result ? { ...view(job), result } : view(job) };
+  // Marcus reads `result_summary` (plain text); `result` keeps the per-agent detail. Both are untrusted model output.
+  const result_summary = result?.outputs.map((o) => o.text).join('\n\n').slice(0, 3000);
+  return { status: 200, body: result ? { ...view(job), result, result_summary } : view(job) };
 }
 
 /**

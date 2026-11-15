@@ -168,6 +168,7 @@ describe.skipIf(!enabled)('marcus real database integration', () => {
       expect(got.body.status).toBe('done');
       expect(got.body.result).toMatchObject({ untrusted: true });
       expect(JSON.stringify(got.body.result)).toContain('verify the evidence');
+      expect(got.body.result_summary).toContain('verify the evidence'); // the field Marcus's client reads
 
       const statuses = (await feed.marcusEventsAfter(owner, null, 1000)).filter((e) => (e.data as { task_id: string }).task_id === t.task_id).map((e) => (e.data as { status: string }).status);
       expect(statuses).toEqual(['received', 'in_progress', 'done']);
