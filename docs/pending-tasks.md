@@ -10,6 +10,8 @@
 - Whether to amend non-negotiable 4 to allow any agent-tier approval (the 8-tier chain was not built; see decisions).
 - Whether an SSH tunnel counts as "local" for a second machine's Ollama.
 
+- Broad multi-domain tasks (for example marketing, sales, finance and legal in one request) get capability gaps from the router, so the Marcus executor reports them `blocked` (`no_specialist_available`) rather than running a partial team. Decide whether to split such tasks, run partial teams, or leave as is.
+
 **Open, engineering:**
 - Run the executor on the owner's Mac with a real account (`ENCRYPTION_KEY`, `MARCUS_BEARER_TOKEN_HASH`, `WHINK_OWNER_EMAILS`, worker running) and look at the executive screens in a browser; neither has been done.
 - One enforced local-only check across the 12 modules that enforce it, plus a call-site audit; live ordered model failover; a literal worker-kill chaos test.

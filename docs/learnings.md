@@ -209,3 +209,4 @@ Overlapping Dependabot PRs in the two repos can request different versions of th
 - **Design documents describe intent, not the repo.** The code audit report reviewed a package that was never committed; most "must fix" items were already handled in the real code. Read the repo and run its tests before building from a brief.
 - **Tasks only know their own text.** Analysis runs with no tools, memory or web, so "summarise my roadmap" correctly gets a refusal. Marcus tasks must carry what to reason about unless context attachment is built.
 - **Repeat the real check:** `scripts/marcus-e2e.py` drives Marcus's own client against a running ECHELON.
+- **Measure before optimizing.** `next build` compiles in about 6 s and the full 2453-test suite runs in about 7 s, so build and test time are not worth tuning. The router already picks 1 to 2 agents per task even at the 5-agent cap, so lowering the cap for Marcus tasks would save no model tokens.
