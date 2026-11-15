@@ -1,4 +1,4 @@
-> **Status update 2026-11-15:** Superseded in part: Marcus tasks are now executed (the largest gap listed below), the proxy exemption is recorded in decisions.md (it still needs a security-reviewer pass), and the flow was verified over real HTTP with Marcus's own client. See `HANDOFF-MARCUS-EXECUTOR.md` and `docs/daily-syncs/2026-11-15.md`.
+> **Status update 2026-11-15:** Superseded in part: Marcus tasks are now executed (the largest gap listed below), the proxy exemption is recorded in decisions.md (it still needs a security-reviewer pass), and the flow was verified over real HTTP with Marcus's own client. See `HANDOFF-MARCUS-EXECUTOR.md` and `../daily-syncs/2026-11-15.md`.
 
 # Group B handoff — Marcus workflow contract, worker repair
 
