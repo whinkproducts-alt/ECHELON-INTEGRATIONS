@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 export interface Idea {
   id: string;
   title: string;
-  body: string;
+  body: string | null;
   source: 'founder' | 'recommendation';
   archived: boolean;
   createdAt: string;

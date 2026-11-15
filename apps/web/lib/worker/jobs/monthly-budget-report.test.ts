@@ -54,12 +54,12 @@ describe('runMonthlyBudgetReport', () => {
     ]);
 
     // Mock open holds (no date filter)
-    vi.mocked(prisma.usageEvent.aggregate).mockImplementation(async (args: any) => {
+    vi.mocked(prisma.usageEvent.aggregate).mockImplementation((async (args: any) => {
       if (args.where.state?.in) {
         return { _sum: { reservedMicros: 2_000_000 } } as any;
       }
       return { _sum: { costMicros: 0 } } as any;
-    });
+    }) as never); // Prisma's PrismaPromise brand cannot be satisfied by a plain async mock
 
     // Mock unpriced events (null costMicros)
     vi.mocked(prisma.usageEvent.findMany).mockResolvedValue([

@@ -42,7 +42,7 @@ describe('decideAdmission spend cap tests', () => {
       reservedMicros: 500_001,
     });
     expect(result.ok).toBe(false);
-    expect(result.code).toBe('SPEND_HARD_LIMIT');
+    expect(result).toMatchObject({ ok: false, code: 'SPEND_HARD_LIMIT' });
   });
 
   it('rejects with SPEND_CAP_UNSET when spendCapMicros is null for metered call', () => {
@@ -51,7 +51,7 @@ describe('decideAdmission spend cap tests', () => {
       spendCapMicros: null,
     });
     expect(result.ok).toBe(false);
-    expect(result.code).toBe('SPEND_CAP_UNSET');
+    expect(result).toMatchObject({ ok: false, code: 'SPEND_CAP_UNSET' });
   });
 
   it('admits local cost class with no cap set', () => {

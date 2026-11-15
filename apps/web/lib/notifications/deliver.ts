@@ -3,14 +3,13 @@
  * In-app + email notification delivery for ECHELON.
  *
  * In-app:  prisma.recommendation  (dedupeKey for idempotency)
- * Email:   deliverEmail() from lib/comms/delivery.ts
+ * Email:   not sent (see notify)
  *
  * NOTE: prisma.notification does NOT exist in schema.prisma.
  *       All in-app delivery goes through prisma.recommendation.
  */
 
 import { prisma } from '@/lib/db';
-import { deliverEmail } from '@/lib/comms/delivery';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -96,24 +95,9 @@ export async function notify(params: NotifyParams): Promise<NotifyResult> {
   let emailResult: NotifyResult['email'] = 'skipped';
 
   if (params.emailSubject !== undefined) {
-    const address = await resolveEmailAddress(params.userId);
-
-    if (!address) {
-      emailResult = 'no_address';
-    } else {
-      try {
-        const result = await deliverEmail({
-          to: address,
-          subject: params.emailSubject,
-          body: params.body,
-          channel: 'EMAIL',
-          userId: params.userId,
-        });
-        emailResult = result.ok ? 'sent' : 'error';
-      } catch {
-        emailResult = 'error';
-      }
-    }
+    // Not sent: lib/comms/delivery has no exported email sender, and mailing ledger data outside the account is a
+    // protected disclosure that needs the owner's approval by request id. The in-app notice above still lands.
+    emailResult = (await resolveEmailAddress(params.userId)) ? 'skipped' : 'no_address';
   }
 
   return { inApp, email: emailResult };

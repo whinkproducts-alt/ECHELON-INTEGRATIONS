@@ -5,11 +5,6 @@ import { ShieldAlert, ShieldCheck, Plus, Edit, Archive, ExternalLink, MessageSqu
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LockdownButton } from '@/components/safety/lockdown-control';
-import { listPending } from '@/lib/approvals';
-import { isLockedDown, engageLockdown, releaseLockdown } from '@/lib/safety/lockdown';
-import { listIdeas, createIdea, updateIdea, archiveIdea, listRecommendations } from '@/lib/ideas';
-import { listInitiatives } from '@/lib/initiatives';
-import { listSealedObjectives } from '@/lib/sealed-scope';
 
 interface FounderOfficeProps {
   userId: string;
@@ -71,7 +66,7 @@ export function FounderOffice({ userId, userEmail }: FounderOfficeProps) {
 
   const loadData = async () => {
     try {
-      setLoading(true);
+      // Not setLoading(true): the initial state is already true, and re-setting it on every 30 s poll flashed the loading view.
       const [approvalsData, ideasData, recommendationsData, initiativesData, sealedData, lockdownData] = await Promise.all([
         fetch('/api/approvals?status=pending').then(r => r.ok ? r.json() : { approvals: [] }).then(d => d.approvals ?? []),
         fetch('/api/ideas?scope=private').then(r => r.ok ? r.json() : { ideas: [] }).then(d => d.ideas ?? []),
@@ -94,7 +89,7 @@ export function FounderOffice({ userId, userEmail }: FounderOfficeProps) {
   };
 
   useEffect(() => {
-    loadData();
+    loadData(); // eslint-disable-line react-hooks/set-state-in-effect
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -529,7 +524,7 @@ export function FounderOffice({ userId, userEmail }: FounderOfficeProps) {
                           </div>
                         )}
                       </div>
-                      {initiative.result && (
+                      {initiative.result != null && (
                         <button className="rounded p-1.5 text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--accent)/0.1)] transition-colors shrink-0" title="View result">
                           <ExternalLink className="h-4 w-4" />
                         </button>
