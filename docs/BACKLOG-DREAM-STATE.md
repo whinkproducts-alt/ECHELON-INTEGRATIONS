@@ -12,8 +12,8 @@ Method: every line counts once, unweighted (not effort). Done = 1, Built-not-acc
 | Done | 18 | 18 |
 | Built, not accepted | 7 | 3.5 |
 | Built, connection unverified (Part 2) | 13 | 6.5 |
-| Open (Part 1: 28; Part 2: 40) | 68 | 0 |
-| **Total** | **106** | **28 → 26%** |
+| Open (Part 1: 29; Part 2: 40) | 69 | 0 |
+| **Total** | **107** | **28 → 26%** |
 
 Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except the exclusions listed in Part 2.
 
@@ -198,3 +198,22 @@ Legend note: the 13 "B" rows are the ones counted at 0.5 in the completion table
 | 52 | **KPIs per entity and promotion rules you set.** Registry agents carry a `kpis` list (checked non-empty by `agent-validator`) but nothing measures or scores it. No promotion or review system exists; "promote" in the code means idea → initiative only. | Open | You set KPIs and targets per entity (board, directorate head, subsidiary head, kill team member, agent). Scores come from the ledger and task results. A promotion or demotion is a proposal you approve. |
 | 53 | **Learning per entity.** Agents read and write lessons (`agent-memory.ts` in the chat orchestrator; swarm learnings per run). The self-improvement job learns at the WHINK/owner level only. | Built, partial | Every entity keeps its own lessons and debriefs from real work, and improves its own procedures. Changes outside low-risk procedural updates go to you as proposals. |
 | 54 | **Talk to every person individually in the Founders Office.** Chat exists for 9 personas (WHINK, MAMBA, Marcus, and 6 directorate-style personas). No individual chat for the rest of the 326-agent roster, subsidiary heads or kill team members. | Partial | One conversation per board member, directorate head, subsidiary head, kill team member, WHINK, MAMBA and Marcus. Each speaks as itself, with its own memory. A persona changes voice, never access. |
+| 55 | **HR runs training for every entity, all the time.** No training code exists at all. | Open | An HR training cycle: curriculum (skills, ethics, compliance, mandatory), a schedule, completion records and a pass check per entity. For agents, "training" means vetted lessons added to their knowledge plus a scenario test they must pass (agents do not change their model weights). Overdue mandatory training shows on the entity's score and to you. Content for ethics and compliance comes from you and the compliance checker, not invented by an agent. |
+
+### KPI design (agreed 2026-11-15; open items still marked)
+
+**Who is scored:** leaders only (board, directorate heads, subsidiary heads, kill team members), from ledger evidence. All agents also carry two company-wide signals (ideas, revenue contribution), see below.
+
+**Signals from the ledger:** tasks done vs failed or blocked; how often your approval was needed and what you decided; rework; time and cost; your thumbs up or down. Nothing an agent says about itself.
+
+**Company-wide signals for every agent (new, and what is missing):**
+1. *Viable ideas.* Today `FounderIdea` has no author, so no idea can be credited to an agent. Needs an author field and a definition of "viable". Proposed: an idea counts when it is promoted to an initiative or you approve it, not when it is merely written. Counting raw ideas would reward volume.
+2. *Money the organisation makes.* Today `Contract` has a value, subsidiary and status, but no record of who sourced it or worked on it. No invoices, payments or lead records exist. Needs: who sourced each contract, and a credit rule. Proposed: credit goes to the agents who worked on tasks linked to the contract's project, split by share of tasks, counted only when the contract is ACTIVE or COMPLETED. Revenue is slow and shared, so it is one signal among several, never the only one.
+
+**Promotion:** a proposal, never automatic. It needs approval from the person's line manager **and** that manager's manager (two levels). Reporting lines exist for `staff-directory.ts` entries only; the 326-agent registry has `reports_to_human` and no agent-to-agent chain, so one must be defined. Line managers are mostly AI personas, so their approval is a workflow gate, not human authority. Anything that changes access or permissions (tools, autonomy level) also needs you, because no agent can approve on your behalf (rule 4, Protected actions).
+
+**Subsidiary heads:** reviewed twice a year by WHINK and MAMBA. MAMBA's view is adversarial and stored as a hypothesis (confidence capped at 0.4), so the review shows both opinions side by side for you and the two managers to weigh. A scheduled job opens each review.
+
+**Tamper rule:** scoring code and scores are written by ECHELON only, from ledger rows. A scored agent cannot edit its own KPIs, targets or score.
+
+**Still to decide:** the targets and weights per role (you set them in a screen), the review period for non-subsidiary roles, and the thresholds that trigger a promotion proposal.
