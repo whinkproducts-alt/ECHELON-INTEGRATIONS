@@ -9,11 +9,11 @@ Method: every line counts once, unweighted (not effort). Done = 1, Built-not-acc
 
 | | Items | Credit |
 |---|---|---|
-| Done | 18 | 18 |
+| Done | 19 | 19 |
 | Built, not accepted | 10 | 5 |
 | Built, connection unverified (Part 2) | 13 | 6.5 |
-| Open (Part 1: 29; Part 2: 40; Part 4: 8) | 77 | 0 |
-| **Total** | **118** | **29.5 → 25%** |
+| Open (Part 1: 29; Part 2: 40; Part 4: 11) | 80 | 0 |
+| **Total** | **122** | **30.5 → 25%** |
 
 Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except the exclusions listed in Part 2.
 
@@ -50,6 +50,16 @@ Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except t
 | 22 | Executive screens | never opened in a browser |
 | 23 | Voice, media, speech, avatar | no Mac audio acceptance |
 | 24 | Hosts / infra (Group E) | no run outside tests |
+
+## Priority order (set 2026-11-15; first line is first to do)
+
+Ranked by safety, then what unblocks others, then features. "Needs you" items are listed last because they cannot move without you.
+
+1. **Safeguards before loosening:** 58 and 59 (built), then 67, 68, 70 (open).
+2. **Rule and correctness gaps:** 27 proxy exemption review, 45 crash window (fails closed today, so lower), 46 chaos test, 41 skipped tests.
+3. **Core function:** 28 auto-split, 31 failover, 32 durable memory, 33 lockdown in flight, 52 to 55 KPIs, learning, individual chat, training.
+4. **Connections (Part 2)** in the order of work below.
+5. **Needs you:** 29 passkey, 30 real run, 48 founder inputs, 66 inference caps, 25 warp choices, 47 pre-release review.
 
 ## Open
 
@@ -236,7 +246,7 @@ All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now h
 
 | # | Rule change | What to build | Status |
 |---|---|---|---|
-| 57 | R1 Local-only off for routine work | One enforced check replacing the 12 module checks; call-site audit; ledger every block | Open |
+| 57 | R1 Local-only: one audited check | **Done 2026-11-15.** `lib/__tests__/outbound-audit.test.ts` fails if any server file calling `fetch(` neither checks Local-Only mode nor is classified (local service or browser code). The audit found one real gap, GitHub read-only reports, now refused in Local-Only mode. Local-only stays a mode you switch on; it is off by default (R1). | Done |
 | 58 | R2 Execution sandbox, R14 command allow-list | **Built 2026-11-15, not connected:** `lib/exec-policy.ts` (command class B or C from an owner allow-list, hardened `docker run` arguments, plain-language explain), 6 tests. **Still to do:** the command and browser tools must call it; the allow-list screen. No tool runs commands through it yet. | Built, not accepted |
 | 59 | R3 Sender pairing | **Built 2026-11-15, not connected:** `lib/pairing.ts`, table `channel_pairings` (migration `20261115010000`), one-time code hashed, 1 hour expiry, 5 pending per channel, revoke; 3 real-database tests pass. **Still to do:** every inbound channel adapter must call `requestPairing` (none exist yet), and an owner screen to approve a code. | Built, not accepted |
 | 60 | R5 Learned delegations | Offer after 5 identical approvals; 30 day expiry, daily cap, revocable; Class C excluded. A delegation can only tighten the action class, never loosen it (as in OpenClaw approvals) | Open |
@@ -246,6 +256,11 @@ All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now h
 | 64 | R12 Assurance gate for docs, data and test changes | Automated gate; amend non-negotiable 9 wording | Open |
 | 65 | R13 Mission activation | Wake agents per mission, return to dormant after | Open |
 | 66 | R15 Model-inference envelope | Daily and monthly figures set once; stops at cap; amend non-negotiable 10 wording. **Figures needed from Victor** | Open |
+
+| 67 | Wire pairing into every inbound channel adapter (WhatsApp, Telegram, Discord, Slack, Teams, Google Chat, IMAP) | Each adapter calls `requestPairing` before replying; test per adapter. Comes with each Part 2 messaging row. | Open |
+| 68 | Wire `exec-policy` into any command or browser tool | Class from `classifyCommand`, run under `sandboxDockerArgs`; no tool may spawn a command another way (add a call-site audit test like item 57). | Open |
+| 69 | Owner screens: approve a pairing code, edit the command allow-list, see the sandbox explanation | One settings panel. | Open |
+| 70 | Switch-on gate for the loosened rules | R4, R5, R7, R8, R9 stay off by a flag until items 58, 59, 67 and 68 are connected, so the order of work is enforced in code, not only written. | Open |
 
 **Settled:** R6 dropped (30 s stays); R10 option C (Class B on allow-listed domains, Class C on login, payment and settings pages); R14 option B now, option C after item 58.
 **Needs Victor:** R15 figures (daily and monthly model-inference caps).

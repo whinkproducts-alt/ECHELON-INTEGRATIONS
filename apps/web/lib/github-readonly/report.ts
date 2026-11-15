@@ -1,6 +1,7 @@
 /** Fixed-repository, read-only GitHub report. No arbitrary URL, repo, or method input. */
 import { createPrivateKey, createSign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { isLocalOnlyMode } from '@/lib/local-only';
 
 export interface GithubConfig { owner: string; repo: string; branch: string; appId: string; installationId: string; privateKeyPath: string }
 export type ApiGet = (path: string, token: string) => Promise<{ data: unknown; incomplete: boolean }>;
@@ -20,6 +21,7 @@ function jwt(c: GithubConfig): string {
   return `${input}.${sign.sign(createPrivateKey(readFileSync(c.privateKeyPath))).toString('base64url')}`;
 }
 async function jsonGet(url: URL, token: string): Promise<{ data: unknown; incomplete: boolean }> {
+  if (isLocalOnlyMode()) throw new Error('GitHub is not available in Local-Only mode');
   if (url.origin !== 'https://api.github.com' || url.username || url.password) throw new Error('GitHub destination denied');
   const res = await fetch(url, { method: 'GET', redirect: 'manual', headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'echelon-readonly-report' }, signal: AbortSignal.timeout(10_000) });
   if (res.status >= 300 && res.status < 400) throw new Error('GitHub redirect denied');
@@ -32,6 +34,7 @@ async function jsonGet(url: URL, token: string): Promise<{ data: unknown; incomp
 }
 let cached: { token: string; expires: number; identity: string } | null = null;
 export async function installationToken(c: GithubConfig): Promise<string> {
+  if (isLocalOnlyMode()) throw new Error('GitHub is not available in Local-Only mode');
   const identity = `${c.appId}/${c.installationId}/${c.owner}/${c.repo}`;
   if (cached?.identity === identity && cached.expires > Date.now() + 5 * 60_000) return cached.token;
   const url = new URL(`https://api.github.com/app/installations/${encoded(c.installationId)}/access_tokens`);
