@@ -14102,7 +14102,7 @@
     "cost_profile": "low"
   },
   {
-    "agent_id": "people_culture.hr_business_partnering_people_operations.hr_business_partnering_people_operations_core.agent261_whink261",
+    "agent_id": "executive_office_corporate_strategy.hr_business_partnering_people_operations.hr_business_partnering_people_operations_core.agent261_whink261",
     "name": "Ebele Onyeka",
     "title": "Principal Specialist — HR Business Partnering & People Operations",
     "directorate": "Executive Office & Corporate Strategy",
@@ -14157,7 +14157,7 @@
     "cost_profile": "medium"
   },
   {
-    "agent_id": "people_culture.hr_business_partnering_people_operations.hr_business_partnering_people_operations_core.agent262_whink262",
+    "agent_id": "executive_office_corporate_strategy.hr_business_partnering_people_operations.hr_business_partnering_people_operations_core.agent262_whink262",
     "name": "Funmi Olatunji",
     "title": "Analyst & Reviewer — HR Business Partnering & People Operations",
     "directorate": "Executive Office & Corporate Strategy",
@@ -18264,6 +18264,120 @@
       "incident_management",
       "compliance_monitoring",
       "ai_auditability",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "tools": [],
+    "data_access": [
+      "minimum_required_by_task"
+    ],
+    "permissions": [
+      "advice",
+      "draft",
+      "prepare"
+    ],
+    "autonomy_level": 2,
+    "state": "dormant",
+    "human_approval_required_for": [
+      "task_start",
+      "public_action",
+      "financial_commitment",
+      "material_memory_write"
+    ],
+    "completion_criteria": [
+      "approved_scope_complete",
+      "quality_checks_passed",
+      "handoff_ready"
+    ],
+    "kpis": [
+      "accuracy",
+      "quality",
+      "cycle_time",
+      "reuse_rate"
+    ],
+    "provider_binding": null,
+    "cost_profile": "low"
+  },
+  {
+    "agent_id": "executive_office_corporate_strategy.people_operations_hr_strategy.people_operations_hr_strategy_core.adaora_mbanefo",
+    "name": "Adaora Mbanefo",
+    "title": "Principal Specialist — People Operations & HR Strategy",
+    "directorate": "Executive Office & Corporate Strategy",
+    "department": "People Operations & HR Strategy",
+    "team": "People Operations & HR Strategy Core",
+    "reports_to_human": "Nneka Eze",
+    "mission": "Support People Operations & HR Strategy with approved, evidence-based work.",
+    "responsibilities": [
+      "workforce_planning",
+      "people_operations",
+      "org_design",
+      "talent_reviews",
+      "employee_experience"
+    ],
+    "skills": [
+      "workforce_planning",
+      "people_operations",
+      "org_design",
+      "talent_reviews",
+      "employee_experience",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "tools": [],
+    "data_access": [
+      "minimum_required_by_task"
+    ],
+    "permissions": [
+      "advice",
+      "draft",
+      "prepare"
+    ],
+    "autonomy_level": 2,
+    "state": "dormant",
+    "human_approval_required_for": [
+      "task_start",
+      "public_action",
+      "financial_commitment",
+      "material_memory_write"
+    ],
+    "completion_criteria": [
+      "approved_scope_complete",
+      "quality_checks_passed",
+      "handoff_ready"
+    ],
+    "kpis": [
+      "accuracy",
+      "quality",
+      "cycle_time",
+      "reuse_rate"
+    ],
+    "provider_binding": null,
+    "cost_profile": "medium"
+  },
+  {
+    "agent_id": "executive_office_corporate_strategy.people_operations_hr_strategy.people_operations_hr_strategy_core.obiageli_nwankwo",
+    "name": "Obiageli Nwankwo",
+    "title": "Analyst & Reviewer — People Operations & HR Strategy",
+    "directorate": "Executive Office & Corporate Strategy",
+    "department": "People Operations & HR Strategy",
+    "team": "People Operations & HR Strategy Core",
+    "reports_to_human": "Nneka Eze",
+    "mission": "Support People Operations & HR Strategy with approved, evidence-based work.",
+    "responsibilities": [
+      "workforce_planning",
+      "people_operations",
+      "org_design",
+      "talent_reviews",
+      "employee_experience"
+    ],
+    "skills": [
+      "workforce_planning",
+      "people_operations",
+      "org_design",
+      "talent_reviews",
+      "employee_experience",
       "web_research",
       "source_verification",
       "quality_review"

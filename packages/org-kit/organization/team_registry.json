@@ -2417,7 +2417,7 @@
     "max_default_active_agents": 3
   },
   {
-    "team_id": "people_culture.hr_business_partnering_people_operations.hr_business_partnering_people_operations_core",
+    "team_id": "executive_office_corporate_strategy.hr_business_partnering_people_operations.hr_business_partnering_people_operations_core",
     "name": "HR Business Partnering & People Operations Core",
     "directorate": "Executive Office & Corporate Strategy",
     "department": "HR Business Partnering & People Operations",
@@ -3141,6 +3141,27 @@
       "compliance_monitoring",
       "ai_auditability",
       "agent_autonomy",
+      "web_research",
+      "source_verification",
+      "quality_review"
+    ],
+    "default_state": "dormant",
+    "max_default_active_agents": 3
+  },
+  {
+    "team_id": "executive_office_corporate_strategy.people_operations_hr_strategy.people_operations_hr_strategy_core",
+    "name": "People Operations & HR Strategy Core",
+    "directorate": "Executive Office & Corporate Strategy",
+    "department": "People Operations & HR Strategy",
+    "department_head": "Nneka Eze",
+    "mission": "Primary execution and advisory team for People Operations & HR Strategy.",
+    "core_skills": [
+      "workforce_planning",
+      "people_operations",
+      "org_design",
+      "talent_reviews",
+      "employee_experience",
+      "policy_administration",
       "web_research",
       "source_verification",
       "quality_review"

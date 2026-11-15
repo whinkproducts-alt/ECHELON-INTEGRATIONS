@@ -14,10 +14,10 @@ beforeAll(async () => {
 });
 
 describe('loader and registry', () => {
-  it('loads 336 agents, 570 skills, 168 teams matching the manifest', () => {
-    expect(kit.agents).toHaveLength(336);
+  it('loads 338 agents, 570 skills, 169 teams matching the manifest', () => {
+    expect(kit.agents).toHaveLength(338);
     expect(kit.skills).toHaveLength(570);
-    expect(kit.teams).toHaveLength(168);
+    expect(kit.teams).toHaveLength(169);
     expect(kit.countMismatches).toEqual([]);
     expect(registry.skillCount).toBe(570);
     expect(registry.unknownBindings).toEqual([]);
@@ -31,10 +31,10 @@ describe('validator', () => {
     expect(r.categoryCount).toBe(7);
     expect(new Set(RULES.map((x) => x.id)).size).toBe(32);
   });
-  it('passes all 336 agents with no errors', () => {
+  it('passes all 338 agents with no errors', () => {
     const r = validateAll(kit);
     expect(r.violations.filter((v) => v.severity === 'error')).toEqual([]);
-    expect(r.valid).toBe(336);
+    expect(r.valid).toBe(338);
   });
   it('rejects a broken agent and never throws', () => {
     const ctx = buildRuleContext(kit);

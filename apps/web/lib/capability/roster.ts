@@ -1,6 +1,6 @@
 /**
  * Canonical identities for grants. Subjects are the org-kit agent_id / team_id values: the roster of
- * 336 agents and 168 teams is read, never written. A grant to an id that is not in the roster is refused,
+ * 338 agents and 169 teams is read, never written. A grant to an id that is not in the roster is refused,
  * and the team of an agent is derived from the roster here, never taken from the caller.
  */
 import { getOrgKit } from '@/lib/agent-loader';
