@@ -17,6 +17,7 @@ model User {
   commandAllowList CommandAllowList?
   spendEnvelope SpendEnvelope?
   marcusFreeze MarcusFreeze?
+  orgEntities OrgEntity[]
   id            String    @id @default(cuid())
   name          String?
   email         String    @unique
@@ -762,12 +763,15 @@ model FounderIdea {
   source        String   @default("founder") // founder | recommendation
   archived      Boolean  @default(false)
   privacyScope  String   @default("private") // private | shared
+  authorKey     String? // lane E: OrgEntity.key of the entity that wrote it
+  viableAt      DateTime? // lane E: set when promoted to an initiative or approved by the owner
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, source, archived])
+  @@index([userId, authorKey])
   @@map("founder_ideas")
 }
 
@@ -1179,6 +1183,7 @@ model Contract {
   endDate      DateTime?
   renewalDate  DateTime?
   notes        String?
+  sourcedByKey String? // lane E: OrgEntity.key that sourced the contract
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -1751,4 +1756,155 @@ model CommandAllowList {
   updatedAt DateTime @updatedAt
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@map("command_allow_lists")
+}
+
+// ── lane E: organisation, KPIs, promotion, reviews, training ─────
+// One row per person or agent, seeded from packages/org-kit. One manager each; loops are rejected by lib/org/graph.ts.
+model OrgEntity {
+  id         String   @id @default(cuid())
+  userId     String
+  key        String
+  kind       String // human | persona | agent
+  name       String
+  role       String
+  tier       Int // 0 founder, 1 board/persona/kill team, 2 subsidiary head or director, 3 department head, 4 agent
+  directorate String?
+  department String?
+  managerKey String?
+  roles      String[] // every role the person holds
+  status     String   @default("active")
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, key])
+  @@index([userId, managerKey])
+  @@map("org_entities")
+}
+
+// Targets and weights are set by the owner only. No row exists until the owner makes one.
+model OrgKpi {
+  id          String   @id @default(cuid())
+  userId      String
+  entityKey   String
+  measureCode String
+  target      Float
+  weight      Float
+  periodDays  Int
+  createdAt   DateTime @default(now())
+  @@unique([userId, entityKey, measureCode])
+  @@map("org_kpis")
+}
+
+// Written only by lib/org/scoring.ts.
+model OrgKpiScore {
+  id          String   @id @default(cuid())
+  userId      String
+  entityKey   String
+  measureCode String
+  periodStart DateTime
+  periodEnd   DateTime
+  value       Float?   // null = no evidence in the period
+  meetsTarget Boolean?
+  evidence    Int      @default(0)
+  createdAt   DateTime @default(now())
+  @@unique([userId, entityKey, measureCode, periodStart])
+  @@index([userId, entityKey])
+  @@map("org_kpi_scores")
+}
+
+// Promotion thresholds are blank until the owner sets them, so nothing triggers by default.
+model OrgPolicy {
+  userId             String   @id
+  promotionThreshold Float?
+  periodsRequired    Int?
+  updatedAt          DateTime @updatedAt
+  @@map("org_policies")
+}
+
+model OrgPromotion {
+  id             String   @id @default(cuid())
+  userId         String
+  entityKey      String
+  kind           String // promote | demote
+  toRole         String
+  changesAccess  Boolean  @default(false)
+  contentHash    String
+  requiredKeys   String[]
+  status         String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  createdAt      DateTime @default(now())
+  decidedAt      DateTime?
+  approvals      OrgPromotionApproval[]
+  @@index([userId, status])
+  @@map("org_promotions")
+}
+
+model OrgPromotionApproval {
+  id          String   @id @default(cuid())
+  promotionId String
+  approverKey String
+  decision    String // approve | reject
+  contentHash String
+  createdAt   DateTime @default(now())
+  promotion   OrgPromotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  @@unique([promotionId, approverKey])
+  @@map("org_promotion_approvals")
+}
+
+// Twice-yearly subsidiary head review. MAMBA's view is also stored as a Hypothesis (confidence at most 0.4).
+model OrgReview {
+  id         String   @id @default(cuid())
+  userId     String
+  entityKey  String
+  period     String // e.g. 2026-H2
+  status     String   @default("OPEN") // OPEN | COMPLETE
+  evidence   Json?
+  whinkView  String?
+  mambaView  String?
+  createdAt  DateTime @default(now())
+  @@unique([userId, entityKey, period])
+  @@map("org_reviews")
+}
+
+// Curriculum. Ethics and compliance bodies come from Victor and the compliance checker: contentStatus stays NEEDS_VICTOR until then.
+model OrgCourse {
+  id            String   @id @default(cuid())
+  userId        String
+  code          String
+  title         String
+  category      String // skills | ethics | compliance | mandatory
+  mandatory     Boolean  @default(false)
+  contentStatus String   @default("NEEDS_VICTOR") // NEEDS_VICTOR | APPROVED
+  body          String?
+  scenarios     Json? // [{ id, prompt, mustMention[], mustNotMention[] }]
+  passMark      Float? // set by the owner, 0..1
+  intervalDays  Int?
+  createdAt     DateTime @default(now())
+  @@unique([userId, code])
+  @@map("org_courses")
+}
+
+model OrgTraining {
+  id        String   @id @default(cuid())
+  userId    String
+  entityKey String
+  courseId  String
+  dueAt     DateTime
+  status    String   @default("ASSIGNED") // ASSIGNED | PASSED | FAILED
+  score     Float?
+  attempts  Int      @default(0)
+  passedAt  DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, entityKey])
+  @@index([userId, courseId])
+  @@map("org_training")
+}
+
+model OrgChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  entityKey String
+  role      String // user | assistant
+  content   String
+  createdAt DateTime @default(now())
+  @@index([userId, entityKey, createdAt])
+  @@map("org_chat_messages")
 }

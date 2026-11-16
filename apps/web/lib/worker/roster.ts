@@ -5,7 +5,7 @@ import { intervalOrThrow } from '@/lib/worker/schedule';
 export const JOB_TYPES = [
   'news_digest', 'opportunity_scan', 'weekly_brief', 'project_monitor',
   'memory_curation', 'security_watch', 'skills_sweeper', 'swarm_resume',
-  'self_improvement', 'monthly_budget_report',
+  'self_improvement', 'monthly_budget_report', 'org_cycle',
 ] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 
@@ -54,6 +54,7 @@ export const SYSTEM_JOBS: readonly SystemJob[] = [
   { key: 'swarm-resume', job: 'swarm_resume', schedule: 'every 5m', critical: true },
   // The report dedupes per UTC month, so a daily run is a no-op except the first run of a new month.
   { key: 'monthly-budget-report', job: 'monthly_budget_report', schedule: 'every 1d', critical: true },
+  { key: 'org-cycle', job: 'org_cycle', schedule: 'every 1d', critical: true },
 ];
 
 export function rosterStats() {
