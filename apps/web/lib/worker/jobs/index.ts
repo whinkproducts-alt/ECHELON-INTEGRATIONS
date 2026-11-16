@@ -8,6 +8,7 @@ import { securityWatch } from '@/lib/worker/jobs/security-watch';
 import { skillsSweeper } from '@/lib/worker/jobs/skills-sweeper';
 import { swarmResume } from '@/lib/worker/jobs/swarm-resume';
 import { selfImprovement } from '@/lib/worker/jobs/self-improvement';
+import { orgCycle } from '@/lib/worker/jobs/org-cycle';
 import { runMonthlyBudgetReport } from '@/lib/worker/jobs/monthly-budget-report';
 
 export interface JobDef {
@@ -29,4 +30,5 @@ export const JOBS: Readonly<Record<JobType, JobDef>> = {
   swarm_resume: { run: (c) => swarmResume(c), usesModel: false, critical: true },
   self_improvement: { run: (c) => selfImprovement(c), usesModel: true, critical: false },
   monthly_budget_report: { run: (c) => runMonthlyBudgetReport({ userId: c.userId, now: c.now }), usesModel: false, critical: true },
+  org_cycle: { run: (c) => orgCycle(c), usesModel: false, critical: true },
 };

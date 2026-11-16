@@ -12,10 +12,10 @@ import { workerConcurrency, jobTimeoutMs } from '../worker/runner';
 beforeEach(() => { resetDb(); raw.queryRaw.mockReset(); });
 
 describe('job table', () => {
-  it('desired jobs are the 22 enabled roster entries plus the three system jobs (skills sweeper, swarm resume, monthly budget report), with unique keys', () => {
+  it('desired jobs are the 22 enabled roster entries plus the four system jobs (skills sweeper, swarm resume, monthly budget report, org cycle), with unique keys', () => {
     const d = desiredJobs();
-    expect(d).toHaveLength(25);
-    expect(new Set(d.map((j) => j.jobKey)).size).toBe(25);
+    expect(d).toHaveLength(26);
+    expect(new Set(d.map((j) => j.jobKey)).size).toBe(26);
     expect(d.find((j) => j.job === 'skills_sweeper')!.critical).toBe(true);
   });
   it('ensureJobs creates only the missing rows for that user, staggered, skipDuplicates', async () => {
@@ -27,7 +27,7 @@ describe('job table', () => {
     expect(db.agentJob.findMany.mock.calls[0][0].where).toEqual({ userId: 'uA' });
     const arg = db.agentJob.createMany.mock.calls[0][0];
     expect(arg.skipDuplicates).toBe(true);
-    expect(arg.data).toHaveLength(3);
+    expect(arg.data).toHaveLength(4);
     for (const r of arg.data) { expect(r.userId).toBe('uA'); expect(r.nextRunAt.getTime() - now.getTime()).toBeLessThan(10 * 60_000); }
     await expect(ensureJobs('')).rejects.toThrow();
   });
