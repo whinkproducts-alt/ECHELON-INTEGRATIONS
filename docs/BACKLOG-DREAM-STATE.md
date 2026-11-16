@@ -9,11 +9,11 @@ Method: every line counts once, unweighted (not effort). Done = 1, Built-not-acc
 
 | | Items | Credit |
 |---|---|---|
-| Done | 19 | 19 |
+| Done | 21 | 21 |
 | Built, not accepted | 11 | 5.5 |
 | Built, connection unverified (Part 2) | 13 | 6.5 |
-| Open (Part 1: 29; Part 2: 40; Part 4: 10) | 79 | 0 |
-| **Total** | **122** | **31 → 25%** |
+| Open (Part 1: 27; Part 2: 40; Part 4: 10) | 77 | 0 |
+| **Total** | **122** | **33 → 27%** |
 
 Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except the exclusions listed in Part 2.
 
@@ -67,7 +67,7 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 |---|---|---|
 | **25** | **Warp opening screen before login** (see below) | engineering + **V** (decisions) |
 | 26 | ~~Marcus sends `subsidiary` / `target_subsidiaries`~~ Done 2026-11-15 (Marcus e7f92d1, 75 tests pass, not run on real Postgres) | push, then restart Marcus so its database gets the new columns |
-| 27 | Security review of the `proxy.ts` exemption for Marcus routes | security-reviewer |
+| 27 | Security review of the `proxy.ts` exemption for Marcus routes | **Done 2026-11-15.** Reviewed all 7 routes: each calls `requireMarcusAuth` first (hash plus constant-time compare, fails closed when no hash is set). New test `marcus-proxy-exemption.test.ts` checks the exemption pattern matches exactly the routes that exist and that every method of every route returns 401 without a valid token. | Done |
 | 28 | Auto-split requests over 5 domains | **V** (decide) |
 | 29 | Owner account and passkey (F01) | **V** |
 | 30 | Run executor on the Mac with a real account and worker | **V** |
@@ -81,7 +81,7 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | 38 | E09 Mac-off hosting | **V** (F06) |
 | 39 | Nothing run on Windows | engineering |
 | 40 | 131 dependency alerts; Prisma 7 and TypeScript 7 held; PRs #14, #11, #9, #15 | engineering |
-| 41 | 132 skipped tests are not acceptance | engineering |
+| 41 | 132 skipped tests are not acceptance | **Done for the database tests 2026-11-15:** `pnpm test:real` (`scripts/test-real-db.sh`) starts a throwaway Postgres, migrates and runs every real-database test serially (96 pass). Serial running fixed a flaky worker test caused by parallel files stealing each other's queued jobs. The Ollama tests remain opt-in and need a running model. | Done |
 | 42 | Do Marcus tasks need attached documents or memory? | **V** (decide) |
 | 43 | ~~SSH tunnel counts as local?~~ Decided 2026-11-15: own SSH hosts count as local. Merged into item 50. | done in 50 |
 | 44 | Amend non-negotiable 4 to allow agent-tier approvals | **V** (decide) |
