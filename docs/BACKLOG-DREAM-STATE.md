@@ -15,7 +15,7 @@ Method: every line counts once, unweighted (not effort). Done = 1, Built-not-acc
 | Open (Parts 1, 3, 4: 5; Part 2: 11) | 16 | 0 |
 | **Total** | **122** | **65.5 → 54%** |
 
-Recounted by the lead on 2026-11-16 after merging ten lanes. "Built" means code and tests exist, mostly on mocked services; nothing in Part 2 has been run live. Open in Parts 1, 3, 4: 30 (real run on the Mac), 40 (held upgrades and PRs), 48 (founder inputs), 63 and 64 (rule wording).
+Recounted by the lead on 2026-11-16 after merging ten lanes. "Built" means code and tests exist, mostly on mocked services; nothing in Part 2 has been run live. Cross-lane acceptance added 2026-11-16 (`cross-lane.integration.test.ts`, 6 tests, all pass): pairing before any inbound text, no command runs without approval or during lockdown, standing grants refused while the switch is off, and no catalog provider can spend while the envelope is off. These check the merged features together on mocks; they do not replace live runs. Open in Parts 1, 3, 4: 30 (real run on the Mac), 40 (held upgrades and PRs), 48 (founder inputs), 63 and 64 (rule wording).
 
 Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except the exclusions listed in Part 2.
 
