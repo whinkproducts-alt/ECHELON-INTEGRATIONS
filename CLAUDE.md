@@ -118,6 +118,7 @@ Delivery transports live in `lib/comms/delivery.ts`; callers must enforce permis
 4. security-reviewer reviews anything touching auth, permissions, tenants, secrets, tools or external content.
 5. brand-guardian reviews anything visual.
 6. lead-architect approves and merges.
+7. **Backlog rule (set by Victor 2026-11-15).** Every fix updates its row in `docs/BACKLOG-DREAM-STATE.md` and the completion table in the same commit: new status, what was verified, what is still open. A fix that has no row gets one first, placed by rank in the priority order. A change that is not in the backlog does not count as done.
 
 At the end of each phase:
 - qa-engineer runs the acceptance criteria against the running app.

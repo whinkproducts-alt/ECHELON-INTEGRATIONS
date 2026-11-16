@@ -80,7 +80,7 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | 37 | E08 desktop app, readiness, backup and tested restore | engineering |
 | 38 | E09 Mac-off hosting | **V** (F06) |
 | 39 | Nothing run on Windows | engineering |
-| 40 | 131 dependency alerts; Prisma 7 and TypeScript 7 held; PRs #14, #11, #9, #15 | engineering |
+| 40 | Dependency alerts; Prisma 7 and TypeScript 7 held; PRs #14, #11, #9, #15 | engineering. **2026-11-15:** `pnpm audit --prod` reports no known vulnerabilities (hono pinned in `pnpm-workspace.yaml`, unused `@azure/storage-blob` removed). The older "131 alerts" figure was GitHub's count across all dependencies and has not been re-checked. Held majors and the four PRs are still open. |
 | 41 | 132 skipped tests are not acceptance | **Done for the database tests 2026-11-15:** `pnpm test:real` (`scripts/test-real-db.sh`) starts a throwaway Postgres, migrates and runs every real-database test serially (96 pass). Serial running fixed a flaky worker test caused by parallel files stealing each other's queued jobs. The Ollama tests remain opt-in and need a running model. | Done |
 | 42 | Do Marcus tasks need attached documents or memory? | **V** (decide) |
 | 43 | ~~SSH tunnel counts as local?~~ Decided 2026-11-15: own SSH hosts count as local. Merged into item 50. | done in 50 |
