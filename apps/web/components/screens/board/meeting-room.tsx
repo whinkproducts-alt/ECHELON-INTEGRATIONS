@@ -5,7 +5,7 @@
 // The agenda checklist is a local aid for the session and is not stored.
 import * as React from 'react';
 import Image from 'next/image';
-import { Save } from 'lucide-react';
+import { Save, Volume2, Square } from 'lucide-react';
 import { HoloBadge, HoloButton, HoloEmpty, HoloPanel } from '@/components/ui/holo';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import type { BoardMember } from '@/lib/board';
@@ -32,6 +32,21 @@ function Room({ meeting, members, onSaved }: { meeting: BoardMeetingView; member
   const [minutes, setMinutes] = React.useState(meeting.minutes ?? '');
   const [saving, setSaving] = React.useState(false);
   const [status, setStatus] = React.useState<{ kind: 'idle' | 'saved' | 'error'; message?: string }>({ kind: 'idle' });
+
+  const [reading, setReading] = React.useState<number | null>(null);
+  const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
+  React.useEffect(() => () => { if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel(); }, []);
+  // Browser speech only: nothing leaves the device. Reads the agenda item by item and marks the one being read.
+  const readAgenda = () => {
+    const synth = window.speechSynthesis;
+    if (reading !== null) { synth.cancel(); setReading(null); return; }
+    meeting.agenda.forEach((text, i) => {
+      const u = new SpeechSynthesisUtterance(text);
+      u.onstart = () => setReading(i);
+      u.onend = u.onerror = () => setReading((r) => (r === i && i === meeting.agenda.length - 1 ? null : r));
+      synth.speak(u);
+    });
+  };
 
   const seated = meeting.attendees.map((name) => ({ name, member: members.find((m) => m.name === name) }));
 
@@ -76,7 +91,7 @@ function Room({ meeting, members, onSaved }: { meeting: BoardMeetingView; member
             {seated.length === 0 && <p className="absolute inset-x-0 bottom-[8%] text-center text-xs text-muted-foreground">No attendees were invited.</p>}
             <ul className="absolute inset-0">
               {seated.map((s, i) => (
-                <li key={`${s.name}-${i}`} className="absolute flex w-[22%] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 text-center" style={seat(i, seated.length)}>
+                <li key={`${s.name}-${i}`} className="seat-in absolute flex w-[22%] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 text-center" style={{ ...seat(i, seated.length), animationDelay: `${i * 80}ms` }}>
                   <span className="relative block aspect-square w-[78%] overflow-hidden rounded-full border border-border bg-[hsl(var(--surface))]">
                     {s.member?.imageUrl
                       ? <Image src={s.member.imageUrl} alt="" fill sizes="6rem" className="object-cover object-top" />
@@ -91,14 +106,19 @@ function Room({ meeting, members, onSaved }: { meeting: BoardMeetingView; member
 
         <div className="space-y-6">
           <HoloPanel as="section" aria-labelledby="agenda-title">
-            <h3 id="agenda-title" className="mb-3 font-display text-lg font-semibold text-foreground">Agenda</h3>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 id="agenda-title" className="font-display text-lg font-semibold text-foreground">Agenda</h3>
+              {canSpeak && meeting.agenda.length > 0 && (
+                <HoloButton onClick={readAgenda} leftIcon={reading === null ? <Volume2 className="h-4 w-4" aria-hidden /> : <Square className="h-4 w-4" aria-hidden />}>{reading === null ? 'Read aloud' : 'Stop'}</HoloButton>
+              )}
+            </div>
             {meeting.agenda.length === 0 ? <p className="text-sm text-muted-foreground">No agenda items were set.</p> : (
               <ul className="space-y-2">
                 {meeting.agenda.map((a, i) => (
                   <li key={`${i}-${a}`}>
                     <label className="flex cursor-pointer items-start gap-3 text-sm">
                       <input type="checkbox" className="mt-1 h-4 w-4 accent-[hsl(var(--whink-accent))]" checked={done[i] ?? false} onChange={() => setDone((d) => d.map((v, j) => (j === i ? !v : v)))} />
-                      <span className={done[i] ? 'text-muted-foreground line-through' : 'text-foreground'}>{a}</span>
+                      <span className={done[i] ? 'text-muted-foreground line-through' : reading === i ? 'text-primary' : 'text-foreground'} aria-current={reading === i ? 'true' : undefined}>{a}</span>
                     </label>
                   </li>
                 ))}

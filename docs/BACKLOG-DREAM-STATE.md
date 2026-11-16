@@ -47,8 +47,8 @@ Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except t
 | 19 | Org-tier approval (opt-in, default off) | the 8-tier chain was not built (see 44) |
 | 20 | Local-only enforcement | present in 12 modules; no single enforced check or call-site audit |
 | 21 | Model failover modules | live ordered failover never shown |
-| 22 | Executive screens | never opened in a browser |
-| 23 | Voice, media, speech, avatar | no Mac audio acceptance |
+| 22 | Executive screens | never opened in a browser | (lane F 2026-11-15: not done. Only /dashboard/board and its voice briefing dialog were opened in a browser; /executive screens still unopened.)
+| 23 | Voice, media, speech, avatar | no Mac audio acceptance | (lane F: briefing dialog opened in browser and correctly reports "no speech service answered"; no Mac audio acceptance.)
 | 24 | Hosts / infra (Group E) | no run outside tests |
 
 ## Priority order (set 2026-11-15; first line is first to do)
@@ -76,7 +76,7 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | 33 | E04 lockdown across in-flight jobs, mic and camera | engineering |
 | 34 | E05 iMessage bridge, real two-way phone audio | iMessage inbound parser plus pairing built (off until `IMESSAGE_BRIDGE_TOKEN`; Mac-side reader process and sends still open); real two-way phone audio needs hardware: **Needs Victor** |
 | 35 | E06 real GitHub mission acceptance | Software part done 2026-11-15 (lane C2): `evaluateMissionAcceptance` plus a scripted-GitHub acceptance test (`github-mission-acceptance.test.ts`): accepts only complete passing checks at the mission commit; refuses failing, no checks, running, incomplete pages, and a moved head. Live run still **V** (F02): needs Victor's GitHub App. |
-| 36 | E07 Board Room motion and voice, HOLO lifecycle, 15 vs 16 directorates | **V** (roster) |
+| 36 | E07 Board Room motion and voice, HOLO lifecycle, 15 vs 16 directorates | **V** (roster) | (lane F: **partial**. Board Room seats arrive in turn (reduced-motion safe) and agenda has browser read-aloud. No "15 directorates" assumption exists in app/ or components/. HOLO hub count and lifecycle not touched. Meeting room not browser-tested.)
 | 37 | E08 desktop app, readiness, backup and tested restore | engineering |
 | 38 | E09 Mac-off hosting | **V** (F06) |
 | 39 | Nothing run on Windows | engineering |
@@ -259,8 +259,10 @@ All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now h
 
 | 67 | Wire pairing into every inbound channel adapter (WhatsApp, Telegram, Discord, Slack, Teams, Google Chat, IMAP) | Each adapter calls `requestPairing` before replying; test per adapter. Comes with each Part 2 messaging row. | Pairing wired in the shared `handleInbound` and tested for all 7 adapters (mocked pairing; unknown sender gets silence, code goes to owner). Telegram has no inbound adapter yet. Open: routes/pollers that call it. In progress |
 | 68 | Wire `exec-policy` into any command or browser tool | Class from `classifyCommand`, run under `sandboxDockerArgs`; no tool may spawn a command another way (add a call-site audit test like item 57). | Open |
-| 69 | Owner screens: approve a pairing code, edit the command allow-list, see the sandbox explanation | One settings panel. | Open |
+| 69 | Owner screens: approve a pairing code, edit the command allow-list, see the sandbox explanation | One settings panel. | Built in Settings → "Pairing, commands and sandbox" (new `command_allow_lists` table, server actions, ledgered). Browser-verified: allow-list saved and ledgered; pairing approve not exercised with a real code. 4 unit tests. Lane H must read `getAllowList` (lib/owner-controls.ts) when wiring exec-policy. |
 | 70 | Switch-on gate for the loosened rules | R4, R5, R7, R8, R9 stay off by a flag until items 58, 59, 67 and 68 are connected, so the order of work is enforced in code, not only written. | Open |
 
 **Settled:** R6 dropped (30 s stays); R10 option C (Class B on allow-listed domains, Class C on login, payment and settings pages); R14 option B now, option C after item 58.
 **R15 figures set:** CA$1 a day, CA$20 a month.
+
+| 25 (lane F) | Warp opening screen before login | Built (`components/screens/warp`). Defaults in `config/tenant-defaults.json` `warp`: enabled, oncePerSession, showHint. Silent; reduced motion skips; click, key or touch continues; CSS self-hides after 6 s if script fails. Verified in browser at desktop and 375px. **Needs Victor:** the open warp choices. |
