@@ -6,8 +6,6 @@ import { cancelExecution } from '@/lib/worker/ear-execution';
 export const MARCUS_JOB_PREFIX = 'marcus:';
 /** nextRunAt for a Marcus job that must not be claimed: frozen, waiting, blocked or finished. */
 export const MARCUS_NEVER_RUN = new Date('2100-01-01T00:00:00Z');
-// shortcut: freeze flag stored as a sentinel AgentJob row, avoiding a migration; move to a real table in Group B.
-const FREEZE_KEY = `${MARCUS_JOB_PREFIX}__freeze__`;
 const FREEZABLE = ['received', 'routed', 'in_progress', 'reconfirmation_required'];
 
 export async function resolveMarcusOwner(): Promise<{ id: string; email: string } | null> {
@@ -17,8 +15,7 @@ export async function resolveMarcusOwner(): Promise<{ id: string; email: string 
 }
 
 export async function isMarcusFrozen(userId: string): Promise<boolean> {
-  const row = await prisma.agentJob.findUnique({ where: { jobKey_userId: { jobKey: FREEZE_KEY, userId } }, select: { lastStatus: true } });
-  return row?.lastStatus === 'freeze_on';
+  return (await prisma.marcusFreeze.findUnique({ where: { userId }, select: { frozen: true } }))?.frozen === true;
 }
 
 /**
@@ -30,11 +27,7 @@ export async function setMarcusFreeze(userId: string, on: boolean): Promise<stri
   const from = on ? FREEZABLE : ['frozen'];
   const batch = `${on ? 'freeze' : 'unfreeze'}:${Date.now()}`;
   const { ids, started } = await prisma.$transaction(async (tx) => {
-    await tx.agentJob.upsert({
-      where: { jobKey_userId: { jobKey: FREEZE_KEY, userId } },
-      create: { jobKey: FREEZE_KEY, userId, nextRunAt: MARCUS_NEVER_RUN, lastStatus: on ? 'freeze_on' : 'freeze_off' },
-      update: { lastStatus: on ? 'freeze_on' : 'freeze_off' },
-    });
+    await tx.marcusFreeze.upsert({ where: { userId }, create: { userId, frozen: on }, update: { frozen: on } });
     const tasks = await tx.agentJob.findMany({
       where: { userId, jobKey: { startsWith: MARCUS_JOB_PREFIX }, lastStatus: { in: from } },
       select: { id: true, capabilityReceiptId: true },
@@ -55,7 +48,8 @@ export async function setMarcusFreeze(userId: string, on: boolean): Promise<stri
         permissionClass: 'A', status: 'EXECUTED', correlationId: `marcus-task:${id}`, inputSummary: `batch=${batch}`,
       }, tx);
     }
-    return { ids, started: on ? tasks.filter((t) => t.capabilityReceiptId).map((t) => t.capabilityReceiptId as string) : [] };
+    // A split task keeps one execution per part, comma-joined in capabilityReceiptId.
+    return { ids, started: on ? tasks.flatMap((t) => t.capabilityReceiptId?.split(',') ?? []) : [] };
   });
   for (const executionId of started) await cancelExecution(userId, executionId);
   return ids;

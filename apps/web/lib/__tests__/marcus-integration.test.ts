@@ -9,7 +9,7 @@ process.env.WHINK_OWNER_EMAILS = 'owner@example.com';
 process.env.ENCRYPTION_KEY = 'ab'.repeat(32);
 
 type Row = Record<string, any>;
-const h = vi.hoisted(() => ({ jobs: [] as Row[], approvals: [] as Row[], scopes: [] as Row[], ledger: [] as Row[], hasOwner: true, seq: 0 }));
+const h = vi.hoisted(() => ({ jobs: [] as Row[], approvals: [] as Row[], scopes: [] as Row[], ledger: [] as Row[], hasOwner: true, seq: 0, freezes: {} as Record<string, boolean> }));
 
 const dup = () => Object.assign(new Error('unique'), { code: 'P2002' });
 const inList = (v: unknown, c: any) => (c?.in ? c.in.includes(v) : c === v);
@@ -56,6 +56,10 @@ vi.mock('@/lib/db', () => {
         return { count: hit.length };
       },
     },
+    marcusFreeze: {
+      findUnique: async ({ where }: Row) => (where.userId in h.freezes ? { frozen: h.freezes[where.userId] } : null),
+      upsert: async ({ where, create }: Row) => { h.freezes[where.userId] = create.frozen; return create; },
+    },
     sealedScope: { create: async ({ data }: Row) => { h.scopes.push(data); return data; } },
     action: {
       findMany: async ({ where, take }: Row) => {
@@ -85,7 +89,7 @@ function body(over: Row = {}) {
 const post = (b: unknown, token = 'tok') =>
   intakeMarcusTask(new Request('http://x/api/integrations/marcus/tasks', { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(b) }));
 
-beforeEach(() => { h.jobs = []; h.approvals = []; h.scopes = []; h.ledger = []; h.hasOwner = true; h.seq = 0; });
+beforeEach(() => { h.jobs = []; h.approvals = []; h.scopes = []; h.ledger = []; h.hasOwner = true; h.seq = 0; h.freezes = {}; });
 
 describe('Marcus intake', () => {
   it('rejects a bad or missing token with 401 and writes nothing', async () => {
