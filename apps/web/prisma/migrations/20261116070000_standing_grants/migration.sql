@@ -17,3 +17,5 @@ CREATE TABLE "standing_grants" (
 );
 CREATE INDEX "standing_grants_userId_kind_revokedAt_expiresAt_idx" ON "standing_grants"("userId", "kind", "revokedAt", "expiresAt");
 ALTER TABLE "standing_grants" ADD CONSTRAINT "standing_grants_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- At most one live global window per user; closes the open-twice race.
+CREATE UNIQUE INDEX "standing_grants_one_global" ON "standing_grants"("userId") WHERE "kind" = 'global' AND "revokedAt" IS NULL;

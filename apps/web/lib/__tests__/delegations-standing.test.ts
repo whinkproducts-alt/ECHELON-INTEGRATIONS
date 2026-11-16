@@ -43,7 +43,8 @@ vi.mock('@/lib/ledger', () => ({
   recordAction: async (e: R) => { ledgerRows.push(e); return 'l'; },
   recordActionSafe: async (e: R) => { ledgerRows.push(e); },
 }));
-vi.mock('@/lib/safety/lockdown', () => ({ isLockedDown: async () => locked }));
+let changedAt: string | null = null;
+vi.mock('@/lib/safety/lockdown', () => ({ isLockedDown: async () => locked, getSafetyState: async () => ({ lockedDown: locked, changedAt }) }));
 vi.mock('@/lib/logger', () => ({ logger: { security: () => {}, error: () => {} } }));
 vi.mock('@/lib/tool-registry', () => ({
   registeredToolClass: (n: string) => (({ routine_b: 'B', other_b: 'B', plain_c: 'C' }) as R)[n] ?? 'C',
@@ -58,7 +59,7 @@ const NOW = new Date('2026-11-16T12:00:00Z');
 const auth = () => ({ owner: true as const, passkeyVerifiedAt: new Date(NOW.getTime() - 60_000) });
 const H = 3_600_000;
 
-beforeEach(() => { vi.resetModules(); grants = []; approvals = []; ledgerRows = []; locked = false; seq = 0; decided = []; process.env.ECHELON_STANDING_GRANTS = 'on'; });
+beforeEach(() => { vi.resetModules(); grants = []; approvals = []; ledgerRows = []; locked = false; changedAt = null; seq = 0; decided = []; process.env.ECHELON_STANDING_GRANTS = 'on'; });
 afterEach(() => { delete process.env.ECHELON_STANDING_GRANTS; });
 
 const mod = () => import('@/lib/delegations-standing');
@@ -131,6 +132,19 @@ describe('R9 global window', () => {
     expect(await s.findStandingGrant(ME, 'routine_b', 'B', {}, NOW)).toBeNull();
     locked = false;
     expect(await s.findStandingGrant(ME, 'routine_b', 'B', {}, NOW)).toBeNull();
+  });
+  it('a lockdown lifted later does not revive a window opened before it', async () => {
+    const s = await mod();
+    await s.openGlobalWindow(ME, 5 * H, auth(), NOW);
+    changedAt = new Date(NOW.getTime() + H).toISOString(); // lockdown activated and lifted without any Class B call in between
+    const later = new Date(NOW.getTime() + 2 * H);
+    expect(await s.getActiveGlobalWindow(ME, later)).toBeNull();
+    expect(await s.findStandingGrant(ME, 'routine_b', 'B', {}, later)).toBeNull();
+  });
+  it('does not fire on a tainted turn, and ledger failure means no run', async () => {
+    const s = await mod();
+    await s.openGlobalWindow(ME, H, auth(), NOW);
+    expect(await s.findStandingGrant(ME, 'routine_b', 'B', { tainted: true }, NOW)).toBeNull();
   });
   it('revoke is instant', async () => {
     const s = await mod();

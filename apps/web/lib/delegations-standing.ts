@@ -17,7 +17,7 @@ import { approvalContentHash, toolArgsHash } from '@/lib/canonical-json';
 import { classifyProtected } from '@/lib/protected-actions';
 import { createApproval, decide, type ApprovalView, type DecisionOutcome } from '@/lib/approvals';
 import { SECRET_RULES } from '@/lib/secret-scan';
-import { isLockedDown } from '@/lib/safety/lockdown';
+import { isLockedDown, getSafetyState } from '@/lib/safety/lockdown';
 
 export type GrantKind = 'agent_tier' | 'learned' | 'template' | 'global';
 
@@ -49,9 +49,7 @@ export function isExcludedScope(capability: string, scope?: string): boolean {
 
 async function registeredClass(capability: string): Promise<'A' | 'B' | 'C'> {
   const { registeredToolClass } = await import('@/lib/tool-registry');
-  const { CAPABILITY_CLASSES } = await import('@/lib/permission-engine');
-  const t = registeredToolClass(capability);
-  return t !== 'C' ? t : (CAPABILITY_CLASSES[capability] ?? 'C');
+  return registeredToolClass(capability); // the tool registry alone decides; no second table can lower it
 }
 
 /** A grant may only cover a plain Class B action: registered B, not protected, not an excluded scope. */
@@ -76,7 +74,9 @@ interface GrantRow { id: string; userId: string; kind: string; capability: strin
 // ── creation ────────────────────────────────────────────────────────────────
 
 async function create(userId: string, kind: GrantKind, data: { capability?: string; team?: string; paramsHash?: string; content?: object; dailyCap?: number }, expiresAt: Date, summary: string): Promise<string> {
-  const row = await prisma.standingGrant.create({ data: { userId, kind, ...data, expiresAt } });
+  let row;
+  try { row = await prisma.standingGrant.create({ data: { userId, kind, ...data, expiresAt } }); }
+  catch (e) { if ((e as { code?: string })?.code === 'P2002') throw new Error('standing grants: a global window is already open'); throw e; }
   try { await ledger(userId, row.id, kind, 'standing_grant_created', summary, 'EXECUTED', data.capability); }
   catch (e) { await prisma.standingGrant.deleteMany({ where: { id: row.id, userId } }); throw e; } // no grant without a ledger row
   return row.id;
@@ -102,7 +102,15 @@ export async function openGlobalWindow(userId: string, ms: number, auth: OwnerAu
 }
 
 /** For the on-screen banner. Null when none is open (an expired window is simply not returned: it reverts by itself). */
+/** A lockdown change ends every global window opened before it, so a lift never revives one. */
+async function endStaleGlobals(userId: string, now: Date): Promise<void> {
+  const st = await getSafetyState(userId);
+  if (st.changedAt) await prisma.standingGrant.updateMany({ where: { userId, kind: 'global', revokedAt: null, startsAt: { lt: new Date(st.changedAt) } }, data: { revokedAt: now } });
+}
+
 export async function getActiveGlobalWindow(userId: string, now = new Date()): Promise<{ id: string; expiresAt: Date } | null> {
+  if (await isLockedDown(userId)) return null;
+  await endStaleGlobals(userId, now);
   const r = await prisma.standingGrant.findFirst({ where: { userId, kind: 'global', revokedAt: null, startsAt: { lte: now }, expiresAt: { gt: now } } });
   return r ? { id: r.id, expiresAt: r.expiresAt } : null;
 }
@@ -162,7 +170,9 @@ export async function useTemplate(userId: string, grantId: string, call: { tool:
   const g = await prisma.standingGrant.findFirst({ where: { id: grantId, userId, kind: 'template', capability: call.tool, revokedAt: null, startsAt: { lte: now }, expiresAt: { gt: now } } }) as GrantRow | null;
   if (!g || g.paramsHash !== toolArgsHash(call)) return false;
   try { await assertEligible(call.tool, call.args); } catch { return false; }
-  return spend(g, now);
+  if (!(await spend(g, now))) return false;
+  try { await recordAction({ userId, initiator: 'system', action: 'standing_grant_used', permissionClass: 'B', status: 'EXECUTED', tool: call.tool, correlationId: `grant:${g.id}`, grantId: g.id, validationResult: JSON.stringify({ grantId: g.id, kind: 'template' }) }); } catch { return false; }
+  return true;
 }
 
 // ── use at decision time (called by checkPermission for Class B only) ───────
@@ -179,14 +189,15 @@ async function spend(g: GrantRow, now: Date): Promise<boolean> {
  * Does a standing grant let this Class B call run? Returns the grant id or null. Never called for Class C or protected calls.
  * agent_tier needs ctx.agentTeam to match; learned needs the same exact params; global covers any routine Class B.
  */
-export async function findStandingGrant(userId: string, capability: string, cls: 'A' | 'B' | 'C', ctx: { params?: unknown; agentTeam?: string; scope?: string } = {}, now = new Date()): Promise<{ id: string; kind: GrantKind } | null> {
-  if (cls !== 'B' || !standingGrantsEnabled() || isExcludedScope(capability, ctx.scope)) return null;
+export async function findStandingGrant(userId: string, capability: string, cls: 'A' | 'B' | 'C', ctx: { params?: unknown; agentTeam?: string; scope?: string; tainted?: boolean } = {}, now = new Date()): Promise<{ id: string; kind: GrantKind } | null> {
+  if (cls !== 'B' || ctx.tainted === true || !standingGrantsEnabled() || isExcludedScope(capability, ctx.scope)) return null;
   if (classifyProtected({ toolName: capability, capability, params: ctx.params }).protected) return null;
   if (await isLockedDown(userId)) {
     // Lockdown ends every global window at once.
     await prisma.standingGrant.updateMany({ where: { userId, kind: 'global', revokedAt: null }, data: { revokedAt: now } });
     return null;
   }
+  await endStaleGlobals(userId, now);
   const rows = await prisma.standingGrant.findMany({
     where: { userId, revokedAt: null, startsAt: { lte: now }, expiresAt: { gt: now }, OR: [{ kind: 'global' }, { kind: 'agent_tier', capability, team: ctx.agentTeam ?? '\u0000' }, { kind: 'learned', capability }] },
     orderBy: { createdAt: 'asc' },
@@ -195,7 +206,8 @@ export async function findStandingGrant(userId: string, capability: string, cls:
   for (const g of rows) {
     if (g.kind === 'learned' && g.paramsHash !== argsHash) continue;
     if (!(await spend(g, now))) continue;
-    await recordActionSafe({ userId, initiator: 'system', action: 'standing_grant_used', permissionClass: 'B', status: 'EXECUTED', tool: capability, correlationId: `grant:${g.id}`, grantId: g.id, validationResult: JSON.stringify({ grantId: g.id, kind: g.kind, windowId: g.kind === 'global' ? g.id : undefined }) });
+    // Strict: no ledger row, no run (non-negotiable 5).
+    try { await recordAction({ userId, initiator: 'system', action: 'standing_grant_used', permissionClass: 'B', status: 'EXECUTED', tool: capability, correlationId: `grant:${g.id}`, grantId: g.id, validationResult: JSON.stringify({ grantId: g.id, kind: g.kind, windowId: g.kind === 'global' ? g.id : undefined }) }); } catch { return null; }
     return { id: g.id, kind: g.kind as GrantKind };
   }
   return null;
