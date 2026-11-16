@@ -32,6 +32,8 @@ export interface RouteContext {
   /** Spend admission for a metered entry: operator admitted paid models, or the user pays with their own key. */
   paidAdmitted: (e: ModelRegistryEntry) => boolean;
   env?: EnvMap;
+  /** Provider ids with a key in the user's encrypted settings (see storedProviderIds). */
+  storedProviders?: ReadonlySet<string>;
   now?: number;
 }
 
@@ -110,7 +112,7 @@ export function skipReasonFor(e: ModelRegistryEntry, ctx: RouteContext, env: Env
   if (!e.admitted) return 'trial_evaluation_only';
   if (ctx.needsStream && !e.capabilities.stream && e.kind === 'api') return 'stream_unsupported';
   if (e.cost === 'metered' && !ctx.paidAdmitted(e)) return 'paid_not_admitted';
-  if (!entryConfigured(e, env)) return 'not_configured';
+  if (!entryConfigured(e, env, ctx.storedProviders)) return 'not_configured';
   return healthOf(e.id, ctx.now);
 }
 
