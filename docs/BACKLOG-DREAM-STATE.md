@@ -71,7 +71,7 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | 28 | ~~Auto-split requests over 5 domains~~ Done 2026-11-16 (lane A). A request whose skills a 5-specialist team cannot cover is split into parts (cap 4), each its own EAR execution of at most 5 specialists; the task is done only when every part is, and its result joins all parts' output. Verified on real Postgres (`marcus.integration`). Still open: the 4-part cap path has no test (needs a request wider than the org has departments); Victor's decision on the cap. | **V** (confirm cap of 4 parts) |
 | 29 | Owner account and passkey (F01) | **V** |
 | 30 | Run executor on the Mac with a real account and worker | **V** |
-| 31 | E02 live model failover | engineering |
+| 31 | E02 live model failover | **Built 2026-11-15 (lane C1)**: `chatWithFailover`; test kills the primary, next model answers, `model_failover` ledgered; credential failure benches primary; spend stop does not fail over. Open: wiring into the messages route (outside lane) and a live run. | engineering |
 | 32 | E03 durable founder-private objectives and memory | engineering |
 | 33 | E04 lockdown across in-flight jobs, mic and camera | engineering |
 | 34 | E05 iMessage bridge, real two-way phone audio | iMessage inbound parser plus pairing built (off until `IMESSAGE_BRIDGE_TOKEN`; Mac-side reader process and sends still open); real two-way phone audio needs hardware: **Needs Victor** |
@@ -143,31 +143,31 @@ State today: **B** = built, connection unverified. **O** = open, to build or con
 | Models | NVIDIA NIM | B | trial adapter; metered stays blocked until priced |
 | Models | OmniRoute | B | adapter exists |
 | Models | Hermes | B | adapter exists |
-| Models | OpenRouter | O | config + price + cap |
-| Models | Fireworks | O | same |
-| Models | Novita | O | same |
-| Models | DeepInfra | O | same |
-| Models | Hugging Face | O | same |
-| Models | Kimi / Moonshot | O | same |
-| Models | z.ai / GLM | O | same |
-| Models | MiniMax | O | same |
-| Models | Nebius | O | same |
-| Models | Upstage | O | same |
-| Models | Ramp Router | O | same |
-| Models | Tencent TokenHub / TokenPlan | O | same |
-| Models | OpenCode Zen | O | same |
-| Models | OpenCode Go | O | same |
-| Models | Arcee | O | same |
-| Models | Xiaomi MiMo | O | same |
-| Models | Ollama Cloud | O | not local: never for founder-private data |
+| Models | OpenRouter | **B, Needs Victor** | config + price + cap. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | Fireworks | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | Novita | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | DeepInfra | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | Hugging Face | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | Kimi / Moonshot | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | z.ai / GLM | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | MiniMax | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | Nebius | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | Upstage | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | Ramp Router | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. Base URL not published: set env. |
+| Models | Tencent TokenHub / TokenPlan | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. Base URL not published: set env. |
+| Models | OpenCode Zen | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | OpenCode Go | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | Arcee | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | Xiaomi MiMo | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
+| Models | Ollama Cloud | **B, Needs Victor** | not local: never for founder-private data. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
 | Search | Exa | O | gateway provider; metered |
 | Search | Parallel | O | same |
 | Search | Firecrawl | O | same |
 | Search | Reddit (public feeds) | O | read-only |
 | Media | FAL.ai images | O | metered; prompts leave the machine, approval each time |
 | Browser | Local browser tool (decision 49) | O | |
-| Models | Qwen OAuth (you import the login once into encrypted settings) | O | decided 2026-11-15; ECHELON never reads the other tool's file |
 | Messaging | WhatsApp via unofficial bridge (Baileys-style) | O | UNOFFICIAL bridge: not endorsed by WhatsApp, the number can get banned, use a dedicated one. Off until `WHATSAPP_BRIDGE_TOKEN` is set; sends stay Class C approvals. Needs "official APIs only" amended and a licence check before the bridge process is added. Inbound parser built 2026-11-15 (lane B): `lib/channels/adapters.ts` parser and verifier, pairing then silence for unknown senders via `lib/channels/inbound.ts`, text wrapped untrusted, test in `channel-adapters.test.ts`. Still open: the web route or poller that calls it (`app/api` is not lane B), real credentials (Needs Victor). |
+| Models | Qwen OAuth (you import the login once into encrypted settings) | **B, Needs Victor** | decided 2026-11-15; ECHELON never reads the other tool's file. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. Qwen: import and refresh built; refresh needs QWEN_OAUTH_TOKEN_URL and QWEN_OAUTH_CLIENT_ID from Victor. |
 | Messaging | Email out (SMTP) | B | |
 | Messaging | SMS (Twilio) | B | |
 | Messaging | WhatsApp (Twilio) | B | |

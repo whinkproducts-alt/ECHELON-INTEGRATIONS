@@ -13,7 +13,9 @@ export type RegistryKind = 'api' | 'manual_handoff';
 export type CostClass = 'local' | 'trial' | 'metered' | 'manual';
 /** Most sensitive data an entry may receive. private > internal > synthetic. */
 export type DataCeiling = 'private' | 'internal' | 'synthetic';
-export type ProviderId = 'ollama' | 'anthropic' | 'gemini' | 'openai_compatible' | 'nvidia' | 'deepseek_web';
+export type ProviderId = 'ollama' | 'anthropic' | 'gemini' | 'openai_compatible' | 'nvidia' | 'deepseek_web' | 'cloud';
+
+import { PROVIDERS, providerBaseUrl, providerEnvConfigured, providerModel, providerSpec } from './provider-catalog';
 
 type EnvMap = Record<string, string | undefined>;
 
@@ -94,6 +96,14 @@ export function modelRegistry(env: EnvMap = process.env): ModelRegistryEntry[] {
       timeoutMs: 60_000, admitted: true, note: 'Paid per token unless your Google plan says otherwise.',
     });
   }
+  // Config-only cloud providers (lane C1). Listed always so the Founder can see them; never private data, never local.
+  for (const p of PROVIDERS) {
+    list.push({
+      id: p.id, label: `${p.label} (paid API)`, provider: 'cloud', model: providerModel(p, env), kind: 'api', local: false, cost: 'metered',
+      dataCeiling: 'internal', capabilities: { text: true, tools: p.tools, stream: false }, timeoutMs: 60_000, admitted: true,
+      note: `${p.note ? p.note + ' ' : ''}Off until the spend envelope is on, the price is set and a key exists.`,
+    });
+  }
   return list;
 }
 
@@ -102,7 +112,7 @@ export function registryEntry(id: string, env: EnvMap = process.env): ModelRegis
 }
 
 /** Whether the server holds a credential for the entry. Presence only. */
-export function entryConfigured(e: ModelRegistryEntry, env: EnvMap = process.env): boolean {
+export function entryConfigured(e: ModelRegistryEntry, env: EnvMap = process.env, stored: ReadonlySet<string> = new Set()): boolean {
   switch (e.provider) {
     case 'ollama': return true; // reachability is a runtime health question, not configuration
     case 'anthropic': return has(env, 'ANTHROPIC_API_KEY');
@@ -110,6 +120,10 @@ export function entryConfigured(e: ModelRegistryEntry, env: EnvMap = process.env
     case 'openai_compatible': return has(env, 'OPENAI_COMPATIBLE_BASE_URL');
     case 'nvidia': return has(env, 'NVIDIA_API_KEY');
     case 'deepseek_web': return true;
+    case 'cloud': {
+      const p = providerSpec(e.id);
+      return Boolean(p && providerBaseUrl(p, env) && (providerEnvConfigured(p, env) || stored.has(p.id)));
+    }
   }
 }
 
