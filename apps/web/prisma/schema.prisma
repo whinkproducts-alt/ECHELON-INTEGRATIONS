@@ -12,6 +12,8 @@ datasource db {
 // ── Auth.js tables ──────────────────────────────────────────────
 
 model User {
+  missionActivations MissionActivation[]
+  founderObjectives FounderObjective[]
   killTeamMembers KillTeamMember[]
   channelPairings ChannelPairing[]
   spendEnvelope SpendEnvelope?
@@ -1730,4 +1732,37 @@ model SpendEnvelope {
   updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@map("spend_envelopes")
+}
+
+// lane g1b: durable Founder-private objectives. Private by construction; no shared read ever includes this table.
+model FounderObjective {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  detail    String?
+  status    String   @default("ACTIVE") // ACTIVE | DONE | DROPPED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("founder_objectives")
+}
+
+// lane g1b: R13 which dormant agents a running mission has woken. Rows are labels only; they grant nothing.
+model MissionActivation {
+  id          String    @id @default(cuid())
+  userId      String
+  missionId   String
+  agentId     String
+  status      String    @default("ACTIVE") // ACTIVE | RETURNED
+  activatedAt DateTime  @default(now())
+  returnedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, missionId, agentId])
+  @@index([userId, status])
+  @@map("mission_activations")
 }

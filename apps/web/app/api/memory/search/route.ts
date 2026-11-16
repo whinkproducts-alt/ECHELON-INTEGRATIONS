@@ -9,6 +9,6 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const query = searchParams.get('q') ?? '';
   const projectId = searchParams.get('projectId');
-  const result = await searchMemory(session.user.id, query, projectId);
+  const result = await searchMemory(session.user.id, query, projectId, 10, { includePrivate: true });
   return NextResponse.json(result);
 }

@@ -69,11 +69,11 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | 26 | ~~Marcus sends `subsidiary` / `target_subsidiaries`~~ Done 2026-11-15 (Marcus e7f92d1, 75 tests pass, not run on real Postgres) | push, then restart Marcus so its database gets the new columns |
 | 27 | Security review of the `proxy.ts` exemption for Marcus routes | **Done 2026-11-15.** Reviewed all 7 routes: each calls `requireMarcusAuth` first (hash plus constant-time compare, fails closed when no hash is set). New test `marcus-proxy-exemption.test.ts` checks the exemption pattern matches exactly the routes that exist and that every method of every route returns 401 without a valid token. | Done |
 | 28 | Auto-split requests over 5 domains | **V** (decide) |
-| 29 | Owner account and passkey (F01) | **V** |
+| 29 | Owner account and passkey (F01) | **V**. Lane G1b: enrolment, login, re-auth and password recovery were already built and tested (`passkeys.test.ts`); added `ownerReadiness()` (4 tests) listing open steps. **Needs Victor:** enrol on your device, exact steps in `docs/lanes/g1b-notes.md`. |
 | 30 | Run executor on the Mac with a real account and worker | **V** |
 | 31 | E02 live model failover | engineering |
-| 32 | E03 durable founder-private objectives and memory | engineering |
-| 33 | E04 lockdown across in-flight jobs, mic and camera | engineering |
+| 32 | E03 durable founder-private objectives and memory | engineering. Lane G1b: done in code. `founder_objectives` table, private scope on memory rows, shared reads exclude private by default, debrief refuses quotes of private text; 8 tests. Open: no UI for objectives yet; quote check is a 5-word match, not semantic. |
+| 33 | E04 lockdown across in-flight jobs, mic and camera | engineering. Lane G1b: done in code. Engage aborts running work in-process and the worker aborts a running job within 2 s, one ledger row each; 4 tests. Mic and camera already stop client-side on the next poll. Open: speech routes do not yet register in-flight streams (`registerInflight`); not run against a real worker. |
 | 34 | E05 iMessage bridge, real two-way phone audio | engineering + **V** |
 | 35 | E06 real GitHub mission acceptance | **V** (F02) |
 | 36 | E07 Board Room motion and voice, HOLO lifecycle, 15 vs 16 directorates | **V** (roster) |
@@ -82,7 +82,7 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | 39 | Nothing run on Windows | engineering |
 | 40 | Dependency alerts; Prisma 7 and TypeScript 7 held; PRs #14, #11, #9, #15 | engineering. **2026-11-15:** `pnpm audit --prod` reports no known vulnerabilities (hono pinned in `pnpm-workspace.yaml`, unused `@azure/storage-blob` removed). The older "131 alerts" figure was GitHub's count across all dependencies and has not been re-checked. Held majors and the four PRs are still open. |
 | 41 | 132 skipped tests are not acceptance | **Done for the database tests 2026-11-15:** `pnpm test:real` (`scripts/test-real-db.sh`) starts a throwaway Postgres, migrates and runs every real-database test serially (96 pass). Serial running fixed a flaky worker test caused by parallel files stealing each other's queued jobs. The Ollama tests remain opt-in and need a running model. | Done |
-| 42 | Do Marcus tasks need attached documents or memory? | **V** (decide) |
+| 42 | Do Marcus tasks need attached documents or memory? | **V** (decide). Lane G1b decided: no attachments. Intake rejects attachment-like fields (400); 2 tests. Victor can overrule. |
 | 43 | ~~SSH tunnel counts as local?~~ Decided 2026-11-15: own SSH hosts count as local. Merged into item 50. | done in 50 |
 | 44 | Amend non-negotiable 4 to allow agent-tier approvals | **V** (decide) |
 | 45 | Freeze sentinel row → table; crash between consuming approval and queueing ends `failed` | engineering |
@@ -254,7 +254,7 @@ All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now h
 | 62 | R8 Template plus schedule approval | 30 day cap, non-protected public content, edit cancels | Open |
 | 63 | R11 Licence rule | Amend non-negotiable 7 wording; compliance-checker checks each MPL or LGPL dependency | Open |
 | 64 | R12 Assurance gate for docs, data and test changes | Automated gate; amend non-negotiable 9 wording | Open |
-| 65 | R13 Mission activation | Wake agents per mission, return to dormant after | Open |
+| 65 | R13 Mission activation | Wake agents per mission, return to dormant after | Lane G1b: done in code. `mission_activations` table, wake only named agents, always return in `finally`, refused during lockdown, grants nothing; swarm runs use it; 10 tests. Open: Marcus tasks do not use it yet; no UI shows awake agents. |
 | 66 | R15 Model-inference envelope | **Built 2026-11-15, not yet used in a real run:** table `spend_envelopes`, approval kind `spend_envelope`, daily and monthly CAD caps plus rate editable in Settings ("Model spending limits"), enforced in admission; `CLAUDE.md` rule 10 amended. Tests: 5 unit, 2 real-database. **Still to do:** set the real CAD per USD rate (placeholder 1.37), switch it on and approve once, then watch one real paid call stop at the cap. | Built, not accepted |
 
 | 67 | Wire pairing into every inbound channel adapter (WhatsApp, Telegram, Discord, Slack, Teams, Google Chat, IMAP) | Each adapter calls `requestPairing` before replying; test per adapter. Comes with each Part 2 messaging row. | Open |

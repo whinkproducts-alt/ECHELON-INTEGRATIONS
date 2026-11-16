@@ -58,7 +58,7 @@ beforeEach(() => {
 describe('assembleContext — query-ranked path', () => {
   it('calls searchMemory with correct userId and query when query is provided', async () => {
     await assembleContext(USER_ID, CONV_ID, null, undefined, 'what is the project status');
-    expect(searchMemory).toHaveBeenCalledWith(USER_ID, 'what is the project status', null, 20);
+    expect(searchMemory).toHaveBeenCalledWith(USER_ID, 'what is the project status', null, 20, { includePrivate: true });
   });
 
   it('does not call prisma.memorySemantic.findMany when query is provided', async () => {
@@ -84,7 +84,7 @@ describe('assembleContext — query-ranked path', () => {
 
   it('passes projectId to searchMemory', async () => {
     await assembleContext(USER_ID, CONV_ID, 'proj-42', undefined, 'project question');
-    expect(searchMemory).toHaveBeenCalledWith(USER_ID, 'project question', 'proj-42', 20);
+    expect(searchMemory).toHaveBeenCalledWith(USER_ID, 'project question', 'proj-42', 20, { includePrivate: true });
   });
 
   it('tenant isolation: searchMemory always receives the correct userId', async () => {

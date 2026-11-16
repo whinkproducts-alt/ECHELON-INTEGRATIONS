@@ -7,6 +7,7 @@ import { budgetState } from '@/lib/budget';
 import { connectivityMode, offlineFallbackEnabled, ollamaReachable } from '@/lib/offline';
 import { recordActionSafe } from '@/lib/ledger';
 import { isLockedDown, ledgerLockdownBlock } from '@/lib/safety/lockdown';
+import { watchLockdown } from '@/lib/safety/inflight';
 import { JOBS } from '@/lib/worker/jobs';
 import { assertNoTools, ledgerRun, makeContext } from '@/lib/worker/context';
 import { claimDueJobs, completeJob, discoverUsers, ensureJobs, resolveJob, type ClaimedJob, type JobOutcome } from '@/lib/worker/scheduler';
@@ -98,10 +99,14 @@ export async function runClaimedJob(job: ClaimedJob, workerId: string, now = new
     assertNoTools(ctx);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, rej) => { timer = setTimeout(() => { ac.abort(); rej(new Error('timeout')); }, jobTimeoutMs()); });
+    // Item 33: an engaged lockdown aborts a job that is already running.
+    const stopWatch = watchLockdown(job.userId, ac, correlationId);
+    const aborted = new Promise<never>((_, rej) => ac.signal.addEventListener('abort', () => { if ((ac.signal.reason as Error)?.message === 'lockdown') rej(new Error('lockdown')); }, { once: true }));
     try {
-      await Promise.race([def.run(ctx), timeout]);
+      await Promise.race([def.run(ctx), timeout, aborted]);
     } finally {
       if (timer) clearTimeout(timer);
+      stopWatch();
     }
     await ledgerRun(ctx, 'EXECUTED', started);
   } catch (e) {

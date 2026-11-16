@@ -7,6 +7,7 @@
  * - agents get no tools; their output is parsed as strict JSON and sanitised
  * Every query carries userId.
  */
+import { wakeForMission, returnToDormant } from '@/lib/mission-activation';
 import { createHash, randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -201,11 +202,21 @@ async function skipPending(runId: string, userId: string, reason: string, laneId
   });
 }
 
+/** R13: wake only the agents this run's tasks use. A refusal (lockdown, unknown agent) is logged; the run's own gates still decide. */
+async function wakeRunAgents(runId: string, userId: string): Promise<void> {
+  try {
+    const rows = (await prisma.swarmTask.findMany({ where: { runId, userId }, select: { agentId: true } })) as Array<{ agentId: string | null }>;
+    const r = await wakeForMission(userId, runId, rows.map((t) => t.agentId).filter((x): x is string => !!x));
+    if (!r.ok) logger.warn('mission wake refused', { runId, error: r.error });
+  } catch (e) { logger.error('mission wake failed', { runId, error: (e as Error)?.message }); }
+}
+
 /** Run one swarm to completion (or cancel / token cap), then finalise. Safe to call twice: the second call is a no-op. */
 export async function runSwarm(runId: string, userId: string): Promise<'finished' | 'already_active'> {
   if (!userId) throw new Error('swarm: userId is required');
   if (activeRuns.has(runId)) return 'already_active';
   activeRuns.add(runId);
+  await wakeRunAgents(runId, userId);
   const owner = randomUUID();
   const inflight = new Map<string, Promise<void>>();
   let lastBudgetCheck = 0;
@@ -279,6 +290,7 @@ export async function runSwarm(runId: string, userId: string): Promise<'finished
     return 'finished';
   } finally {
     activeRuns.delete(runId);
+    await returnToDormant(userId, runId).catch((e) => logger.error('mission dormant failed', { runId, error: (e as Error)?.message }));
   }
 }
 

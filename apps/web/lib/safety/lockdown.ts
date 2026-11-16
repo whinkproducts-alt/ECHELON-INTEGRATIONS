@@ -16,6 +16,7 @@
 import { prisma } from '@/lib/db';
 import { recordAction, recordActionSafe } from '@/lib/ledger';
 import { logger } from '@/lib/logger';
+import { stopInflight } from '@/lib/safety/inflight';
 
 export interface SafetyState {
   lockedDown: boolean;
@@ -96,7 +97,7 @@ export async function setLockdown(
 ): Promise<LockdownTransition> {
   if (!userId) throw new Error('setLockdown: userId is required');
   const reason = (opts.reason ?? '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim().slice(0, 200) || null;
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // Row lock so two concurrent transitions serialise on the same account. The row is created first: with no
     // row, FOR UPDATE locks nothing and two first-ever engagements would both transition.
     await tx.$executeRaw`INSERT INTO account_safety_states ("userId") VALUES (${userId}) ON CONFLICT ("userId") DO NOTHING`;
@@ -151,4 +152,7 @@ export async function setLockdown(
       state: { lockedDown: next.lockedDown, epoch: next.epoch, reason: next.reason ?? null, changedAt: next.changedAt.toISOString() },
     };
   });
+  // Item 33: stop work already running in this process (after commit, so the state is durable first).
+  if (engage && result.ok && result.changed) await stopInflight(userId, opts.correlationId ?? `lockdown-${result.state.epoch}`);
+  return result;
 }
