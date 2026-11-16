@@ -74,7 +74,7 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | 31 | E02 live model failover | engineering |
 | 32 | E03 durable founder-private objectives and memory | engineering |
 | 33 | E04 lockdown across in-flight jobs, mic and camera | engineering |
-| 34 | E05 iMessage bridge, real two-way phone audio | engineering + **V** |
+| 34 | E05 iMessage bridge, real two-way phone audio | iMessage inbound parser plus pairing built (off until `IMESSAGE_BRIDGE_TOKEN`; Mac-side reader process and sends still open); real two-way phone audio needs hardware: **Needs Victor** |
 | 35 | E06 real GitHub mission acceptance | **V** (F02) |
 | 36 | E07 Board Room motion and voice, HOLO lifecycle, 15 vs 16 directorates | **V** (roster) |
 | 37 | E08 desktop app, readiness, backup and tested restore | engineering |
@@ -167,16 +167,16 @@ State today: **B** = built, connection unverified. **O** = open, to build or con
 | Media | FAL.ai images | O | metered; prompts leave the machine, approval each time |
 | Browser | Local browser tool (decision 49) | O | |
 | Models | Qwen OAuth (you import the login once into encrypted settings) | O | decided 2026-11-15; ECHELON never reads the other tool's file |
-| Messaging | WhatsApp via unofficial bridge (Baileys-style) | O | needs "official APIs only" amended; ban risk on the number, use a dedicated one; licence check; Twilio stays the default |
+| Messaging | WhatsApp via unofficial bridge (Baileys-style) | O | UNOFFICIAL bridge: not endorsed by WhatsApp, the number can get banned, use a dedicated one. Off until `WHATSAPP_BRIDGE_TOKEN` is set; sends stay Class C approvals. Needs "official APIs only" amended and a licence check before the bridge process is added. Inbound parser built 2026-11-15 (lane B): `lib/channels/adapters.ts` parser and verifier, pairing then silence for unknown senders via `lib/channels/inbound.ts`, text wrapped untrusted, test in `channel-adapters.test.ts`. Still open: the web route or poller that calls it (`app/api` is not lane B), real credentials (Needs Victor). |
 | Messaging | Email out (SMTP) | B | |
 | Messaging | SMS (Twilio) | B | |
 | Messaging | WhatsApp (Twilio) | B | |
 | Messaging | Telegram | B | |
-| Messaging | Email in (IMAP) | O | owner allowlist |
-| Messaging | Discord | O | owner allowlist |
-| Messaging | Slack | O | owner allowlist |
-| Messaging | Microsoft Teams | O | owner allowlist |
-| Messaging | Google Chat | O | owner allowlist |
+| Messaging | Email in (IMAP) | O | owner allowlist; parser built 2026-11-15 (lane B): `lib/channels/adapters.ts` parser and verifier, pairing then silence for unknown senders via `lib/channels/inbound.ts`, text wrapped untrusted, test in `channel-adapters.test.ts`. Still open: the web route or poller that calls it (`app/api` is not lane B), real credentials (Needs Victor). IMAP client library (e.g. imapflow, MIT) not added yet |
+| Messaging | Discord | O | owner allowlist; Ed25519-verified interactions endpoint built 2026-11-15 (lane B): `lib/channels/adapters.ts` parser and verifier, pairing then silence for unknown senders via `lib/channels/inbound.ts`, text wrapped untrusted, test in `channel-adapters.test.ts`. Still open: the web route or poller that calls it (`app/api` is not lane B), real credentials (Needs Victor). |
+| Messaging | Slack | O | owner allowlist; HMAC-verified Events API built 2026-11-15 (lane B): `lib/channels/adapters.ts` parser and verifier, pairing then silence for unknown senders via `lib/channels/inbound.ts`, text wrapped untrusted, test in `channel-adapters.test.ts`. Still open: the web route or poller that calls it (`app/api` is not lane B), real credentials (Needs Victor). |
+| Messaging | Microsoft Teams | O | owner allowlist; relay-token guard only, full Microsoft JWT validation open; built 2026-11-15 (lane B): `lib/channels/adapters.ts` parser and verifier, pairing then silence for unknown senders via `lib/channels/inbound.ts`, text wrapped untrusted, test in `channel-adapters.test.ts`. Still open: the web route or poller that calls it (`app/api` is not lane B), real credentials (Needs Victor). |
+| Messaging | Google Chat | O | owner allowlist; relay-token guard only, full Google JWT validation open; built 2026-11-15 (lane B): `lib/channels/adapters.ts` parser and verifier, pairing then silence for unknown senders via `lib/channels/inbound.ts`, text wrapped untrusted, test in `channel-adapters.test.ts`. Still open: the web route or poller that calls it (`app/api` is not lane B), real credentials (Needs Victor). |
 | Voice | Local Whisper | B | |
 | Voice | Local Kokoro | B | |
 | Voice | Groq speech | O | audio leaves the machine; approval |
@@ -257,7 +257,7 @@ All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now h
 | 65 | R13 Mission activation | Wake agents per mission, return to dormant after | Open |
 | 66 | R15 Model-inference envelope | **Built 2026-11-15, not yet used in a real run:** table `spend_envelopes`, approval kind `spend_envelope`, daily and monthly CAD caps plus rate editable in Settings ("Model spending limits"), enforced in admission; `CLAUDE.md` rule 10 amended. Tests: 5 unit, 2 real-database. **Still to do:** set the real CAD per USD rate (placeholder 1.37), switch it on and approve once, then watch one real paid call stop at the cap. | Built, not accepted |
 
-| 67 | Wire pairing into every inbound channel adapter (WhatsApp, Telegram, Discord, Slack, Teams, Google Chat, IMAP) | Each adapter calls `requestPairing` before replying; test per adapter. Comes with each Part 2 messaging row. | Open |
+| 67 | Wire pairing into every inbound channel adapter (WhatsApp, Telegram, Discord, Slack, Teams, Google Chat, IMAP) | Each adapter calls `requestPairing` before replying; test per adapter. Comes with each Part 2 messaging row. | Pairing wired in the shared `handleInbound` and tested for all 7 adapters (mocked pairing; unknown sender gets silence, code goes to owner). Telegram has no inbound adapter yet. Open: routes/pollers that call it. In progress |
 | 68 | Wire `exec-policy` into any command or browser tool | Class from `classifyCommand`, run under `sandboxDockerArgs`; no tool may spawn a command another way (add a call-site audit test like item 57). | Open |
 | 69 | Owner screens: approve a pairing code, edit the command allow-list, see the sandbox explanation | One settings panel. | Open |
 | 70 | Switch-on gate for the loosened rules | R4, R5, R7, R8, R9 stay off by a flag until items 58, 59, 67 and 68 are connected, so the order of work is enforced in code, not only written. | Open |
