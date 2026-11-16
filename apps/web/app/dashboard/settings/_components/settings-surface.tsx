@@ -11,6 +11,7 @@ import { PasskeysPanel } from './passkeys-panel';
 import { SpeechServicePanel } from './speech-service-panel';
 import { ModelPriorityPanel } from './model-priority-panel';
 import { ChannelsPanel, SafetyPanel } from './safety-panel';
+import { OwnerControlsPanel } from './owner-controls-panel';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import { useDashboardDataClient } from '@/components/shell/dashboard-data-provider';
 import { DASHBOARD_KEYS } from '@/lib/dashboard-query-cache';
@@ -366,6 +367,9 @@ export function SettingsSurface() {
           </Section>
           <Section title="Communication channels" icon={<Radio className="h-4 w-4" />}>
             <ChannelsPanel />
+          </Section>
+          <Section title="Pairing, commands and sandbox" icon={<ShieldAlert className="h-4 w-4" />}>
+            <OwnerControlsPanel />
           </Section>
         </>
       )}

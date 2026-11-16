@@ -14,6 +14,7 @@ datasource db {
 model User {
   killTeamMembers KillTeamMember[]
   channelPairings ChannelPairing[]
+  commandAllowList CommandAllowList?
   spendEnvelope SpendEnvelope?
   id            String    @id @default(cuid())
   name          String?
@@ -1730,4 +1731,14 @@ model SpendEnvelope {
   updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@map("spend_envelopes")
+}
+
+// lane F: owner-set read-only command allow-list (item 69). Empty by default: nothing is Class B until the owner sets it.
+model CommandAllowList {
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  programs String[]
+  updatedAt DateTime @updatedAt
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("command_allow_lists")
 }
