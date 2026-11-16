@@ -36,7 +36,7 @@ describe('Marcus routes exempt from the login wall', () => {
       const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].filter((m) => typeof mod[m] === 'function');
       expect(methods.length, f).toBeGreaterThan(0);
       for (const m of methods) {
-        for (const headers of [{}, { authorization: 'Bearer wrong' }, { authorization: 'Basic abc' }]) {
+        for (const headers of [{}, { authorization: 'Bearer wrong' }, { authorization: 'Basic abc' }] as Record<string, string>[]) {
           const res = await mod[m](new Request('http://localhost' + toPath(f), { method: m, headers, body: m === 'GET' ? undefined : '{}' }), { params: Promise.resolve({ id: 'abc123' }) });
           expect(res.status, `${m} ${toPath(f)} ${JSON.stringify(headers)}`).toBe(401);
         }
