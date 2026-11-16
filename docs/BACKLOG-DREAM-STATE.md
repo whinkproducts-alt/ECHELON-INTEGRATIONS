@@ -77,17 +77,17 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | 34 | E05 iMessage bridge, real two-way phone audio | engineering + **V** |
 | 35 | E06 real GitHub mission acceptance | **V** (F02) |
 | 36 | E07 Board Room motion and voice, HOLO lifecycle, 15 vs 16 directorates | **V** (roster) |
-| 37 | E08 desktop app, readiness, backup and tested restore | engineering |
-| 38 | E09 Mac-off hosting | **V** (F06) |
-| 39 | Nothing run on Windows | engineering |
-| 40 | Dependency alerts; Prisma 7 and TypeScript 7 held; PRs #14, #11, #9, #15 | engineering. **2026-11-15:** `pnpm audit --prod` reports no known vulnerabilities (hono pinned in `pnpm-workspace.yaml`, unused `@azure/storage-blob` removed). The older "131 alerts" figure was GitHub's count across all dependencies and has not been re-checked. Held majors and the four PRs are still open. |
+| 37 | E08 desktop app, readiness, backup and tested restore | engineering. **2026-11-15 (lane G2):** `scripts/ops/` adds `db-backup.sh`, `db-restore.sh` (empty target only), `readiness.mjs` (2 node tests) and `test-restore.sh`: real migrations in a throwaway container, backup, restore to a second database, row counts of all 81 tables identical (PASS), populated target refused. Runbook `docs/ops/BACKUP-RESTORE.md`. Open: realistic-size data, scheduled and off-machine copies (Needs Victor: where), packaged-app readiness button, signed desktop app. |
+| 38 | E09 Mac-off hosting | **V** (F06). **2026-11-15 (lane G2):** `packaging/hosting/compose.yaml` (Caddy TLS overlay, config validated) and `docs/ops/MAC-OFF-HOSTING.md`. Nothing provisioned. Needs Victor: host, domain, spend, off-site backups. |
+| 39 | Nothing run on Windows | engineering. **2026-11-15 (lane G2):** `docs/ops/WINDOWS-RUN-CHECKLIST.md`; CI already builds and tests the installer on `windows-2025` and boots the stack on Linux. Real Windows run: Needs Victor (hardware). |
+| 40 | Dependency alerts; Prisma 7 and TypeScript 7 held; PRs #14, #11, #9, #15 | engineering. **2026-11-15:** `pnpm audit --prod` reports no known vulnerabilities (hono pinned in `pnpm-workspace.yaml`, unused `@azure/storage-blob` removed). The older "131 alerts" figure was GitHub's count across all dependencies and has not been re-checked. Held majors and the four PRs are still open. **Lane G2 2026-11-15, throwaway-branch results (nothing merged):** PR #14 applies (re-apply bumps; PR conflicts with base), install, tsc, 2508 tests and `next build` pass: merge. PR #11/#9 (Prisma 7.10.1): CI fails, `prisma generate` rejects `directUrl`/`url` in schema, needs `prisma.config.ts` + driver adapter, do as one migration, close the two PRs. TypeScript 7.0.2: 47 type errors (Buffer vs Uint8Array), hold. PR #15: 12 conflicts vs base, do not merge as is. Also fixed a base type error in `marcus-proxy-exemption.test.ts` that broke `next build`. Detail: `docs/lanes/g2-notes.md`. |
 | 41 | 132 skipped tests are not acceptance | **Done for the database tests 2026-11-15:** `pnpm test:real` (`scripts/test-real-db.sh`) starts a throwaway Postgres, migrates and runs every real-database test serially (96 pass). Serial running fixed a flaky worker test caused by parallel files stealing each other's queued jobs. The Ollama tests remain opt-in and need a running model. | Done |
 | 42 | Do Marcus tasks need attached documents or memory? | **V** (decide) |
 | 43 | ~~SSH tunnel counts as local?~~ Decided 2026-11-15: own SSH hosts count as local. Merged into item 50. | done in 50 |
 | 44 | Amend non-negotiable 4 to allow agent-tier approvals | **V** (decide) |
 | 45 | Freeze sentinel row → table; crash between consuming approval and queueing ends `failed` | engineering |
 | 46 | Worker-kill chaos test | engineering |
-| 47 | Before wider release: legal/privacy, performance, accessibility, brand, hosting | engineering |
+| 47 | Before wider release: legal/privacy, performance, accessibility, brand, hosting | engineering. **2026-11-15 (lane G2):** `docs/release-review/PRE-RELEASE-REVIEW-PACK.md`: privacy/legal checklist (sign-off Needs Victor), measured performance on this Mac (web p95 9 ms, 189 MB, build 130 s loaded), code-level accessibility audit (1 real finding, 2 to verify), brand check (3 hex literals, hardcoded names/title). Open: contrast and screen-reader run, recall/first-token budgets with real models, legal sign-off. |
 | 48 | Founder inputs F02–F08 (GitHub, channels, models, approvals, remote host, roster, repo settings) | **V** |
 
 ## Item 25: Warp opening screen (source: `docs/product/Whink-Warp-Preview.html`)

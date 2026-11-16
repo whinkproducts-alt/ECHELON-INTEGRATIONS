@@ -1,0 +1,22 @@
+# Mac-off hosting overlay (item 38). NOT provisioned: this is the file a hosted run would use. Needs Victor: a server, a domain, spend.
+# Use WITH the local stack so the app, migrate step, worker and Postgres are identical to the Mac install:
+#   docker compose --env-file runtime.env -f packaging/local/compose.yaml -f packaging/hosting/compose.yaml up -d --build --wait
+# Caddy (Apache-2.0) terminates TLS with automatic certificates. Postgres still publishes no port.
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      WHINK_DOMAIN: ${WHINK_DOMAIN:?public domain required, e.g. whink.example.com}
+    command: ["sh", "-c", "printf '%s {\\n  encode zstd gzip\\n  reverse_proxy web:3000\\n}\\n' \"$$WHINK_DOMAIN\" > /etc/caddy/Caddyfile && caddy run --config /etc/caddy/Caddyfile"]
+    volumes: ["caddy_data:/data"]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      web: {condition: service_healthy}
+  web:
+    # The loopback publish from the local file stays; the public path is through caddy only.
+    environment:
+      AUTH_TRUST_HOST: "true"
+volumes:
+  caddy_data:
