@@ -8,6 +8,7 @@ import { encryptKey, isEncryptionConfigured } from '@/lib/key-encryption';
 import { isLockedDown } from '@/lib/safety/lockdown';
 import { isMarcusFrozen, resolveMarcusOwner, MARCUS_NEVER_RUN } from '@/lib/marcus/freeze';
 import { parseSubsidiaries } from '@/lib/marcus/routing';
+import { attachmentKeys } from '@/lib/safety/marcus-no-attachments';
 
 export interface MarcusTaskInput {
   client_operation_id: string;
@@ -37,6 +38,7 @@ export async function intakeMarcusTask(req: Request) {
   if (!body || !str(body.client_operation_id, 100) || !str(body.title, 200) || !str(body.goal, 10_000) || !body.approval || !str(body.approval.approval_id, 100)) {
     return bad('Missing or oversized required fields');
   }
+  if (attachmentKeys(body).length) return bad('Marcus tasks cannot carry attached documents or memory');
   if (body.deadline !== null && typeof body.deadline !== 'string') return bad('Invalid deadline');
   if (!['standard', 'proprietary', 'financial'].includes(body.sensitivity)) return bad('Invalid sensitivity value');
   if (!['voice', 'tap'].includes(body.approval.method)) return bad('Invalid approval method');

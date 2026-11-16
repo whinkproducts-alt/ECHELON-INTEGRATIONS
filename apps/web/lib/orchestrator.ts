@@ -316,6 +316,7 @@ export function debriefTurn(params: {
         lesson,
         outcome: outcome as 'success' | 'failure' | 'partial',
         accountId: params.accountId,
+        sourceUserId: params.userId,
       });
     } catch {
       // Non-blocking — swallow all errors

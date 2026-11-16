@@ -113,7 +113,7 @@ export async function assembleContext(
   // 3. Semantic + episodic memories — query-ranked when a query is present, recency fallback otherwise
   if (query && query.trim()) {
     // Query-ranked path: use hybrid vector + full-text search
-    const searchResults = await searchMemory(userId, query, projectId, 20);
+    const searchResults = await searchMemory(userId, query, projectId, 20, { includePrivate: true });
 
     for (const mem of searchResults.semantics ?? []) {
       const cleanStatement = stripFakeUntrustedTags(mem.statement);

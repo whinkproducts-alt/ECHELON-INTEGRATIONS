@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { generateEmbedding } from '@/lib/embedding-service';
+import { filterPrivate, FOUNDER_PRIVATE, FOUNDER_PRIVATE_CLASS } from '@/lib/memory-scope';
 
 /**
  * Find memory rows in memory_semantic that are semantically similar to the given
@@ -13,6 +14,7 @@ export async function findSimilarMemories(
   embedding: number[],
   threshold: number = 0.92,
   limit: number = 5,
+  scope: string = 'general',
 ): Promise<Array<{ id: string; statement: string; confidence: number; distance: number }>> {
   if (!userId) throw new Error('findSimilarMemories: userId is required');
   const vecLiteral = `[${embedding.join(',')}]`;
@@ -24,10 +26,11 @@ export async function findSimilarMemories(
      WHERE "userId" = $2
        AND "supersededBy" IS NULL
        AND embedding IS NOT NULL
+       AND COALESCE(scope, 'general') = $5
        AND (embedding <=> $1::vector) <= $3
      ORDER BY distance
      LIMIT $4`,
-    vecLiteral, userId, distanceThreshold, limit,
+    vecLiteral, userId, distanceThreshold, limit, scope,
   );
 }
 
@@ -52,6 +55,8 @@ export interface MemoryWriteInput {
   mambaMode?: string;
   rationale?: string;
   entities?: string[];
+  /** 'founder_private' keeps the row out of every shared read (item 32). Default general. */
+  scope?: 'general' | 'founder_private';
 }
 
 /** Returned by writeMemory. Carries the stored row id and a dedup flag (for semantic). */
@@ -67,6 +72,7 @@ export async function writeMemory(input: MemoryWriteInput): Promise<MemoryWriteR
     confidence, importance, eventType, eventDate, epistemicStatus,
     mambaMode, rationale, entities,
   } = input;
+  const scope = input.scope === FOUNDER_PRIVATE ? FOUNDER_PRIVATE : 'general';
 
   switch (type) {
     case 'episodic': {
@@ -83,6 +89,7 @@ export async function writeMemory(input: MemoryWriteInput): Promise<MemoryWriteR
           confidence: confidence ?? 0.8,
           importance: importance ?? 0.5,
           entities: entities ? JSON.stringify(entities) : null,
+          ...(scope === FOUNDER_PRIVATE ? { privacyClass: FOUNDER_PRIVATE_CLASS } : {}),
         },
       });
       // Fire-and-forget embedding update, stamp embeddingModel
@@ -107,7 +114,7 @@ export async function writeMemory(input: MemoryWriteInput): Promise<MemoryWriteR
       // Semantic dedup: if a near-identical fact exists (cosine sim >= 0.92), upsert instead.
       if (vec) {
         try {
-          const similar = await findSimilarMemories(userId, vec, 0.92, 1);
+          const similar = await findSimilarMemories(userId, vec, 0.92, 1, scope);
           if (similar.length > 0) {
             const existing = similar[0];
             const updated = await prisma.memorySemantic.update({
@@ -135,6 +142,7 @@ export async function writeMemory(input: MemoryWriteInput): Promise<MemoryWriteR
           extractorModel: extractorModel ?? null,
           confidence: confidence ?? 0.8,
           epistemicStatus: epistemicStatus ?? 'KNOWN',
+          scope,
         },
       });
 
@@ -291,7 +299,9 @@ export async function searchMemory(
   userId: string,
   query: string,
   projectId?: string | null,
-  limit: number = 10
+  limit: number = 10,
+  /** Owner's own recall only. Shared or agent-facing callers must leave this false (item 32). */
+  opts: { includePrivate?: boolean } = {},
 ) {
   const queryVec = await generateEmbedding(query, userId);
 
@@ -500,5 +510,6 @@ export async function searchMemory(
     take: limit,
   });
 
-  return { semantics, episodes, hypotheses, procedurals, searchMode };
+  const includePrivate = opts.includePrivate === true;
+  return { semantics: filterPrivate(semantics, includePrivate), episodes: filterPrivate(episodes, includePrivate), hypotheses, procedurals, searchMode };
 }

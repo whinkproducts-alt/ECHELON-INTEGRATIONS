@@ -10,6 +10,7 @@
 
 import { prisma } from '@/lib/db';
 import type { AgentKnowledge } from '@prisma/client';
+import { assertNoPrivateLeak } from '@/lib/memory-scope';
 
 export type { AgentKnowledge };
 
@@ -76,7 +77,10 @@ export async function writeDebrief(params: {
   outcome: 'success' | 'failure' | 'partial';
   tags?: string[];
   accountId?: string;
+  /** The user whose conversation produced the lesson. When set, a lesson quoting their private memory is refused. */
+  sourceUserId?: string;
 }): Promise<AgentKnowledge> {
+  if (params.sourceUserId) await assertNoPrivateLeak(params.sourceUserId, params.lesson);
   return prisma.agentKnowledge.create({
     data: {
       agentId: params.agentId,
