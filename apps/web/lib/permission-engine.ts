@@ -76,7 +76,7 @@ export async function checkPermission(
   permissionClass: PermissionClass,
   _correlationId?: string,
   /** What the call carries: its parameters, and whether external content has entered the turn. */
-  ctx: { params?: unknown; tainted?: boolean; description?: string } = {}
+  ctx: { params?: unknown; tainted?: boolean; description?: string; agentTeam?: string; scope?: string } = {}
 ): Promise<PermissionCheckResult> {
   // Protected actions (money, proprietary egress) are decided first and cannot be lowered by
   // anything below: not the requested class, autonomy, a delegation row, persona or allow-list.
@@ -111,6 +111,14 @@ export async function checkPermission(
   // Class C: always requires explicit human approval — no autonomy bypass, no delegation bypass
   if (permissionClass === 'C') {
     return { allowed: false, reason: 'Class C actions always require explicit human approval. Contact WHINK to queue an approval.', method: 'requires_confirmation' };
+  }
+
+  // Standing grants (R4, R5, R9; off unless ECHELON_STANDING_GRANTS=on). Class B only, after the protected and Class C returns above,
+  // so they can never lift a protected or Class C action. They answer yes or no; they never change the class.
+  if (permissionClass === 'B' && process.env.ECHELON_STANDING_GRANTS === 'on') {
+    const { findStandingGrant } = await import('@/lib/delegations-standing');
+    const g = await findStandingGrant(userId, capability, permissionClass, ctx);
+    if (g) return { allowed: true, method: 'delegated', reason: `standing grant ${g.id} (${g.kind})` };
   }
 
   // Check for delegation (Class B only — Class C is already handled above)
