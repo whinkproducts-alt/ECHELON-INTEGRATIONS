@@ -8,7 +8,7 @@ const fail = (status: number, error: string): TaskResult => ({ status, body: { e
 
 async function load(userId: string, id: string) {
   const job = await prisma.agentJob.findFirst({ where: { id, userId, jobKey: { startsWith: MARCUS_JOB_PREFIX } } });
-  return job && !job.jobKey.endsWith('__freeze__') ? job : null;
+  return job;
 }
 const view = (j: { id: string; jobKey: string; lastStatus: string | null; createdAt: Date }) =>
   ({ task_id: j.id, client_operation_id: j.jobKey.slice(MARCUS_JOB_PREFIX.length), status: j.lastStatus ?? 'received', created_at: j.createdAt.toISOString() });
@@ -16,10 +16,10 @@ const view = (j: { id: string; jobKey: string; lastStatus: string | null; create
 /** What the analysis produced, only once the task is done. Model output is untrusted text. */
 async function resultOf(j: { lastStatus: string | null; capabilityReceiptId: string | null; userId: string }) {
   if (j.lastStatus !== 'done' || !j.capabilityReceiptId) return undefined;
-  const ex = await prisma.agentExecution.findFirst({ where: { id: j.capabilityReceiptId, userId: j.userId }, select: { output: true } });
-  const agents = (ex?.output as { agents?: Array<{ agentId?: unknown; result?: unknown }> } | null)?.agents;
-  if (!Array.isArray(agents)) return undefined;
-  return { untrusted: true, outputs: agents.slice(0, 5).map((a) => ({ agent_id: String(a.agentId), text: String(a.result).slice(0, 4000) })) };
+  const exs = await prisma.agentExecution.findMany({ where: { id: { in: j.capabilityReceiptId.split(',') }, userId: j.userId }, select: { output: true }, orderBy: { createdAt: 'asc' } });
+  const agents = exs.flatMap((ex) => { const a = (ex.output as { agents?: Array<{ agentId?: unknown; result?: unknown }> } | null)?.agents; return Array.isArray(a) ? a.slice(0, 5) : []; });
+  if (!agents.length) return undefined;
+  return { untrusted: true, outputs: agents.map((a) => ({ agent_id: String(a.agentId), text: String(a.result).slice(0, 4000) })) };
 }
 
 export async function getMarcusTask(userId: string, id: string): Promise<TaskResult> {

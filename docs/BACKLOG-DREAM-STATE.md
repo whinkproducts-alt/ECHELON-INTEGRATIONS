@@ -68,7 +68,7 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | **25** | **Warp opening screen before login** (see below) | engineering + **V** (decisions) |
 | 26 | ~~Marcus sends `subsidiary` / `target_subsidiaries`~~ Done 2026-11-15 (Marcus e7f92d1, 75 tests pass, not run on real Postgres) | push, then restart Marcus so its database gets the new columns |
 | 27 | Security review of the `proxy.ts` exemption for Marcus routes | **Done 2026-11-15.** Reviewed all 7 routes: each calls `requireMarcusAuth` first (hash plus constant-time compare, fails closed when no hash is set). New test `marcus-proxy-exemption.test.ts` checks the exemption pattern matches exactly the routes that exist and that every method of every route returns 401 without a valid token. | Done |
-| 28 | Auto-split requests over 5 domains | **V** (decide) |
+| 28 | ~~Auto-split requests over 5 domains~~ Done 2026-11-16 (lane A). A request whose skills a 5-specialist team cannot cover is split into parts (cap 4), each its own EAR execution of at most 5 specialists; the task is done only when every part is, and its result joins all parts' output. Verified on real Postgres (`marcus.integration`). Still open: the 4-part cap path has no test (needs a request wider than the org has departments); Victor's decision on the cap. | **V** (confirm cap of 4 parts) |
 | 29 | Owner account and passkey (F01) | **V** |
 | 30 | Run executor on the Mac with a real account and worker | **V** |
 | 31 | E02 live model failover | engineering |
@@ -85,8 +85,8 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | 42 | Do Marcus tasks need attached documents or memory? | **V** (decide) |
 | 43 | ~~SSH tunnel counts as local?~~ Decided 2026-11-15: own SSH hosts count as local. Merged into item 50. | done in 50 |
 | 44 | Amend non-negotiable 4 to allow agent-tier approvals | **V** (decide) |
-| 45 | Freeze sentinel row → table; crash between consuming approval and queueing ends `failed` | engineering |
-| 46 | Worker-kill chaos test | engineering |
+| 45 | ~~Freeze sentinel row → table; crash window~~ Done 2026-11-16 (lane A). Freeze flag is the `marcus_freezes` table (migration `20261116010000` copies and deletes old sentinel rows). Consuming the Marcus approval and creating the EAR rows is one transaction; a retry after a crash adopts the existing execution instead of failing or queuing a second one. Verified in `marcus-chaos.integration`. Still open: internal EAR rows now live 30 min, not 30 s, so recovery works after the 10-minute lease lapses. | engineering |
+| 46 | ~~Worker-kill chaos test~~ Done 2026-11-16 (lane A). `marcus-chaos.integration.test.ts` on real Postgres: death after queueing, death before queueing, death mid-run (expired lease, next worker finishes once, model called once per specialist, job parks), and two racing admitters (one execution). Still open: kills are simulated by the database state a dead worker leaves, not a real process kill. | engineering |
 | 47 | Before wider release: legal/privacy, performance, accessibility, brand, hosting | engineering |
 | 48 | Founder inputs F02–F08 (GitHub, channels, models, approvals, remote host, roster, repo settings) | **V** |
 

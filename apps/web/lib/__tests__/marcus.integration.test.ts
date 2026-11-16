@@ -216,12 +216,29 @@ describe.skipIf(!enabled)('marcus real database integration', () => {
       expect(new Set(agents.map((a) => a.directorate)).size).toBeGreaterThanOrEqual(4);
     });
 
-    it('a request spanning more departments than one analysis may use is blocked with a clear reason and its approval kept', async () => {
+    it('a request spanning more departments than one analysis may use is split into parts of at most 5 specialists and joined', async () => {
       const b = task({ title: 'Everything review', goal: 'Plan the product launch with a sales forecast, a legal review, a budget, recruiting a contractor and a security review' });
       const t = await (await post(b)).json();
-      await tick(`marcus:${b.client_operation_id}`);
-      expect(await job(t.task_id)).toMatchObject({ lastStatus: 'blocked', lastError: 'too_many_departments' });
-      expect((await prisma.approvalRequest.findUniqueOrThrow({ where: { id: b.approval.approval_id } })).status).toBe('APPROVED');
+      const jobKey = `marcus:${b.client_operation_id}`;
+      await tick(jobKey);
+      const started = await job(t.task_id);
+      expect(started, `ended ${started.lastStatus} (${started.lastError})`).toMatchObject({ lastStatus: 'in_progress' });
+      const ids = started.capabilityReceiptId!.split(',');
+      expect(ids.length).toBeGreaterThan(1);
+      const exs = await prisma.agentExecution.findMany({ where: { id: { in: ids } } });
+      expect(exs.every((e) => e.agentIds.length <= 5)).toBe(true);
+      expect((await prisma.approvalRequest.findUniqueOrThrow({ where: { id: b.approval.approval_id } })).status).toBe('EXECUTED');
+
+      expect(await tick(`ear:${ids[0]}`)).toBe('OK');
+      await makeDue(t.task_id);
+      await tick(jobKey);
+      expect((await job(t.task_id)).lastStatus).toBe('in_progress'); // one part done: the join waits for the rest
+      for (const id of ids.slice(1)) await tick(`ear:${id}`);
+      await makeDue(t.task_id);
+      await tick(jobKey);
+      expect((await job(t.task_id)).lastStatus).toBe('done');
+      const got = await tasks.getMarcusTask(owner, t.task_id);
+      expect((got.body.result as { outputs: unknown[] }).outputs.length).toBe(exs.reduce((n, e) => n + e.agentIds.length, 0));
     });
 
     it('with no local model the task is blocked without using its approval; resume then lets it run', async () => {

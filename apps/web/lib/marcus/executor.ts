@@ -10,7 +10,6 @@ import { recordAction } from '@/lib/ledger';
 import { canonicalJson, approvalContentHash } from '@/lib/canonical-json';
 import { decryptKey } from '@/lib/key-encryption';
 import { extractRequiredSkills } from '@/lib/task-gate';
-import { APPROVAL_TTL_MS } from '@/lib/approvals';
 import { budgetState } from '@/lib/budget';
 import { analysisRoute, cancelExecution, enqueueApprovedEar } from '@/lib/worker/ear-execution';
 import { MARCUS_NEVER_RUN } from '@/lib/marcus/freeze';
@@ -21,6 +20,9 @@ import type { ClaimedJob, JobOutcome } from '@/lib/worker/scheduler';
 const POLL_MS = 5_000;
 // The router needs at least one skill to pick a team; most Marcus tasks name none of the gate's keywords.
 const FALLBACK_SKILLS = ['quality_review'];
+const MAX_PARTS = 4;
+// Recovery after a crash only happens once the 10-minute lease has lapsed, so the internal EAR rows outlive the usual 30 s window.
+const ADMISSION_WINDOW_MS = 30 * 60_000;
 const TERMINAL: Record<string, string> = { SUCCEEDED: 'done', FAILED: 'failed', BLOCKED_POLICY: 'blocked', BLOCKED_COST: 'blocked', CANCELLED: 'cancelled' };
 const LEDGER_STATUS = { done: 'EXECUTED', failed: 'FAILED', blocked: 'DENIED', cancelled: 'VALIDATED' } as const;
 
@@ -61,44 +63,76 @@ async function admit(job: ClaimedJob, workerId: string, row: NonNullable<Job>): 
   const objective = `${subsidiaryContext(scope)}${text}`.slice(0, 300);
   const skills = extractRequiredSkills(text);
   const directorate = matchDirectorate(content.directorate, [...new Set((await getOrgKit()).agents.map((a) => a.directorate))]);
-  const ear = buildAuthorizationRequest(objective, skills.length ? skills : FALLBACK_SKILLS, { maxAgents: 5, ...(directorate ? { targetDirectorate: directorate } : {}) });
-  ear.execution_scope = 'internal_analysis';
-  if (!ear.lead_agent || ear.capability_gaps.length) {
-    // A full team with skills left over means the request spans more domains than one analysis may use; split it.
-    return finish(job, workerId, 'received', 'blocked', ear.team_size >= 5 && ear.lead_agent ? 'too_many_departments' : 'no_specialist_available');
+  // Split by department: each analysis uses at most 5 specialists, so skills a full team could not cover go to the next one.
+  const parts: ReturnType<typeof buildAuthorizationRequest>[] = [];
+  let remaining = skills.length ? skills : FALLBACK_SKILLS;
+  while (remaining.length) {
+    const ear = buildAuthorizationRequest(objective, remaining, { maxAgents: 5, ...(directorate ? { targetDirectorate: directorate } : {}) });
+    ear.execution_scope = 'internal_analysis';
+    // A gap with room left in the team (or no progress) means nobody has that skill, not that the team was full.
+    if (!ear.lead_agent || (ear.capability_gaps.length && (ear.team_size < 5 || ear.capability_gaps.length >= remaining.length))) return finish(job, workerId, 'received', 'blocked', 'no_specialist_available');
+    remaining = ear.capability_gaps;
+    ear.capability_gaps = []; // the leftover skills go to the next part; the EAR gate only admits a part with no gaps
+    ear.required_skills = ear.required_skills.filter((k) => !remaining.includes(k));
+    parts.push(ear);
+    if (remaining.length && parts.length >= MAX_PARTS) return finish(job, workerId, 'received', 'blocked', 'too_many_departments');
   }
 
-  // Single use: only one caller can flip the Marcus approval to EXECUTED.
-  const used = await prisma.approvalRequest.updateMany({
-    where: { id: row.capabilityApprovalId ?? '', userId, status: 'APPROVED', executedAt: null },
-    data: { status: 'EXECUTED', executedAt: new Date() },
-  });
-  if (used.count !== 1) return finish(job, workerId, 'received', 'failed', 'approval_unavailable');
+  // Single use: the Marcus approval is consumed and every part's EAR row is created in one transaction, so a crash
+  // cannot leave a consumed approval with nothing recorded. A retry after a crash finds those rows and adopts them.
+  const prior = await prisma.approvalRequest.count({ where: { userId, kind: 'ear', correlationId: { startsWith: `${row.jobKey}#` } } });
+  let earIds: string[] = [];
+  if (!prior) {
+    try {
+      earIds = await prisma.$transaction(async (tx) => {
+        const used = await tx.approvalRequest.updateMany({
+          where: { id: row.capabilityApprovalId ?? '', userId, status: 'APPROVED', executedAt: null },
+          data: { status: 'EXECUTED', executedAt: new Date() },
+        });
+        if (used.count !== 1) throw new Error('approval_unavailable');
+        const now = new Date();
+        const ids: string[] = [];
+        for (const [i, ear] of parts.entries()) {
+          const params = JSON.parse(JSON.stringify(ear));
+          ids.push((await tx.approvalRequest.create({
+            data: {
+              userId, kind: 'ear', tool: null, params, contentHash: approvalContentHash({ kind: 'ear', tool: null, params }),
+              summary: `Marcus task: ${content.title}${parts.length > 1 ? ` (part ${i + 1} of ${parts.length})` : ''}`.slice(0, 200), permissionClass: 'C', status: 'EXECUTING',
+              correlationId: `${row.jobKey}#${i}`, persona: 'WHINK', createdAt: now, decidedAt: now, expiresAt: new Date(now.getTime() + ADMISSION_WINDOW_MS),
+            },
+          })).id);
+        }
+        return ids;
+      });
+    } catch (e) {
+      return finish(job, workerId, 'received', 'failed', e instanceof Error && e.message === 'approval_unavailable' ? 'approval_unavailable' : 'admission_failed');
+    }
+  } else {
+    earIds = (await prisma.approvalRequest.findMany({ where: { userId, kind: 'ear', correlationId: { startsWith: `${row.jobKey}#` } }, select: { id: true, correlationId: true } }))
+      .sort((x, y) => Number(x.correlationId?.split('#')[1]) - Number(y.correlationId?.split('#')[1])).map((r) => r.id);
+  }
 
-  let executionId: string;
-  let earApprovalId: string;
+  const executionIds: string[] = [];
   try {
-    const now = new Date();
-    const params = JSON.parse(JSON.stringify(ear));
-    const earRow = await prisma.approvalRequest.create({
-      data: {
-        userId, kind: 'ear', tool: null, params, contentHash: approvalContentHash({ kind: 'ear', tool: null, params }),
-        summary: `Marcus task: ${content.title}`.slice(0, 200), permissionClass: 'C', status: 'EXECUTING', correlationId: row.jobKey,
-        persona: 'WHINK', createdAt: now, decidedAt: now, expiresAt: new Date(now.getTime() + APPROVAL_TTL_MS),
-      },
-    });
-    earApprovalId = earRow.id;
-    executionId = (await enqueueApprovedEar(userId, earRow.id)).executionId;
-    await prisma.sealedScope.create({ data: { userId, kind: 'EXECUTION', refId: executionId } });
+    for (const earId of earIds) {
+      // Already queued by a run that crashed before moving the job on: adopt it, never queue a second one.
+      const existing = await prisma.agentExecution.findFirst({ where: { approvalId: earId, userId }, select: { id: true } });
+      const id = existing?.id ?? (await enqueueApprovedEar(userId, earId)).executionId;
+      await prisma.sealedScope.upsert({ where: { kind_refId: { kind: 'EXECUTION', refId: id } }, create: { userId, kind: 'EXECUTION', refId: id }, update: {} });
+      executionIds.push(id);
+    }
   } catch {
+    for (const id of executionIds) await cancelExecution(userId, id);
     return finish(job, workerId, 'received', 'failed', 'admission_failed');
   }
+  const executionId = executionIds.join(',');
+  const earApprovalId = earIds.join(',');
 
   const moved = await prisma.agentJob.updateMany({
     where: { id: job.id, userId, leaseOwner: workerId, lastStatus: 'received' },
     data: { lastStatus: 'in_progress', capabilityReceiptId: executionId, capabilityRequestEnc: null, lastRunAt: new Date(), leaseUntil: null, leaseOwner: null, nextRunAt: new Date(Date.now() + POLL_MS) },
   });
-  if (moved.count !== 1) { await cancelExecution(userId, executionId); return 'SKIPPED'; } // frozen between admission and now
+  if (moved.count !== 1) { for (const id of executionIds) await cancelExecution(userId, id); return 'SKIPPED'; } // frozen between admission and now
   await recordAction({
     userId, initiator: 'system', action: 'capability_marcus_task_started', permissionClass: 'C', status: 'VALIDATED',
     correlationId: `marcus-task:${job.id}`, inputSummary: `execution=${executionId} earApproval=${earApprovalId} marcusApproval=${row.capabilityApprovalId} directorate=${directorate ?? '-'} subsidiary=${scope.subsidiary ?? '-'} targets=${scope.targets.join(',') || '-'}`,
@@ -107,10 +141,14 @@ async function admit(job: ClaimedJob, workerId: string, row: NonNullable<Job>): 
 }
 
 async function poll(job: ClaimedJob, workerId: string, row: NonNullable<Job>): Promise<JobOutcome> {
-  const execution = row.capabilityReceiptId ? await prisma.agentExecution.findFirst({ where: { id: row.capabilityReceiptId, userId: job.userId } }) : null;
-  if (!execution) return finish(job, workerId, 'in_progress', 'failed', 'execution_missing');
-  const to = TERMINAL[execution.status];
-  if (to) return finish(job, workerId, 'in_progress', to as 'done' | 'failed' | 'blocked' | 'cancelled', to === 'done' ? null : execution.reason ?? execution.status.toLowerCase());
+  const ids = row.capabilityReceiptId?.split(',') ?? [];
+  const executions = ids.length ? await prisma.agentExecution.findMany({ where: { id: { in: ids }, userId: job.userId } }) : [];
+  if (!executions.length || executions.length !== ids.length) return finish(job, workerId, 'in_progress', 'failed', 'execution_missing');
+  // Join: the task ends only when every part has; it is done only if every part is, otherwise the first failing part decides.
+  if (executions.every((e) => TERMINAL[e.status])) {
+    const bad = executions.find((e) => TERMINAL[e.status] !== 'done');
+    return bad ? finish(job, workerId, 'in_progress', TERMINAL[bad.status] as 'failed' | 'blocked' | 'cancelled', bad.reason ?? bad.status.toLowerCase()) : finish(job, workerId, 'in_progress', 'done', null);
+  }
   await prisma.agentJob.updateMany({
     where: { id: job.id, userId: job.userId, leaseOwner: workerId },
     data: { leaseUntil: null, leaseOwner: null, nextRunAt: new Date(Date.now() + POLL_MS) },
@@ -121,7 +159,7 @@ async function poll(job: ClaimedJob, workerId: string, row: NonNullable<Job>): P
 export async function runMarcusJob(job: ClaimedJob, workerId: string, _now = new Date()): Promise<JobOutcome> {
   const row = await loadJob(job);
   const park = () => prisma.agentJob.updateMany({ where: { id: job.id, userId: job.userId, leaseOwner: workerId }, data: { leaseUntil: null, leaseOwner: null, nextRunAt: MARCUS_NEVER_RUN } });
-  if (!row || row.jobKey.endsWith('__freeze__')) { await park(); return 'SKIPPED'; }
+  if (!row) { await park(); return 'SKIPPED'; }
   if (row.lastStatus === 'received') return admit(job, workerId, row);
   if (row.lastStatus === 'in_progress') return poll(job, workerId, row);
   await park(); // frozen, waiting for reconfirmation, blocked or finished: nothing to do until its status changes
