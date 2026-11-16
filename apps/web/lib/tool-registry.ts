@@ -671,6 +671,8 @@ const TOOL_HANDLERS: Record<string, (userId: string, params: any) => Promise<Too
   },
 });
 
+/** Registered class of a tool; unregistered is C. Read by lib/delegations-standing to refuse grants over non-B tools. */
+export function registeredToolClass(name: string): PermissionClass { return TOOL_RISK_MAP[name] ?? 'C'; }
 const TOOL_RISK_MAP: Record<string, PermissionClass> = Object.assign(Object.create(null), {
   // Class C always: runs only through an approval of kind 'scheduled_post' (never as a direct call).
   [SCHEDULE_TOOL_NAME]: 'C',

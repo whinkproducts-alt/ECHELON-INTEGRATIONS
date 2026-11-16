@@ -20,6 +20,7 @@ model User {
   spendEnvelope SpendEnvelope?
   marcusFreeze MarcusFreeze?
   orgEntities OrgEntity[]
+  standingGrants StandingGrant[] // lane G1a
   id            String    @id @default(cuid())
   name          String?
   email         String    @unique
@@ -1942,4 +1943,26 @@ model MissionActivation {
   @@unique([userId, missionId, agentId])
   @@index([userId, status])
   @@map("mission_activations")
+}
+
+// lane G1a: standing grants. One table for R4 agent-tier, R5 learned, R8 template and R9 global-window approvals.
+// Only ever consulted for Class B. Class C and protected actions never read this table.
+model StandingGrant {
+  id          String    @id @default(cuid())
+  userId      String
+  kind        String // agent_tier | learned | template | global
+  capability  String?
+  team        String? // agent_tier: the team whose agents it covers
+  paramsHash  String? // learned and template: sha256 of the exact tool and args it covers
+  content     Json? // template: the approved tool and args
+  dailyCap    Int       @default(0) // 0 = no cap (global only)
+  usedDay     String    @default("")
+  usedToday   Int       @default(0)
+  startsAt    DateTime  @default(now())
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, kind, revokedAt, expiresAt])
+  @@map("standing_grants")
 }
