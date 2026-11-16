@@ -9,11 +9,13 @@ Method: every line counts once, unweighted (not effort). Done = 1, Built-not-acc
 
 | | Items | Credit |
 |---|---|---|
-| Done | 21 | 21 |
-| Built, not accepted | 11 | 5.5 |
-| Built, connection unverified (Part 2) | 13 | 6.5 |
-| Open (Part 1: 27; Part 2: 40; Part 4: 10) | 77 | 0 |
-| **Total** | **122** | **33 → 27%** |
+| Done | 25 | 25 |
+| Built, not accepted (Parts 1, 3, 4) | 39 | 19.5 |
+| Built, connection unverified (Part 2, 24 plus 18 that also need Victor) | 42 | 21 |
+| Open (Parts 1, 3, 4: 5; Part 2: 11) | 16 | 0 |
+| **Total** | **122** | **65.5 → 54%** |
+
+Recounted by the lead on 2026-11-16 after merging ten lanes. "Built" means code and tests exist, mostly on mocked services; nothing in Part 2 has been run live. Open in Parts 1, 3, 4: 30 (real run on the Mac), 40 (held upgrades and PRs), 48 (founder inputs), 63 and 64 (rule wording).
 
 Dream state: **every row in Parts 1 to 3 reads "built and connected"**, except the exclusions listed in Part 2.
 
@@ -81,7 +83,6 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | 38 | E09 Mac-off hosting | **V** (F06). **2026-11-15 (lane G2):** `packaging/hosting/compose.yaml` (Caddy TLS overlay, config validated) and `docs/ops/MAC-OFF-HOSTING.md`. Nothing provisioned. Needs Victor: host, domain, spend, off-site backups. |
 | 39 | Nothing run on Windows | engineering. **2026-11-15 (lane G2):** `docs/ops/WINDOWS-RUN-CHECKLIST.md`; CI already builds and tests the installer on `windows-2025` and boots the stack on Linux. Real Windows run: Needs Victor (hardware). |
 | 40 | Dependency alerts; Prisma 7 and TypeScript 7 held; PRs #14, #11, #9, #15 | engineering. **2026-11-15:** `pnpm audit --prod` reports no known vulnerabilities (hono pinned in `pnpm-workspace.yaml`, unused `@azure/storage-blob` removed). The older "131 alerts" figure was GitHub's count across all dependencies and has not been re-checked. Held majors and the four PRs are still open. **Lane G2 2026-11-15, throwaway-branch results (nothing merged):** PR #14 applies (re-apply bumps; PR conflicts with base), install, tsc, 2508 tests and `next build` pass: merge. PR #11/#9 (Prisma 7.10.1): CI fails, `prisma generate` rejects `directUrl`/`url` in schema, needs `prisma.config.ts` + driver adapter, do as one migration, close the two PRs. TypeScript 7.0.2: 47 type errors (Buffer vs Uint8Array), hold. PR #15: 12 conflicts vs base, do not merge as is. Also fixed a base type error in `marcus-proxy-exemption.test.ts` that broke `next build`. Detail: `docs/lanes/g2-notes.md`. |
-| 28 | Auto-split requests over 5 domains | **V** (decide) |
 | 41 | 132 skipped tests are not acceptance | **Done for the database tests 2026-11-15:** `pnpm test:real` (`scripts/test-real-db.sh`) starts a throwaway Postgres, migrates and runs every real-database test serially (96 pass). Serial running fixed a flaky worker test caused by parallel files stealing each other's queued jobs. The Ollama tests remain opt-in and need a running model. | Done |
 | 42 | Do Marcus tasks need attached documents or memory? | **V** (decide). Lane G1b decided: no attachments. Intake rejects attachment-like fields (400); 2 tests. Victor can overrule. |
 | 43 | ~~SSH tunnel counts as local?~~ Decided 2026-11-15: own SSH hosts count as local. Merged into item 50. | done in 50 |
@@ -89,8 +90,6 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | 45 | ~~Freeze sentinel row → table; crash window~~ Done 2026-11-16 (lane A). Freeze flag is the `marcus_freezes` table (migration `20261116010000` copies and deletes old sentinel rows). Consuming the Marcus approval and creating the EAR rows is one transaction; a retry after a crash adopts the existing execution instead of failing or queuing a second one. Verified in `marcus-chaos.integration`. Still open: internal EAR rows now live 30 min, not 30 s, so recovery works after the 10-minute lease lapses. | engineering |
 | 46 | ~~Worker-kill chaos test~~ Done 2026-11-16 (lane A). `marcus-chaos.integration.test.ts` on real Postgres: death after queueing, death before queueing, death mid-run (expired lease, next worker finishes once, model called once per specialist, job parks), and two racing admitters (one execution). Still open: kills are simulated by the database state a dead worker leaves, not a real process kill. | engineering |
 | 47 | Before wider release: legal/privacy, performance, accessibility, brand, hosting | engineering. **2026-11-15 (lane G2):** `docs/release-review/PRE-RELEASE-REVIEW-PACK.md`: privacy/legal checklist (sign-off Needs Victor), measured performance on this Mac (web p95 9 ms, 189 MB, build 130 s loaded), code-level accessibility audit (1 real finding, 2 to verify), brand check (3 hex literals, hardcoded names/title). Open: contrast and screen-reader run, recall/first-token budgets with real models, legal sign-off. |
-| 45 | Freeze sentinel row → table; crash between consuming approval and queueing ends `failed` | engineering |
-| 46 | Worker-kill chaos test | engineering |
 | 48 | Founder inputs F02–F08 (GitHub, channels, models, approvals, remote host, roster, repo settings) | **V** |
 
 ## Item 25: Warp opening screen (source: `docs/product/Whink-Warp-Preview.html`)
