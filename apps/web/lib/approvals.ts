@@ -525,6 +525,18 @@ export async function decide(
       }
     }
 
+    if (row.kind === 'tool_call' && row.tool && row.tool.startsWith('ext_')) {
+      // Direct external tools (lib/capability/providers-direct.ts): search, Reddit, FAL, Hyperliquid reads.
+      const { isDirectTool, executeApprovedDirectTool } = await import('@/lib/capability/providers-direct');
+      if (isDirectTool(row.tool)) {
+        const out = await executeApprovedDirectTool(userId, {
+          id: row.id, tool: row.tool, params: row.params, contentHash: row.contentHash, correlationId: row.correlationId, persona: row.persona,
+        });
+        return finish(row, 'EXECUTING', out.success ? 'EXECUTED' : 'FAILED',
+          { success: out.success, data: out.data, error: out.error }, clock, 'user_confirmed');
+      }
+    }
+
     // Dynamic import: tool-registry imports this module (createApproval).
     const { executeApprovedTool } = await import('@/lib/tool-registry');
     const res = await executeApprovedTool(userId, {

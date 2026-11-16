@@ -75,7 +75,7 @@ Ranked by safety, then what unblocks others, then features. "Needs you" items ar
 | 32 | E03 durable founder-private objectives and memory | engineering |
 | 33 | E04 lockdown across in-flight jobs, mic and camera | engineering |
 | 34 | E05 iMessage bridge, real two-way phone audio | iMessage inbound parser plus pairing built (off until `IMESSAGE_BRIDGE_TOKEN`; Mac-side reader process and sends still open); real two-way phone audio needs hardware: **Needs Victor** |
-| 35 | E06 real GitHub mission acceptance | **V** (F02) |
+| 35 | E06 real GitHub mission acceptance | Software part done 2026-11-15 (lane C2): `evaluateMissionAcceptance` plus a scripted-GitHub acceptance test (`github-mission-acceptance.test.ts`): accepts only complete passing checks at the mission commit; refuses failing, no checks, running, incomplete pages, and a moved head. Live run still **V** (F02): needs Victor's GitHub App. |
 | 36 | E07 Board Room motion and voice, HOLO lifecycle, 15 vs 16 directorates | **V** (roster) |
 | 37 | E08 desktop app, readiness, backup and tested restore | engineering |
 | 38 | E09 Mac-off hosting | **V** (F06) |
@@ -160,11 +160,11 @@ State today: **B** = built, connection unverified. **O** = open, to build or con
 | Models | Arcee | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
 | Models | Xiaomi MiMo | **B, Needs Victor** | same. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
 | Models | Ollama Cloud | **B, Needs Victor** | not local: never for founder-private data. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. |
-| Search | Exa | O | gateway provider; metered |
-| Search | Parallel | O | same |
-| Search | Firecrawl | O | same |
-| Search | Reddit (public feeds) | O | read-only |
-| Media | FAL.ai images | O | metered; prompts leave the machine, approval each time |
+| Search | Exa | B | 2026-11-15 lane C2: built and tested on mocked HTTP only (no live key, never called); needs Victor to add the key. `ext_exa_search` in `lib/capability/providers-direct.ts`: Class C, admission-gated (needs `WHINK_EXA_MICROS_PER_CALL` and a spend cap), key `EXA_API_KEY`, result wrapped untrusted. Needs Victor: key. |
+| Search | Parallel | B | 2026-11-15 lane C2: built and tested on mocked HTTP only (no live key, never called); needs Victor to add the key. `ext_parallel_search`, key `PARALLEL_API_KEY`; request shape written from memory of the docs, verify on first live call. |
+| Search | Firecrawl | B | 2026-11-15 lane C2: built and tested on mocked HTTP only (no live key, never called); needs Victor to add the key. `ext_firecrawl_search` (search only; no scrape-by-URL), key `FIRECRAWL_API_KEY`; shape to verify live. |
+| Search | Reddit (public feeds) | B | 2026-11-15 lane C2: built and tested on mocked HTTP only (no live key, never called); needs Victor to add the key. `ext_reddit_read`: GET only, validated subreddit and sort, no key, Class A by the WHINK-side table, result untrusted. Reddit may rate-limit anonymous reads. |
+| Media | FAL.ai images | B | 2026-11-15 lane C2: built and tested on mocked HTTP only (no live key, never called); needs Victor to add the key. `ext_fal_image`: Class C so approval each time, admission-gated (`WHINK_FAL_MICROS_PER_IMAGE`), one image, one allow-listed model, prompt never in the ledger. Needs Victor: `FAL_KEY`. |
 | Browser | Local browser tool (decision 49) | O | |
 | Messaging | WhatsApp via unofficial bridge (Baileys-style) | O | UNOFFICIAL bridge: not endorsed by WhatsApp, the number can get banned, use a dedicated one. Off until `WHATSAPP_BRIDGE_TOKEN` is set; sends stay Class C approvals. Needs "official APIs only" amended and a licence check before the bridge process is added. Inbound parser built 2026-11-15 (lane B): `lib/channels/adapters.ts` parser and verifier, pairing then silence for unknown senders via `lib/channels/inbound.ts`, text wrapped untrusted, test in `channel-adapters.test.ts`. Still open: the web route or poller that calls it (`app/api` is not lane B), real credentials (Needs Victor). |
 | Models | Qwen OAuth (you import the login once into encrypted settings) | **B, Needs Victor** | decided 2026-11-15; ECHELON never reads the other tool's file. Lane C1 2026-11-15: config-only via `lib/model-router/provider-catalog.ts`, mocked-HTTP tests in `model-providers.test.ts`. Off until envelope on, key set and `WHINK_MODEL_PRICES` has `<id>/<model>`; refused in Local-Only and lockdown. Live call unverified: needs key, price, base-URL check. Qwen: import and refresh built; refresh needs QWEN_OAUTH_TOKEN_URL and QWEN_OAUTH_CLIENT_ID from Victor. |
@@ -179,15 +179,15 @@ State today: **B** = built, connection unverified. **O** = open, to build or con
 | Messaging | Google Chat | O | owner allowlist; relay-token guard only, full Google JWT validation open; built 2026-11-15 (lane B): `lib/channels/adapters.ts` parser and verifier, pairing then silence for unknown senders via `lib/channels/inbound.ts`, text wrapped untrusted, test in `channel-adapters.test.ts`. Still open: the web route or poller that calls it (`app/api` is not lane B), real credentials (Needs Victor). |
 | Voice | Local Whisper | B | |
 | Voice | Local Kokoro | B | |
-| Voice | Groq speech | O | audio leaves the machine; approval |
-| Voice | OpenAI speech | O | same |
-| Voice | ElevenLabs | O | same |
+| Voice | Groq speech | B | 2026-11-15 lane C2: built and tested on mocked HTTP only (no live key, never called); needs Victor to add the key. `lib/speech-cloud.ts`, STT only. Off unless named in `SPEECH_CLOUD_PROVIDERS` and the key is set; refused in Local-Only and lockdown; needs the owner to delegate Class B `speech_cloud`; admission-gated. Not yet wired into the voice routes (those are `app/**`). Needs Victor: `GROQ_API_KEY`. |
+| Voice | OpenAI speech | B | 2026-11-15 lane C2: built and tested on mocked HTTP only (no live key, never called); needs Victor to add the key. Same module, STT and TTS, `OPENAI_API_KEY`. Same open item: voice routes not wired. |
+| Voice | ElevenLabs | B | 2026-11-15 lane C2: built and tested on mocked HTTP only (no live key, never called); needs Victor to add the key. Same module, STT and TTS, `ELEVENLABS_API_KEY`. Same open item: voice routes not wired. |
 | Execution | Local and Docker command backend | O | needs approval path first |
 | Execution | SSH to own machines (decision 50) | O | |
 | Execution | Cloud sandboxes (decision 50) | O | approval per run |
-| Integrations | GitHub skills token | O | read-only, fine-grained |
-| Integrations | Context compression | O | `context-budget.ts` exists; compare with Hermes behaviour |
-| Integrations | Hyperliquid | O | reads; orders only by approval request ID |
+| Integrations | GitHub skills token | B | 2026-11-15 lane C2: built and tested on mocked HTTP only (no live key, never called); needs Victor to add the key. `lib/github-readonly/skills-token.ts`: fine-grained token only (classic refused), fixed repo, GET only, path-validated, result untrusted. Needs Victor: the token and repo env. |
+| Integrations | Context compression | B | 2026-11-15 lane C2: `compressConversation` (`lib/capability/providers-compress.ts`) adds a deterministic, model-free digest of dropped user turns on top of `budgetConversation`; tested. Not wired into the chat route, and not compared with Hermes (no Hermes source read). |
+| Integrations | Hyperliquid | B | 2026-11-15 lane C2: built and tested on mocked HTTP only (no live key, never called); needs Victor to add the key. **Reads only**: `ext_hyperliquid_info` accepts allMids, meta, l2Book, metaAndAssetCtxs; no `/exchange`, order, transfer or withdrawal code exists. **Trading and any money movement are deliberately NOT built**: money is protected (non-negotiable 10) and each order would need Victor's approval by request ID; that is a separate decision for Victor. |
 | Safety | Global Approval window (decision 51) | O | |
 
 Legend note: the 13 "B" rows are the ones counted at 0.5 in the completion table; the other 40 are Open.
