@@ -4,7 +4,7 @@
 ARG INCLUDE_REF_SERVER=false
 
 # Base image pinned by exact version AND digest (multi-arch index). Bump both together.
-FROM node:26.13.0-alpine3.24@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216 AS build
+FROM node:26.13.1-alpine3.24@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
@@ -13,18 +13,18 @@ COPY src ./src
 RUN npx tsc -p tsconfig.build.json
 
 # Optional dev-only reference upstream, installed from its own lockfile into /out/ref.
-FROM node:26.13.0-alpine3.24@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216 AS ref-true
+FROM node:26.13.1-alpine3.24@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS ref-true
 WORKDIR /out/ref
 COPY upstreams/ref/package.json upstreams/ref/package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
-FROM node:26.13.0-alpine3.24@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216 AS ref-false
+FROM node:26.13.1-alpine3.24@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS ref-false
 RUN mkdir -p /out
 
 FROM ref-${INCLUDE_REF_SERVER} AS ref
 
 # Social MCP upstream (x, instagram, tiktok). Our own code, always built into the image.
-FROM node:26.13.0-alpine3.24@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216 AS social
+FROM node:26.13.1-alpine3.24@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS social
 WORKDIR /out/social
 COPY upstreams/social/package.json upstreams/social/package-lock.json ./
 RUN npm ci --ignore-scripts
@@ -32,7 +32,7 @@ COPY upstreams/social/tsconfig.json upstreams/social/tsconfig.build.json ./
 COPY upstreams/social/src ./src
 RUN npx tsc -p tsconfig.build.json && npm prune --omit=dev --ignore-scripts && rm -rf src tsconfig*.json
 
-FROM node:26.13.0-alpine3.24@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216
+FROM node:26.13.1-alpine3.24@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
 # Extra OS packages for upstream servers, set from docker-compose.yml build args.
 # Example for Python MCP servers: EXTRA_APK: "uv"
 ARG EXTRA_APK=""
