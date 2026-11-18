@@ -12,8 +12,10 @@ Method: every line counts once, unweighted (not effort). Done = 1, Built-not-acc
 | Done | 25 | 25 |
 | Built, not accepted (Parts 1, 3, 4) | 39 | 19.5 |
 | Built, connection unverified (Part 2, 24 plus 18 that also need Victor) | 42 | 21 |
-| Open (Parts 1, 3, 4: 5; Part 2: 11) | 16 | 0 |
-| **Total** | **122** | **65.5 → 54%** |
+| Open (Parts 1, 3, 4: 7; Part 2: 11) | 18 | 0 |
+| **Total** | **124** | **65.5 → 53%** |
+
+Rows 71 and 72 were added 2026-11-18 from the Marcus/ECHELON audit; both are Open, so the total rose from 122 to 124 and the credit is unchanged.
 
 Recounted by the lead on 2026-11-16 after merging ten lanes. "Built" means code and tests exist, mostly on mocked services; nothing in Part 2 has been run live. Cross-lane acceptance added 2026-11-16 (`cross-lane.integration.test.ts`, 6 tests, all pass): pairing before any inbound text, no command runs without approval or during lockdown, standing grants refused while the switch is off, and no catalog provider can spend while the envelope is off. These check the merged features together on mocks; they do not replace live runs. Open in Parts 1, 3, 4: 30 (real run on the Mac), 40 (held upgrades and PRs), 48 (founder inputs), 63 and 64 (rule wording).
 
@@ -263,6 +265,11 @@ All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now h
 | 68 | Wire `exec-policy` into any command or browser tool | Class from `classifyCommand`, run under `sandboxDockerArgs`; no tool may spawn a command another way (add a call-site audit test like item 57). | Built, not accepted 2026-11-15 (lane H): `lib/exec-backend.ts` runs classifyCommand, then the permission engine or approval id, then sandboxDockerArgs, then the only runner `lib/exec-runner.ts` (execFile, no shell, timeout, output cap, minimal env). `exec-spawn-audit.test.ts` fails on any other process spawner. 6 tests. Open: registering the tools in the model tool registry and approval executor (outside lane H files). |
 | 69 | Owner screens: approve a pairing code, edit the command allow-list, see the sandbox explanation | One settings panel. | Built in Settings → "Pairing, commands and sandbox" (new `command_allow_lists` table, server actions, ledgered). Browser-verified: allow-list saved and ledgered; pairing approve not exercised with a real code. 4 unit tests. Lane H must read `getAllowList` (lib/owner-controls.ts) when wiring exec-policy. |
 | 70 | Switch-on gate for the loosened rules | R4, R5, R7, R8, R9 stay off by a flag until items 58, 59, 67 and 68 are connected, so the order of work is enforced in code, not only written. | **Done.** Env `ECHELON_STANDING_GRANTS` must equal `on`; default off; tested that every create, use and batch call refuses or no-ops while off, and that `checkPermission` ignores existing grant rows. Open: Victor sets it on only after 58, 59, 67, 68 land. |
+
+| # | Item | Status |
+|---|---|---|
+| 71 | Marcus task sensitivity is declared by the sender (`lib/marcus/intake.ts`, `RECONFIRM`). Classify title and goal server-side with `lib/protected-actions.ts`, take the stricter result, fail closed, ledger the upgrade. | Open (lane E1, `docs/handoffs/KICKOFF-2026-11-18.md`). Safe today only because Marcus tasks run analysis with no tools; must be done before they get tools. |
+| 72 | `lib/permission-engine.ts:6` imports `canonicalJson` but never uses it. Confirm the stored-parameter hash is re-checked at execution (acceptance B6) and that a test fails when parameters change; then remove the import. | Open (lane E2). Not yet traced, so it may be harmless. |
 
 **Settled:** R6 dropped (30 s stays); R10 option C (Class B on allow-listed domains, Class C on login, payment and settings pages); R14 option B now, option C after item 58.
 **R15 figures set:** CA$1 a day, CA$20 a month.
