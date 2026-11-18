@@ -2,6 +2,8 @@
 
 The imported handoff below preserves its original dated claims; old repo names, branches, test results and "next action" are **not current instructions**. Current repo is `whinkproducts-alt/ECHELON-CORP`, main code baseline `99f6d7eb3f58cff9d9aae8f59641137faf755a9c`. Read [docs/ECHELON-AUDIT-HANDOFF-2026-11-04.md](docs/ECHELON-AUDIT-HANDOFF-2026-11-04.md), [docs/pending-tasks.md](docs/pending-tasks.md) and the newest daily sync. For root handoffs, these documents are under `docs/`. Mandatory engineering/security rules remain binding. Do not execute old import/reset/merge instructions or claim historical failures as current.
 
+**Later roster note (12 November 2026):** The Founder identified AI Organization and Autonomous Operations. Its leadership entry is on an unmerged ECHELON-INTEGRATIONS branch; staffing is open. The imported handoff below is not current roster status.
+
 ---
 
 # KAMSI Build Handoff
