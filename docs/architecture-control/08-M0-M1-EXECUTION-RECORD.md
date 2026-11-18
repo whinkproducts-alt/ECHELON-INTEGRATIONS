@@ -1,6 +1,7 @@
 # M0 reconciliation and M1 execution repair — 30 October 2026
 
 Implementation record, not a new architecture proposal or release acceptance.
+Current update (12 November 2026, America/Edmonton): the Founder later supplied the missing directorate; its leadership addition is on the unmerged Integrations branch `org/add-ai-autonomous-operations-directorate`. The M0 snapshot below remains unchanged as historical evidence. No agent or team assignment has been made to the new directorate.
 Founder authorization: the implementation order in this Codex session, explicitly authorizing M0/M1 on `feat/whink-architecture-control-20261030`, PR #14, base `work`; reinforced by FDR-024..029 and the approved first ticket in `04-IMPLEMENTATION-ROADMAP.md`.
 
 ## M0 evidence
