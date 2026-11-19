@@ -581,4 +581,4 @@ Victor decided ECHELON-CORP, ECHELON-INTEGRATIONS and Marcus-Vale-by-WhinkApps s
 
 ## 2026-11-19 (later) — CORP's awesome-clarke line is the base
 
-Victor said ECHELON-CORP is the main app. Its `main` is an unrelated Resume Engine; the ECHELON app lives on CORP's `claude/awesome-clarke-q7gqaw` (31 commits this branch lacks, 37 merge conflicts in security files). Victor chose that line as the base. The skill uploader, UI foundation and Marcus intake hardening were ported there as ECHELON-CORP PR #51 (into that line, never CORP `main`). This supersedes "repos stay separate" above for the ECHELON app. This branch's other history was not merged.
+Victor said ECHELON-CORP is the main app. Its `main` is an unrelated app (kept in its own repository); the ECHELON app lives on CORP's `claude/awesome-clarke-q7gqaw` (31 commits this branch lacks, 37 merge conflicts in security files). Victor chose that line as the base. The skill uploader, UI foundation and Marcus intake hardening were ported there as ECHELON-CORP PR #51 (into that line, never CORP `main`). This supersedes "repos stay separate" above for the ECHELON app. This branch's other history was not merged.
