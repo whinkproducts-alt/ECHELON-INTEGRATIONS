@@ -33,7 +33,7 @@
     --accent: 218 12% 19%;
     --accent-foreground: 210 20% 92%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 357 74% 58%;
     --destructive-foreground: 0 0% 98%;
 
     --border: 218 10% 22%;
@@ -98,7 +98,7 @@
     --muted-foreground: 215 10% 68%;
     --accent: 218 12% 19%;
     --accent-foreground: 210 20% 92%;
-    --destructive: 0 72% 51%;
+    --destructive: 357 74% 58%;
     --destructive-foreground: 0 0% 98%;
     --border: 218 10% 22%;
     --input: 218 10% 26%;
@@ -385,7 +385,7 @@
 .operations-stat::before { content:''; position:absolute; top:20px; bottom:20px; left:0; width:2px; background:hsl(var(--primary) / .7); }
 .operations-stat-label { font-size:11px; color:hsl(var(--muted-foreground)); }
 .operations-stat-value { margin-top:13px; font-family:var(--font-display); font-size:32px; line-height:1; letter-spacing:-.03em; }
-.workspace-panel { border:1px solid hsl(var(--border)); border-radius:14px; padding:22px; background:hsl(var(--background) / .92); box-shadow:0 5px 25px #00000012; }
+.workspace-panel { border:1px solid hsl(var(--border)); border-radius:14px; padding:22px; background:hsl(var(--background) / .92); box-shadow:0 5px 25px hsl(var(--background) / .07); }
 .workspace-section-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
 .workspace-section-title { font-family:var(--font-display); font-size:19px; line-height:1.35; font-weight:500; letter-spacing:-.015em; }
 .workspace-text-link { display:inline-flex; align-items:center; gap:7px; font-size:12px; color:hsl(var(--primary)); }
