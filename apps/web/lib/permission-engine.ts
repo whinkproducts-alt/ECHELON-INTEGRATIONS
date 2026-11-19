@@ -3,7 +3,6 @@ import { logger } from '@/lib/logger';
 import { recordAction, type LedgerStatus } from '@/lib/ledger';
 import { approvalContentHash, toolArgsHash } from '@/lib/canonical-json';
 import { classifyProtected, type ProtectedCategory } from '@/lib/protected-actions';
-import { canonicalJson } from '@/lib/canonical-json';
 
 export type PermissionClass = 'A' | 'B' | 'C';
 
