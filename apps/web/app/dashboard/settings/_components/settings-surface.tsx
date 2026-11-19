@@ -15,6 +15,7 @@ import { OwnerControlsPanel } from './owner-controls-panel';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
 import { useDashboardDataClient } from '@/components/shell/dashboard-data-provider';
 import { DASHBOARD_KEYS } from '@/lib/dashboard-query-cache';
+import { PageHeader } from '@/components/ui/page-header';
 import { dashboardJson } from '@/lib/dashboard-client';
 import {
   interpretPatchResponse, pickPendingAutonomy, resolveDecision, type AutonomyApproval,
@@ -166,10 +167,7 @@ export function SettingsSurface() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-1">Configure your operating parameters</p>
-      </div>
+      <PageHeader title="Settings" description="Configure your operating parameters" />
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border pb-0">

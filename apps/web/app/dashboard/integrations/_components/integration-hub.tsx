@@ -7,7 +7,10 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle, Clock, Loader2, Plug, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Plug, ShieldCheck } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { ErrorState } from '@/components/ui/error-state';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Tool { id: string; name: string; originalName: string | null; riskClass: string; costClass: string; isActive: boolean; defHash: string | null; reviewedDefHash: string | null }
 interface Provider {
@@ -98,10 +101,7 @@ export function IntegrationHub() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold tracking-tight flex items-center gap-2"><Plug className="h-6 w-6" aria-hidden /> Integration Hub</h1>
-        <p className="text-sm text-muted-foreground mt-1">Add MCP providers, review them, grant one tool to one agent or team, test, monitor, revoke. Deny by default.</p>
-      </div>
+      <PageHeader title="Integration Hub" description="Add MCP providers, review them, grant one tool to one agent or team, test, monitor, revoke. Deny by default." />
 
       <div className="flex items-start gap-2 bg-card border border-border rounded-lg p-4 text-sm text-muted-foreground">
         <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0 text-foreground" aria-hidden />
@@ -113,9 +113,10 @@ export function IntegrationHub() {
         </ul>
       </div>
 
-      {error && <div role="alert" className="flex items-start gap-2 rounded-lg border p-3 text-sm" style={{ borderColor: 'hsl(var(--destructive))', color: 'hsl(var(--destructive))' }}><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />{error}</div>}
+      {error && loaded && <div role="alert" className="flex items-start gap-2 rounded-lg border p-3 text-sm" style={{ borderColor: 'hsl(var(--destructive))', color: 'hsl(var(--destructive))' }}><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />{error}</div>}
       {notice && <div role="status" className="flex items-start gap-2 rounded-lg border border-border bg-card p-3 text-sm"><CheckCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />{notice}</div>}
-      {!loaded && !error && <p className="text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading</p>}
+      {!loaded && error && <ErrorState title="The hub did not load" message={error} onRetry={() => { setError(''); void load(); }} />}
+      {!loaded && !error && <div className="space-y-3" role="status"><span className="sr-only">Loading</span><Skeleton className="h-24 w-full" /><Skeleton className="h-40 w-full" /></div>}
 
       {newToken && (
         <div role="alert" className="rounded-lg border p-4 text-sm space-y-2" style={{ borderColor: 'hsl(var(--pending-amber))' }}>
