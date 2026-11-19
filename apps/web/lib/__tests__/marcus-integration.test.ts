@@ -9,11 +9,15 @@ process.env.WHINK_OWNER_EMAILS = 'owner@example.com';
 process.env.ENCRYPTION_KEY = 'ab'.repeat(32);
 
 type Row = Record<string, any>;
-const h = vi.hoisted(() => ({ jobs: [] as Row[], approvals: [] as Row[], scopes: [] as Row[], ledger: [] as Row[], hasOwner: true, seq: 0, freezes: {} as Record<string, boolean> }));
+const h = vi.hoisted(() => ({ jobs: [] as Row[], approvals: [] as Row[], scopes: [] as Row[], ledger: [] as Row[], hasOwner: true, seq: 0, freezes: {} as Record<string, boolean>, classifierThrows: false }));
 
 const dup = () => Object.assign(new Error('unique'), { code: 'P2002' });
 const inList = (v: unknown, c: any) => (c?.in ? c.in.includes(v) : c === v);
 
+vi.mock('@/lib/protected-actions', async (orig) => {
+  const real = await orig<typeof import('@/lib/protected-actions')>();
+  return { ...real, classifyProtected: (i: any) => { if (h.classifierThrows) throw new Error('boom'); return real.classifyProtected(i); } };
+});
 vi.mock('@/lib/ledger', () => ({ recordAction: vi.fn(async (e: Row) => { h.ledger.push({ ...e, id: `a${String(h.ledger.length + 1).padStart(3, '0')}`, createdAt: new Date(1_800_000_000_000 + h.ledger.length * 1000) }); return { id: 'x' }; }) }));
 vi.mock('@/lib/db', () => {
   const p: Row = {
@@ -89,7 +93,7 @@ function body(over: Row = {}) {
 const post = (b: unknown, token = 'tok') =>
   intakeMarcusTask(new Request('http://x/api/integrations/marcus/tasks', { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(b) }));
 
-beforeEach(() => { h.jobs = []; h.approvals = []; h.scopes = []; h.ledger = []; h.hasOwner = true; h.seq = 0; h.freezes = {}; });
+beforeEach(() => { h.jobs = []; h.approvals = []; h.scopes = []; h.ledger = []; h.hasOwner = true; h.seq = 0; h.freezes = {}; h.classifierThrows = false; });
 
 describe('Marcus intake', () => {
   it('rejects a bad or missing token with 401 and writes nothing', async () => {
@@ -105,6 +109,25 @@ describe('Marcus intake', () => {
     expect(h.scopes).toHaveLength(1);
     expect(h.ledger[0]).toMatchObject({ action: 'capability_marcus_task_received', userId: 'u1' });
     expect(h.jobs[0].userId).toBe('u1');
+  });
+
+  it('payment-like text labelled standard is upgraded to reconfirmation, ledgered by category only', async () => {
+    const res = await post(body({ title: 'Pay the invoice', goal: 'Wire funds to the supplier' }));
+    expect((await res.json()).status).toBe('reconfirmation_required');
+    expect(h.approvals[0]).toMatchObject({ status: 'PENDING', permissionClass: 'C' });
+    const up = h.ledger.find((e) => e.action === 'capability_marcus_sensitivity_upgraded');
+    expect(up?.inputSummary).toBe('declared=standard category=money');
+  });
+
+  it('ordinary text labelled standard is unchanged', async () => {
+    expect((await (await post(body())).json()).status).toBe('received');
+    expect(h.ledger.some((e) => e.action === 'capability_marcus_sensitivity_upgraded')).toBe(false);
+  });
+
+  it('classifier error fails closed to reconfirmation', async () => {
+    h.classifierThrows = true;
+    expect((await (await post(body())).json()).status).toBe('reconfirmation_required');
+    expect(h.ledger.find((e) => e.action === 'capability_marcus_sensitivity_upgraded')?.inputSummary).toContain('classifier_error');
   });
 
   it.each(['financial', 'proprietary'])('%s task waits for reconfirmation as Class C', async (sensitivity) => {
