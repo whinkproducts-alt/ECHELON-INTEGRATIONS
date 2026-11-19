@@ -1,5 +1,6 @@
 'use client';
 // Kill Team roster: add, delete, and talk to members one by one or all together. Founder only (the API enforces it).
+import { Skeleton } from '@/components/ui/skeleton';
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowRight, MessageSquare, Plus, Trash2, Users } from 'lucide-react';
 
@@ -79,7 +80,7 @@ export function KillTeamRoster({ founder }: { founder: boolean }) {
             <button type="submit" className="min-h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground md:col-span-2">Add to the Kill Team</button>
           </form>
         )}
-        {founder && members === null && !error && <p role="status" className="text-sm text-muted-foreground">Loading the roster…</p>}
+        {founder && members === null && !error && <div role="status" aria-busy="true"><span className="sr-only">Loading the roster</span><Skeleton className="h-16 w-full" /></div>}
         {(!founder || (members && members.length === 0)) && <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">{founder ? 'The Kill Team is empty. Add a member.' : 'The roster is visible to the founder only.'}</p>}
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {members?.map((m) => (

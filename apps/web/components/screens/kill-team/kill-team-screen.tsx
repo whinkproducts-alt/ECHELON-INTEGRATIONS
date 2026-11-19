@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { PageHeader } from '@/components/ui/page-header';
 import { KillTeamRoster } from './kill-team-roster';
-import { AlertTriangle, CheckCircle2, LockKeyhole, Radar, Send, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, LockKeyhole, Send, ShieldCheck } from 'lucide-react';
 
 export function KillTeamScreen({ founder }: { founder: boolean }) {
   const [objective, setObjective] = useState('');
@@ -15,16 +16,13 @@ export function KillTeamScreen({ founder }: { founder: boolean }) {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-primary">Founder command</p>
-          <h1 className="mt-2 flex items-center gap-3 text-2xl font-display font-bold tracking-tight text-foreground"><Radar className="h-6 w-6 text-primary" /> Kill Team</h1>
-          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">A specialist group for research, deconstruction, product decisions, implementation, and growth. WHINK and MAMBA remain the executive layer: they retain full authority, set direction, and cascade each request to the right directorate.</p>
-        </div>
-        <span className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1.5 text-xs font-mono ${founder ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500' : 'border-border bg-secondary text-muted-foreground'}`}>
-          <LockKeyhole className="h-3.5 w-3.5" /> {founder ? 'Founder access' : 'View only'}
-        </span>
-      </header>
+      <PageHeader
+        title="Kill Team"
+        description="A specialist group for research, deconstruction, product decisions, implementation, and growth. WHINK and MAMBA remain the executive layer: they retain full authority, set direction, and cascade each request to the right directorate."
+        actions={<span className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border px-3 text-xs font-mono ${founder ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-secondary text-muted-foreground'}`}>
+          <LockKeyhole className="h-3.5 w-3.5" aria-hidden /> {founder ? 'Founder access' : 'View only'}
+        </span>}
+      />
 
       <section className="rounded-xl border border-border bg-card p-5" aria-labelledby="objective-heading">
         <div className="flex items-start gap-3">
@@ -43,9 +41,9 @@ export function KillTeamScreen({ founder }: { founder: boolean }) {
 
       <KillTeamRoster founder={founder} />
 
-      <section aria-labelledby="guardrails-heading" className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4"><h2 id="guardrails-heading" className="flex items-center gap-2 text-sm font-semibold text-foreground"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Allowed without another approval</h2><p className="mt-2 text-xs leading-5 text-muted-foreground">Research, analysis, evidence gathering, planning, drafts, code proposals, and testable implementation work within existing access boundaries.</p></div>
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4"><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><AlertTriangle className="h-4 w-4 text-amber-500" /> Always requires your approval</h2><p className="mt-2 text-xs leading-5 text-muted-foreground">Spending money, sending external communications, publishing, deleting data, changing production systems, or any other destructive or irreversible action.</p></div>
+      <section aria-labelledby="guardrails-heading" className="grid divide-y divide-border rounded-xl border border-border bg-card md:grid-cols-2 md:divide-x md:divide-y-0">
+        <div className="p-5"><h2 id="guardrails-heading" className="flex items-center gap-2 text-sm font-semibold text-foreground"><ShieldCheck className="h-4 w-4 text-primary" aria-hidden /> Allowed without another approval</h2><p className="mt-2 text-xs leading-5 text-muted-foreground">Research, analysis, evidence gathering, planning, drafts, code proposals, and testable implementation work within existing access boundaries.</p></div>
+        <div className="p-5"><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden /> Always requires your approval</h2><p className="mt-2 text-xs leading-5 text-muted-foreground">Spending money, sending external communications, publishing, deleting data, changing production systems, or any other destructive or irreversible action.</p></div>
       </section>
 
       <section aria-labelledby="registration-limits-heading" className="rounded-xl border border-border bg-card p-4">
