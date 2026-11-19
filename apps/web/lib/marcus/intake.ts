@@ -56,7 +56,7 @@ export async function intakeMarcusTask(req: Request) {
   if (await isLockedDown(owner.id)) return bad('Lockdown is active', 503);
   if (await isMarcusFrozen(owner.id)) return bad('Marcus tasks are frozen', 503);
 
-  // The task text is kept encrypted only until the executor admits it, then erased; without a key it cannot be stored.
+  // The task text is kept encrypted only until the executor admits it, then erased; without a key it cannot be stored. The title (first 200 chars) is also in the approval summary so the owner can see what is being approved.
   if (!isEncryptionConfigured()) return bad('Encryption is not configured (ENCRYPTION_KEY)', 503);
 
   const jobKey = `marcus:${body.client_operation_id}`;
