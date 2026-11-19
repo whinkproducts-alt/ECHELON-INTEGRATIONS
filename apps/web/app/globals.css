@@ -12,42 +12,49 @@
     --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
     --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-    --background: 218 30% 6%;
+    --background: 220 16% 6%;
     --foreground: 210 20% 92%;
 
-    --card: 218 32% 10%;
+    --card: 220 14% 10%;
     --card-foreground: 210 20% 92%;
 
-    --popover: 218 32% 10%;
+    --popover: 220 14% 10%;
     --popover-foreground: 210 20% 92%;
 
-    --primary: 204 100% 61%;
+    --primary: 204 78% 62%;
     --primary-foreground: 220 20% 6%;
 
-    --secondary: 216 26% 15%;
+    --secondary: 220 11% 15%;
     --secondary-foreground: 210 20% 85%;
 
-    --muted: 216 26% 13%;
-    --muted-foreground: 211 16% 68%;
+    --muted: 220 11% 13%;
+    --muted-foreground: 215 10% 68%;
 
-    --accent: 212 30% 19%;
+    --accent: 218 12% 19%;
     --accent-foreground: 210 20% 92%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 212 28% 23%;
-    --input: 212 28% 26%;
-    --ring: 204 100% 61%;
+    --border: 218 10% 22%;
+    --input: 218 10% 26%;
+    --ring: 204 78% 62%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
     --radius-sm: 0.25rem;
-    --radius-lg: 0.75rem;
+    --radius-lg: 1rem;
     --radius-full: 9999px;
 
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+    --shadow-sm: 0 1px 2px 0 hsl(218 40% 4% / 0.3);
+    --shadow-md: 0 6px 14px -4px hsl(218 40% 4% / 0.4);
+    --shadow-lg: 0 18px 36px -10px hsl(218 40% 4% / 0.5);
+
+    --shadow-tint: 0 8px 24px -8px hsl(var(--deep) / 0.45);
+    --highlight-inner: inset 0 1px 0 hsl(0 0% 100% / 0.05);
+    --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+    --page-gutter: 1rem;
+    --page-max: 80rem;
 
     --duration-fast: 150ms;
     --duration-normal: 250ms;
@@ -77,25 +84,25 @@
   }
 
   .dark {
-    --background: 218 30% 6%;
+    --background: 220 16% 6%;
     --foreground: 210 20% 92%;
-    --card: 218 32% 10%;
+    --card: 220 14% 10%;
     --card-foreground: 210 20% 92%;
-    --popover: 218 32% 10%;
+    --popover: 220 14% 10%;
     --popover-foreground: 210 20% 92%;
-    --primary: 204 100% 61%;
+    --primary: 204 78% 62%;
     --primary-foreground: 220 20% 6%;
-    --secondary: 216 26% 15%;
+    --secondary: 220 11% 15%;
     --secondary-foreground: 210 20% 85%;
-    --muted: 216 26% 13%;
-    --muted-foreground: 211 16% 68%;
-    --accent: 212 30% 19%;
+    --muted: 220 11% 13%;
+    --muted-foreground: 215 10% 68%;
+    --accent: 218 12% 19%;
     --accent-foreground: 210 20% 92%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 212 28% 23%;
-    --input: 212 28% 26%;
-    --ring: 204 100% 61%;
+    --border: 218 10% 22%;
+    --input: 218 10% 26%;
+    --ring: 204 78% 62%;
   }
 }
 
@@ -590,3 +597,13 @@
 @keyframes seat-in { from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 .seat-in { animation: seat-in 450ms ease-out both; }
 @media (prefers-reduced-motion: reduce) { .seat-in { animation: none; } }
+
+
+/* Shared primitives: skeleton shimmer, page gutters, glass highlight. Motion is opacity/transform only. */
+.skeleton-shimmer { position: relative; overflow: hidden; background: hsl(var(--muted)); }
+.skeleton-shimmer::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.06), transparent); animation: skeleton-sweep 1.6s var(--ease-out-soft) infinite; }
+@keyframes skeleton-sweep { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .skeleton-shimmer::after { animation: none; } }
+.surface-elevated { box-shadow: var(--highlight-inner), var(--shadow-tint); }
+@media (min-width: 640px) { :root { --page-gutter: 1.5rem; } }
+@media (min-width: 1024px) { :root { --page-gutter: 2rem; } }

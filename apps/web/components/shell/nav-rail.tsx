@@ -41,8 +41,8 @@ export function NavRail({ pathname, expanded = false, onToggle, onNavigate, onSi
                       href={item.href} onClick={onNavigate} aria-current={isActive ? 'page' : undefined}
                       title={expanded ? undefined : item.label} aria-label={expanded ? undefined : item.label}
                       className={cn(
-                        'group relative flex h-10 items-center gap-3 rounded-md px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring',
-                        isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                        'group relative flex h-11 items-center gap-3 rounded-md px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring',
+                        isActive ? 'bg-primary/10 font-medium text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                         !expanded && 'justify-center px-0',
                       )}
                     >
