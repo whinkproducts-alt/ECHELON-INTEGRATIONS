@@ -6,6 +6,12 @@ export const PASSWORD = process.env.E2E_PASSWORD || 'e2e-Test-Pass-1!';
 
 export async function login(page: Page, email: string, password = PASSWORD) {
   await page.goto('/login');
+  // The warp opening covers the form until dismissed, as it does for a real visitor; retry in case the click lands before hydration.
+  const warp = page.getByRole('button', { name: 'Continue to sign in' });
+  await expect(async () => {
+    if (await warp.isVisible()) await warp.click({ timeout: 2_000 });
+    await expect(warp).toBeHidden({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
   // Labels and an exact button name, so the passkey button ("Sign in with a passkey") never matches.
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
