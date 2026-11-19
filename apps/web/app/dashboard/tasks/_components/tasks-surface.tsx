@@ -1,5 +1,9 @@
 'use client';
 
+import { PageHeader } from '@/components/ui/page-header';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useDashboardDataClient } from '@/components/shell/dashboard-data-provider';
@@ -54,10 +58,7 @@ export function TasksSurface() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold tracking-tight">Tasks</h1>
-        <p className="text-sm text-muted-foreground mt-1">All tasks across projects</p>
-      </div>
+      <PageHeader title="Tasks" description="All tasks across projects" />
 
       <div className="flex gap-2">
         {['ALL', 'TODO', 'IN_PROGRESS', 'DONE'].map(f => (
@@ -73,14 +74,11 @@ export function TasksSurface() {
         ))}
       </div>
 
-      {(error || mutationError) && <p role="alert" className="text-sm text-destructive">{mutationError ?? error?.message} <button onClick={() => void refetch()} disabled={isFetching} className="underline">Refresh</button>{tasks.length > 0 && ' Showing last known tasks.'}</p>}
+      {(error || mutationError) && <ErrorState message={`${mutationError ?? error?.message}${tasks.length > 0 ? ' Showing last known tasks.' : ''}`} onRetry={isFetching ? undefined : () => void refetch()} />}
       {loading ? (
-        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 bg-card animate-pulse rounded" />)}</div>
+        <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14" />)}</div>
       ) : (filtered ?? []).length === 0 ? (
-        <div className="text-center py-16">
-          <CheckSquare className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground">No tasks found.</p>
-        </div>
+        <EmptyState icon={<CheckSquare />} title="No tasks found" description="Tasks appear here when you or WHINK add them to a project, or change the filter above." />
       ) : (
         <div className="space-y-2">
           {(filtered ?? []).map((task: Task) => (

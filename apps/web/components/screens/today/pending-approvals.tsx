@@ -1,5 +1,6 @@
 'use client';
 // Pending approvals on the Today screen. Reuses the existing ApprovalCard (amber, 30 s countdown, id-bound decisions).
+import { Skeleton } from '@/components/ui/skeleton';
 import * as React from 'react';
 import { ApprovalCard } from '@/app/dashboard/conversation/_components/approval-card';
 import {
@@ -65,7 +66,7 @@ export function PendingApprovals({ onCount }: { onCount?: (n: number | null) => 
     return () => clearInterval(t);
   }, []);
 
-  if (load === 'loading') return <HoloEmpty state="loading" title="Checking approvals" />;
+  if (load === 'loading') return <div role="status" aria-busy="true"><span className="sr-only">Checking approvals</span><Skeleton className="h-24" /></div>;
   if (load === 'error') {
     return <HoloEmpty state="error" title="Approvals did not load" description="Nothing is waiting that you can see here. Try again."
       action={<HoloButton variant="ghost" onClick={() => { setLoad('loading'); setTick((n) => n + 1); }}>Try again</HoloButton>} />;

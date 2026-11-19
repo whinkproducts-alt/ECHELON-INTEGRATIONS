@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeader } from '@/components/ui/page-header';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect } from 'react';
 import { Brain, Search, Database, GitBranch, Lightbulb, Check, Pencil, Trash2, X } from 'lucide-react';
 import { SafeDate } from '@/components/safe-format';
@@ -232,10 +234,7 @@ export function MemorySurface() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold tracking-tight">Memory</h1>
-        <p className="text-sm text-muted-foreground mt-1">Browse and search across all memory classes</p>
-      </div>
+      <PageHeader title="Memory" description="Browse and search across all memory classes" />
 
       {/* Search */}
       <div className="flex gap-3">
@@ -271,7 +270,7 @@ export function MemorySurface() {
 
       {/* Content */}
       {loading ? (
-        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-12 bg-card animate-pulse rounded" />)}</div>
+        <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12" />)}</div>
       ) : (
         <div className="space-y-2">
           {tab === 'semantic' && (results?.semantics ?? []).map((m: any) => (

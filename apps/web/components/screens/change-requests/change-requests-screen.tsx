@@ -1,5 +1,7 @@
 'use client';
 // Change requests: composer plus list. GET/POST /api/change-requests. Saving a draft sends nothing anywhere.
+import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/ui/error-state';
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -68,11 +70,11 @@ export function ChangeRequestsScreen() {
     list = (
       <div role="status" aria-busy="true" aria-live="polite">
         <span className="sr-only">Loading change requests</span>
-        <div className="grid gap-3" aria-hidden>{Array.from({ length: 3 }, (_, i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-secondary/50 motion-reduce:animate-none" />)}</div>
+        <div className="grid gap-3" aria-hidden>{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}</div>
       </div>
     );
   } else if (result.state !== 'ok') {
-    list = <HoloEmpty state="error" title="Change requests could not be loaded" description="The server did not answer. Nothing was changed." action={<HoloButton onClick={retry}>Retry</HoloButton>} />;
+    list = <ErrorState title="Change requests could not be loaded" message="The server did not answer. Nothing was changed." onRetry={retry} />;
   } else if (result.data.changeRequests.length === 0) {
     list = <HoloEmpty icon={<GitPullRequestDraft className="h-6 w-6" aria-hidden />} title="No change requests yet" description="Write the first one above. It stays a private draft until you approve sending it." />;
   } else {
