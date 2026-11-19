@@ -578,3 +578,7 @@ The Founder authorized merging only ready local work, cleanup of redundant branc
 ## 2026-11-19 — Repos stay separate; merges by pull request; UI defaults
 
 Victor decided ECHELON-CORP, ECHELON-INTEGRATIONS and Marcus-Vale-by-WhinkApps stay separate (unrelated histories). Integrations is cleaned and merged by pull request only. Victor approved the design-taste skill defaults (variance 8, motion 6, density 4), applied only through the tokens in `app/globals.css` so white-label stays intact; semantic colours (amber for approvals, denial, MAMBA) are unchanged. No new font dependency until compliance checks its licence. `--destructive` now equals the denial colour.
+
+## 2026-11-19 (later) — CORP's awesome-clarke line is the base
+
+Victor said ECHELON-CORP is the main app. Its `main` is an unrelated Resume Engine; the ECHELON app lives on CORP's `claude/awesome-clarke-q7gqaw` (31 commits this branch lacks, 37 merge conflicts in security files). Victor chose that line as the base. The skill uploader, UI foundation and Marcus intake hardening were ported there as ECHELON-CORP PR #51 (into that line, never CORP `main`). This supersedes "repos stay separate" above for the ECHELON app. This branch's other history was not merged.
