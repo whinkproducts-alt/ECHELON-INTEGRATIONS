@@ -26,6 +26,7 @@ export interface MarcusTaskInput {
 }
 
 const RECONFIRM = new Set(['financial', 'proprietary']);
+const MONEY_STEMS = /\b(pay\w*|paid|transfer\w*|e-?transfer|wir(?:e|es|ed|ing)|invoic\w*|re-?fund\w*|remit\w*|reimburs\w*|settle\w*|withdraw\w*|purchas\w*)\b/i;
 const bad = (error: string, status = 400) => NextResponse.json({ error }, { status });
 const str = (v: unknown, max: number) => typeof v === 'string' && v.length > 0 && v.length <= max;
 
@@ -68,8 +69,12 @@ export async function intakeMarcusTask(req: Request) {
   let upgrade: string | null = null;
   if (!RECONFIRM.has(body.sensitivity)) {
     try {
-      const c = classifyProtected({ toolName: 'marcus_task_intake', description: `${body.title} ${body.goal}` });
+      const text = `${body.title} ${body.goal}`.normalize('NFKC');
+      const c = classifyProtected({ toolName: 'marcus_task_intake', description: text });
       if (c.protected) upgrade = c.category ?? 'proprietary';
+      // shortcut: keyword stems and a script-mix check, not semantic understanding; replace with a real classifier later.
+      else if (MONEY_STEMS.test(text)) upgrade = 'money';
+      else if (/\p{Cf}/u.test(text) || (/\p{Script=Latin}/u.test(text) && /[\p{Script=Cyrillic}\p{Script=Greek}]/u.test(text))) upgrade = 'obfuscated_text';
     } catch { upgrade = 'classifier_error'; }
   }
   const reconfirm = RECONFIRM.has(body.sensitivity) || upgrade !== null;
@@ -104,7 +109,7 @@ export async function intakeMarcusTask(req: Request) {
       await recordAction({
         userId: owner.id, initiator: 'system', action: 'capability_marcus_task_received', permissionClass: reconfirm ? 'C' : 'A',
         status: reconfirm ? 'AWAITING_APPROVAL' : 'VALIDATED', errorCode: reconfirm ? 'RECONFIRMATION_REQUIRED' : null,
-        inputSummary: `title=${body.title} sensitivity=${body.sensitivity}`, correlationId: `marcus-task:${job.id}`,
+        inputSummary: `sensitivity=${body.sensitivity} hash=${body.approval.content_hash.slice(0, 12)}`, correlationId: `marcus-task:${job.id}`,
       }, tx);
       return job;
     });

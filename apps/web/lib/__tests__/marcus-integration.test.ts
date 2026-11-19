@@ -124,6 +124,19 @@ describe('Marcus intake', () => {
     expect(h.ledger.some((e) => e.action === 'capability_marcus_sensitivity_upgraded')).toBe(false);
   });
 
+  it.each(['Process the payment today', 'Arrange transferring of funds', 'Customer refunded last week', 'Reimburse the travel costs', 'p\u0430y the supplier', 'pa\u200By the supplier'])(
+    'money word variant "%s" labelled standard is upgraded', async (goal) => {
+      const res = await post(body({ title: 'Routine task', goal }));
+      expect((await res.json()).status).toBe('reconfirmation_required');
+    });
+
+  it('the received ledger row holds no task text', async () => {
+    await post(body({ title: 'Quarterly planning notes' }));
+    const row = h.ledger.find((e) => e.action === 'capability_marcus_task_received');
+    expect(String(row?.inputSummary)).not.toContain('Quarterly');
+    expect(String(row?.inputSummary)).toMatch(/^sensitivity=standard hash=[0-9a-f]{12}$/);
+  });
+
   it('classifier error fails closed to reconfirmation', async () => {
     h.classifierThrows = true;
     expect((await (await post(body())).json()).status).toBe('reconfirmation_required');
