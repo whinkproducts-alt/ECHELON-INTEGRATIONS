@@ -574,3 +574,7 @@ Amends non-negotiable 10 for model inference only (wording in `CLAUDE.md`). Star
 ## 2026-11-14 — Merge ready slices; preserve incomplete builds
 
 The Founder authorized merging only ready local work, cleanup of redundant branches and current notes. Include the reviewed organisation metadata and compatibility repairs; preserve unfinished executive/Marcus/spend-retirement work on their branches. Restore the standing-worker API rather than drop existing jobs. Unregistered tier lookup defaults to the lowest tier because no Agent Prisma model exists. The notification helper remains in-app only; external sends still require the existing exact approval path. D8 is an unverified planning proposal and does not override protected-action policy. Do not retire envelope tables or activate unsupported monthly scheduling in this consolidation.
+
+## 2026-11-19 — Repos stay separate; merges by pull request; UI defaults
+
+Victor decided ECHELON-CORP, ECHELON-INTEGRATIONS and Marcus-Vale-by-WhinkApps stay separate (unrelated histories). Integrations is cleaned and merged by pull request only. Victor approved the design-taste skill defaults (variance 8, motion 6, density 4), applied only through the tokens in `app/globals.css` so white-label stays intact; semantic colours (amber for approvals, denial, MAMBA) are unchanged. No new font dependency until compliance checks its licence. `--destructive` now equals the denial colour.

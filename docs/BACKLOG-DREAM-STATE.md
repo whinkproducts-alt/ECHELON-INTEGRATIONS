@@ -15,7 +15,7 @@ Method: every line counts once, unweighted (not effort). Done = 1, Built-not-acc
 | Open (Parts 1, 3, 4: 7; Part 2: 11) | 18 | 0 |
 | **Total** | **124** | **65.5 → 53%** |
 
-Rows 71 and 72 were added 2026-11-18 from the Marcus/ECHELON audit; both are Open, so the total rose from 122 to 124 and the credit is unchanged.
+Rows 73 and 74 were added 2026-11-19 and are Built-not-accepted (0.5 each); the totals above were not recounted. Rows 71 and 72 were added 2026-11-18 from the Marcus/ECHELON audit; both are Open, so the total rose from 122 to 124 and the credit is unchanged.
 
 Recounted by the lead on 2026-11-16 after merging ten lanes. "Built" means code and tests exist, mostly on mocked services; nothing in Part 2 has been run live. Cross-lane acceptance added 2026-11-16 (`cross-lane.integration.test.ts`, 6 tests, all pass): pairing before any inbound text, no command runs without approval or during lockdown, standing grants refused while the switch is off, and no catalog provider can spend while the envelope is off. These check the merged features together on mocks; they do not replace live runs. Open in Parts 1, 3, 4: 30 (real run on the Mac), 40 (held upgrades and PRs), 48 (founder inputs), 63 and 64 (rule wording).
 
@@ -270,6 +270,8 @@ All decided, none built. Items 44 (R4) and 51 (R9) already exist above and now h
 |---|---|---|
 | 71 | Marcus task sensitivity is declared by the sender (`lib/marcus/intake.ts`, `RECONFIRM`). Classify title and goal server-side with `lib/protected-actions.ts`, take the stricter result, fail closed, ledger the upgrade. | Open (lane E1, `docs/handoffs/KICKOFF-2026-11-18.md`). Safe today only because Marcus tasks run analysis with no tools; must be done before they get tools. |
 | 72 | `lib/permission-engine.ts:6` imports `canonicalJson` but never uses it. Confirm the stored-parameter hash is re-checked at execution (acceptance B6) and that a test fails when parameters change; then remove the import. | Open (lane E2). Not yet traced, so it may be harmless. |
+| 73 | Local skill uploader (`scripts/skill-uploader/server.mjs`) forwards files and folders to `POST /api/skills`. | **Built, not accepted 2026-11-19.** Forwarding checked against a mock server only; never run against a real ECHELON session. Needs Victor: run it on the Mac with `ECHELON_COOKIE`. |
+| 74 | UI foundation and polish pass (tokens, shared state components, 14 screens). | **Built, not accepted 2026-11-19.** 38 preview screens render, no horizontal scroll at 375 px; no contrast audit of all screens; glow effects and hardcoded persona labels left as open design decisions. |
 
 **Settled:** R6 dropped (30 s stays); R10 option C (Class B on allow-listed domains, Class C on login, payment and settings pages); R14 option B now, option C after item 58.
 **R15 figures set:** CA$1 a day, CA$20 a month.
