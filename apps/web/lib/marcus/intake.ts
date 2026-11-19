@@ -8,6 +8,7 @@ import { encryptKey, isEncryptionConfigured } from '@/lib/key-encryption';
 import { isLockedDown } from '@/lib/safety/lockdown';
 import { isMarcusFrozen, resolveMarcusOwner, MARCUS_NEVER_RUN } from '@/lib/marcus/freeze';
 import { parseSubsidiaries } from '@/lib/marcus/routing';
+import { classifyProtected } from '@/lib/protected-actions';
 import { attachmentKeys } from '@/lib/safety/marcus-no-attachments';
 
 export interface MarcusTaskInput {
@@ -25,6 +26,7 @@ export interface MarcusTaskInput {
 }
 
 const RECONFIRM = new Set(['financial', 'proprietary']);
+const MONEY_STEMS = /\b(pay\w*|paid|transfer\w*|e-?transfer|wir(?:e|es|ed|ing)|invoic\w*|re-?fund\w*|remit\w*|reimburs\w*|settle\w*|withdraw\w*|purchas\w*)\b/i;
 const bad = (error: string, status = 400) => NextResponse.json({ error }, { status });
 const str = (v: unknown, max: number) => typeof v === 'string' && v.length > 0 && v.length <= max;
 
@@ -54,7 +56,7 @@ export async function intakeMarcusTask(req: Request) {
   if (await isLockedDown(owner.id)) return bad('Lockdown is active', 503);
   if (await isMarcusFrozen(owner.id)) return bad('Marcus tasks are frozen', 503);
 
-  // The task text is kept encrypted only until the executor admits it, then erased; without a key it cannot be stored.
+  // The task text is kept encrypted only until the executor admits it, then erased; without a key it cannot be stored. The title (first 200 chars) is also in the approval summary so the owner can see what is being approved.
   if (!isEncryptionConfigured()) return bad('Encryption is not configured (ENCRYPTION_KEY)', 503);
 
   const jobKey = `marcus:${body.client_operation_id}`;
@@ -63,7 +65,19 @@ export async function intakeMarcusTask(req: Request) {
     return NextResponse.json({ task_id: existing.id, client_operation_id: body.client_operation_id, status: existing.lastStatus ?? 'received', created_at: existing.createdAt.toISOString() });
   }
 
-  const reconfirm = RECONFIRM.has(body.sensitivity);
+  // The sender's label is a floor: ECHELON's own classifier can only raise it. A classifier error fails closed.
+  let upgrade: string | null = null;
+  if (!RECONFIRM.has(body.sensitivity)) {
+    try {
+      const text = `${body.title} ${body.goal}`.normalize('NFKC');
+      const c = classifyProtected({ toolName: 'marcus_task_intake', description: text });
+      if (c.protected) upgrade = c.category ?? 'proprietary';
+      // shortcut: keyword stems and a script-mix check, not semantic understanding; replace with a real classifier later.
+      else if (MONEY_STEMS.test(text)) upgrade = 'money';
+      else if (/\p{Cf}/u.test(text) || (/\p{Script=Latin}/u.test(text) && /[\p{Script=Cyrillic}\p{Script=Greek}]/u.test(text))) upgrade = 'obfuscated_text';
+    } catch { upgrade = 'classifier_error'; }
+  }
+  const reconfirm = RECONFIRM.has(body.sensitivity) || upgrade !== null;
   const status = reconfirm ? 'reconfirmation_required' : 'received';
   const params = { client_operation_id: body.client_operation_id, content_hash: body.approval.content_hash };
   const correlationId = jobKey;
@@ -86,10 +100,16 @@ export async function intakeMarcusTask(req: Request) {
           capabilityRequestEnc: encryptKey(JSON.stringify({ title: body.title, goal: body.goal, deadline: body.deadline, directorate: body.directorate ?? null, subsidiary: scope.value.subsidiary, targets: scope.value.targets })), capabilityApprovalId: body.approval.approval_id },
       });
       await tx.sealedScope.create({ data: { userId: owner.id, kind: 'OBJECTIVE', refId: job.id } });
+      if (upgrade) {
+        await recordAction({
+          userId: owner.id, initiator: 'system', action: 'capability_marcus_sensitivity_upgraded', permissionClass: 'C', status: 'AWAITING_APPROVAL',
+          errorCode: 'RECONFIRMATION_REQUIRED', inputSummary: `declared=${body.sensitivity} category=${upgrade}`, correlationId: `marcus-task:${job.id}`,
+        }, tx);
+      }
       await recordAction({
         userId: owner.id, initiator: 'system', action: 'capability_marcus_task_received', permissionClass: reconfirm ? 'C' : 'A',
         status: reconfirm ? 'AWAITING_APPROVAL' : 'VALIDATED', errorCode: reconfirm ? 'RECONFIRMATION_REQUIRED' : null,
-        inputSummary: `title=${body.title} sensitivity=${body.sensitivity}`, correlationId: `marcus-task:${job.id}`,
+        inputSummary: `sensitivity=${body.sensitivity} hash=${body.approval.content_hash.slice(0, 12)}`, correlationId: `marcus-task:${job.id}`,
       }, tx);
       return job;
     });

@@ -1,4 +1,10 @@
-# ECHELON pending work — updated 2026-11-15
+# ECHELON pending work — updated 2026-11-19
+
+## Update 2026-11-19
+
+**Open, Victor decides:** where the founders' entry video lives (not in this repo);  merge the PR from `claude/funny-allen-2y96vx`; merge Marcus PR #1 (Scroll Craft redesign, 41 commits ahead of main, not reviewed here); whether to soften the glow effects; whether persona labels ("WHINK · Assistant") become tenant-configurable; Dependabot PRs #9, #11, #17, #18, #19 (Prisma 7 needs one planned migration).
+**Needs keys and hosting only:** Tailscale HTTPS for ECHELON and Marcus Vale; real keys per `docs/BACKLOG-DREAM-STATE.md` Part 2; `ENCRYPTION_KEY` for skill uploads.
+**Stale branches (not deleted):** Marcus `stream/m5-marcus-loose`, `stream/m6-marcus-alerts`, `stream/s1-marcus-ui`, `master`; Integrations merged feature branches. Delete only on Victor's word.
 
 ## Update 2026-11-15 (Marcus executor, build repair)
 

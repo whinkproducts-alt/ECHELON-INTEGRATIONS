@@ -1,5 +1,6 @@
 'use client';
 // Approval history: filters, table, status chips, cursor pagination. Read only.
+import { Skeleton } from '@/components/ui/skeleton';
 import * as React from 'react';
 import { History, Search } from 'lucide-react';
 import { HoloBadge, HoloButton, HoloEmpty, HoloPanel } from '@/components/ui/holo';
@@ -47,7 +48,7 @@ export function HistoryTable({ nonce, onOpen }: { nonce: number; onOpen: (id: st
 
       <div aria-live="polite">
         {list.loading ? (
-          <HoloEmpty state="loading" title="Loading history" />
+          <div role="status" aria-busy="true"><span className="sr-only">Loading history</span><div className="space-y-2" aria-hidden>{[1, 2, 3].map((i) => <Skeleton key={i} className="h-10" />)}</div></div>
         ) : list.status !== 200 ? (
           <HoloEmpty state="error" title={list.status === 401 ? 'Sign in to see approvals' : 'History did not load'}
             description="Nothing was changed. Your pending approvals above are not affected."

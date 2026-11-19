@@ -2,6 +2,7 @@
 // Ledger explorer. Read only: search and filters against GET /api/ledger/search with facet counts from
 // /api/ledger/search/facets. Security events (injection blocks, hash lock failures, cross tenant attempts)
 // use the denial token together with a "Security event" label. Nothing here can edit a row.
+import { Skeleton } from '@/components/ui/skeleton';
 import * as React from 'react';
 import { ChevronRight, Lock, RefreshCw, Search, X } from 'lucide-react';
 import { HoloBadge, HoloButton, HoloEmpty, HoloHeading, HoloOrbBackdrop, HoloPanel } from '@/components/ui/holo';
@@ -189,7 +190,7 @@ export function LedgerScreen({ initialCorrelationId = '' }: { initialCorrelation
 
         <div aria-live="polite">
           {list.loading ? (
-            <HoloEmpty state="loading" title="Loading ledger" />
+            <div role="status" aria-busy="true"><span className="sr-only">Loading ledger</span><div className="space-y-2" aria-hidden>{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-9" />)}</div></div>
           ) : list.status !== 200 ? (
             <HoloEmpty state="error" title={list.status === 401 ? 'Sign in to see the ledger' : 'The ledger did not load'}
               description="Nothing was changed. The ledger itself is not affected."

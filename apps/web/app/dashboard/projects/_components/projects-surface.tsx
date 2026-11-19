@@ -1,5 +1,9 @@
 'use client';
 
+import { PageHeader } from '@/components/ui/page-header';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useDashboardDataClient } from '@/components/shell/dashboard-data-provider';
@@ -60,10 +64,7 @@ export function ProjectsSurface() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight">Projects</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage active projects and their context</p>
-        </div>
+        <PageHeader className="flex-1 border-0 pb-0" title="Projects" description="Manage active projects and their context" />
         <button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90">
           <Plus className="h-4 w-4" /> New Project
         </button>
@@ -94,14 +95,11 @@ export function ProjectsSurface() {
         </div>
       )}
 
-      {error && <p role="alert" className="text-sm text-destructive">{error.message} <button onClick={() => void refetch()} disabled={isFetching} className="underline">Retry</button>{projects.length > 0 && ' Showing last known projects.'}</p>}
+      {error && <ErrorState message={`${error.message}${projects.length > 0 ? ' Showing last known projects.' : ''}`} onRetry={isFetching ? undefined : () => void refetch()} />}
       {loading ? (
-        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 bg-card animate-pulse rounded-lg" />)}</div>
+        <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-20" />)}</div>
       ) : (projects ?? []).length === 0 ? (
-        <div className="text-center py-16">
-          <FolderKanban className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground">No projects. Create one to get started.</p>
-        </div>
+        <EmptyState icon={<FolderKanban />} title="No projects yet" description="Create a project to group tasks, documents and decisions under one goal." />
       ) : (
         <div className="grid gap-3">
           {(projects ?? []).map((p: Project) => (

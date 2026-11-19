@@ -1,15 +1,8 @@
 import { cn } from '@/lib/utils';
 
-function Skeleton({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn('animate-pulse rounded-md bg-muted', className)}
-      {...props}
-    />
-  );
+/** Loading placeholder. Shimmer is disabled under prefers-reduced-motion (see globals.css). */
+function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div aria-hidden className={cn('skeleton-shimmer rounded-md', className)} {...props} />;
 }
 
 export { Skeleton };

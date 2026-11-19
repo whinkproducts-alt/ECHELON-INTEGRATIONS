@@ -216,3 +216,16 @@ Overlapping Dependabot PRs in the two repos can request different versions of th
 ## 2026-11-14 — Consolidation verification
 
 A replacement roster containing only job/schedule fields broke existing worker/API consumers. Preserve complete schemas and exported helpers when adding jobs. The worker accepts bounded interval schedules, not cron expressions. A standalone Marcus service and an ECHELON component bearing a private label do not establish a working/private mission bridge. Review request/event contracts and real worker consumption before promotion. Do not export a low-level email adapter to solve a build error: notifications need exact protected-action approval.
+
+## 2026-11-19
+
+- Skill uploads: `POST /api/skills` only (session cookie, multipart field `file`, .md/.txt/.json/.yaml/.yml, 256 KB, 24,000 characters, 10 files per request, 20 a day). Accepted skills become semantic memories (confidence capped 0.6), not registered tools. Marcus has no skill library; it reaches skills only through ECHELON.
+- Subagent UI passes reported "already has headers and states" for most screens; verify with screenshots, not reports.
+
+## 2026-11-19 — Signature screens to preserve in any UI change
+
+- **Boot splash**: `components/shell/boot-sequence.tsx`, mounted in `dashboard-shell.tsx`; plays once per browser session (`boot-sequence-seen`), shows only a Skip button first.
+- **Rotating company logos** (the "pulsing logos" screen): `components/brand/logo-rotator.tsx` with `lib/brand/logo-sequence.ts`; pauses off-screen and under reduced motion.
+- **Warp opening** ("CREATE THE U.L.T.I.M.A.T.E UNIVERSE"): `components/screens/warp/warp-opening.tsx`, shown on `/login`. Source `docs/product/Whink-Warp-Preview.html`. Making it the `/` opening is backlog item 25 (needs a `proxy.ts` security review and Victor's decisions).
+- **Founders' entry video**: no video file, component or commit mentioning it exists in this repo (searched 2026-11-19, no .mp4/.webm/.mov under `apps/web/public`). Ask Victor where it lived; do not recreate it from guesswork.
+- **Marcus Vale**: Scroll Craft redesign (orbital M mark, portrait hero) is Marcus PR #1, branch `design/scrollcraft-marcus-full-ui`, unmerged.

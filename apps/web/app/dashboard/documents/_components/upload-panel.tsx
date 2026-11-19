@@ -1,5 +1,7 @@
 'use client';
 
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useState, useRef, useEffect } from 'react';
 import { Upload, CheckCircle, Trash2, FileText, Loader2 } from 'lucide-react';
 import { useTenantConfig } from '@/lib/hooks/useTenantConfig';
@@ -179,14 +181,11 @@ export function UploadPanel() {
         {docsLoading ? (
           <div className="space-y-2">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-10 bg-card animate-pulse rounded-md" />
+              <Skeleton key={i} className="h-10" />
             ))}
           </div>
         ) : documents.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" aria-hidden />
-            <p className="text-sm">No documents yet. Upload one to get started.</p>
-          </div>
+          <EmptyState icon={<FileText />} title="No documents yet" description="Upload a PDF, DOCX, text or Markdown file above and it becomes searchable in recall." />
         ) : (
           <ul className="space-y-2" aria-label="Uploaded documents">
             {documents.map(doc => (
