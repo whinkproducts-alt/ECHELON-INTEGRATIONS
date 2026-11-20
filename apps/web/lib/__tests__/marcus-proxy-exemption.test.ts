@@ -8,7 +8,7 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 const ROOT = path.resolve(__dirname, '../../app/api/integrations/marcus');
-const MARCUS_ROUTE = new RegExp(/^\/api\/integrations\/marcus\/(tasks(\/[A-Za-z0-9]{1,64}(\/(confirm|resume))?)?|events|freeze|unfreeze)$/.source);
+const MARCUS_ROUTE = new RegExp(/^\/api\/integrations\/marcus\/(tasks(\/[A-Za-z0-9]{1,64}(\/(confirm|resume))?)?|dashboards(\/[A-Za-z0-9-]{1,64})?|events|freeze|unfreeze)$/.source);
 const proxySrc = readFileSync(path.resolve(__dirname, '../../proxy.ts'), 'utf8');
 
 function routes(dir: string, out: string[] = []): string[] {

@@ -24,7 +24,7 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
   return res;
 });
 
-const MARCUS_ROUTE = /^\/api\/integrations\/marcus\/(tasks(\/[A-Za-z0-9]{1,64}(\/(confirm|resume))?)?|events|freeze|unfreeze)$/;
+const MARCUS_ROUTE = /^\/api\/integrations\/marcus\/(tasks(\/[A-Za-z0-9]{1,64}(\/(confirm|resume))?)?|dashboards(\/[A-Za-z0-9-]{1,64})?|events|freeze|unfreeze)$/;
 
 async function handle(req: NextRequest & { auth: any }, nonce: string, csp: string): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
